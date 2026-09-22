@@ -56,10 +56,11 @@ h1, h2, h3, p { margin: 0; }
 .sidebar-actions { display: flex; gap: 1px; flex-shrink: 0; }
 .icon-button { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 29px; height: 29px; padding: 0; border: 0; border-radius: 5px; background: transparent; color: var(--muted); flex: 0 0 auto; }
 .icon-button:hover:not(:disabled), .icon-button.active { background: var(--hover); color: var(--text); }
-.tool-status-dot { position: absolute; top: 4px; right: 3px; width: 5px; height: 5px; border-radius: 50%; outline: 1px solid var(--canvas); }
-.tool-status-dot.offline { background: var(--red); }
-.tool-status-dot.available { background: var(--green); }
-.tool-status-dot.information { background: #88a7d0; }
+.tool-status-dot { position: absolute; top: 3px; right: 2px; width: 6px; height: 6px; border-radius: 50%; outline: 2px solid var(--canvas); pointer-events: none; }
+.icon-button:hover .tool-status-dot, .icon-button.active .tool-status-dot { outline-color: var(--hover); }
+.tool-status-dot.failed { background: var(--red); }
+.tool-status-dot.connected { background: var(--green); }
+.tool-status-dot.unread { background: #88a7d0; }
 
 .game-menu { position: absolute; z-index: 20; top: calc(100% + 8px); left: 0; width: 240px; padding: 5px; border: 1px solid #3b3d3d; border-radius: 8px; background: #202121; box-shadow: 0 10px 30px #0006; }
 .menu-label { padding: 7px 9px; color: var(--muted); font-size: 12px; }

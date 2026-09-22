@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
-  Bell, Check, ChevronDown, CircleHelp, FileClock, Gamepad2, Home, Keyboard,
+  Check, ChevronDown, CircleHelp, FileClock, Gamepad2, Home, Keyboard,
   MonitorPlay, PanelLeftClose, PanelLeftOpen, Search, TerminalSquare, Tv,
 } from 'lucide-react';
 import { CommandPalette, type CommandAction } from './components/CommandPalette';
@@ -14,8 +14,9 @@ import { createLog, games, type GameId, type LogEntry, type Modal, type Page } f
 import { usePanelWindows } from './usePanelWindows';
 import { useScriptLibrary } from './useScriptLibrary';
 import { parentFolder, scriptError } from './scriptLibrary';
+import { GlobalTools, initialConnections, type DeviceConnections } from './components/GlobalTools';
 
-export default function App() {
+export default function App({ connections = initialConnections }: { connections?: DeviceConnections }) {
   const [page, setPage] = useState<Page>('脚本编辑');
   const [cursor, setCursor] = useState({ line: 1, column: 1 });
   const [game, setGame] = useState<GameId>('frlg');
@@ -217,11 +218,7 @@ export default function App() {
               </div>
             )}
           </div>
-          <div className="sidebar-actions" role="group" aria-label="全局工具">
-            <IconButton label="视频源：未连接" onClick={() => openModal('video')}><Tv size={16} /><span className="tool-status-dot offline" /></IconButton>
-            <IconButton label="虚拟手柄：输入预览" onClick={() => openModal('controller')}><Gamepad2 size={16} /><span className="tool-status-dot available" /></IconButton>
-            <IconButton label={unread ? '通知：有未读通知' : '通知'} onClick={() => openModal('notification')}><Bell size={16} />{unread && <span className="tool-status-dot information" />}</IconButton>
-          </div>
+          <GlobalTools connections={connections} unread={unread} open={openModal} />
         </div>
 
         <nav className="sidebar-nav" aria-label="工作区">

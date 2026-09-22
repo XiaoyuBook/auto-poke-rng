@@ -161,7 +161,7 @@ describe('workspace interactions', () => {
     const nav = screen.getByRole('navigation', { name: '工作区' });
     expect(within(nav).getAllByRole('button').map(button => button.textContent)).toEqual(['首页', '脚本编辑']);
     const globalTools = screen.getByRole('group', { name: '全局工具' });
-    expect(within(globalTools).getAllByRole('button').map(button => button.getAttribute('aria-label'))).toEqual(['视频源：未连接', '虚拟手柄：输入预览', '通知：有未读通知']);
+    expect(within(globalTools).getAllByRole('button').map(button => button.getAttribute('aria-label'))).toEqual(['视频源：未尝试连接', '虚拟手柄：未尝试连接', '通知：有未读通知']);
     fireEvent.click(screen.getByRole('button', { name: '收起侧栏' }));
     expect(document.querySelector('.app-shell')?.getAttribute('data-collapsed')).toBe('true');
     fireEvent.click(screen.getByRole('button', { name: '展开侧栏' }));
@@ -216,7 +216,7 @@ describe('workspace interactions', () => {
     expect(screen.getByRole('dialog', { name: '通知' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '关闭通知' }));
     expect(screen.queryByRole('button', { name: '通知：有未读通知' })).toBeNull();
-    expect(screen.getByRole('button', { name: '通知' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '通知：无未读通知' })).toBeTruthy();
   });
 
   it('keeps edits and log filters while the floating panel expands, minimizes, and restores', async () => {
