@@ -12,7 +12,7 @@
 
 - Node.js 22.12 或更高版本（当前使用 Node.js 24）
 - Windows x64 桌面环境
-- VS 2022 C++ Build Tools、Windows SDK、CMake 3.24+、7-Zip
+- VS 2022 C++ Build Tools、Windows SDK、CMake 3.24+
 - Python 3.12+（复用 EasyCon 脚本解释器；硬件由 C++ 持有）
 
 安装依赖并启动桌面开发窗口：

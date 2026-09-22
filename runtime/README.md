@@ -4,14 +4,14 @@ Windows x64 / C++20，供所有游戏模块共享。采集使用 OpenCV 4.12.0 �
 
 ## 构建和启动
 
-需要 VS 2022 C++ Build Tools、Windows SDK、CMake 3.24+、7-Zip 和 Python 3.12+。在项目根目录执行：
+需要 VS 2022 C++ Build Tools、Windows SDK、CMake 3.24+ 和 Python 3.12+。在项目根目录执行：
 
 ```powershell
 npm run setup:runtime
 npm run dev
 ```
 
-`setup:runtime` 下载固定版本的官方 OpenCV Windows SDK，检查 SHA-256，并构建 C++ 程序；脚本引擎依赖安装到本项目 `.deps/script-python`，不改动系统 Python 环境。CMake 下载的两个单头文件库同样校验固定 SHA-256。已有 OpenCV SDK 可以通过 `tools/build-runtime.ps1 -OpenCVDir <path>` 指定。
+`setup:runtime` 下载固定版本的官方 OpenCV Windows SDK，检查 SHA-256，并构建 C++ 程序；脚本引擎依赖安装到本项目 `.deps/script-python`，不改动系统 Python 环境。脚本会查找 PATH 和默认安装目录中的 7-Zip，未找到时使用校验后的 OpenCV 官方包自带的解压器，无需额外安装 7-Zip。CMake 下载的两个单头文件库同样校验固定 SHA-256。已有 OpenCV SDK 可以通过 `tools/build-runtime.ps1 -OpenCVDir <path>` 指定。
 
 可单独执行 `npm run build:runtime`。输出为 `runtime/bin/Release/poke-runtime.exe` 及同目录 OpenCV DLL。`AUTO_POKE_RUNTIME` 可指定运行时路径，`AUTO_POKE_PYTHON` 可指定脚本解释器；默认使用本项目虚拟环境，缺失时尝试 PATH 中的 Python。构建产物和依赖不入库。
 
