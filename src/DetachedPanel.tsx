@@ -3,10 +3,10 @@ import { FileClock, MonitorPlay, PanelRightClose, Pin, PinOff } from 'lucide-rea
 import type { PanelTool } from './desktop';
 import { usePanelWindows } from './usePanelWindows';
 import { LogsPanel } from './components/LogsPanel';
-import { VideoPreview } from './components/Tools';
+import { VideoPreview, VideoLabelsButton } from './components/VideoPreview';
 
 export function DetachedPanel({ tool }: { tool: PanelTool }) {
-  const { state, setLogSource, error, setError } = usePanelWindows();
+  const { state, setLogSource, setVideoLabelsOpen, error, setError } = usePanelWindows();
   const [platform, setPlatform] = useState('win32');
   const api = window.desktop?.panels;
   const title = tool === 'video' ? '视频预览' : '日志中心';
@@ -25,6 +25,7 @@ export function DetachedPanel({ tool }: { tool: PanelTool }) {
       {tool === 'video' ? <MonitorPlay size={16} /> : <FileClock size={16} />}
       <h1>{title}</h1>
       <div className="floating-panel-actions">
+        {tool === 'video' && <VideoLabelsButton expanded={state.videoLabelsOpen} toggle={() => setVideoLabelsOpen(!state.videoLabelsOpen)} />}
         <button className="icon-button" title="收回主窗口" aria-label="收回主窗口" onClick={() => perform(api?.dock())}><PanelRightClose size={15} /></button>
         <button className="icon-button" title={state.alwaysOnTop ? '取消置顶' : '窗口置顶'} aria-label={state.alwaysOnTop ? '取消置顶' : '窗口置顶'} aria-pressed={state.alwaysOnTop} onClick={() => perform(api?.setAlwaysOnTop(!state.alwaysOnTop))}>
           {state.alwaysOnTop ? <PinOff size={15} /> : <Pin size={15} />}
@@ -33,7 +34,7 @@ export function DetachedPanel({ tool }: { tool: PanelTool }) {
     </header>
     <div className="floating-panel-body">
       {error && <p className="panel-error" role="alert">{error}</p>}
-      {tool === 'video' ? <VideoPreview /> : <LogsPanel logs={state.logs} source={state.logSource} setSource={setLogSource} clear={() => perform(api?.clearLogs())} />}
+      {tool === 'video' ? <VideoPreview labelsOpen={state.videoLabelsOpen} /> : <LogsPanel logs={state.logs} source={state.logSource} setSource={setLogSource} clear={() => perform(api?.clearLogs())} />}
     </div>
   </main>;
 }

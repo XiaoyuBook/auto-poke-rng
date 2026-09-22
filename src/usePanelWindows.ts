@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { LogSource, PanelWindowState } from './desktop';
 
 export function usePanelWindows() {
-  const [state, setState] = useState<PanelWindowState>({ detached: [], logs: [], logSource: '全部来源', alwaysOnTop: false });
+  const [state, setState] = useState<PanelWindowState>({ detached: [], logs: [], logSource: '全部来源', alwaysOnTop: false, videoLabelsOpen: false });
   const [error, setError] = useState('');
   const api = window.desktop?.panels;
 
@@ -22,5 +22,10 @@ export function usePanelWindows() {
     else setState(current => ({ ...current, logSource: source }));
   };
 
-  return { state, setLogSource, error, setError };
+  const setVideoLabelsOpen = (open: boolean) => {
+    if (api) void api.setVideoLabelsOpen(open).catch(() => setError('图像标签面板切换失败，请重试。'));
+    else setState(current => ({ ...current, videoLabelsOpen: open }));
+  };
+
+  return { state, setLogSource, setVideoLabelsOpen, error, setError };
 }

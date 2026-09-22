@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('desktop', {
     clearLogs: () => ipcRenderer.invoke('panels:clear-logs'),
     dock: () => ipcRenderer.invoke('panels:dock'),
     setAlwaysOnTop: enabled => ipcRenderer.invoke('panels:always-on-top', enabled),
+    setVideoLabelsOpen: open => ipcRenderer.invoke('panels:video-labels', open),
     onState: listener => subscribe('panels:state', listener),
     onAction: listener => subscribe('panels:action', listener),
   },

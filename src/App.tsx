@@ -9,7 +9,8 @@ import { FloatingSidePanel, type PanelState, type PanelTool } from './components
 import { ScriptWorkspace } from './components/ScriptWorkspace';
 import { ScriptLibrary } from './components/ScriptLibrary';
 import { QuickTools } from './components/QuickTools';
-import { ToolsDialog, VideoPreview } from './components/Tools';
+import { ToolsDialog } from './components/Tools';
+import { VideoPreview, VideoLabelsButton } from './components/VideoPreview';
 import { createLog, games, type GameId, type LogEntry, type Modal, type Page } from './workspace';
 import { usePanelWindows } from './usePanelWindows';
 import { useScriptLibrary } from './useScriptLibrary';
@@ -32,7 +33,7 @@ export default function App({ connections = initialConnections }: { connections?
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [toolPanel, setToolPanel] = useState<PanelState | null>(null);
   const [detaching, setDetaching] = useState(false);
-  const { state: panelWindows, setLogSource, error: panelError } = usePanelWindows();
+  const { state: panelWindows, setLogSource, setVideoLabelsOpen, error: panelError } = usePanelWindows();
   const nativePanels = window.desktop?.panels;
   const [unread, setUnread] = useState(true);
   const [version, setVersion] = useState('0.1.0');
@@ -276,8 +277,10 @@ export default function App({ connections = initialConnections }: { connections?
 
       {toolPanel && <FloatingSidePanel state={toolPanel} title={toolPanel.tool === 'video' ? '视频预览' : '日志中心'} icon={toolPanel.tool === 'video' ? <MonitorPlay size={16} /> : <FileClock size={16} />}
         detach={nativePanels ? detachPanel : undefined} detaching={detaching}
+        wide={toolPanel.tool === 'video' && panelWindows.videoLabelsOpen}
+        actions={toolPanel.tool === 'video' && <VideoLabelsButton expanded={panelWindows.videoLabelsOpen} toggle={() => setVideoLabelsOpen(!panelWindows.videoLabelsOpen)} />}
         minimize={minimizePanel} restore={() => showPanel(toolPanel.tool)} toggleExpanded={() => setToolPanel(current => current && { ...current, expanded: !current.expanded })} close={closePanel}>
-        {toolPanel.tool === 'video' ? <VideoPreview /> : <LogsPanel logs={logs} source={panelWindows.logSource} setSource={setLogSource} clear={() => setLogs([])} />}
+        {toolPanel.tool === 'video' ? <VideoPreview labelsOpen={panelWindows.videoLabelsOpen} /> : <LogsPanel logs={logs} source={panelWindows.logSource} setSource={setLogSource} clear={() => setLogs([])} />}
       </FloatingSidePanel>}
       {modal && <ToolsDialog modal={modal} close={closeModal} onInput={key => { if (recording) addLog('输入预览：' + key, '手柄'); }} />}
       {paletteOpen && <CommandPalette actions={actions} close={() => setPaletteOpen(false)} />}

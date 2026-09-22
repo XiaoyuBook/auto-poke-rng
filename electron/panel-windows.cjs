@@ -8,6 +8,14 @@ function registerPanelWindows({ getMainWindow, loadWindow }) {
   const bounds = new Map();
   let logs = [];
   let logSource = '全部来源';
+  let videoLabelsOpen = false;
+  const boundsKey = tool => tool === 'video' && videoLabelsOpen ? 'video-labels' : tool;
+  const contentBounds = window => {
+    const frame = window.getBounds();
+    const { x, y } = frame;
+    const [width, height] = window.getContentSize();
+    return { x, y, width, height, frame };
+  };
   const validTools = new Set(['video', 'logs']);
   const sources = new Set(['全部来源', '系统', '脚本', '手柄']);
   const canSend = window => window && !window.isDestroyed() && !window.webContents.isDestroyed();
@@ -16,7 +24,7 @@ function registerPanelWindows({ getMainWindow, loadWindow }) {
     if (canSend(main)) main.webContents.send('panels:action', action);
   };
 
-  const stateFor = window => ({ detached: [...windows.keys()], logs, logSource, alwaysOnTop: window.isAlwaysOnTop() });
+  const stateFor = window => ({ detached: [...windows.keys()], logs, logSource, videoLabelsOpen, alwaysOnTop: window.isAlwaysOnTop() });
   const broadcast = () => {
     for (const window of [getMainWindow(), ...[...windows.values()].map(item => item.window)]) {
       // An owned window may close after the owner's renderer is destroyed but
@@ -53,10 +61,11 @@ function registerPanelWindows({ getMainWindow, loadWindow }) {
       return;
     }
     const mainBounds = getMainWindow().getBounds();
-    const preferred = bounds.get(tool) || { x: mainBounds.x + mainBounds.width - 500, y: mainBounds.y + 80, width: 440, height: 640 };
+    const labels = tool === 'video' && videoLabelsOpen;
+    const preferred = bounds.get(boundsKey(tool)) || { x: mainBounds.x + mainBounds.width - (labels ? 1180 : 500), y: mainBounds.y + 80, width: labels ? 1120 : 440, height: labels ? 780 : 640 };
     const area = screen.getDisplayMatching(preferred).workArea;
-    const width = Math.min(Math.max(360, preferred.width), area.width);
-    const height = Math.min(Math.max(280, preferred.height), area.height);
+    const width = Math.min(Math.max(labels ? 960 : 360, preferred.width), area.width);
+    const height = Math.min(Math.max(labels ? 620 : 280, preferred.height), area.height);
     const window = new BrowserWindow({
       width, height, useContentSize: true,
       // Owned, non-modal windows stay above the workspace while it has focus.
@@ -64,7 +73,7 @@ function registerPanelWindows({ getMainWindow, loadWindow }) {
       parent: getMainWindow(), modal: false,
       x: Math.max(area.x, Math.min(preferred.x, area.x + area.width - width)),
       y: Math.max(area.y, Math.min(preferred.y, area.y + area.height - height)),
-      minWidth: 360, minHeight: 280, show: false, resizable: true,
+      minWidth: labels ? 960 : 360, minHeight: labels ? 620 : 280, show: false, resizable: true,
       title: (tool === 'video' ? '视频预览' : '日志中心') + ' · Auto Poke RNG',
       backgroundColor: '#1d2020', titleBarStyle: 'hidden',
       titleBarOverlay: { color: '#1d2020', symbolColor: '#acafaf', height: 44 },
@@ -79,10 +88,8 @@ function registerPanelWindows({ getMainWindow, loadWindow }) {
     window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     const rememberBounds = () => {
       if (window.isDestroyed() || window.isMaximized() || window.isMinimized()) return;
-      const { x, y } = window.getBounds();
-      const [width, height] = window.getContentSize();
       // Content dimensions avoid accumulating native-frame rounding at non-100% DPI.
-      bounds.set(tool, { x, y, width, height });
+      bounds.set(boundsKey(tool), contentBounds(window));
     };
     window.on('move', rememberBounds);
     window.on('resize', rememberBounds);
@@ -135,6 +142,42 @@ function registerPanelWindows({ getMainWindow, loadWindow }) {
     const { window } = requireTool(event);
     if (typeof enabled !== 'boolean') throw new Error('Invalid window state');
     window.setAlwaysOnTop(enabled);
+    broadcast();
+  });
+  ipcMain.handle('panels:video-labels', (event, enabled) => {
+    const sender = requireWindow(event);
+    const video = windows.get('video')?.window;
+    if (sender !== getMainWindow() && sender !== video) throw new Error('Video or main window required');
+    if (typeof enabled !== 'boolean') throw new Error('Invalid video layout');
+    if (videoLabelsOpen === enabled) return;
+    const canResize = canSend(video) && !video.isMaximized() && !video.isMinimized();
+    const previous = canResize ? contentBounds(video) : null;
+    if (previous) bounds.set(boundsKey('video'), previous);
+    videoLabelsOpen = enabled;
+    if (previous) {
+      // Keep normal preview and label editing sizes separate, including after docking.
+      const preferred = bounds.get(boundsKey('video')) || {
+        x: previous.x + previous.width - (enabled ? 1120 : 440), y: previous.y,
+        width: enabled ? 1120 : 440, height: enabled ? 780 : 640,
+      };
+      video.setMinimumSize(enabled ? 960 : 360, enabled ? 620 : 280);
+      const area = screen.getDisplayMatching(video.getBounds()).workArea;
+      // Restore saved native bounds directly to avoid accumulating Windows DPI
+      // rounding when converting content sizes to frame sizes on every toggle.
+      const width = Math.min(preferred.frame?.width || preferred.width + previous.frame.width - previous.width, area.width);
+      const height = Math.min(preferred.frame?.height || preferred.height + previous.frame.height - previous.height, area.height);
+      video.setBounds({ width, height,
+        x: Math.max(area.x, Math.min(preferred.x, area.x + area.width - width)),
+        y: Math.max(area.y, Math.min(preferred.y, area.y + area.height - height)),
+      });
+      // Moving/resizing the native frame can round its insets on scaled displays.
+      // Apply content size last, as when a tool window is first constructed.
+      const actual = contentBounds(video);
+      video.setContentSize(Math.min(preferred.width, area.width - (actual.frame.width - actual.width)),
+        Math.min(preferred.height, area.height - (actual.frame.height - actual.height)));
+    } else if (canSend(video)) {
+      video.setMinimumSize(enabled ? 960 : 360, enabled ? 620 : 280);
+    }
     broadcast();
   });
 

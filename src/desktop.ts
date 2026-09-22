@@ -8,6 +8,7 @@ export interface PanelWindowState {
   logs: LogEntry[];
   logSource: LogSource;
   alwaysOnTop: boolean;
+  videoLabelsOpen: boolean;
 }
 export type PanelAction = { type: 'dock'; tool: PanelTool } | { type: 'clear-logs' };
 export interface PanelWindowsApi {
@@ -18,6 +19,7 @@ export interface PanelWindowsApi {
   clearLogs: () => Promise<void>;
   dock: () => Promise<void>;
   setAlwaysOnTop: (enabled: boolean) => Promise<void>;
+  setVideoLabelsOpen: (open: boolean) => Promise<void>;
   onState: (listener: (state: PanelWindowState) => void) => () => void;
   onAction: (listener: (action: PanelAction) => void) => () => void;
 }

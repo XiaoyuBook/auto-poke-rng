@@ -31,6 +31,27 @@ const panelBounds = window => evaluate(window, `(() => {
   const r = document.querySelector('.floating-side-panel').getBoundingClientRect();
   return { x: r.x, y: r.y, width: r.width, height: r.height, right: r.right, bottom: r.bottom };
 })()`);
+async function assertLabelWorkspaceFits(window) {
+  const layout = await evaluate(window, `(() => {
+    const content = document.querySelector('.image-label-content');
+    const bounds = content.getBoundingClientRect();
+    const coordinates = document.querySelector('.label-coordinates').getBoundingClientRect();
+    const note = document.querySelector('.label-workspace-note').getBoundingClientRect();
+    const inputs = [...document.querySelectorAll('.label-coordinates input')].map(input => input.getBoundingClientRect());
+    const controls = [...content.querySelectorAll('button, input, select, .label-workspace-note')];
+    return {
+      fitsHeight: content.scrollHeight <= content.clientHeight + 1,
+      fitsWidth: content.scrollWidth <= content.clientWidth + 1,
+      controlsVisible: controls.every(control => {
+        const rect = control.getBoundingClientRect();
+        return rect.top >= bounds.top && rect.bottom <= bounds.bottom + 1 && rect.left >= bounds.left && rect.right <= bounds.right + 1;
+      }),
+      coordinatesOnOneRow: inputs.every(rect => Math.abs(rect.top - inputs[0].top) < 1),
+      footerBelowFields: note.top >= coordinates.bottom,
+    };
+  })()`);
+  assert.deepEqual(layout, { fitsHeight: true, fitsWidth: true, controlsVisible: true, coordinatesOnOneRow: true, footerBelowFields: true }, 'label workspace fits without scrolling, clipped controls, or wrapped coordinates');
+}
 async function until(condition, description) {
   const deadline = Date.now() + 6000;
   while (Date.now() < deadline) {
@@ -180,7 +201,7 @@ app.whenReady().then(async () => {
   await assertAboveMain(main, logs);
   await click(main, '弹出为独立窗口');
   await until(() => Boolean(findTool('video')), 'video window created');
-  const video = findTool('video');
+  let video = findTool('video');
   await until(() => evaluate(video, 'Boolean(document.querySelector(".video-preview-content"))'), 'video ready');
   assert.equal(BrowserWindow.getAllWindows().length, 3);
   main.focus();
@@ -193,6 +214,7 @@ app.whenReady().then(async () => {
   hideTestWindows = true;
   await capture(video, 'detached-video');
   video.setContentSize(760, 280);
+  video.setPosition(main.getBounds().x + 40, main.getBounds().y + 40);
   await delay(150);
   const compactVideo = await evaluate(video, `(() => {
     const r = document.querySelector('.preview-frame').getBoundingClientRect();
@@ -202,9 +224,90 @@ app.whenReady().then(async () => {
   assert.ok(Math.abs(compactVideo.ratio - 16 / 9) < 0.02, 'short, wide video window preserves aspect ratio');
   assert.equal(compactVideo.overflow, false);
   await capture(video, 'detached-video-compact');
+  const previewSize = video.getContentSize();
+  const previewPosition = video.getPosition();
+  await click(video, '标签');
+  await until(() => evaluate(video, 'document.querySelector(".video-preview-content").dataset.labelsOpen === "true"'), 'native label layout opened');
+  assert.ok(video.getContentSize()[0] > previewSize[0], 'native label layout widens the video window');
+  const labelLayout = await evaluate(video, `(() => {
+    const still = document.querySelector('.label-snapshot-stage').getBoundingClientRect();
+    const live = document.querySelector('.label-monitor-frame').getBoundingClientRect();
+    return {
+      stillLeft: still.right < live.x,
+      equalWidth: Math.abs(still.width - live.width) < 1,
+      alignedTop: Math.abs(still.top - live.top) < 1,
+      alignedBottom: Math.abs(still.bottom - live.bottom) < 1,
+    };
+  })()`);
+  assert.deepEqual(labelLayout, { stillLeft: true, equalWidth: true, alignedTop: true, alignedBottom: true }, 'static canvas and live video split equally with aligned top and bottom edges');
+  await assertLabelWorkspaceFits(video);
+  await capture(video, 'detached-video-labels');
+  const listScroll = await evaluate(video, `(() => {
+    const list = document.querySelector('.label-library-items');
+    const search = document.querySelector('.label-list-search');
+    const canvas = document.querySelector('.label-snapshot-stage');
+    const original = list.innerHTML;
+    const searchTop = search.getBoundingClientRect().top;
+    const canvasHeight = canvas.getBoundingClientRect().height;
+    const emptyFits = list.scrollHeight <= list.clientHeight;
+    list.replaceChildren(...Array.from({ length: 30 }, (_, index) => {
+      const row = document.createElement('div');
+      row.textContent = '标签 ' + (index + 1);
+      row.style.height = '32px';
+      return row;
+    }));
+    list.scrollTop = 64;
+    const result = {
+      emptyFits,
+      populatedScrolls: list.scrollHeight > list.clientHeight && list.scrollTop > 0,
+      searchFixed: search.getBoundingClientRect().top === searchTop,
+      canvasUnchanged: canvas.getBoundingClientRect().height === canvasHeight,
+    };
+    list.innerHTML = original;
+    list.scrollTop = 0;
+    return result;
+  })()`);
+  assert.deepEqual(listScroll, { emptyFits: true, populatedScrolls: true, searchFixed: true, canvasUnchanged: true }, 'only overflowing label items scroll; empty list, search, and canvas stay fixed');
+  video.setContentSize(360, 500);
+  await delay(150);
+  assert.deepEqual(video.getMinimumSize(), [960, 620], 'label editing has a usable minimum window size');
+  await assertLabelWorkspaceFits(video);
+  await capture(video, 'detached-video-labels-minimum');
+  await click(video, '标签');
+  await until(() => evaluate(video, 'Boolean(document.querySelector(".preview-frame"))'), 'native normal preview restored');
+  assert.ok(video.getContentSize().every((size, index) => Math.abs(size - previewSize[index]) <= 1), 'closing labels restores normal content size: ' + JSON.stringify({ before: previewSize, after: video.getContentSize() }));
+  assert.deepEqual(video.getPosition(), previewPosition, 'closing labels restores normal position');
+  assert.deepEqual(video.getMinimumSize(), [360, 280], 'closing labels restores compact preview resize limits');
+  await click(video, '标签');
+  await until(() => evaluate(video, 'document.querySelector(".video-preview-content").dataset.labelsOpen === "true"'), 'labels reopened');
+  await click(video, '收回主窗口');
+  await until(() => video.isDestroyed(), 'video labels docked');
+  await until(() => evaluate(main, 'document.querySelector(".floating-side-panel")?.dataset.wide === "true"'), 'inline labels retain expanded mode');
+  await assertLabelWorkspaceFits(main);
+  await capture(main, 'inline-video-labels');
+  const labelMainSize = main.getContentSize();
+  main.setContentSize(1100, 680);
+  await delay(150);
+  await assertLabelWorkspaceFits(main);
+  await capture(main, 'inline-video-labels-compact');
+  main.setContentSize(...labelMainSize);
+  await delay(150);
+  await click(main, '标签');
+  await until(() => evaluate(main, 'document.querySelector(".floating-side-panel")?.dataset.wide === "false"'), 'inline preview restored');
+  assert.deepEqual(await panelBounds(main), resized, 'closing inline labels restores original preview bounds');
+  await click(main, '标签');
+  await until(() => evaluate(main, 'document.querySelector(".floating-side-panel")?.dataset.wide === "true"'), 'inline labels reopened');
+  await click(main, '弹出为独立窗口');
+  await until(() => Boolean(findTool('video')), 'label window detached again');
+  video = findTool('video');
+  await until(() => evaluate(video, 'document.querySelector(".video-preview-content")?.dataset.labelsOpen === "true"'), 'detaching retains label mode');
+  await click(video, '标签');
+  await until(() => evaluate(video, 'Boolean(document.querySelector(".preview-frame"))'), 'reopened video returns to normal preview');
+  console.log('Video labels: aligned frames, no workspace scrolling, list overflow, single-row coordinates, compact layout, native/inline restoration, detach/dock passed');
   console.log('The following rejected IPC call is an expected sender-permission check.');
   assert.equal(await evaluate(video, `window.desktop.panels.open('logs').then(() => false, () => true)`), true, 'tool windows cannot create other windows');
   assert.equal(await evaluate(video, `window.desktop.scripts.list().then(() => false, () => true)`), true, 'tool windows cannot access project script files');
+  assert.equal(await evaluate(logs, `window.desktop.panels.setVideoLabelsOpen(true).then(() => false, () => true)`), true, 'log windows cannot change video layout');
   await click(logs, '收回主窗口');
   await until(() => logs.isDestroyed(), 'log window docked');
   await until(() => evaluate(main, `document.querySelector('.floating-side-panel select')?.value === '脚本'`), 'docked filter retained');

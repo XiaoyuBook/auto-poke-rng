@@ -35,10 +35,12 @@ interface Props {
   close: () => void;
   detach?: () => void;
   detaching?: boolean;
+  wide?: boolean;
+  actions?: ReactNode;
   children: ReactNode;
 }
 
-export function FloatingSidePanel({ title, icon, state, minimize, restore, toggleExpanded, close, detach, detaching, children }: Props) {
+export function FloatingSidePanel({ title, icon, state, minimize, restore, toggleExpanded, close, detach, detaching, wide = false, actions, children }: Props) {
   const panel = useRef<HTMLElement>(null);
   const [size, setSize] = useState(readSize);
   const drag = useRef<{ x: number; y: number; size: Size; edge: ResizeEdge } | null>(null);
@@ -72,12 +74,12 @@ export function FloatingSidePanel({ title, icon, state, minimize, restore, toggl
   return (
     <section ref={panel} id="floating-tool-panel" className="floating-side-panel"
       style={{ '--panel-width': size.width + 'px', '--panel-height': size.height + 'px' } as CSSProperties}
-      data-expanded={state.expanded} data-minimized={state.minimized}
+      data-expanded={state.expanded} data-minimized={state.minimized} data-wide={wide}
       role="dialog" aria-modal="false" aria-labelledby={titleId} tabIndex={-1}
       onKeyDown={event => {
         if (event.key === 'Escape') { event.stopPropagation(); close(); }
       }}>
-      {!state.minimized && !state.expanded && (['left', 'top', 'corner'] as const).map(edge => (
+      {!state.minimized && !state.expanded && !wide && (['left', 'top', 'corner'] as const).map(edge => (
         <button key={edge} className={'panel-resize-handle resize-' + edge} type="button"
           aria-label={edge === 'left' ? '调整面板宽度' : edge === 'top' ? '调整面板高度' : '调整面板大小'}
           title="拖动调整大小，或使用方向键"
@@ -99,6 +101,7 @@ export function FloatingSidePanel({ title, icon, state, minimize, restore, toggl
         {icon}
         <h2 id={titleId}>{title}</h2>
         <div className="floating-panel-actions">
+          {!state.minimized && actions}
           {detach && <button className="icon-button" title="弹出为独立窗口" aria-label="弹出为独立窗口" disabled={detaching} onClick={detach}><ExternalLink size={14} /></button>}
           {state.minimized ? (
             <button className="icon-button" title={'恢复' + title} aria-label={'恢复' + title} aria-controls={contentId} aria-expanded="false" onClick={restore}><Maximize2 size={14} /></button>

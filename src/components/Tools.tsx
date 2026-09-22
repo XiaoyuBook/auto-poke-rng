@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Bell, Gamepad2, MonitorPlay, Settings, Tv } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Bell, Gamepad2, Settings, Tv } from 'lucide-react';
 import type { Modal } from '../workspace';
 import { Dialog } from './Dialog';
 
@@ -51,14 +51,4 @@ function Controller({ onInput }: { onInput: (key: string) => void }) {
     </div>
     <p className="dialog-footnote">输入仅在此窗口预览，不会发送到设备。</p>
   </>;
-}
-
-export function VideoPreview() {
-  return (
-    <section className="video-preview-content" aria-label="视频画面">
-      <div className="preview-stage">
-        <div className="preview-frame"><MonitorPlay size={28} /><strong>等待视频源连接</strong></div>
-      </div>
-    </section>
-  );
 }
