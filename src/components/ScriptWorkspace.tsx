@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { CircleHelp, Circle, Gamepad2, Keyboard, Play, Save, Square } from 'lucide-react';
 import { formatElapsed, type LogEntry, type Modal } from '../workspace';
 
 interface Props {
   script: string;
   onChange: (script: string) => void;
+  onCursorChange: (position: { line: number; column: number }) => void;
   saved: boolean;
   onSave: () => void;
   logs: LogEntry[];
@@ -22,8 +23,9 @@ export function ScriptWorkspace(props: Props) {
   const editor = useRef<HTMLTextAreaElement>(null);
   const logStream = useRef<HTMLDivElement>(null);
   const followLogs = useRef(true);
-  const [cursor, setCursor] = useState({ line: 1, column: 1 });
+  const { onCursorChange } = props;
   const lines = props.script.split('\n').length;
+  useEffect(() => { onCursorChange({ line: 1, column: 1 }); }, [onCursorChange]);
   useEffect(() => {
     if (logStream.current && followLogs.current) logStream.current.scrollTop = logStream.current.scrollHeight;
   }, [props.logs]);
@@ -31,7 +33,7 @@ export function ScriptWorkspace(props: Props) {
     const field = editor.current;
     if (!field) return;
     const beforeCursor = field.value.slice(0, field.selectionStart).split('\n');
-    setCursor({ line: beforeCursor.length, column: beforeCursor.at(-1)!.length + 1 });
+    onCursorChange({ line: beforeCursor.length, column: beforeCursor.at(-1)!.length + 1 });
   };
 
   return (
@@ -100,12 +102,6 @@ export function ScriptWorkspace(props: Props) {
             onScroll={event => { if (lineNumbers.current) lineNumbers.current.scrollTop = event.currentTarget.scrollTop; }}
             placeholder="# 在此输入脚本"
           />
-        </div>
-        <div className="editor-statusbar">
-          <span>文本脚本</span>
-          <span className="editor-cursor">行 {cursor.line}，列 {cursor.column}</span>
-          <span>UTF-8</span>
-          <span>{lines} 行</span>
         </div>
       </section>
     </section>

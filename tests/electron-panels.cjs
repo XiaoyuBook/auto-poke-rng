@@ -98,12 +98,12 @@ app.whenReady().then(async () => {
   })()`);
   main.webContents.sendInputEvent({ type: 'mouseMove', ...handle });
   main.webContents.sendInputEvent({ type: 'mouseDown', ...handle, button: 'left', clickCount: 1 });
-  main.webContents.sendInputEvent({ type: 'mouseMove', x: handle.x - 90, y: handle.y - 60, modifiers: ['leftButtonDown'] });
-  main.webContents.sendInputEvent({ type: 'mouseUp', x: handle.x - 90, y: handle.y - 60, button: 'left', clickCount: 1 });
+  main.webContents.sendInputEvent({ type: 'mouseMove', x: handle.x - 90, y: handle.y + 30, modifiers: ['leftButtonDown'] });
+  main.webContents.sendInputEvent({ type: 'mouseUp', x: handle.x - 90, y: handle.y + 30, button: 'left', clickCount: 1 });
   await until(async () => (await panelBounds(main)).width > original.width, 'pointer resizing');
   const resized = await panelBounds(main);
   assert.equal(resized.width, original.width + 90);
-  assert.equal(resized.height, original.height + 60);
+  assert.equal(resized.height, original.height - 30);
   assert.ok(Math.abs(resized.right - original.right) < 1);
   assert.ok(Math.abs(resized.bottom - original.bottom) < 1);
   await click(main, '展开面板');
@@ -196,7 +196,7 @@ app.whenReady().then(async () => {
   assert.equal(reopenedBounds.y, movedNative.y, 'native vertical position remembered');
   await until(() => evaluate(main, '!document.querySelector(".floating-side-panel")'), 'reopened inline panel removed');
   logs.close();
-  await until(() => evaluate(main, `document.querySelector('[aria-label="日志中心"]').title === '日志中心'`), 'closing window clears dock state');
+  await until(() => evaluate(main, `document.querySelector('[aria-label="日志中心"]').dataset.state === 'closed'`), 'closing window clears dock state');
   await click(main, '日志中心');
   await until(() => evaluate(main, 'Boolean(document.querySelector(".floating-side-panel"))'), 'closed tool opens inline again');
   assert.equal(await evaluate(main, 'document.querySelector("textarea").value'), '# unsaved detached test');

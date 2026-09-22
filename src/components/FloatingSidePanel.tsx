@@ -20,8 +20,8 @@ function readSize(): Size {
 
 function constrainSize(size: Size): Size {
   return {
-    width: Math.min(Math.max(320, size.width), Math.max(1, window.innerWidth - 96)),
-    height: Math.min(Math.max(260, size.height), Math.max(1, window.innerHeight - 86)),
+    width: Math.min(Math.max(320, size.width), Math.max(1, window.innerWidth - 44)),
+    height: Math.min(Math.max(260, size.height), Math.max(1, window.innerHeight - 122)),
   };
 }
 

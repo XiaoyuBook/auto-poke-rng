@@ -7,12 +7,14 @@ import { CommandPalette, type CommandAction } from './components/CommandPalette'
 import { LogsPanel } from './components/LogsPanel';
 import { FloatingSidePanel, type PanelState, type PanelTool } from './components/FloatingSidePanel';
 import { ScriptWorkspace } from './components/ScriptWorkspace';
+import { QuickTools } from './components/QuickTools';
 import { ToolsDialog, VideoPreview } from './components/Tools';
 import { createLog, games, readDrafts, type GameId, type LogEntry, type Modal, type Page } from './workspace';
 import { usePanelWindows } from './usePanelWindows';
 
 export default function App() {
   const [page, setPage] = useState<Page>('脚本编辑');
+  const [cursor, setCursor] = useState({ line: 1, column: 1 });
   const [game, setGame] = useState<GameId>('frlg');
   const [gameMenuOpen, setGameMenuOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -247,18 +249,23 @@ export default function App() {
         </header>
 
         <div className="workspace-content">
-          {page === '脚本编辑' && <ScriptWorkspace key={game} script={script} onChange={value => setDrafts(current => ({ ...current, [game]: value }))} saved={saved} onSave={saveDraft}
+          {page === '脚本编辑' && <ScriptWorkspace key={game} script={script} onChange={value => setDrafts(current => ({ ...current, [game]: value }))} onCursorChange={setCursor} saved={saved} onSave={saveDraft}
             logs={logs} clearLogs={() => setLogs([])} running={Boolean(run)} recording={recording} elapsed={elapsed} toggleRunning={toggleRunning} toggleRecording={toggleRecording} openModal={openModal} />}
           {page === '首页' && <div className="empty-state home-empty"><Home size={28} /><h2>开始你的工作</h2><p>当前游戏为{activeGame.label}，打开脚本编辑开始配置操作。</p><button className="button" onClick={() => setPage('脚本编辑')}><TerminalSquare size={15} />打开脚本编辑</button></div>}
         </div>
+        <footer className="workspace-footer" aria-label="工作区状态与工具">
+          <div className="workspace-status">
+            {page === '脚本编辑' ? <>
+              <span>文本脚本</span>
+              <span className="workspace-cursor">行 {cursor.line}，列 {cursor.column}</span>
+              <span>UTF-8</span>
+              <span>{script.split('\n').length} 行</span>
+            </> : <span>{activeGame.label}</span>}
+          </div>
+          <QuickTools panel={toolPanel} detached={panelWindows.detached} toggle={togglePanel} buttons={dockButtons.current} />
+        </footer>
       </main>
 
-      <div className="quick-dock" role="toolbar" aria-label="快捷工具">
-        <button ref={node => { dockButtons.current.video = node; }} className={'icon-button ' + (panelWindows.detached.includes('video') || toolPanel?.tool === 'video' && !toolPanel.minimized ? 'active' : '')}
-          title={panelWindows.detached.includes('video') ? '显示视频独立窗口' : '视频预览'} aria-label="视频预览" aria-expanded={toolPanel?.tool === 'video' && !toolPanel.minimized} aria-controls={toolPanel?.tool === 'video' ? 'floating-tool-panel' : undefined} aria-haspopup="dialog" onClick={() => togglePanel('video')}><MonitorPlay size={18} />{panelWindows.detached.includes('video') && <span className="detached-indicator" />}</button>
-        <button ref={node => { dockButtons.current.logs = node; }} className={'icon-button ' + (panelWindows.detached.includes('logs') || toolPanel?.tool === 'logs' && !toolPanel.minimized ? 'active' : '')}
-          title={panelWindows.detached.includes('logs') ? '显示日志独立窗口' : '日志中心'} aria-label="日志中心" aria-expanded={toolPanel?.tool === 'logs' && !toolPanel.minimized} aria-controls={toolPanel?.tool === 'logs' ? 'floating-tool-panel' : undefined} aria-haspopup="dialog" onClick={() => togglePanel('logs')}><FileClock size={18} />{panelWindows.detached.includes('logs') && <span className="detached-indicator" />}</button>
-      </div>
       {toolPanel && <FloatingSidePanel state={toolPanel} title={toolPanel.tool === 'video' ? '视频预览' : '日志中心'} icon={toolPanel.tool === 'video' ? <MonitorPlay size={16} /> : <FileClock size={16} />}
         detach={nativePanels ? detachPanel : undefined} detaching={detaching}
         minimize={minimizePanel} restore={() => showPanel(toolPanel.tool)} toggleExpanded={() => setToolPanel(current => current && { ...current, expanded: !current.expanded })} close={closePanel}>
