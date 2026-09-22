@@ -130,4 +130,70 @@ describe('workspace interactions', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(document.activeElement).toBe(screen.getByRole('button', { name: '视频预览' }));
   });
+
+  it('keeps separate script edits and only persists the selected script snapshot', () => {
+    const app = render(<App />);
+    const edit = (value: string) => fireEvent.change(screen.getByRole('textbox', { name: '脚本内容' }), { target: { value } });
+    const select = (name: string) => fireEvent.click(screen.getByRole('button', { name: '选择脚本：' + name }));
+    edit('# 已保存的个人脚本');
+    fireEvent.keyDown(window, { key: 's', ctrlKey: true });
+    edit('# 尚未保存的个人修改');
+    select('等待与确认');
+    edit('# 示例的独立编辑内容');
+    select('未命名脚本');
+    expect(screen.getByRole('textbox', { name: '脚本内容' }).textContent).toBe('# 尚未保存的个人修改');
+    select('等待与确认');
+    expect(screen.getByRole('textbox', { name: '脚本内容' }).textContent).toBe('# 示例的独立编辑内容');
+    fireEvent.keyDown(window, { key: 's', ctrlKey: true });
+    changeGame('珍钻复刻');
+    select('等待与确认');
+    expect(screen.getByRole('textbox', { name: '脚本内容' }).textContent).not.toContain('独立编辑内容');
+    changeGame('火叶');
+    expect(screen.getByRole('textbox', { name: '脚本内容' }).textContent).toBe('# 示例的独立编辑内容');
+    app.unmount();
+    render(<App />);
+    expect(screen.getByRole('textbox', { name: '脚本内容' }).textContent).toBe('# 已保存的个人脚本');
+    select('等待与确认');
+    expect(screen.getByRole('textbox', { name: '脚本内容' }).textContent).toBe('# 示例的独立编辑内容');
+  });
+
+  it('creates, renames, searches, and restores a saved library script', () => {
+    const app = render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: '新建脚本' }));
+    expect((screen.getByRole('textbox', { name: '脚本名称' }) as HTMLInputElement).value).toBe('未命名脚本 2');
+    fireEvent.change(screen.getByRole('textbox', { name: '脚本名称' }), { target: { value: '  自定义流程  ' } });
+    fireEvent.change(screen.getByRole('textbox', { name: '脚本内容' }), { target: { value: 'wait 250\npress B' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存草稿' }));
+    fireEvent.change(screen.getByRole('searchbox', { name: '搜索脚本' }), { target: { value: '自定义' } });
+    expect(screen.getAllByRole('button', { name: /^选择脚本：/ })).toHaveLength(1);
+    expect(screen.getByRole('button', { name: '选择脚本：自定义流程' })).toBeTruthy();
+    fireEvent.change(screen.getByRole('searchbox', { name: '搜索脚本' }), { target: { value: '不存在' } });
+    expect(screen.getByText('没有匹配的脚本')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '新建脚本' }));
+    expect((screen.getByRole('searchbox', { name: '搜索脚本' }) as HTMLInputElement).value).toBe('');
+    app.unmount();
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: '选择脚本：自定义流程' }));
+    expect(screen.getByRole('textbox', { name: '脚本内容' }).textContent).toBe('wait 250\npress B');
+    expect(screen.queryByRole('button', { name: '选择脚本：未命名脚本 2' })).toBeNull();
+  });
+
+  it('migrates legacy drafts and retains edits when library storage fails', () => {
+    localStorage.setItem('auto-poke-rng:drafts', JSON.stringify({ frlg: '# 旧版本的草稿' }));
+    const app = render(<App />);
+    expect(screen.getByRole('textbox', { name: '脚本内容' }).textContent).toBe('# 旧版本的草稿');
+    fireEvent.change(screen.getByRole('textbox', { name: '脚本内容' }), { target: { value: '# 新版本保存' } });
+    fireEvent.keyDown(window, { key: 's', ctrlKey: true });
+    app.unmount();
+    render(<App />);
+    expect(screen.getByRole('textbox', { name: '脚本内容' }).textContent).toBe('# 新版本保存');
+    fireEvent.change(screen.getByRole('textbox', { name: '脚本内容' }), { target: { value: '# 保存失败也保留的内容' } });
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new DOMException('Quota exceeded'); });
+    fireEvent.click(screen.getByRole('button', { name: '保存草稿' }));
+    expect(screen.getByText('保存失败，请检查本机存储空间')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '选择脚本：等待与确认' }));
+    fireEvent.click(screen.getByRole('button', { name: '选择脚本：未命名脚本' }));
+    expect(screen.getByRole('textbox', { name: '脚本内容' }).textContent).toBe('# 保存失败也保留的内容');
+    expect(screen.getByText('未保存')).toBeTruthy();
+  });
 });

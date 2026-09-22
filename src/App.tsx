@@ -7,10 +7,13 @@ import { CommandPalette, type CommandAction } from './components/CommandPalette'
 import { LogsPanel } from './components/LogsPanel';
 import { FloatingSidePanel, type PanelState, type PanelTool } from './components/FloatingSidePanel';
 import { ScriptWorkspace } from './components/ScriptWorkspace';
+import { ScriptLibrary } from './components/ScriptLibrary';
 import { QuickTools } from './components/QuickTools';
 import { ToolsDialog, VideoPreview } from './components/Tools';
-import { createLog, games, readDrafts, type GameId, type LogEntry, type Modal, type Page } from './workspace';
+import { createLog, games, type GameId, type LogEntry, type Modal, type Page } from './workspace';
 import { usePanelWindows } from './usePanelWindows';
+import { useScriptLibrary } from './useScriptLibrary';
+import { isScriptDirty } from './scriptLibrary';
 
 export default function App() {
   const [page, setPage] = useState<Page>('脚本编辑');
@@ -18,12 +21,11 @@ export default function App() {
   const [game, setGame] = useState<GameId>('frlg');
   const [gameMenuOpen, setGameMenuOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
-  const [run, setRun] = useState<{ game: GameId; started: number } | null>(null);
+  const [run, setRun] = useState<{ game: GameId; scriptName: string; started: number } | null>(null);
   const [recording, setRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
-  const [initialDrafts] = useState(readDrafts);
-  const [savedDrafts, setSavedDrafts] = useState(initialDrafts.drafts);
-  const [drafts, setDrafts] = useState(savedDrafts);
+  const library = useScriptLibrary(game);
+  const { save: saveScript } = library;
   const [logs, setLogs] = useState<LogEntry[]>(() => [createLog('工作区已就绪，等待运行脚本。')]);
   const [modal, setModal] = useState<Modal | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -38,9 +40,8 @@ export default function App() {
   const gameButton = useRef<HTMLButtonElement>(null);
   const dockButtons = useRef<Partial<Record<PanelTool, HTMLButtonElement | null>>>({});
   const activeGame = games.find(item => item.id === game)!;
-  const script = drafts[game];
-  const [savedGames, setSavedGames] = useState(initialDrafts.saved);
-  const saved = savedGames.has(game) && script === savedDrafts[game];
+  const script = library.active.body;
+  const saved = library.saved;
 
   const addLog = useCallback((message: string, source: LogEntry['source'] = '系统', level: LogEntry['level'] = 'info') => {
     setLogs(entries => [...entries, createLog(message, source, level)].slice(-500));
@@ -97,17 +98,13 @@ export default function App() {
 
   const saveDraft = useCallback(() => {
     try {
-      const next = { ...savedDrafts, [game]: script };
-      const ids = new Set(savedGames).add(game);
-      localStorage.setItem('auto-poke-rng:drafts', JSON.stringify(Object.fromEntries([...ids].map(id => [id, next[id]]))));
-      setSavedDrafts(next);
-      setSavedGames(previous => new Set(previous).add(game));
+      saveScript();
       setToast('草稿已保存到本机');
     } catch {
       setToast('保存失败，请检查本机存储空间');
       addLog('草稿保存失败，编辑内容仍保留在当前窗口。', '脚本', 'warning');
     }
-  }, [addLog, game, savedDrafts, savedGames, script]);
+  }, [addLog, saveScript]);
 
   useEffect(() => {
     window.desktop?.getMetadata().then(data => setVersion(data.version)).catch(() => undefined);
@@ -164,8 +161,9 @@ export default function App() {
       addLog('运行演示已停止。', '脚本');
     } else {
       setElapsed(0);
-      setRun({ game, started: Date.now() });
-      addLog(activeGame.label + '：开始运行演示，不向设备发送操作。', '脚本', 'success');
+      const scriptName = library.active.name.trim() || '未命名脚本';
+      setRun({ game, scriptName, started: Date.now() });
+      addLog(activeGame.label + ' · ' + scriptName + '：开始运行演示，不向设备发送操作。', '脚本', 'success');
     }
   };
 
@@ -249,8 +247,11 @@ export default function App() {
         </header>
 
         <div className="workspace-content">
-          {page === '脚本编辑' && <ScriptWorkspace key={game} script={script} onChange={value => setDrafts(current => ({ ...current, [game]: value }))} onCursorChange={setCursor} saved={saved} onSave={saveDraft}
-            logs={logs} clearLogs={() => setLogs([])} running={Boolean(run)} recording={recording} elapsed={elapsed} toggleRunning={toggleRunning} toggleRecording={toggleRecording} openModal={openModal} />}
+          {page === '脚本编辑' && <ScriptWorkspace key={game} scriptId={library.active.id} scriptName={library.active.name} script={script}
+            onChange={body => library.update({ body })} onRename={name => library.update({ name })} onCursorChange={setCursor} saved={saved}
+            statusLabel={saved ? '已保存到本机' : library.active.example && !isScriptDirty(library.active) ? '示例脚本' : '未保存'} onSave={saveDraft}
+            library={<ScriptLibrary gameName={activeGame.label} scripts={library.scripts} selectedId={library.active.id} select={library.select} create={library.create} />}
+            logs={logs} clearLogs={() => setLogs([])} running={Boolean(run)} runningName={run?.scriptName} recording={recording} elapsed={elapsed} toggleRunning={toggleRunning} toggleRecording={toggleRecording} openModal={openModal} />}
           {page === '首页' && <div className="empty-state home-empty"><Home size={28} /><h2>开始你的工作</h2><p>当前游戏为{activeGame.label}，打开脚本编辑开始配置操作。</p><button className="button" onClick={() => setPage('脚本编辑')}><TerminalSquare size={15} />打开脚本编辑</button></div>}
         </div>
         <footer className="workspace-footer" aria-label="工作区状态与工具">
