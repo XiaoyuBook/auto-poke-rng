@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('node:path');
 const { registerPanelWindows } = require('./panel-windows.cjs');
+const { registerScriptFiles } = require('./script-files.cjs');
 
 let mainWindow = null;
 let panels;
@@ -43,6 +44,7 @@ function createWindow() {
 app.whenReady().then(() => {
   ipcMain.handle('app:metadata', () => ({ name: 'Auto Poke RNG', version: app.getVersion(), platform: process.platform }));
   panels = registerPanelWindows({ getMainWindow: () => mainWindow, loadWindow });
+  registerScriptFiles({ getMainWindow: () => mainWindow, rootDirectory: path.join(app.getAppPath(), 'scripts') });
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

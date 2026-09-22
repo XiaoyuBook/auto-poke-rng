@@ -1,4 +1,5 @@
 import type { LogEntry } from './workspace';
+import type { ScriptFilesApi } from './scriptLibrary';
 
 export type PanelTool = 'video' | 'logs';
 export type LogSource = '全部来源' | LogEntry['source'];
@@ -24,4 +25,5 @@ export interface PanelWindowsApi {
 export interface DesktopApi {
   getMetadata: () => Promise<{ name: string; version: string; platform: string }>;
   panels: PanelWindowsApi;
+  scripts: ScriptFilesApi;
 }

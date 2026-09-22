@@ -8,6 +8,11 @@ const subscribe = (channel, listener) => {
 
 contextBridge.exposeInMainWorld('desktop', {
   getMetadata: () => ipcRenderer.invoke('app:metadata'),
+  scripts: {
+    list: () => ipcRenderer.invoke('scripts:list'),
+    create: folder => ipcRenderer.invoke('scripts:create', { folder }),
+    save: script => ipcRenderer.invoke('scripts:save', script),
+  },
   panels: {
     open: tool => ipcRenderer.invoke('panels:open', tool),
     getState: () => ipcRenderer.invoke('panels:get-state'),

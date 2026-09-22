@@ -1,0 +1,8 @@
+# 连续确认对话
+# 输入预览示例
+
+press A
+wait 800
+press A
+wait 800
+press A

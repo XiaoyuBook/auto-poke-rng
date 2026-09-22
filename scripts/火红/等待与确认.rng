@@ -1,0 +1,7 @@
+# 等待画面稳定后确认
+# 输入预览示例
+
+wait 1000
+press A
+wait 500
+press A

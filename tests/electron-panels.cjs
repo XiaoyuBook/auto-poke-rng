@@ -5,6 +5,7 @@ const path = require('node:path');
 const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 const { registerPanelWindows } = require('../electron/panel-windows.cjs');
+const { registerScriptFiles } = require('../electron/script-files.cjs');
 
 // Fail automation immediately instead of showing Electron's uncaught-error dialog.
 const fail = error => { console.error(error); app.exit(1); };
@@ -79,12 +80,33 @@ app.whenReady().then(async () => {
   });
   const loadWindow = (window, query = {}) => window.loadFile(path.join(root, 'dist/index.html'), { query });
   const manager = registerPanelWindows({ getMainWindow: () => main, loadWindow });
+  const scriptRoot = fs.mkdtempSync(path.join(output, 'scripts-'));
+  fs.mkdirSync(path.join(scriptRoot, '火红'));
+  fs.mkdirSync(path.join(scriptRoot, '珍钻复刻'));
+  fs.writeFileSync(path.join(scriptRoot, '火红', '确认.rng'), '# 火红测试\npress A');
+  fs.writeFileSync(path.join(scriptRoot, '珍钻复刻', '菜单.rng'), '# 珍钻测试\npress X');
+  registerScriptFiles({ getMainWindow: () => main, rootDirectory: scriptRoot });
   main.on('closed', () => { main = null; manager.closeAll(); });
   await loadWindow(main);
   await evaluate(main, 'localStorage.clear()');
   await loadWindow(main);
   await until(() => evaluate(main, 'Boolean(document.querySelector("textarea"))'), 'workspace ready');
   console.log('Workspace ready');
+  assert.equal(await evaluate(main, 'document.querySelectorAll(".library-folder-button").length'), 2);
+  await click(main, '文件夹：珍钻复刻');
+  await click(main, '选择脚本：菜单');
+  assert.equal(await evaluate(main, 'document.querySelector("textarea").value'), '# 珍钻测试\npress X');
+  await evaluate(main, `(() => {
+    const field = document.querySelector('textarea');
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(field, '# 保存到磁盘');
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+  })()`);
+  await click(main, '保存脚本');
+  await until(() => fs.readFileSync(path.join(scriptRoot, '珍钻复刻', '菜单.rng'), 'utf8') === '# 保存到磁盘', 'script saved through preload IPC');
+  await click(main, '选择脚本：确认');
+  assert.equal(await evaluate(main, 'document.querySelector("textarea").value'), '# 火红测试\npress A');
+  await click(main, '选择脚本：菜单');
+  console.log('Project folder discovery, selection, and disk save passed');
   await evaluate(main, `(() => {
     const field = document.querySelector('textarea');
     Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(field, '# unsaved detached test');
@@ -182,6 +204,7 @@ app.whenReady().then(async () => {
   await capture(video, 'detached-video-compact');
   console.log('The following rejected IPC call is an expected sender-permission check.');
   assert.equal(await evaluate(video, `window.desktop.panels.open('logs').then(() => false, () => true)`), true, 'tool windows cannot create other windows');
+  assert.equal(await evaluate(video, `window.desktop.scripts.list().then(() => false, () => true)`), true, 'tool windows cannot access project script files');
   await click(logs, '收回主窗口');
   await until(() => logs.isDestroyed(), 'log window docked');
   await until(() => evaluate(main, `document.querySelector('.floating-side-panel select')?.value === '脚本'`), 'docked filter retained');

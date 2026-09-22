@@ -15,7 +15,6 @@ export const games = [
   { id: 'swsh', label: '剑盾', generation: '第八世代', detail: 'SWSH · Switch', color: '#b09bca' },
 ] as const;
 
-export const initialScript = '# 输入预览示例\n# 等待 1 秒，然后按下 A 键\n\nwait 1000\npress A\n';
 export const createLog = (message: string, source: LogEntry['source'] = '系统', level: LogEntry['level'] = 'info'): LogEntry => ({
   id: crypto.randomUUID(),
   time: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
@@ -23,21 +22,6 @@ export const createLog = (message: string, source: LogEntry['source'] = '系统'
   message,
   level,
 });
-
-export function readDrafts(): { drafts: Record<GameId, string>; saved: Set<GameId> } {
-  const defaults = { frlg: initialScript, bdsp: initialScript, swsh: initialScript };
-  const savedIds = new Set<GameId>();
-  try {
-    const saved: unknown = JSON.parse(localStorage.getItem('auto-poke-rng:drafts') || '{}');
-    if (saved && typeof saved === 'object') {
-      for (const id of Object.keys(defaults) as GameId[]) {
-        const value = (saved as Record<string, unknown>)[id];
-        if (typeof value === 'string') { defaults[id] = value; savedIds.add(id); }
-      }
-    }
-  } catch { /* An unavailable or outdated local draft must not block the workspace. */ }
-  return { drafts: defaults, saved: savedIds };
-}
 
 export function formatElapsed(seconds: number) {
   return [Math.floor(seconds / 3600), Math.floor(seconds / 60) % 60, seconds % 60]

@@ -9,7 +9,7 @@
     "dev": "concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && electron .\"",
     "build": "tsc -b && vite build",
     "test": "vitest run",
-    "test:electron": "npm run build && node scripts/test-electron.cjs",
+    "test:electron": "npm run build && node tests/run-electron.cjs",
     "start": "electron .",
     "preview": "vite preview"
   },

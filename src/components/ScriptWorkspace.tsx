@@ -11,6 +11,7 @@ interface Props {
   onRename: (name: string) => void;
   onCursorChange: (position: { line: number; column: number }) => void;
   saved: boolean;
+  busy: boolean;
   statusLabel: string;
   onSave: () => void;
   logs: LogEntry[];
@@ -53,12 +54,12 @@ export function ScriptWorkspace(props: Props) {
       <div className="editor-toolbar">
         <div className="editor-file">
           <FileCode2 size={16} />
-          <input className="script-title-input" aria-label="脚本名称" title="点击修改脚本名称" maxLength={80} value={props.scriptName} onChange={event => props.onRename(event.target.value)} placeholder="未命名脚本" />
-          <span className="file-extension">.rng</span>
+          {props.scriptId ? <><input className="script-title-input" aria-label="脚本名称" title={'scripts/' + props.scriptId + '（修改名称后保存）'} maxLength={80} value={props.scriptName} onChange={event => props.onRename(event.target.value)} placeholder="未命名脚本" />
+          <span className="file-extension">.rng</span></> : <span className="file-extension">未打开脚本</span>}
         </div>
         <div className="editor-actions">
           <span className="saved-state">{props.statusLabel}</span>
-          <button className="icon-button" title="保存草稿 (Ctrl+S)" aria-label="保存草稿" onClick={props.onSave} disabled={props.saved}><Save size={15} /></button>
+          <button className="icon-button" title="保存文件 (Ctrl+S)" aria-label="保存脚本" onClick={props.onSave} disabled={props.saved || props.busy || !props.scriptId}><Save size={15} /></button>
           <span className="toolbar-separator" />
           <button className={'button run-button ' + (props.running ? 'danger' : 'primary')} onClick={props.toggleRunning} disabled={props.recording || (!props.running && !props.script.trim())} title="运行界面演示，不向设备发送操作">
             {props.running ? <Square size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
@@ -67,7 +68,7 @@ export function ScriptWorkspace(props: Props) {
         </div>
       </div>
       <div className="script-tools" role="toolbar" aria-label="脚本工具">
-        <button className={'editor-tool-button ' + (props.recording ? 'active' : '')} disabled={props.running} aria-pressed={props.recording} onClick={props.toggleRecording}>
+        <button className={'editor-tool-button ' + (props.recording ? 'active' : '')} disabled={props.running || (!props.recording && !props.scriptId)} aria-pressed={props.recording} onClick={props.toggleRecording}>
           {props.recording ? <Square size={13} /> : <Circle size={13} />}<span>{props.recording ? '停止录制' : '开始录制'}</span>
         </button>
         <span className="toolbar-separator" />
@@ -75,12 +76,12 @@ export function ScriptWorkspace(props: Props) {
         <button className="editor-tool-button" onClick={() => props.openModal('mapping')}><Keyboard size={14} /><span>按键映射</span></button>
         <button className="editor-tool-button script-help" onClick={() => props.openModal('help')}><CircleHelp size={14} /><span>帮助</span></button>
       </div>
-      <div className="editor-surface">
+      {props.scriptId ? <div className="editor-surface">
         <pre ref={lineNumbers} className="line-numbers" aria-hidden="true">{Array.from({ length: lines }, (_, i) => i + 1).join('\n')}</pre>
         <textarea ref={editor} aria-label="脚本内容" value={props.script} wrap="off" spellCheck={false} autoCapitalize="off"
           onChange={event => { props.onChange(event.target.value); updateCursor(); }} onSelect={updateCursor}
           onScroll={event => { if (lineNumbers.current) lineNumbers.current.scrollTop = event.currentTarget.scrollTop; }} placeholder="# 在此输入脚本" />
-      </div>
+      </div> : <div className="empty-state editor-empty"><FileCode2 size={26} /><h2>选择一个脚本</h2><p>展开左侧文件夹，选择脚本开始编辑</p></div>}
       <section className="execution-console" aria-label="运行日志">
         <header className="execution-header">
           <TerminalSquare size={14} /><h2>日志</h2>

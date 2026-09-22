@@ -1,36 +1,83 @@
-import { useCallback, useState } from 'react';
-import type { GameId } from './workspace';
-import { defaultScriptId, isScriptSaved, persistScriptLibrary, readScriptLibrary, type LibraryScript } from './scriptLibrary';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { fromFile, isScriptDirty, scriptError, type LibraryScript, type ScriptFolder } from './scriptLibrary';
 
-export function useScriptLibrary(game: GameId) {
-  const [scripts, setScripts] = useState(readScriptLibrary);
-  const [selected, setSelected] = useState<Record<GameId, string>>({
-    frlg: defaultScriptId('frlg'), bdsp: defaultScriptId('bdsp'), swsh: defaultScriptId('swsh'),
-  });
-  const available = scripts.filter(script => script.game === game);
-  const active = available.find(script => script.id === selected[game]) || available[0];
+export function useScriptLibrary() {
+  const api = window.desktop?.scripts;
+  const [scripts, setScripts] = useState<LibraryScript[]>([]);
+  const [folders, setFolders] = useState<ScriptFolder[]>([]);
+  const [selected, setSelected] = useState('');
+  const [rootPath, setRootPath] = useState('');
+  const [error, setError] = useState('');
+  const [warnings, setWarnings] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const pending = useRef(false);
+  const active = scripts.find(script => script.path === selected) || scripts[0];
+  useEffect(() => { setSelected(active?.path || ''); }, [active?.path]);
 
-  const select = (id: string) => {
-    if (available.some(script => script.id === id)) setSelected(current => ({ ...current, [game]: id }));
-  };
+  const refresh = useCallback(async () => {
+    if (!api || pending.current) return;
+    pending.current = true;
+    setBusy(true);
+    try {
+      const listing = await api.list();
+      setRootPath(listing.rootPath);
+      setFolders(listing.folders);
+      setWarnings(listing.warnings);
+      setScripts(current => {
+        const previous = new Map(current.map(script => [script.path, script]));
+        const next = listing.files.map(file => {
+          const old = previous.get(file.path);
+          previous.delete(file.path);
+          return old && isScriptDirty(old) ? { ...old, missing: false, diskChanged: old.saved.revision !== file.revision } : fromFile(file);
+        });
+        // Keep edited files even if they were removed outside the application.
+        return [...next, ...[...previous.values()].filter(isScriptDirty).map(script => ({ ...script, missing: true }))];
+      });
+      setLoaded(true);
+      setError('');
+    } catch (cause) { setError(scriptError(cause)); }
+    finally { pending.current = false; setBusy(false); }
+  }, [api]);
+
+  useEffect(() => { void refresh(); }, [refresh]);
+
   const update = (changes: Partial<Pick<LibraryScript, 'name' | 'body'>>) => {
-    setScripts(current => current.map(script => script.id === active.id ? { ...script, ...changes } : script));
+    if (active) setScripts(current => current.map(script => script.path === active.path ? { ...script, ...changes } : script));
   };
-  const create = () => {
-    let name = '未命名脚本';
-    let number = 2;
-    while (available.some(script => script.name === name)) name = '未命名脚本 ' + number++;
-    const entry: LibraryScript = { id: game + ':' + crypto.randomUUID(), game, name, body: '# 在此编写脚本\n', description: '本机草稿', example: false };
-    setScripts(current => [entry, ...current]);
-    setSelected(current => ({ ...current, [game]: entry.id }));
+  const create = async (folder: string) => {
+    if (!api || pending.current) return;
+    pending.current = true;
+    setBusy(true);
+    try {
+      const file = await api.create(folder);
+      setScripts(current => [...current, fromFile(file)]);
+      setSelected(file.path);
+      setError('');
+    } catch (cause) { setError(scriptError(cause)); }
+    finally { pending.current = false; setBusy(false); }
   };
-  const save = useCallback(() => {
-    const name = active.name.trim() || '未命名脚本';
-    const next = scripts.map(script => script.id === active.id
-      ? { ...script, name, description: '本机脚本', example: false, saved: { name, body: script.body } } : script);
-    persistScriptLibrary(next);
-    setScripts(next);
-  }, [active, scripts]);
+  const save = useCallback(async () => {
+    if (!api || !active || pending.current || !isScriptDirty(active)) return false;
+    pending.current = true;
+    setBusy(true);
+    try {
+      const file = await api.save({ path: active.path, name: active.name, body: active.body, expectedRevision: active.saved.revision });
+      setScripts(current => current.map(script => script.path === active.path ? {
+        ...fromFile(file),
+        // Typing and selecting other scripts can continue while disk I/O is pending.
+        name: script.name === active.name ? file.name : script.name,
+        body: script.body,
+      } : script));
+      setSelected(current => current === active.path || !current ? file.path : current);
+      setError('');
+      return true;
+    } catch (cause) { setError(scriptError(cause)); throw cause; }
+    finally { pending.current = false; setBusy(false); }
+  }, [active, api]);
 
-  return { scripts: available, active, saved: isScriptSaved(active), select, update, create, save };
+  return {
+    scripts, folders, active, rootPath, error, warnings, busy, loaded, available: Boolean(api),
+    saved: Boolean(active && !isScriptDirty(active)), select: setSelected, update, create, save, refresh,
+  };
 }

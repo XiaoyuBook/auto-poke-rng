@@ -13,7 +13,7 @@ import { ToolsDialog, VideoPreview } from './components/Tools';
 import { createLog, games, type GameId, type LogEntry, type Modal, type Page } from './workspace';
 import { usePanelWindows } from './usePanelWindows';
 import { useScriptLibrary } from './useScriptLibrary';
-import { isScriptDirty } from './scriptLibrary';
+import { parentFolder, scriptError } from './scriptLibrary';
 
 export default function App() {
   const [page, setPage] = useState<Page>('脚本编辑');
@@ -21,10 +21,10 @@ export default function App() {
   const [game, setGame] = useState<GameId>('frlg');
   const [gameMenuOpen, setGameMenuOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
-  const [run, setRun] = useState<{ game: GameId; scriptName: string; started: number } | null>(null);
+  const [run, setRun] = useState<{ folder: string; scriptName: string; started: number } | null>(null);
   const [recording, setRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
-  const library = useScriptLibrary(game);
+  const library = useScriptLibrary();
   const { save: saveScript } = library;
   const [logs, setLogs] = useState<LogEntry[]>(() => [createLog('工作区已就绪，等待运行脚本。')]);
   const [modal, setModal] = useState<Modal | null>(null);
@@ -40,7 +40,7 @@ export default function App() {
   const gameButton = useRef<HTMLButtonElement>(null);
   const dockButtons = useRef<Partial<Record<PanelTool, HTMLButtonElement | null>>>({});
   const activeGame = games.find(item => item.id === game)!;
-  const script = library.active.body;
+  const script = library.active?.body || '';
   const saved = library.saved;
 
   const addLog = useCallback((message: string, source: LogEntry['source'] = '系统', level: LogEntry['level'] = 'info') => {
@@ -96,13 +96,12 @@ export default function App() {
     void nativePanels?.publishLogs(logs).catch(() => setToast('独立窗口的日志同步失败，请重新打开窗口。'));
   }, [logs, nativePanels]);
 
-  const saveDraft = useCallback(() => {
+  const saveDraft = useCallback(async () => {
     try {
-      saveScript();
-      setToast('草稿已保存到本机');
-    } catch {
-      setToast('保存失败，请检查本机存储空间');
-      addLog('草稿保存失败，编辑内容仍保留在当前窗口。', '脚本', 'warning');
+      if (await saveScript()) setToast('脚本已保存到文件');
+    } catch (error) {
+      setToast('保存失败：' + scriptError(error));
+      addLog('脚本保存失败，编辑内容仍保留在当前窗口。', '脚本', 'warning');
     }
   }, [addLog, saveScript]);
 
@@ -159,11 +158,12 @@ export default function App() {
       setElapsed(Math.floor((Date.now() - run.started) / 1000));
       setRun(null);
       addLog('运行演示已停止。', '脚本');
-    } else {
+    } else if (library.active) {
       setElapsed(0);
       const scriptName = library.active.name.trim() || '未命名脚本';
-      setRun({ game, scriptName, started: Date.now() });
-      addLog(activeGame.label + ' · ' + scriptName + '：开始运行演示，不向设备发送操作。', '脚本', 'success');
+      const folder = parentFolder(library.active.path) || 'scripts';
+      setRun({ folder, scriptName, started: Date.now() });
+      addLog(folder + ' · ' + scriptName + '：开始运行演示，不向设备发送操作。', '脚本', 'success');
     }
   };
 
@@ -242,15 +242,15 @@ export default function App() {
           <h1>{page}</h1>
           <div className="topbar-actions">
             <button className="search-trigger" title="快速查找 (Ctrl+K)" aria-label="快速查找" onClick={() => setPaletteOpen(true)}><Search size={15} /><kbd>Ctrl K</kbd></button>
-            <span className="run-state"><span className={'status-dot ' + (run || recording ? 'success' : '')} />{run ? games.find(item => item.id === run.game)!.label + ' · 演示运行中' : recording ? '录制预览中' : '待命'}</span>
+            <span className="run-state"><span className={'status-dot ' + (run || recording ? 'success' : '')} />{run ? run.folder + ' · 演示运行中' : recording ? '录制预览中' : '待命'}</span>
           </div>
         </header>
 
         <div className="workspace-content">
-          {page === '脚本编辑' && <ScriptWorkspace key={game} scriptId={library.active.id} scriptName={library.active.name} script={script}
+          {page === '脚本编辑' && <ScriptWorkspace scriptId={library.active?.path || ''} scriptName={library.active?.name || ''} script={script}
             onChange={body => library.update({ body })} onRename={name => library.update({ name })} onCursorChange={setCursor} saved={saved}
-            statusLabel={saved ? '已保存到本机' : library.active.example && !isScriptDirty(library.active) ? '示例脚本' : '未保存'} onSave={saveDraft}
-            library={<ScriptLibrary gameName={activeGame.label} scripts={library.scripts} selectedId={library.active.id} select={library.select} create={library.create} />}
+            busy={library.busy} statusLabel={!library.active ? '' : library.active.missing ? '文件已移除 · 编辑保留' : library.active.diskChanged ? '外部已修改 · 编辑保留' : saved ? '已保存' : '未保存'} onSave={saveDraft}
+            library={<ScriptLibrary {...library} selectedPath={library.active?.path} />}
             logs={logs} clearLogs={() => setLogs([])} running={Boolean(run)} runningName={run?.scriptName} recording={recording} elapsed={elapsed} toggleRunning={toggleRunning} toggleRecording={toggleRecording} openModal={openModal} />}
           {page === '首页' && <div className="empty-state home-empty"><Home size={28} /><h2>开始你的工作</h2><p>当前游戏为{activeGame.label}，打开脚本编辑开始配置操作。</p><button className="button" onClick={() => setPage('脚本编辑')}><TerminalSquare size={15} />打开脚本编辑</button></div>}
         </div>

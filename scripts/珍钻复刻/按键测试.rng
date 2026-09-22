@@ -1,0 +1,9 @@
+# 按顺序预览常用按键
+
+press A
+wait 500
+press B
+wait 500
+press X
+wait 500
+press Y

@@ -25,7 +25,7 @@ export function ToolsDialog({ modal, close, onInput }: { modal: Modal; close: ()
             <div><dt><code>wait 1000</code></dt><dd>等待 1000 毫秒</dd></div>
             <div><dt><code>press A</code></dt><dd>按下 A 键</dd></div>
           </dl>
-          <div className="help-shortcuts"><span><kbd>Ctrl K</kbd> 快速查找</span><span><kbd>Ctrl S</kbd> 保存本机草稿</span></div>
+          <div className="help-shortcuts"><span><kbd>Ctrl K</kbd> 快速查找</span><span><kbd>Ctrl S</kbd> 保存当前文件</span></div>
         </>}
       </div>
     </Dialog>
