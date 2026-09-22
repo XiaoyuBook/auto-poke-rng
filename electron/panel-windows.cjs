@@ -10,11 +10,18 @@ function registerPanelWindows({ getMainWindow, loadWindow }) {
   let logSource = '全部来源';
   const validTools = new Set(['video', 'logs']);
   const sources = new Set(['全部来源', '系统', '脚本', '手柄']);
+  const canSend = window => window && !window.isDestroyed() && !window.webContents.isDestroyed();
+  const notifyMain = action => {
+    const main = getMainWindow();
+    if (canSend(main)) main.webContents.send('panels:action', action);
+  };
 
   const stateFor = window => ({ detached: [...windows.keys()], logs, logSource, alwaysOnTop: window.isAlwaysOnTop() });
   const broadcast = () => {
     for (const window of [getMainWindow(), ...[...windows.values()].map(item => item.window)]) {
-      if (window && !window.isDestroyed()) window.webContents.send('panels:state', stateFor(window));
+      // An owned window may close after the owner's renderer is destroyed but
+      // before its BrowserWindow emits 'closed'. Check both lifetimes.
+      if (canSend(window)) window.webContents.send('panels:state', stateFor(window));
     }
   };
   const requireWindow = event => {
@@ -52,6 +59,9 @@ function registerPanelWindows({ getMainWindow, loadWindow }) {
     const height = Math.min(Math.max(280, preferred.height), area.height);
     const window = new BrowserWindow({
       width, height, useContentSize: true,
+      // Owned, non-modal windows stay above the workspace while it has focus.
+      // Global always-on-top remains an explicit choice via the pin button.
+      parent: getMainWindow(), modal: false,
       x: Math.max(area.x, Math.min(preferred.x, area.x + area.width - width)),
       y: Math.max(area.y, Math.min(preferred.y, area.y + area.height - height)),
       minWidth: 360, minHeight: 280, show: false, resizable: true,
@@ -108,17 +118,17 @@ function registerPanelWindows({ getMainWindow, loadWindow }) {
   });
   ipcMain.handle('panels:clear-logs', event => {
     requireTool(event);
-    getMainWindow()?.webContents.send('panels:action', { type: 'clear-logs' });
+    notifyMain({ type: 'clear-logs' });
   });
   ipcMain.handle('panels:dock', event => {
     const { tool, window } = requireTool(event);
     const main = getMainWindow();
-    if (main && !main.isDestroyed()) {
+    if (canSend(main)) {
       if (main.isMinimized()) main.restore();
       main.show();
       main.focus();
       window.close();
-      main.webContents.send('panels:action', { type: 'dock', tool });
+      notifyMain({ type: 'dock', tool });
     }
   });
   ipcMain.handle('panels:always-on-top', (event, enabled) => {

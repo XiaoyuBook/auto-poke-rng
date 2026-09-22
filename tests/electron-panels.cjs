@@ -2,7 +2,14 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { execFile } = require('node:child_process');
+const { promisify } = require('node:util');
 const { registerPanelWindows } = require('../electron/panel-windows.cjs');
+
+// Fail automation immediately instead of showing Electron's uncaught-error dialog.
+const fail = error => { console.error(error); app.exit(1); };
+process.on('uncaughtException', fail);
+process.on('unhandledRejection', fail);
 
 const root = path.resolve(__dirname, '..');
 const output = path.join(root, 'node_modules/.tmp/panel-window-review');
@@ -42,6 +49,23 @@ async function capture(window, name) {
   hideTestWindows = true;
 }
 const findTool = tool => BrowserWindow.getAllWindows().find(window => new URL(window.webContents.getURL() || 'about:blank').searchParams.get('panel') === tool);
+
+async function assertAboveMain(main, tool) {
+  assert.equal(tool.isVisible(), true, 'tool remains visible while using main window');
+  assert.equal(tool.isMinimized(), false, 'tool is not minimized by main window focus');
+  assert.equal(tool.isAlwaysOnTop(), false, 'tool does not need global always-on-top');
+  if (process.platform !== 'win32') return;
+  const nativeHandle = window => {
+    const bytes = window.getNativeWindowHandle();
+    return (bytes.length === 8 ? bytes.readBigUInt64LE() : bytes.readUInt32LE()).toString();
+  };
+  const { stdout } = await promisify(execFile)('powershell.exe', [
+    '-NoProfile', '-NonInteractive', '-File', path.join(__dirname, 'window-order.ps1'),
+    '-MainHandle', nativeHandle(main), '-ToolHandle', nativeHandle(tool),
+  ], { windowsHide: true, timeout: 10000 });
+  assert.deepEqual(JSON.parse(stdout.trim()), { aboveMain: true, minimized: false, visible: true },
+    'detached tool stays above the main window in native Windows stacking order');
+}
 
 app.whenReady().then(async () => {
   const errors = [];
@@ -103,7 +127,8 @@ app.whenReady().then(async () => {
   await until(() => evaluate(main, '!document.querySelector(".floating-side-panel")'), 'inline panel removed');
   assert.equal(logs.isResizable(), true);
   assert.equal(logs.isMovable(), true);
-  assert.equal(logs.getParentWindow(), null);
+  assert.equal(logs.getParentWindow(), main);
+  assert.equal(logs.isModal(), false, 'detached tools do not block the main window');
   console.log('Detached window ready');
   await click(main, '日志中心');
   assert.equal(BrowserWindow.getAllWindows().length, 2, 'existing window is reused');
@@ -124,12 +149,26 @@ app.whenReady().then(async () => {
   assert.notEqual(movedNative.x, initialNative.x);
   assert.ok(movedNative.width > initialNative.width);
   await capture(logs, 'detached-logs');
+  hideTestWindows = false;
+  main.show();
+  logs.show();
+  main.focus();
+  await until(() => main.isFocused(), 'main window can take focus while tool stays open');
   await click(main, '视频预览');
+  await assertAboveMain(main, logs);
   await click(main, '弹出为独立窗口');
   await until(() => Boolean(findTool('video')), 'video window created');
   const video = findTool('video');
   await until(() => evaluate(video, 'Boolean(document.querySelector(".video-preview-content"))'), 'video ready');
   assert.equal(BrowserWindow.getAllWindows().length, 3);
+  main.focus();
+  await until(() => main.isFocused(), 'main stays interactive with both tools open');
+  await assertAboveMain(main, logs);
+  await assertAboveMain(main, video);
+  main.hide();
+  logs.hide();
+  video.hide();
+  hideTestWindows = true;
   await capture(video, 'detached-video');
   video.setContentSize(760, 280);
   await delay(150);
@@ -173,7 +212,7 @@ app.whenReady().then(async () => {
   assert.equal(video.isDestroyed(), true, 'main close cleans up detached tools');
   assert.equal(BrowserWindow.getAllWindows().length, 0);
   clearTimeout(timeout);
-  console.log('PASS Electron panels: pointer resize, size persistence, independent move/resize, detach/dock, duplicate prevention, live logs, filters, clear, pin, edits, cleanup.');
+  console.log('PASS Electron panels: pointer resize, size persistence, independent move/resize, detach/dock, native stacking order, duplicate prevention, live logs, filters, clear, pin, edits, cleanup.');
   console.log('Screenshots: ' + output);
   app.exit(0);
 }).catch(error => { console.error(error); app.exit(1); });
