@@ -7,9 +7,9 @@ function createWindow() {
     height: 920,
     minWidth: 1100,
     minHeight: 680,
-    backgroundColor: '#101114',
+    backgroundColor: '#191a1a',
     titleBarStyle: 'hidden',
-    titleBarOverlay: { color: '#131519', symbolColor: '#a5aab5', height: 42 },
+    titleBarOverlay: { color: '#191a1a', symbolColor: '#acafaf', height: 44 },
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -20,7 +20,6 @@ function createWindow() {
 
   if (!app.isPackaged) {
     window.loadURL('http://127.0.0.1:5173');
-    window.webContents.openDevTools({ mode: 'detach' });
   } else {
     window.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
   }
