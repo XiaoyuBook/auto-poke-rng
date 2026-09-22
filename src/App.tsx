@@ -16,14 +16,18 @@ import { usePanelWindows } from './usePanelWindows';
 import { useScriptLibrary } from './useScriptLibrary';
 import { parentFolder, scriptError } from './scriptLibrary';
 import { GlobalTools, initialConnections, type DeviceConnections } from './components/GlobalTools';
+import { useDevices } from './useDevices';
 
 export default function App({ connections = initialConnections }: { connections?: DeviceConnections }) {
+  const devices = useDevices();
+  const actualConnections = window.desktop?.devices ? { video: devices.video.status, controller: devices.controller.status } : connections;
   const [page, setPage] = useState<Page>('脚本编辑');
   const [cursor, setCursor] = useState({ line: 1, column: 1 });
   const [game, setGame] = useState<GameId>('frlg');
   const [gameMenuOpen, setGameMenuOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [run, setRun] = useState<{ folder: string; scriptName: string; started: number } | null>(null);
+  const startingRun = useRef<Promise<unknown> | null>(null);
   const [recording, setRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const library = useScriptLibrary();
@@ -49,6 +53,15 @@ export default function App({ connections = initialConnections }: { connections?
   const addLog = useCallback((message: string, source: LogEntry['source'] = '系统', level: LogEntry['level'] = 'info') => {
     setLogs(entries => [...entries, createLog(message, source, level)].slice(-500));
   }, []);
+
+  useEffect(() => window.desktop?.devices?.onEvent(event => {
+    if (event.event === 'script.started') addLog('脚本已通过预检，开始执行。', '脚本', 'success');
+    if (event.event === 'script.log' && event.message) addLog(event.message, '脚本');
+    if (event.event === 'script.done') {
+      setRun(current => { if (current) setElapsed(Math.floor((Date.now() - current.started) / 1000)); return null; });
+      addLog(event.status === 'completed' ? '脚本执行完成，伊机控保持连接。' : event.status === 'cancelled' ? '脚本已停止，按键已释放。' : '脚本执行失败：' + event.message, '脚本', event.status === 'failed' ? 'warning' : 'info');
+    }
+  }), [addLog]);
 
   const openModal = (next: Modal) => {
     setGameMenuOpen(false);
@@ -162,6 +175,20 @@ export default function App({ connections = initialConnections }: { connections?
   }, [gameMenuOpen]);
 
   const toggleRunning = () => {
+    const api = window.desktop?.devices?.execution;
+    if (api) {
+      if (run) {
+        void Promise.resolve(startingRun.current).then(() => api.stop()).catch(error => { setToast(error.message); addLog(error.message, '脚本', 'warning'); });
+      } else if (library.active) {
+        const folder = parentFolder(library.active.path) || 'scripts';
+        setElapsed(0); setRun({ folder, scriptName: library.active.name, started: Date.now() });
+        addLog(folder + ' · ' + library.active.name + '：准备执行。', '脚本');
+        const pending = api.start({ text: script, path: library.active.path });
+        startingRun.current = pending;
+        void pending.catch(error => { setRun(null); setToast(error.message); addLog(error.message, '脚本', 'warning'); }).finally(() => { startingRun.current = null; });
+      }
+      return;
+    }
     if (run) {
       setElapsed(Math.floor((Date.now() - run.started) / 1000));
       setRun(null);
@@ -226,7 +253,7 @@ export default function App({ connections = initialConnections }: { connections?
               </div>
             )}
           </div>
-          <GlobalTools connections={connections} unread={unread} open={openModal} />
+          <GlobalTools connections={actualConnections} unread={unread} open={openModal} />
         </div>
 
         <nav className="sidebar-nav" aria-label="工作区">
@@ -250,7 +277,7 @@ export default function App({ connections = initialConnections }: { connections?
           <h1>{page}</h1>
           <div className="topbar-actions">
             <button className="search-trigger" title="快速查找 (Ctrl+K)" aria-label="快速查找" onClick={() => setPaletteOpen(true)}><Search size={15} /><kbd>Ctrl K</kbd></button>
-            <span className="run-state"><span className={'status-dot ' + (run || recording ? 'success' : '')} />{run ? run.folder + ' · 演示运行中' : recording ? '录制预览中' : '待命'}</span>
+            <span className="run-state"><span className={'status-dot ' + (run || recording ? 'success' : '')} />{run ? run.folder + (window.desktop?.devices ? ' · 运行中' : ' · 演示运行中') : recording ? '录制预览中' : '待命'}</span>
           </div>
         </header>
 

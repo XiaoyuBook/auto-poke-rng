@@ -1,0 +1,18 @@
+{
+  "source": "frlg-auto-rng",
+  "commit": "4d2b7b50d64e83a3ae35456c29b6bf6f7fd6ee32",
+  "path": "easycon/native",
+  "files": {
+    "ast.py": "c10ef4a4a1004f03f37402103cd91b21109d59aa955d5b7f208ba7ca286c58eb",
+    "errors.py": "ea6d8fd9d66ad8c96e92f958d5f29a01e80223da59966168db35640692793acf",
+    "parser.py": "d7e76997c363cfd3c1f4821ddbc518582b5731f6d27d4a5ac6f4b2a58ace6ca3",
+    "validation.py": "76a9d5fc11c449618108c1d785d09edba9713bf6d5d1340e3a0baa27514c7914",
+    "engine.py": "b55493ea44f4ede6360de9886e049d01bc31f5749eb9dc510ee0c08899fcf129",
+    "runtime.py": "363c48dd2666c6be12402a6fa88ac23eaf7cf34c280f5aa708248192df787cfb",
+    "trace.py": "2902f51b013d2c71e762a2f9d357a59ef7c6577036d690eb8527db35ef0a848d",
+    "live_edit.py": "0459ac892488adf0263aff448caa8714bdc2f3cb26f6eb06cdd4c2e6b576968c",
+    "pause.py": "2c964a36376cfd2dc1974028d8404302207d07bd19ae95096e4c0a2542e4609a",
+    "image_labels.py": "0f0dc2b9694ec4bbf943bcfb2b23b1205491d3247f026c90053155257f00fbf7",
+    "tesseract.py": "9f6be3119e1f642217ece37542d67100192f07e05a0eee3e169e972861269def"
+  }
+}

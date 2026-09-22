@@ -25,6 +25,7 @@ export interface PanelWindowsApi {
 }
 
 export interface DesktopApi {
+  devices?: import('./devices').DevicesApi;
   getMetadata: () => Promise<{ name: string; version: string; platform: string }>;
   panels: PanelWindowsApi;
   scripts: ScriptFilesApi;

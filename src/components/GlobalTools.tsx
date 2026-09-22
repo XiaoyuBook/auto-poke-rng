@@ -1,6 +1,6 @@
 import { Bell, Gamepad2, Tv } from 'lucide-react';
 
-export type ConnectionStatus = 'idle' | 'failed' | 'connected';
+export type ConnectionStatus = 'idle' | 'connecting' | 'failed' | 'connected';
 export interface DeviceConnections {
   video: ConnectionStatus;
   controller: ConnectionStatus;
@@ -8,7 +8,7 @@ export interface DeviceConnections {
 
 export const initialConnections: DeviceConnections = { video: 'idle', controller: 'idle' };
 const connectionLabels: Record<ConnectionStatus, string> = {
-  idle: '未尝试连接', failed: '连接失败', connected: '连接成功',
+  idle: '未尝试连接', connecting: '正在连接', failed: '连接失败', connected: '连接成功',
 };
 
 interface Props {

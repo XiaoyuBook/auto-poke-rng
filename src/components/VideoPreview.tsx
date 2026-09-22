@@ -1,5 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Camera, CircleHelp, Focus, Image, ImagePlus, MonitorPlay, Play, Save, ScanSearch, Search, Tag, Tags } from 'lucide-react';
+import { useDevices } from '../useDevices';
+import type { Snapshot } from '../devices';
+
+function LiveVideo() {
+  const { video } = useDevices();
+  return video.status === 'connected' && video.previewUrl
+    ? <img className="live-video" src={video.previewUrl} alt="实时视频画面" draggable={false} />
+    : <><MonitorPlay size={28} /><strong>{video.status === 'connecting' ? '正在连接视频源…' : video.status === 'failed' ? '视频源已中断' : '等待视频源连接'}</strong></>;
+}
 
 export function VideoLabelsButton({ expanded, toggle }: { expanded: boolean; toggle: () => void }) {
   return <button className={'icon-button ' + (expanded ? 'active' : '')} title="标签" aria-label="标签"
@@ -9,13 +18,29 @@ export function VideoLabelsButton({ expanded, toggle }: { expanded: boolean; tog
 export function VideoPreview({ labelsOpen = false }: { labelsOpen?: boolean }) {
   return <section className="video-preview-content" aria-label="视频画面" data-labels-open={labelsOpen}>
     {!labelsOpen && <div className="preview-stage">
-      <div className="preview-frame"><MonitorPlay size={28} /><strong>等待视频源连接</strong></div>
+      <div className="preview-frame"><LiveVideo /></div>
     </div>}
-    <div className="image-label-content" hidden={!labelsOpen}><ImageLabelWorkspace /></div>
+    <div className="image-label-content" hidden={!labelsOpen}><ImageLabelWorkspace active={labelsOpen} /></div>
   </section>;
 }
 
-function ImageLabelWorkspace() {
+function ImageLabelWorkspace({ active }: { active: boolean }) {
+  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
+  useEffect(() => {
+    const api = window.desktop?.devices?.video;
+    if (!api) return;
+    let active = true, changed = false;
+    const unsubscribe = api.onSnapshot(frame => { changed = true; if (active) setSnapshot(frame); });
+    void api.getSnapshot().then(frame => { if (active && !changed) setSnapshot(frame); }).catch(() => {});
+    return () => { active = false; unsubscribe(); };
+  }, []);
+  const captureSnapshot = async () => {
+    try {
+      const api = window.desktop?.devices?.video;
+      if (!api) throw new Error('请使用桌面应用连接视频源。');
+      const frame = await api.snapshot(); setSnapshot(frame); setNotice(`已截取第 ${frame.sequence} 帧 · ${frame.width} × ${frame.height}`);
+    } catch (error) { setNotice(error instanceof Error ? error.message : String(error)); }
+  };
   const [mode, setMode] = useState<'range' | 'target' | null>(null);
   const [notice, setNotice] = useState('');
   const previewAction = (name: string) => setNotice(name + '功能将在后续接入。');
@@ -26,7 +51,7 @@ function ImageLabelWorkspace() {
         <header className="label-section-heading"><h4><Image size={14} />截图画布</h4><span>静态帧</span></header>
         <div className="label-snapshot-stage">
           <div className="label-snapshot-frame">
-            <ImagePlus size={30} /><strong>尚未截图</strong><p>从右侧实时画面截取一帧，在这里圈选与标注</p>
+            {snapshot ? <img className="snapshot-video" src={snapshot.url} alt="截图静态帧" /> : <><ImagePlus size={30} /><strong>尚未截图</strong><p>从右侧实时画面截取一帧，在这里圈选与标注</p></>}
           </div>
         </div>
         <div className="label-canvas-caption"><span>左键移动 · 滚轮缩放 · 右键圈选</span><span>100%</span></div>
@@ -35,13 +60,13 @@ function ImageLabelWorkspace() {
       <section className="label-monitor-section" aria-label="实时视频监视器">
         <header className="label-section-heading"><h4><MonitorPlay size={14} />实时画面</h4></header>
         <div className="label-monitor-stage">
-          <div className="label-monitor-frame"><MonitorPlay size={26} /><strong>等待视频源连接</strong></div>
+          <div className="label-monitor-frame">{active && <LiveVideo />}</div>
         </div>
       </section>
 
       <section className="label-edit-section" aria-label="图像标签编辑">
         <div className="label-action-bar" role="toolbar" aria-label="截图与圈选工具">
-          <button className="button" onClick={() => previewAction('截图')}><Camera size={14} />截图</button>
+          <button className="button" onClick={() => void captureSnapshot()}><Camera size={14} />截图</button>
           <button className={'button label-selection-button range ' + (mode === 'range' ? 'active' : '')} aria-pressed={mode === 'range'} title="红框：圈选搜索范围" onClick={() => setMode(value => value === 'range' ? null : 'range')}><span className="label-color-dot" />搜索范围</button>
           <button className={'button label-selection-button target ' + (mode === 'target' ? 'active' : '')} aria-pressed={mode === 'target'} title="绿框：圈选搜索目标" onClick={() => setMode(value => value === 'target' ? null : 'target')}><span className="label-color-dot" />搜索目标</button>
           <button className="button" onClick={() => previewAction('搜索测试')}><ScanSearch size={14} />搜索测试</button>
@@ -92,7 +117,7 @@ function ImageLabelWorkspace() {
         </section>
       </div>
     </div>
-    <footer className="label-workspace-note" role="status">{notice || '截图、图像识别与标签保存功能待接入。'}</footer>
+    <footer className="label-workspace-note" role="status">{notice || '连接视频源后可截图，圈选、识别测试与标签保存待接入。'}</footer>
   </div>;
 }
 

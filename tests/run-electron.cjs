@@ -3,7 +3,7 @@ const path = require('node:path');
 
 const testEnv = { ...process.env };
 delete testEnv.ELECTRON_RUN_AS_NODE;
-const result = spawnSync(require('electron'), [path.resolve(__dirname, 'electron-panels.cjs')], {
+const result = spawnSync(require('electron'), [path.resolve(__dirname, process.argv[2] || 'electron-panels.cjs')], {
   env: testEnv, encoding: 'utf8', timeout: 60000, windowsHide: true,
 });
 if (result.stdout) process.stdout.write(result.stdout);

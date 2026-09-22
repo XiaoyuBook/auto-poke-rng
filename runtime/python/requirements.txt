@@ -1,0 +1,3 @@
+# Only the reused .IL image-search adapter needs these; the interpreter is stdlib-only.
+numpy==2.2.6
+opencv-python-headless==4.12.0.88

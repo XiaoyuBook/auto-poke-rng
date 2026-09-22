@@ -8,6 +8,10 @@
   "scripts": {
     "dev": "concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && electron .\"",
     "build": "tsc -b && vite build",
+    "build:runtime": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/build-runtime.ps1",
+    "setup:runtime": "npm run build:runtime && powershell -NoProfile -ExecutionPolicy Bypass -File tools/setup-script-host.ps1",
+    "test:runtime": "ctest --test-dir runtime/build -C Release --output-on-failure && node --test tests/runtime-integration.cjs tests/controller-integration.cjs",
+    "test:devices": "npm run build && node tests/run-electron.cjs electron-devices.cjs",
     "test": "vitest run",
     "test:electron": "npm run build && node tests/run-electron.cjs",
     "start": "electron .",

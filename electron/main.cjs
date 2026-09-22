@@ -2,9 +2,12 @@ const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('node:path');
 const { registerPanelWindows } = require('./panel-windows.cjs');
 const { registerScriptFiles } = require('./script-files.cjs');
+const { registerDevices } = require('./devices.cjs');
 
 let mainWindow = null;
 let panels;
+let devices;
+let quitting = false;
 
 function loadWindow(window, query = {}) {
   if (!app.isPackaged) {
@@ -32,6 +35,7 @@ function createWindow() {
     },
   });
   mainWindow = window;
+  window.webContents.on('render-process-gone', () => { void devices?.stopInputs().catch(() => {}); });
   void loadWindow(window);
   window.on('closed', () => { mainWindow = null; panels.closeAll(); });
 
@@ -45,10 +49,17 @@ app.whenReady().then(() => {
   ipcMain.handle('app:metadata', () => ({ name: 'Auto Poke RNG', version: app.getVersion(), platform: process.platform }));
   panels = registerPanelWindows({ getMainWindow: () => mainWindow, loadWindow });
   registerScriptFiles({ getMainWindow: () => mainWindow, rootDirectory: path.join(app.getAppPath(), 'scripts') });
+  devices = registerDevices({ ipcMain, getWindows: () => BrowserWindow.getAllWindows(), testMode: process.env.AUTO_POKE_TEST_DEVICES === '1' });
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+});
+
+app.on('before-quit', event => {
+  if (quitting || !devices) return;
+  event.preventDefault(); quitting = true;
+  void devices.close().finally(() => app.quit());
 });
 
 app.on('window-all-closed', () => {

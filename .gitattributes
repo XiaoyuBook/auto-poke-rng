@@ -1,0 +1,2 @@
+# Preserve the upstream bytes recorded in runtime/python/vendor-manifest.json.
+runtime/python/easycon/native/*.py -text

@@ -61,7 +61,7 @@ export function ScriptWorkspace(props: Props) {
           <span className="saved-state">{props.statusLabel}</span>
           <button className="icon-button" title="保存文件 (Ctrl+S)" aria-label="保存脚本" onClick={props.onSave} disabled={props.saved || props.busy || !props.scriptId}><Save size={15} /></button>
           <span className="toolbar-separator" />
-          <button className={'button run-button ' + (props.running ? 'danger' : 'primary')} onClick={props.toggleRunning} disabled={props.recording || (!props.running && !props.script.trim())} title="运行界面演示，不向设备发送操作">
+          <button className={'button run-button ' + (props.running ? 'danger' : 'primary')} onClick={props.toggleRunning} disabled={props.recording || (!props.running && !props.script.trim())} title={window.desktop?.devices ? '通过伊机控执行当前编辑内容' : '运行界面演示，不向设备发送操作'}>
             {props.running ? <Square size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
             {props.running ? '停止运行' : '开始运行'}
           </button>

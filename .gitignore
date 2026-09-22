@@ -3,3 +3,7 @@ dist/
 .vite/
 *.tsbuildinfo
 /start-gui.bat
+.deps/
+runtime/build/
+runtime/bin/
+__pycache__/

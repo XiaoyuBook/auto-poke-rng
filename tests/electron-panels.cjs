@@ -5,6 +5,7 @@ const path = require('node:path');
 const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 const { registerPanelWindows } = require('../electron/panel-windows.cjs');
+const { registerDevices } = require('../electron/devices.cjs');
 const { registerScriptFiles } = require('../electron/script-files.cjs');
 
 // Fail automation immediately instead of showing Electron's uncaught-error dialog.
@@ -107,6 +108,7 @@ app.whenReady().then(async () => {
   fs.writeFileSync(path.join(scriptRoot, '火红', '确认.rng'), '# 火红测试\npress A');
   fs.writeFileSync(path.join(scriptRoot, '珍钻复刻', '菜单.rng'), '# 珍钻测试\npress X');
   registerScriptFiles({ getMainWindow: () => main, rootDirectory: scriptRoot });
+  const devices = registerDevices({ ipcMain, getWindows: () => BrowserWindow.getAllWindows(), rootDirectory: scriptRoot, testMode: true });
   main.on('closed', () => { main = null; manager.closeAll(); });
   await loadWindow(main);
   await evaluate(main, 'localStorage.clear()');
@@ -175,8 +177,9 @@ app.whenReady().then(async () => {
   console.log('Detached window ready');
   await click(main, '日志中心');
   assert.equal(BrowserWindow.getAllWindows().length, 2, 'existing window is reused');
+  await evaluate(main, `window.desktop.devices.controller.connect('mock')`);
   await evaluate(main, `Array.from(document.querySelectorAll('button')).find(b => b.textContent === '开始运行').click()`);
-  await until(() => evaluate(logs, `document.querySelector('.logs-table')?.textContent.includes('开始运行演示')`), 'live logs reach detached window');
+  await until(() => evaluate(logs, `document.querySelector('.logs-table')?.textContent.includes('脚本执行完成')`), 'real script host logs reach detached window');
   await evaluate(logs, `Array.from(document.querySelectorAll('button')).find(b => b.textContent === '清空日志').click()`);
   await until(() => evaluate(main, 'window.desktop.panels.getState().then(s => s.logs.length === 0)'), 'clear logs reaches main window');
   assert.equal(await evaluate(main, 'document.querySelector("textarea").value'), '# unsaved detached test');
@@ -333,6 +336,7 @@ app.whenReady().then(async () => {
   assert.ok(smallerPanel.x >= 22 && smallerPanel.y >= 63, 'resized panel remains within smaller workspace');
   assert.ok(smallerPanel.right <= smallerViewport.width && smallerPanel.bottom <= smallerViewport.height);
   assert.deepEqual(errors, [], 'no renderer errors');
+  await devices.close();
   main.close();
   await until(() => BrowserWindow.getAllWindows().length === 0, 'main close cleans up all windows');
   assert.equal(video.isDestroyed(), true, 'main close cleans up detached tools');
