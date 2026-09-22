@@ -42,7 +42,8 @@ describe('workspace interactions', () => {
     expect(screen.getAllByRole('option')).toHaveLength(1);
     fireEvent.keyDown(search, { key: 'ArrowDown' });
     fireEvent.keyDown(search, { key: 'Enter' });
-    await waitFor(() => expect(screen.getByRole('heading', { name: '日志中心', level: 1 })).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole('dialog', { name: '日志中心' })).toBeTruthy());
+    expect(screen.getByRole('heading', { name: '脚本编辑', level: 1 })).toBeTruthy();
     expect(screen.queryByRole('dialog', { name: '快速查找' })).toBeNull();
   });
 
@@ -98,5 +99,35 @@ describe('workspace interactions', () => {
     fireEvent.click(screen.getByRole('button', { name: '关闭通知' }));
     expect(screen.queryByRole('button', { name: '通知：有未读通知' })).toBeNull();
     expect(screen.getByRole('button', { name: '通知' })).toBeTruthy();
+  });
+
+  it('keeps edits and log filters while the floating panel expands, minimizes, and restores', () => {
+    render(<App />);
+    fireEvent.change(screen.getByRole('textbox', { name: '脚本内容' }), { target: { value: '# 工作中的草稿' } });
+    fireEvent.click(screen.getByRole('button', { name: '日志中心' }));
+    const panel = screen.getByRole('dialog', { name: '日志中心' });
+    expect(panel.getAttribute('aria-modal')).toBe('false');
+    expect(screen.getByRole('heading', { name: '脚本编辑', level: 1 })).toBeTruthy();
+    fireEvent.change(within(panel).getByRole('combobox', { name: '筛选日志来源' }), { target: { value: '脚本' } });
+    fireEvent.click(within(panel).getByRole('button', { name: '展开面板' }));
+    expect(panel.getAttribute('data-expanded')).toBe('true');
+    fireEvent.click(within(panel).getByRole('button', { name: '还原面板大小' }));
+    expect(panel.getAttribute('data-expanded')).toBe('false');
+    fireEvent.click(within(panel).getByRole('button', { name: '收起日志中心' }));
+    expect(within(panel).queryByRole('combobox')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '日志中心' }));
+    expect((within(panel).getByRole('combobox') as HTMLSelectElement).value).toBe('脚本');
+    expect(screen.getByRole('textbox', { name: '脚本内容' }).textContent).toBe('# 工作中的草稿');
+    // Switching the dock tool replaces panel content, without stacking another panel.
+    fireEvent.click(screen.getByRole('button', { name: '视频预览' }));
+    expect(screen.queryByRole('dialog', { name: '日志中心' })).toBeNull();
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    const video = screen.getByRole('dialog', { name: '视频预览' });
+    fireEvent.click(within(video).getByRole('button', { name: '收起视频预览' }));
+    fireEvent.click(within(video).getByRole('button', { name: '恢复视频预览' }));
+    expect(video.getAttribute('data-minimized')).toBe('false');
+    fireEvent.keyDown(video, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: '视频预览' }));
   });
 });

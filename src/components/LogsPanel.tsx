@@ -2,11 +2,11 @@ import { useState } from 'react';
 import { FileClock, ListFilter } from 'lucide-react';
 import type { LogEntry } from '../workspace';
 
-export function LogsPage({ logs, clear }: { logs: LogEntry[]; clear: () => void }) {
+export function LogsPanel({ logs, clear }: { logs: LogEntry[]; clear: () => void }) {
   const [source, setSource] = useState('全部来源');
   const filtered = logs.filter(log => source === '全部来源' || log.source === source);
   return (
-    <section className="logs-page" aria-label="日志中心">
+    <section className="logs-panel" aria-label="日志记录">
       <div className="logs-toolbar">
         <label className="log-filter"><ListFilter size={14} />
           <select aria-label="筛选日志来源" value={source} onChange={event => setSource(event.target.value)}>

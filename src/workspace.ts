@@ -1,4 +1,4 @@
-export type Page = '首页' | '脚本编辑' | '日志中心';
+export type Page = '首页' | '脚本编辑';
 export type GameId = 'frlg' | 'bdsp' | 'swsh';
 export type Modal = 'controller' | 'video' | 'notification' | 'mapping' | 'help';
 export type LogEntry = {

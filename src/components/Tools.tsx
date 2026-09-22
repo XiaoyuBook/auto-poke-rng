@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Bell, Gamepad2, MonitorPlay, Tv, X } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Bell, Gamepad2, MonitorPlay, Tv } from 'lucide-react';
 import type { Modal } from '../workspace';
 import { Dialog } from './Dialog';
 
@@ -52,12 +52,13 @@ function Controller({ onInput }: { onInput: (key: string) => void }) {
   </>;
 }
 
-export function VideoPreview({ close, openSource }: { close: () => void; openSource: () => void }) {
+export function VideoPreview({ openSource }: { openSource: () => void }) {
   return (
-    <section className="video-preview" role="dialog" aria-label="视频预览">
-      <header><MonitorPlay size={16} /><h2>视频预览</h2><button className="icon-button" title="关闭视频预览" aria-label="关闭视频预览" onClick={close}><X size={15} /></button></header>
-      <div className="preview-frame"><MonitorPlay size={28} /><strong>等待视频源连接</strong><button className="text-button" onClick={openSource}>选择视频源</button></div>
-      <footer><span><span className="status-dot warning" />未连接</span><span>画面预览</span></footer>
+    <section className="video-preview-content" aria-label="视频画面">
+      <div className="preview-stage">
+        <div className="preview-frame"><MonitorPlay size={28} /><strong>等待视频源连接</strong></div>
+      </div>
+      <footer className="video-preview-footer"><span><span className="status-dot warning" />未连接视频源</span><button className="button" onClick={openSource}>选择视频源</button></footer>
     </section>
   );
 }

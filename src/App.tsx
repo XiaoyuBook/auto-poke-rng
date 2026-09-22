@@ -4,7 +4,8 @@ import {
   MonitorPlay, PanelLeftClose, PanelLeftOpen, Search, TerminalSquare, Tv,
 } from 'lucide-react';
 import { CommandPalette, type CommandAction } from './components/CommandPalette';
-import { LogsPage } from './components/LogsPage';
+import { LogsPanel } from './components/LogsPanel';
+import { FloatingSidePanel, type PanelState, type PanelTool } from './components/FloatingSidePanel';
 import { ScriptWorkspace } from './components/ScriptWorkspace';
 import { ToolsDialog, VideoPreview } from './components/Tools';
 import { createLog, games, readDrafts, type GameId, type LogEntry, type Modal, type Page } from './workspace';
@@ -23,12 +24,13 @@ export default function App() {
   const [logs, setLogs] = useState<LogEntry[]>(() => [createLog('工作区已就绪，等待运行脚本。')]);
   const [modal, setModal] = useState<Modal | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [videoOpen, setVideoOpen] = useState(false);
+  const [toolPanel, setToolPanel] = useState<PanelState | null>(null);
   const [unread, setUnread] = useState(true);
   const [version, setVersion] = useState('0.1.0');
   const [toast, setToast] = useState('');
   const switcher = useRef<HTMLDivElement>(null);
   const gameButton = useRef<HTMLButtonElement>(null);
+  const dockButtons = useRef<Partial<Record<PanelTool, HTMLButtonElement | null>>>({});
   const activeGame = games.find(item => item.id === game)!;
   const script = drafts[game];
   const [savedGames, setSavedGames] = useState(initialDrafts.saved);
@@ -42,6 +44,24 @@ export default function App() {
     setGameMenuOpen(false);
     if (next === 'notification') setUnread(false);
     setModal(next);
+  };
+
+  const showPanel = (tool: PanelTool) => {
+    setToolPanel(current => ({ tool, minimized: false, expanded: current?.expanded ?? false }));
+  };
+
+  const togglePanel = (tool: PanelTool) => {
+    setToolPanel(current => ({ tool, minimized: current?.tool === tool && !current.minimized, expanded: current?.expanded ?? false }));
+  };
+
+  const closePanel = () => {
+    if (toolPanel) dockButtons.current[toolPanel.tool]?.focus();
+    setToolPanel(null);
+  };
+
+  const minimizePanel = () => {
+    if (toolPanel) dockButtons.current[toolPanel.tool]?.focus();
+    setToolPanel(current => current && { ...current, minimized: true });
   };
 
   const saveDraft = useCallback(() => {
@@ -126,8 +146,8 @@ export default function App() {
   const actions: CommandAction[] = [
     { label: '首页', keywords: 'home', icon: <Home size={16} />, run: () => setPage('首页') },
     { label: '脚本编辑', keywords: 'script editor', icon: <TerminalSquare size={16} />, run: () => setPage('脚本编辑') },
-    { label: '视频预览', keywords: 'video preview', icon: <MonitorPlay size={16} />, run: () => setVideoOpen(true) },
-    { label: '日志中心', keywords: 'logs history', icon: <FileClock size={16} />, run: () => setPage('日志中心') },
+    { label: '视频预览', keywords: 'video preview', icon: <MonitorPlay size={16} />, run: () => showPanel('video') },
+    { label: '日志中心', keywords: 'logs history', icon: <FileClock size={16} />, run: () => showPanel('logs') },
     { label: '视频源', keywords: 'tv source', icon: <Tv size={16} />, run: () => openModal('video') },
     { label: '虚拟手柄', keywords: 'controller gamepad', icon: <Gamepad2 size={16} />, run: () => openModal('controller') },
     { label: '按键映射', keywords: 'keyboard mapping', icon: <Keyboard size={16} />, run: () => openModal('mapping') },
@@ -201,15 +221,19 @@ export default function App() {
           {page === '脚本编辑' && <ScriptWorkspace key={game} script={script} onChange={value => setDrafts(current => ({ ...current, [game]: value }))} saved={saved} onSave={saveDraft}
             logs={logs} clearLogs={() => setLogs([])} running={Boolean(run)} recording={recording} elapsed={elapsed} toggleRunning={toggleRunning} toggleRecording={toggleRecording} openModal={openModal} />}
           {page === '首页' && <div className="empty-state home-empty"><Home size={28} /><h2>开始你的工作</h2><p>当前游戏为{activeGame.label}，打开脚本编辑开始配置操作。</p><button className="button" onClick={() => setPage('脚本编辑')}><TerminalSquare size={15} />打开脚本编辑</button></div>}
-          {page === '日志中心' && <LogsPage logs={logs} clear={() => setLogs([])} />}
         </div>
       </main>
 
       <div className="quick-dock" role="toolbar" aria-label="快捷工具">
-        <button className={'icon-button ' + (videoOpen ? 'active' : '')} title="视频预览" aria-label="视频预览" aria-pressed={videoOpen} onClick={() => setVideoOpen(value => !value)}><MonitorPlay size={18} /></button>
-        <button className={'icon-button ' + (page === '日志中心' ? 'active' : '')} title="日志中心" aria-label="日志中心" aria-pressed={page === '日志中心'} onClick={() => setPage('日志中心')}><FileClock size={18} /></button>
+        <button ref={node => { dockButtons.current.video = node; }} className={'icon-button ' + (toolPanel?.tool === 'video' && !toolPanel.minimized ? 'active' : '')}
+          title="视频预览" aria-label="视频预览" aria-expanded={toolPanel?.tool === 'video' && !toolPanel.minimized} aria-controls={toolPanel?.tool === 'video' ? 'floating-tool-panel' : undefined} aria-haspopup="dialog" onClick={() => togglePanel('video')}><MonitorPlay size={18} /></button>
+        <button ref={node => { dockButtons.current.logs = node; }} className={'icon-button ' + (toolPanel?.tool === 'logs' && !toolPanel.minimized ? 'active' : '')}
+          title="日志中心" aria-label="日志中心" aria-expanded={toolPanel?.tool === 'logs' && !toolPanel.minimized} aria-controls={toolPanel?.tool === 'logs' ? 'floating-tool-panel' : undefined} aria-haspopup="dialog" onClick={() => togglePanel('logs')}><FileClock size={18} /></button>
       </div>
-      {videoOpen && <VideoPreview close={() => setVideoOpen(false)} openSource={() => openModal('video')} />}
+      {toolPanel && <FloatingSidePanel state={toolPanel} title={toolPanel.tool === 'video' ? '视频预览' : '日志中心'} icon={toolPanel.tool === 'video' ? <MonitorPlay size={16} /> : <FileClock size={16} />}
+        minimize={minimizePanel} restore={() => showPanel(toolPanel.tool)} toggleExpanded={() => setToolPanel(current => current && { ...current, expanded: !current.expanded })} close={closePanel}>
+        {toolPanel.tool === 'video' ? <VideoPreview openSource={() => openModal('video')} /> : <LogsPanel logs={logs} clear={() => setLogs([])} />}
+      </FloatingSidePanel>}
       {modal && <ToolsDialog modal={modal} close={() => setModal(null)} onInput={key => { if (recording) addLog('输入预览：' + key, '手柄'); }} />}
       {paletteOpen && <CommandPalette actions={actions} close={() => setPaletteOpen(false)} />}
       {toast && <div className="toast" role="status"><Check size={15} />{toast}</div>}
