@@ -98,6 +98,6 @@ function ImageLabelWorkspace() {
 
 function Coordinates({ title, kind }: { title: string; kind: 'range' | 'target' }) {
   return <fieldset><legend><span className={'label-color-dot ' + kind} />{title}</legend><div>
-    {['X', 'Y', '宽', '高'].map(label => <label key={label}><span>{label}</span><input type="number" aria-label={title + ' ' + label} min={0} defaultValue={0} /></label>)}
+    {['X', 'Y', 'W', 'H'].map(label => <label key={label}><span>{label}</span><input type="number" aria-label={title + ' ' + label} min={0} defaultValue={0} /></label>)}
   </div></fieldset>;
 }
