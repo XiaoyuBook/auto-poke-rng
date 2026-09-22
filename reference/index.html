@@ -1,0 +1,1309 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Auto Poke RNG - 界面原型</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #222;
+        --muted: #737373;
+        --line: #cfcfcf;
+        --line-strong: #888;
+        --paper: #fff;
+        --wash: #f5f5f5;
+        --sidebar: 268px;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: var(--paper);
+        font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+        font-size: 14px;
+      }
+
+      button { font: inherit; }
+
+      .window-titlebar {
+        display: flex;
+        align-items: center;
+        min-height: 38px;
+        padding: 0 14px;
+        border-bottom: 1px solid var(--line);
+        background: var(--wash);
+        -webkit-app-region: drag;
+      }
+
+      .app-identity {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--ink);
+        font-size: 13px;
+        white-space: nowrap;
+      }
+
+      .app-icon {
+        display: grid;
+        width: 18px;
+        height: 18px;
+        place-items: center;
+        border: 1px solid var(--ink);
+        border-radius: 50%;
+        background: var(--paper);
+        font-size: 7px;
+        font-weight: 700;
+        line-height: 1;
+      }
+
+      .app-version { color: var(--muted); }
+
+      .app-shell {
+        display: grid;
+        grid-template-columns: var(--sidebar) minmax(0, 1fr);
+        min-height: calc(100vh - 38px);
+        transition: grid-template-columns 180ms ease;
+      }
+
+      .app-shell.is-collapsed { --sidebar: 72px; }
+
+      .sidebar {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        border-right: 1px solid var(--line-strong);
+        background: var(--wash);
+        overflow: visible;
+        position: relative;
+      }
+
+      .sidebar-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 62px;
+        padding: 0 14px 0 16px;
+        white-space: nowrap;
+      }
+
+      .sidebar-actions {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+      }
+
+      .sidebar-action-button {
+        display: grid;
+        position: relative;
+        width: 30px;
+        height: 30px;
+        place-items: center;
+        padding: 0;
+        border: 1px solid transparent;
+        background: transparent;
+        color: var(--muted);
+        cursor: pointer;
+      }
+
+      .sidebar-action-button:hover { border-color: var(--line); background: var(--paper); color: var(--ink); }
+      .sidebar-action-button:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+      .lucide-icon { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.7; }
+      .status-badge {
+        position: absolute;
+        top: 4px;
+        right: 3px;
+        width: 8px;
+        height: 8px;
+        border: 1px solid var(--paper);
+        border-radius: 50%;
+        opacity: 0;
+      }
+
+      .sidebar-action-button[data-status="red"] .status-badge { background: #d64040; opacity: 1; }
+      .sidebar-action-button[data-status="green"] .status-badge { background: #2c9b61; opacity: 1; }
+      .sidebar-action-button[data-status="blue"] .status-badge { background: #4387d2; opacity: 1; }
+
+      .quick-dock {
+        position: fixed;
+        right: 24px;
+        bottom: 24px;
+        z-index: 8;
+        display: grid;
+        gap: 8px;
+        padding: 6px;
+        border: 1px solid var(--line-strong);
+        background: var(--paper);
+        box-shadow: 3px 3px 0 rgba(0, 0, 0, .1);
+      }
+
+      .quick-tool-button {
+        display: grid;
+        width: 38px;
+        height: 38px;
+        padding: 0;
+        place-items: center;
+        border: 1px solid transparent;
+        background: transparent;
+        color: var(--ink);
+        cursor: pointer;
+      }
+
+      .quick-tool-button:hover { border-color: var(--line-strong); background: var(--wash); }
+      .quick-tool-button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+      .quick-tool-button .lucide-icon { width: 19px; height: 19px; }
+
+      .icon-button {
+        display: grid;
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        place-items: center;
+        border: 1px solid var(--line-strong);
+        background: var(--paper);
+        color: var(--ink);
+        cursor: pointer;
+        position: absolute;
+        top: 50%;
+        right: 8px;
+        z-index: 3;
+        transform: translateY(-50%);
+        opacity: 0;
+        transition: background 150ms ease, opacity 150ms ease;
+      }
+
+      .icon-button:hover,
+      .icon-button:focus-visible { background: #e9e9e9; outline: 2px solid var(--ink); outline-offset: 1px; }
+
+      .sidebar:hover .icon-button,
+      .sidebar:focus-within .icon-button,
+      .icon-button:hover { opacity: 1; }
+
+      .sidebar-nav {
+        padding: 18px 12px;
+        overflow-y: auto;
+      }
+
+      .nav-list, .subnav { list-style: none; padding: 0; margin: 0; }
+
+      .nav-item + .nav-item { margin-top: 7px; }
+
+      .nav-link,
+      .group-toggle {
+        display: flex;
+        width: 100%;
+        align-items: center;
+        gap: 10px;
+        min-height: 42px;
+        padding: 0 12px;
+        border: 1px solid transparent;
+        color: var(--ink);
+        background: transparent;
+        text-align: left;
+        cursor: pointer;
+        text-decoration: none;
+      }
+
+      .nav-link:hover,
+      .group-toggle:hover { border-color: var(--line); background: var(--paper); }
+
+      .nav-link.is-active,
+      .subnav-link.is-active { border-color: var(--ink); background: var(--paper); font-weight: 700; }
+
+      .nav-glyph {
+        display: inline-grid;
+        width: 20px;
+        height: 20px;
+        place-items: center;
+        border: 1px solid var(--line-strong);
+        flex: 0 0 auto;
+        font-size: 11px;
+      }
+
+      .chevron {
+        margin-left: auto;
+        font-size: 15px;
+        transition: transform 150ms ease;
+      }
+
+      .group-toggle[aria-expanded="true"] .chevron { transform: rotate(90deg); }
+
+      .subnav {
+        display: grid;
+        gap: 4px;
+        margin: 4px 0 8px 30px;
+        border-left: 1px solid var(--line);
+      }
+
+      .subnav[hidden] { display: none; }
+
+      .subnav-link {
+        display: flex;
+        align-items: center;
+        min-height: 36px;
+        padding: 0 10px;
+        border: 1px solid transparent;
+        color: var(--muted);
+        text-decoration: none;
+        cursor: pointer;
+      }
+
+      .subnav-link:hover { color: var(--ink); border-color: var(--line); background: var(--paper); }
+
+      .sidebar-footer {
+        margin-top: auto;
+        padding: 14px 20px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 12px;
+        white-space: nowrap;
+      }
+
+      .main {
+        min-width: 0;
+        background: var(--paper);
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 72px;
+        padding: 0 34px;
+        border-bottom: 1px solid var(--line-strong);
+      }
+
+      .topbar-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+      .game-switcher { position: relative; }
+      .game-selector {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 38px;
+        padding: 0 10px;
+        border: 1px solid transparent;
+        background: transparent;
+        color: var(--ink);
+        cursor: pointer;
+        font-size: 17px;
+        font-weight: 600;
+      }
+
+      .game-selector:hover,
+      .game-selector[aria-expanded="true"] { border-color: var(--line); background: var(--wash); }
+      .game-selector:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+      .game-selector-chevron { color: var(--muted); font-size: 14px; transition: transform 150ms ease; }
+      .game-selector[aria-expanded="true"] .game-selector-chevron { transform: rotate(180deg); }
+      .page-divider { color: var(--line-strong); }
+      .current-page { color: var(--muted); }
+
+      .sidebar .game-selector { padding: 0 4px; }
+      .sidebar .game-menu { top: calc(100% + 8px); left: -4px; }
+      .game-menu {
+        position: absolute;
+        top: calc(100% + 6px);
+        left: 0;
+        z-index: 10;
+        display: none;
+        width: 224px;
+        padding: 6px;
+        border: 1px solid var(--line-strong);
+        background: var(--paper);
+        box-shadow: 5px 5px 0 rgba(0, 0, 0, .1);
+      }
+
+      .game-menu.is-open { display: block; }
+      .game-group-label { padding: 9px 10px 5px; color: var(--muted); font-size: 11px; letter-spacing: .06em; }
+      .game-option {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        min-height: 36px;
+        padding: 0 10px;
+        border: 1px solid transparent;
+        background: transparent;
+        color: var(--ink);
+        cursor: pointer;
+        text-align: left;
+      }
+
+      .game-option:hover,
+      .game-option.is-selected { border-color: var(--line); background: var(--wash); }
+      .game-option.is-selected::after { content: "✓"; color: var(--muted); }
+
+      .content {
+        min-height: calc(100vh - 110px);
+        padding: 28px 34px 34px;
+      }
+
+      .workspace-heading {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 20px;
+        margin-bottom: 22px;
+      }
+
+      .workspace-heading h1 { margin: 0; font-size: 26px; font-weight: 600; }
+      .workspace-heading p { margin: 7px 0 0; color: var(--muted); }
+      .empty-workspace {
+        display: grid;
+        min-height: min(500px, calc(100vh - 220px));
+        place-items: center;
+        border: 1px solid var(--line-strong);
+        background: var(--wash);
+      }
+
+      .empty-workspace > div { max-width: 340px; padding: 24px; text-align: center; }
+      .empty-workspace h2 { margin: 0 0 10px; font-size: 16px; }
+      .empty-workspace p { margin: 0; color: var(--muted); line-height: 1.7; }
+
+      .script-workspace {
+        display: grid;
+        grid-template-columns: minmax(280px, 32%) minmax(0, 1fr);
+        align-items: stretch;
+        min-height: min(690px, calc(100vh - 220px));
+        border: 1px solid var(--line-strong);
+      }
+
+      .log-center-workspace {
+        min-height: min(500px, calc(100vh - 220px));
+        border: 1px solid var(--line-strong);
+        background: var(--paper);
+      }
+
+      .log-center-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 58px;
+        padding: 0 18px;
+        border-bottom: 1px solid var(--line-strong);
+      }
+
+      .log-center-header h2 { margin: 0; font-size: 14px; font-weight: 600; }
+      .log-table-head,
+      .central-log-entry {
+        display: grid;
+        grid-template-columns: 104px 80px minmax(0, 1fr);
+        gap: 12px;
+        align-items: center;
+        padding: 0 18px;
+      }
+
+      .log-table-head {
+        min-height: 36px;
+        border-bottom: 1px solid var(--line);
+        color: var(--muted);
+        background: var(--wash);
+        font-size: 11px;
+      }
+
+      .central-log-entry {
+        min-height: 46px;
+        border-bottom: 1px solid var(--line);
+        color: var(--muted);
+        font: 12px/1.4 Consolas, "Cascadia Mono", monospace;
+      }
+
+      .central-log-entry span:last-child { color: var(--ink); font-family: "Segoe UI", "Microsoft YaHei", sans-serif; }
+      .central-log-entry .log-source { color: var(--muted); }
+
+      .console-column {
+        display: grid;
+        grid-template-rows: minmax(220px, 1fr) auto auto;
+        min-height: 0;
+        border-right: 1px solid var(--line-strong);
+        background: var(--wash);
+      }
+
+      .panel { min-width: 0; padding: 16px; }
+      .panel + .panel { border-top: 1px solid var(--line-strong); }
+      .panel-heading { display: flex; align-items: center; justify-content: space-between; min-height: 20px; margin-bottom: 12px; }
+      .panel-heading h2 { margin: 0; font-size: 14px; font-weight: 600; }
+
+      .log-panel { display: flex; flex-direction: column; min-height: 0; }
+      .log-output {
+        flex: 1;
+        min-height: 170px;
+        margin: 0;
+        padding: 12px;
+        overflow: auto;
+        border: 1px solid var(--line-strong);
+        background: #343434;
+        color: #f1f1f1;
+        font: 12px/1.65 Consolas, "Cascadia Mono", monospace;
+        white-space: pre-wrap;
+      }
+
+      .quiet-button,
+      .command-button {
+        min-height: 36px;
+        padding: 0 14px;
+        border: 1px solid var(--line-strong);
+        background: var(--paper);
+        color: var(--ink);
+        cursor: pointer;
+      }
+
+      .quiet-button:hover,
+      .command-button:hover { background: #e9e9e9; }
+      .quiet-button:focus-visible,
+      .command-button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+      .quiet-button { min-height: 28px; padding: 0 10px; font-size: 12px; }
+
+      .run-controls { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; }
+      .timer {
+        display: grid;
+        min-width: 114px;
+        min-height: 44px;
+        place-items: center;
+        border: 1px solid var(--ink);
+        background: var(--ink);
+        color: var(--paper);
+        font: 600 17px/1 Consolas, "Cascadia Mono", monospace;
+      }
+
+      .command-button { font-weight: 600; }
+      .command-button.is-active { border-color: var(--ink); background: #dfdfdf; }
+
+      .tool-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+      .button-hint { display: block; margin-top: 5px; color: var(--muted); font-size: 11px; font-weight: 400; }
+
+      .editor-column { display: flex; flex-direction: column; min-width: 0; background: var(--paper); }
+      .editor-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 54px;
+        padding: 0 20px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .editor-header h2 { margin: 0; font-size: 14px; font-weight: 600; }
+      .editor-status { color: var(--muted); font-size: 12px; }
+      .editor-surface { display: grid; grid-template-columns: 52px minmax(0, 1fr); flex: 1; min-height: 0; overflow: auto; }
+      .line-numbers {
+        margin: 0;
+        padding: 16px 12px 16px 0;
+        border-right: 1px dotted var(--line);
+        color: var(--muted);
+        background: #fafafa;
+        font: 13px/1.65 Consolas, "Cascadia Mono", monospace;
+        text-align: right;
+        user-select: none;
+      }
+
+      #scriptEditor {
+        width: 100%;
+        min-width: 520px;
+        height: 100%;
+        min-height: 460px;
+        padding: 16px;
+        border: 0;
+        outline: 0;
+        resize: none;
+        color: var(--ink);
+        background: var(--paper);
+        font: 13px/1.65 Consolas, "Cascadia Mono", monospace;
+        tab-size: 2;
+      }
+
+      .controller-dialog {
+        width: min(390px, calc(100vw - 32px));
+        padding: 0;
+        border: 1px solid var(--ink);
+        background: var(--paper);
+        box-shadow: 6px 6px 0 rgba(0, 0, 0, .12);
+      }
+
+      .controller-dialog::backdrop { background: rgba(0, 0, 0, .18); }
+      .preview-dialog {
+        position: fixed;
+        right: 24px;
+        bottom: 82px;
+        width: min(360px, calc(100vw - 32px));
+        margin: 0;
+        padding: 0;
+        border: 1px solid var(--ink);
+        background: var(--paper);
+        box-shadow: 6px 6px 0 rgba(0, 0, 0, .12);
+      }
+
+      .preview-frame {
+        display: grid;
+        min-height: 188px;
+        place-items: center;
+        margin: 16px;
+        border: 1px solid var(--line-strong);
+        background: #343434;
+        color: #e9e9e9;
+        font-size: 12px;
+      }
+
+      .dialog-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--line-strong); }
+      .dialog-header h2 { margin: 0; font-size: 15px; }
+      .dialog-close { width: 30px; height: 30px; padding: 0; }
+      .controller-body { display: grid; place-items: center; padding: 28px; }
+      .controller-frame {
+        display: grid;
+        grid-template-columns: 92px 1fr 92px;
+        align-items: center;
+        width: 100%;
+        min-height: 180px;
+        padding: 18px;
+        border: 1px solid var(--line-strong);
+      }
+
+      .d-pad { display: grid; grid-template-columns: repeat(3, 22px); grid-template-rows: repeat(3, 22px); justify-content: center; }
+      .d-pad span { border: 1px solid var(--ink); }
+      .d-pad span:nth-child(1) { grid-column: 2; }
+      .d-pad span:nth-child(2) { grid-row: 2; }
+      .d-pad span:nth-child(3) { grid-column: 2; grid-row: 2; }
+      .d-pad span:nth-child(4) { grid-column: 3; grid-row: 2; }
+      .d-pad span:nth-child(5) { grid-column: 2; grid-row: 3; }
+      .controller-center { color: var(--muted); font-size: 11px; text-align: center; }
+      .face-buttons { display: grid; grid-template-columns: repeat(2, 30px); gap: 10px; justify-content: center; }
+      .face-buttons span { display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid var(--ink); border-radius: 50%; font-size: 11px; }
+      .mapping-list { display: grid; width: 100%; gap: 8px; }
+      .mapping-list div { display: flex; align-items: center; justify-content: space-between; min-height: 38px; padding: 0 10px; border: 1px solid var(--line); }
+      kbd { min-width: 54px; padding: 4px 8px; border: 1px solid var(--line-strong); background: var(--wash); font: 12px Consolas, monospace; text-align: center; }
+      .help-content { padding: 20px 22px 24px; color: var(--muted); line-height: 1.7; }
+      .help-content p { margin: 0 0 10px; }
+      .help-content code { padding: 2px 5px; border: 1px solid var(--line); color: var(--ink); background: var(--wash); font-family: Consolas, monospace; }
+      .simple-dialog-content { padding: 22px; color: var(--muted); line-height: 1.7; }
+      .source-state { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding: 12px; border: 1px solid var(--line); color: var(--ink); }
+      .state-dot { width: 8px; height: 8px; border: 1px solid var(--muted); border-radius: 50%; }
+
+      .collapsed .brand-text,
+      .collapsed .sidebar-footer,
+      .collapsed .nav-label,
+      .collapsed .chevron,
+      .collapsed .subnav { display: none; }
+
+      .collapsed .sidebar-header { justify-content: center; padding: 0; }
+      .collapsed .sidebar-actions { display: none; }
+      .collapsed .game-selector { padding: 0; }
+      .collapsed .game-selector-chevron { display: none; }
+      .collapsed .sidebar-nav { padding: 18px 12px; }
+      .collapsed .nav-link,
+      .collapsed .group-toggle { justify-content: center; padding: 0; }
+      .collapsed .nav-glyph { width: 28px; height: 28px; }
+
+      @media (max-width: 760px) {
+        .app-shell { --sidebar: 220px; }
+        .app-shell.is-collapsed { --sidebar: 64px; }
+        .topbar { padding: 0 18px; }
+        .content { padding: 22px 18px 32px; }
+        .workspace-heading { align-items: flex-start; flex-direction: column; }
+        .script-workspace { grid-template-columns: 1fr; }
+        .log-table-head,
+        .central-log-entry { grid-template-columns: 88px 66px minmax(0, 1fr); gap: 8px; padding: 0 12px; }
+        .console-column { grid-template-rows: auto auto auto; border-right: 0; border-bottom: 1px solid var(--line-strong); }
+        .log-output { min-height: 190px; }
+        #scriptEditor { min-width: 400px; min-height: 420px; }
+        .quick-dock { right: 16px; bottom: 16px; }
+        .preview-dialog { right: 16px; bottom: 74px; }
+      }
+
+      /* Linear-inspired application skin */
+      :root {
+        color-scheme: dark;
+        --ink: #e7e9ee;
+        --muted: #8b909b;
+        --line: #292d35;
+        --line-strong: #343944;
+        --paper: #15171b;
+        --wash: #1b1e24;
+        --sidebar: 248px;
+        --canvas: #101114;
+        --accent: #8b5cf6;
+        --accent-soft: rgba(139, 92, 246, .16);
+        --green: #45c486;
+        --red: #f07178;
+        --blue: #65a9ff;
+      }
+
+      body {
+        color: var(--ink);
+        background: var(--canvas);
+        font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+        font-size: 13px;
+        letter-spacing: .005em;
+      }
+
+      button, textarea { font-family: inherit; }
+
+      .window-titlebar {
+        min-height: 42px;
+        padding: 0 16px;
+        border-bottom: 1px solid var(--line);
+        background: #131519;
+        color: var(--muted);
+      }
+
+      .app-identity { gap: 9px; color: #c9cdd5; font-size: 12px; font-weight: 600; letter-spacing: .04em; }
+      .app-icon {
+        width: 20px;
+        height: 20px;
+        border: 0;
+        border-radius: 6px;
+        background: linear-gradient(135deg, #a78bfa, #6d28d9);
+        color: #fff;
+        font-size: 7px;
+        box-shadow: 0 0 0 1px rgba(255,255,255,.12) inset, 0 4px 14px rgba(109,40,217,.26);
+      }
+      .app-version { color: #686e7b; font-weight: 500; letter-spacing: 0; }
+
+      .app-shell { min-height: calc(100vh - 42px); }
+      .sidebar {
+        border-right: 1px solid var(--line);
+        background: #15171b;
+      }
+      .sidebar-header { height: 64px; padding: 0 12px 0 14px; border-bottom: 1px solid rgba(255,255,255,.035); }
+      .sidebar-actions { gap: 3px; }
+      .sidebar-action-button {
+        width: 30px;
+        height: 30px;
+        border-radius: 6px;
+        color: #858b97;
+      }
+      .sidebar-action-button:hover { border-color: var(--line); background: #20232a; color: #e1e4ea; }
+      .sidebar-action-button:focus-visible { outline-color: var(--accent); }
+      .status-badge { width: 7px; height: 7px; border-color: #15171b; }
+      .sidebar-nav { padding: 16px 10px; }
+      .nav-item + .nav-item { margin-top: 3px; }
+      .nav-link, .group-toggle {
+        min-height: 36px;
+        gap: 10px;
+        padding: 0 10px;
+        border: 1px solid transparent;
+        border-radius: 6px;
+        color: #9da3ae;
+        font-size: 13px;
+      }
+      .nav-link:hover, .group-toggle:hover { border-color: transparent; background: #20232a; color: #e3e6ec; }
+      .nav-link.is-active, .subnav-link.is-active {
+        border-color: rgba(139,92,246,.24);
+        background: var(--accent-soft);
+        color: #eeeaff;
+        font-weight: 600;
+      }
+      .nav-glyph {
+        width: 20px;
+        height: 20px;
+        border: 0;
+        border-radius: 5px;
+        color: #8f96a3;
+        font-size: 13px;
+      }
+      .nav-link.is-active .nav-glyph { color: #bba8ff; background: rgba(139,92,246,.22); }
+      .subnav { gap: 2px; margin: 3px 0 7px 30px; border-left-color: #2b2f38; }
+      .subnav-link { min-height: 32px; padding: 0 10px; border-radius: 5px; color: #7f8692; }
+      .subnav-link:hover { border-color: transparent; background: #20232a; color: #dfe2e8; }
+      .sidebar-footer { padding: 14px 16px; border-top-color: var(--line); color: #666d79; font-size: 11px; }
+
+      .game-switcher { max-width: 150px; }
+      .game-selector {
+        min-height: 34px;
+        max-width: 150px;
+        padding: 0 7px;
+        border-radius: 6px;
+        color: #e0e3e9;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .game-selector:hover, .game-selector[aria-expanded="true"] { border-color: var(--line-strong); background: #20232a; }
+      .game-selector-chevron { color: #777e8a; }
+      .game-menu {
+        width: 220px;
+        padding: 5px;
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        background: #1b1e24;
+        box-shadow: 0 18px 48px rgba(0,0,0,.38), 0 0 0 1px rgba(255,255,255,.02);
+      }
+      .game-group-label { padding: 9px 9px 5px; color: #6f7682; font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+      .game-option { min-height: 34px; padding: 0 9px; border-radius: 5px; color: #b4bac4; }
+      .game-option:hover, .game-option.is-selected { border-color: transparent; background: #262a32; color: #f0f1f4; }
+
+      .main { background: var(--canvas); }
+      .topbar {
+        min-height: 64px;
+        padding: 0 32px;
+        border-bottom: 1px solid var(--line);
+        background: rgba(16,17,20,.88);
+      }
+      .topbar-left { gap: 9px; }
+      .page-divider { color: #555c68; }
+      .current-page { color: #a0a6b1; }
+      .topbar-state { display: inline-flex; align-items: center; gap: 7px; color: #858c98; font-size: 12px; }
+      .topbar-state::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #606773; box-shadow: 0 0 0 3px rgba(96,103,115,.12); }
+      .content { min-height: calc(100vh - 106px); padding: 30px 32px 36px; }
+      .workspace-heading { align-items: flex-start; margin-bottom: 22px; }
+      .workspace-heading h1 { color: #f0f1f4; font-size: 24px; font-weight: 650; letter-spacing: -.025em; }
+      .workspace-heading p { margin-top: 8px; color: #7f8692; font-size: 13px; }
+
+      .script-workspace, .log-center-workspace, .empty-workspace {
+        border-color: var(--line);
+        border-radius: 10px;
+        background: var(--paper);
+        box-shadow: 0 14px 35px rgba(0,0,0,.13);
+        overflow: hidden;
+      }
+      .script-workspace { min-height: min(690px, calc(100vh - 215px)); }
+      .console-column { border-right-color: var(--line); background: #181a1f; }
+      .panel { padding: 16px; }
+      .panel + .panel { border-top-color: var(--line); }
+      .panel-heading { margin-bottom: 11px; }
+      .panel-heading h2, .editor-header h2, .log-center-header h2 { color: #d7dbe2; font-size: 12px; font-weight: 650; letter-spacing: .035em; text-transform: uppercase; }
+      .log-output {
+        min-height: 170px;
+        padding: 12px;
+        border: 1px solid #2b3039;
+        border-radius: 7px;
+        background: #0f1114;
+        color: #98a1af;
+        font-size: 11px;
+        line-height: 1.75;
+      }
+      .quiet-button, .command-button {
+        min-height: 34px;
+        padding: 0 12px;
+        border: 1px solid #333844;
+        border-radius: 6px;
+        background: #22252c;
+        color: #cbd0d9;
+        font-size: 12px;
+      }
+      .quiet-button:hover, .command-button:hover { border-color: #4b5260; background: #2a2e37; color: #f0f2f5; }
+      .quiet-button:focus-visible, .command-button:focus-visible { outline-color: var(--accent); }
+      .quiet-button { min-height: 26px; padding: 0 9px; color: #898f9b; }
+      .timer { min-height: 42px; border: 1px solid #303641; border-radius: 6px; background: #111317; color: #d6dbe3; font-size: 15px; }
+      .command-button { font-weight: 600; }
+      .command-button.is-active { border-color: rgba(240,113,120,.55); background: rgba(240,113,120,.12); color: #ffb4b8; }
+      .tool-buttons { gap: 7px; }
+      .button-hint { color: #747b87; font-size: 10px; }
+
+      .editor-column { background: #15171b; }
+      .editor-header { min-height: 54px; padding: 0 18px; border-bottom-color: var(--line); }
+      .editor-status { display: inline-flex; align-items: center; gap: 6px; color: #737a86; }
+      .editor-status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #d99b53; }
+      .editor-surface { grid-template-columns: 54px minmax(0, 1fr); }
+      .line-numbers { padding: 16px 13px 16px 0; border-right-color: #252932; background: #131519; color: #5f6672; font-size: 12px; }
+      #scriptEditor { min-height: 460px; padding: 16px 18px; color: #d8dce4; background: #15171b; caret-color: #a78bfa; font-size: 12px; line-height: 1.75; }
+      #scriptEditor::selection { background: rgba(139,92,246,.28); }
+
+      .log-center-header { min-height: 56px; padding: 0 18px; border-bottom-color: var(--line); }
+      .log-table-head { min-height: 34px; border-bottom-color: var(--line); background: #1a1d22; color: #6f7682; }
+      .central-log-entry { min-height: 44px; border-bottom-color: #242830; color: #7f8793; }
+      .central-log-entry span:last-child { color: #c3c8d1; }
+      .empty-workspace { background: #15171b; }
+      .empty-workspace h2 { color: #d6dae2; }
+      .empty-workspace p { color: #7f8692; }
+
+      .quick-dock {
+        right: 24px;
+        bottom: 24px;
+        gap: 3px;
+        padding: 4px;
+        border: 1px solid #30353f;
+        border-radius: 8px;
+        background: #1b1e24;
+        box-shadow: 0 14px 32px rgba(0,0,0,.34);
+      }
+      .quick-tool-button { width: 34px; height: 34px; border-radius: 5px; color: #9aa1ad; }
+      .quick-tool-button:hover { border-color: transparent; background: #2a2e37; color: #edeff4; }
+
+      .controller-dialog, .preview-dialog {
+        border-color: #3a404b;
+        border-radius: 10px;
+        background: #1a1d22;
+        box-shadow: 0 24px 80px rgba(0,0,0,.55);
+      }
+      .controller-dialog::backdrop { background: rgba(0,0,0,.56); backdrop-filter: blur(3px); }
+      .dialog-header { padding: 13px 15px; border-bottom-color: #2b3039; }
+      .dialog-header h2 { color: #e1e4e9; font-size: 13px; font-weight: 650; }
+      .controller-body { padding: 24px; }
+      .controller-frame { border-color: #343a45; border-radius: 8px; }
+      .controller-center, .simple-dialog-content, .help-content { color: #8b929e; }
+      .preview-frame { min-height: 188px; margin: 14px; border-color: #343a45; border-radius: 7px; background: #0e1013; color: #747c89; }
+      .mapping-list div { border-color: #303641; border-radius: 6px; color: #cbd0d8; }
+      kbd { border-color: #454c59; border-radius: 4px; background: #262a32; color: #c8ced8; }
+      .help-content code { border-color: #343a45; border-radius: 4px; color: #d5c9ff; background: #23202e; }
+      .source-state { border-color: #303641; border-radius: 6px; color: #c5cbd5; }
+      .state-dot { border: 0; background: var(--red); box-shadow: 0 0 0 3px rgba(240,113,120,.13); }
+
+      .collapsed .nav-link.is-active { background: var(--accent-soft); }
+
+      @media (max-width: 760px) {
+        .topbar { padding: 0 18px; }
+        .content { padding: 22px 18px 32px; }
+        .script-workspace { border-radius: 8px; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="window-titlebar" aria-label="应用标题栏">
+      <div class="app-identity">
+        <span class="app-icon" aria-hidden="true">RNG</span>
+        <span>AUTO POKE RNG</span>
+        <span class="app-version">v0.1.0</span>
+      </div>
+    </header>
+
+    <div class="app-shell" id="appShell">
+      <aside class="sidebar" aria-label="功能导航">
+        <header class="sidebar-header">
+          <div class="game-switcher">
+            <button class="game-selector" id="gameSelector" type="button" aria-expanded="false" aria-controls="gameMenu">
+              <span id="currentGame">火叶</span>
+              <span class="game-selector-chevron" aria-hidden="true">⌄</span>
+            </button>
+            <div class="game-menu" id="gameMenu" role="menu">
+              <div class="game-group-label">第三世代</div>
+              <button class="game-option is-selected" type="button" role="menuitem" data-game="火叶">火叶</button>
+              <div class="game-group-label">第八世代</div>
+              <button class="game-option" type="button" role="menuitem" data-game="珍钻复刻">珍钻复刻</button>
+              <button class="game-option" type="button" role="menuitem" data-game="剑盾">剑盾</button>
+            </div>
+          </div>
+          <div class="sidebar-actions" aria-label="全局工具">
+            <button class="sidebar-action-button" id="videoSourceButton" type="button" data-status="red" aria-label="视频源：未连接" title="视频源：未连接">
+              <svg class="lucide-icon" viewBox="0 0 24 24" aria-hidden="true"><rect width="20" height="15" x="2" y="7" rx="2" ry="2"></rect><path d="m17 2-5 5-5-5"></path></svg>
+              <span class="status-badge" aria-hidden="true"></span>
+            </button>
+            <button class="sidebar-action-button" id="headerControllerButton" type="button" data-status="green" aria-label="虚拟手柄：可用" title="虚拟手柄：可用">
+              <svg class="lucide-icon" viewBox="0 0 24 24" aria-hidden="true"><line x1="6" x2="10" y1="12" y2="12"></line><line x1="8" x2="8" y1="10" y2="14"></line><line x1="15" x2="15.01" y1="13" y2="13"></line><line x1="18" x2="18.01" y1="11" y2="11"></line><rect width="20" height="12" x="2" y="6" rx="2"></rect></svg>
+              <span class="status-badge" aria-hidden="true"></span>
+            </button>
+            <button class="sidebar-action-button" id="notificationButton" type="button" data-status="blue" aria-label="通知：有未读通知" title="通知：有未读通知">
+              <svg class="lucide-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 21a2 2 0 0 0 3.4 0"></path><path d="M3.3 15.2A2.4 2.4 0 0 0 5 19h14a2.4 2.4 0 0 0 1.7-3.8C19.5 14 18 12.8 18 8a6 6 0 0 0-12 0c0 4.8-1.5 6-2.7 7.2"></path></svg>
+              <span class="status-badge" aria-hidden="true"></span>
+            </button>
+          </div>
+          <button class="icon-button" id="collapseButton" type="button" aria-label="收缩侧栏" title="收缩侧栏">
+            <span aria-hidden="true">‹</span>
+          </button>
+        </header>
+
+        <nav class="sidebar-nav">
+          <ul class="nav-list">
+            <li class="nav-item">
+              <a class="nav-link" href="#home" data-page="首页">
+                <span class="nav-glyph" aria-hidden="true">⌂</span>
+                <span class="nav-label">首页</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link is-active" href="#script" data-page="脚本编辑">
+                <span class="nav-glyph" aria-hidden="true">&gt;_</span>
+                <span class="nav-label">脚本编辑</span>
+              </a>
+            </li>
+          </ul>
+        </nav>
+
+        <footer class="sidebar-footer">界面原型 · 0.1</footer>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div class="topbar-left">
+            <span class="page-divider">工作台 /</span>
+            <span class="current-page" id="currentPage">脚本编辑</span>
+          </div>
+          <div class="topbar-state" id="topbarState">待命</div>
+        </header>
+
+        <section class="content" aria-live="polite">
+          <div class="workspace-heading">
+            <div>
+              <h1 id="pageTitle">脚本编辑</h1>
+              <p id="pageIntro">编辑操作脚本，检查运行日志，并通过虚拟手柄验证输入。</p>
+            </div>
+          </div>
+
+          <div class="script-workspace">
+            <section class="console-column" aria-label="运行控制">
+              <div class="panel log-panel">
+                <div class="panel-heading">
+                  <h2>日志</h2>
+                  <button class="quiet-button" id="clearLogButton" type="button">清屏</button>
+                </div>
+                <pre class="log-output" id="logOutput">[00:00:00] 等待运行脚本...</pre>
+              </div>
+
+              <div class="panel">
+                <div class="panel-heading"><h2>运行</h2></div>
+                <div class="run-controls">
+                  <output class="timer" id="runTimer">00:00:00</output>
+                  <button class="command-button" id="runButton" type="button">开始运行</button>
+                </div>
+              </div>
+
+              <div class="panel">
+                <div class="panel-heading"><h2>工具</h2></div>
+                <div class="tool-buttons">
+                  <button class="command-button" id="recordButton" type="button">开始录制<span class="button-hint">记录手柄输入</span></button>
+                  <button class="command-button" id="controllerButton" type="button">虚拟手柄<span class="button-hint">打开输入面板</span></button>
+                  <button class="command-button" id="mappingButton" type="button">按键映射<span class="button-hint">配置输入对应关系</span></button>
+                  <button class="command-button" id="helpButton" type="button">帮助<span class="button-hint">查看脚本说明</span></button>
+                </div>
+              </div>
+            </section>
+
+            <section class="editor-column" aria-label="脚本编辑器">
+              <div class="editor-header">
+                <h2>脚本</h2>
+                <span class="editor-status" id="editorStatus">未保存</span>
+              </div>
+              <div class="editor-surface">
+                <pre class="line-numbers" id="lineNumbers" aria-hidden="true">1</pre>
+                <textarea id="scriptEditor" spellcheck="false" aria-label="脚本内容" placeholder="# 在此输入脚本&#10;wait 1000&#10;press A"></textarea>
+              </div>
+            </section>
+          </div>
+
+          <section class="log-center-workspace" id="logCenterWorkspace" aria-label="日志中心" hidden>
+            <header class="log-center-header">
+              <h2>全部日志</h2>
+              <button class="quiet-button" id="clearCentralLogButton" type="button">清空日志</button>
+            </header>
+            <div class="log-table-head" aria-hidden="true">
+              <span>时间</span>
+              <span>来源</span>
+              <span>内容</span>
+            </div>
+            <div id="centralLogEntries"></div>
+          </section>
+
+          <section class="empty-workspace" id="emptyWorkspace" hidden>
+            <div>
+              <h2 id="emptyWorkspaceTitle">首页</h2>
+              <p id="emptyWorkspaceText">从左侧选择一个工具开始工作。</p>
+            </div>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <div class="quick-dock" role="toolbar" aria-label="快捷工具">
+      <button class="quick-tool-button" id="quickVideoButton" type="button" aria-label="视频预览" title="视频预览">
+        <svg class="lucide-icon" viewBox="0 0 24 24" aria-hidden="true"><rect width="20" height="14" x="2" y="3" rx="2"></rect><path d="m10 8 5 3-5 3Z"></path><path d="M8 21h8"></path></svg>
+      </button>
+      <button class="quick-tool-button" id="quickLogsButton" type="button" aria-label="日志中心" title="日志中心">
+        <svg class="lucide-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"></path><path d="M14 2v6h6"></path><path d="M8 13h8"></path><path d="M8 17h8"></path><path d="M8 9h2"></path></svg>
+      </button>
+    </div>
+
+    <dialog class="controller-dialog" id="controllerDialog" aria-labelledby="controllerTitle">
+      <header class="dialog-header">
+        <h2 id="controllerTitle">虚拟手柄</h2>
+        <button class="quiet-button dialog-close" id="closeControllerButton" type="button" aria-label="关闭虚拟手柄">×</button>
+      </header>
+      <div class="controller-body">
+        <div class="controller-frame" aria-label="虚拟手柄线框">
+          <div class="d-pad" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+          <div class="controller-center">输入预览</div>
+          <div class="face-buttons" aria-hidden="true"><span>X</span><span>Y</span><span>B</span><span>A</span></div>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="preview-dialog" id="quickVideoDialog" aria-labelledby="quickVideoTitle">
+      <header class="dialog-header">
+        <h2 id="quickVideoTitle">视频预览</h2>
+        <button class="quiet-button dialog-close" id="closeQuickVideoButton" type="button" aria-label="关闭视频预览">×</button>
+      </header>
+      <div class="preview-frame">等待视频源连接</div>
+    </dialog>
+
+    <dialog class="controller-dialog" id="videoSourceDialog" aria-labelledby="videoSourceTitle">
+      <header class="dialog-header">
+        <h2 id="videoSourceTitle">视频源</h2>
+        <button class="quiet-button dialog-close" id="closeVideoSourceButton" type="button" aria-label="关闭视频源">×</button>
+      </header>
+      <div class="simple-dialog-content">
+        选择当前脚本和视频预览使用的设备画面。
+        <div class="source-state"><span class="state-dot" aria-hidden="true"></span>尚未连接视频源</div>
+      </div>
+    </dialog>
+
+    <dialog class="controller-dialog" id="notificationDialog" aria-labelledby="notificationTitle">
+      <header class="dialog-header">
+        <h2 id="notificationTitle">通知</h2>
+        <button class="quiet-button dialog-close" id="closeNotificationButton" type="button" aria-label="关闭通知">×</button>
+      </header>
+      <div class="simple-dialog-content">当前没有新的通知。</div>
+    </dialog>
+
+    <dialog class="controller-dialog" id="mappingDialog" aria-labelledby="mappingTitle">
+      <header class="dialog-header">
+        <h2 id="mappingTitle">按键映射</h2>
+        <button class="quiet-button dialog-close" id="closeMappingButton" type="button" aria-label="关闭按键映射">×</button>
+      </header>
+      <div class="controller-body">
+        <div class="mapping-list">
+          <div><span>确认</span><kbd>A</kbd></div>
+          <div><span>取消</span><kbd>B</kbd></div>
+          <div><span>菜单</span><kbd>＋</kbd></div>
+          <div><span>方向</span><kbd>方向键</kbd></div>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="controller-dialog" id="helpDialog" aria-labelledby="helpTitle">
+      <header class="dialog-header">
+        <h2 id="helpTitle">脚本编辑帮助</h2>
+        <button class="quiet-button dialog-close" id="closeHelpButton" type="button" aria-label="关闭帮助">×</button>
+      </header>
+      <div class="help-content">
+        <p>在右侧编辑区输入脚本，每一行代表一个操作。</p>
+        <p><code>wait 1000</code>：等待 1000 毫秒</p>
+        <p><code>press A</code>：按下 A 键</p>
+      </div>
+    </dialog>
+
+    <script>
+      const shell = document.querySelector('#appShell');
+      const collapseButton = document.querySelector('#collapseButton');
+      const currentPage = document.querySelector('#currentPage');
+      const currentGame = document.querySelector('#currentGame');
+      const gameSelector = document.querySelector('#gameSelector');
+      const gameMenu = document.querySelector('#gameMenu');
+      const pageTitle = document.querySelector('#pageTitle');
+      const pageIntro = document.querySelector('#pageIntro');
+      const topbarState = document.querySelector('#topbarState');
+      const runButton = document.querySelector('#runButton');
+      const recordButton = document.querySelector('#recordButton');
+      const runTimer = document.querySelector('#runTimer');
+      const logOutput = document.querySelector('#logOutput');
+      const clearLogButton = document.querySelector('#clearLogButton');
+      const scriptEditor = document.querySelector('#scriptEditor');
+      const lineNumbers = document.querySelector('#lineNumbers');
+      const editorStatus = document.querySelector('#editorStatus');
+      const controllerDialog = document.querySelector('#controllerDialog');
+      const quickVideoDialog = document.querySelector('#quickVideoDialog');
+      const videoSourceDialog = document.querySelector('#videoSourceDialog');
+      const notificationDialog = document.querySelector('#notificationDialog');
+      const mappingDialog = document.querySelector('#mappingDialog');
+      const helpDialog = document.querySelector('#helpDialog');
+      const scriptWorkspace = document.querySelector('.script-workspace');
+      const logCenterWorkspace = document.querySelector('#logCenterWorkspace');
+      const emptyWorkspace = document.querySelector('#emptyWorkspace');
+      const emptyWorkspaceTitle = document.querySelector('#emptyWorkspaceTitle');
+      const emptyWorkspaceText = document.querySelector('#emptyWorkspaceText');
+      const centralLogEntries = document.querySelector('#centralLogEntries');
+      const clearCentralLogButton = document.querySelector('#clearCentralLogButton');
+      const logEntries = [{ time: '00:00:00', source: '系统', message: '日志中心已就绪。' }];
+      let running = false;
+      let recording = false;
+      let elapsedSeconds = 0;
+      let timerId;
+
+      function timestamp() {
+        return new Date().toLocaleTimeString('zh-CN', { hour12: false });
+      }
+
+      function addLog(message) {
+        logOutput.textContent += `\n[${timestamp()}] ${message}`;
+        logOutput.scrollTop = logOutput.scrollHeight;
+        logEntries.push({ time: timestamp(), source: '系统', message });
+        renderCentralLogs();
+      }
+
+      function renderCentralLogs() {
+        centralLogEntries.replaceChildren();
+        [...logEntries].reverse().forEach((entry) => {
+          const row = document.createElement('div');
+          const time = document.createElement('span');
+          const source = document.createElement('span');
+          const message = document.createElement('span');
+          row.className = 'central-log-entry';
+          time.textContent = entry.time;
+          source.className = 'log-source';
+          source.textContent = entry.source;
+          message.textContent = entry.message;
+          row.append(time, source, message);
+          centralLogEntries.append(row);
+        });
+      }
+
+      function clearLogs() {
+        logEntries.length = 0;
+        logOutput.textContent = `[${timestamp()}] 日志已清空。`;
+        logEntries.push({ time: timestamp(), source: '系统', message: '日志已清空。' });
+        renderCentralLogs();
+      }
+
+      function formatElapsed() {
+        const hours = String(Math.floor(elapsedSeconds / 3600)).padStart(2, '0');
+        const minutes = String(Math.floor((elapsedSeconds % 3600) / 60)).padStart(2, '0');
+        const seconds = String(elapsedSeconds % 60).padStart(2, '0');
+        return `${hours}:${minutes}:${seconds}`;
+      }
+
+      function updateLineNumbers() {
+        const lines = Math.max(1, scriptEditor.value.split('\n').length);
+        lineNumbers.textContent = Array.from({ length: lines }, (_, index) => index + 1).join('\n');
+      }
+
+      function updatePageDescription(page) {
+        const descriptions = {
+          '首页': '查看当前版本的工具与最近工作内容。',
+          '脚本编辑': '编辑操作脚本，检查运行日志，并通过虚拟手柄验证输入。',
+          '视频预览': '查看当前设备画面，并核对脚本执行过程。',
+          '日志中心': '汇总当前应用的运行、连接和操作记录。'
+        };
+        pageTitle.textContent = page;
+        pageIntro.textContent = `当前版本：${currentGame.textContent}。${descriptions[page]}`;
+        const isScriptEditor = page === '脚本编辑';
+        const isLogCenter = page === '日志中心';
+        scriptWorkspace.hidden = !isScriptEditor;
+        logCenterWorkspace.hidden = !isLogCenter;
+        emptyWorkspace.hidden = isScriptEditor || isLogCenter;
+        emptyWorkspaceTitle.textContent = page;
+        emptyWorkspaceText.textContent = page === '首页'
+          ? `当前选择 ${currentGame.textContent}，从左侧选择一个工具开始工作。`
+          : `当前选择 ${currentGame.textContent}。视频预览工作区将在这里显示。`;
+      }
+
+      function activatePage(page) {
+        document.querySelectorAll('[data-page]').forEach((item) => item.classList.toggle('is-active', item.dataset.page === page));
+        currentPage.textContent = page;
+        updatePageDescription(page);
+      }
+
+      function openController() {
+        controllerDialog.showModal();
+        addLog('已打开虚拟手柄。');
+      }
+
+      collapseButton.addEventListener('click', () => {
+        const collapsed = shell.classList.toggle('is-collapsed');
+        document.querySelector('.sidebar').classList.toggle('collapsed', collapsed);
+        collapseButton.setAttribute('aria-label', collapsed ? '展开侧栏' : '收缩侧栏');
+        collapseButton.setAttribute('title', collapsed ? '展开侧栏' : '收缩侧栏');
+        collapseButton.querySelector('span').textContent = collapsed ? '›' : '‹';
+      });
+
+      document.querySelectorAll('[data-page]').forEach((link) => {
+        link.addEventListener('click', () => {
+          activatePage(link.dataset.page);
+        });
+      });
+
+      gameSelector.addEventListener('click', () => {
+        const isOpen = gameMenu.classList.toggle('is-open');
+        gameSelector.setAttribute('aria-expanded', String(isOpen));
+      });
+
+      document.querySelectorAll('.game-option').forEach((option) => {
+        option.addEventListener('click', () => {
+          const game = option.dataset.game;
+          currentGame.textContent = game;
+          document.querySelectorAll('.game-option').forEach((item) => item.classList.toggle('is-selected', item === option));
+          gameMenu.classList.remove('is-open');
+          gameSelector.setAttribute('aria-expanded', 'false');
+          updatePageDescription(currentPage.textContent);
+          addLog(`已切换当前版本：${game}。`);
+        });
+      });
+
+      document.addEventListener('click', (event) => {
+        if (!event.target.closest('.game-switcher')) {
+          gameMenu.classList.remove('is-open');
+          gameSelector.setAttribute('aria-expanded', 'false');
+        }
+      });
+
+      runButton.addEventListener('click', () => {
+        running = !running;
+        runButton.textContent = running ? '停止运行' : '开始运行';
+        runButton.classList.toggle('is-active', running);
+        topbarState.textContent = running ? '运行中' : recording ? '录制中' : '待命';
+        addLog(running ? '脚本已开始运行。' : '脚本已停止运行。');
+
+        if (running) {
+          elapsedSeconds = 0;
+          runTimer.textContent = formatElapsed();
+          timerId = window.setInterval(() => {
+            elapsedSeconds += 1;
+            runTimer.textContent = formatElapsed();
+          }, 1000);
+        } else {
+          window.clearInterval(timerId);
+        }
+      });
+
+      recordButton.addEventListener('click', () => {
+        recording = !recording;
+        recordButton.innerHTML = recording ? '停止录制<span class="button-hint">正在记录手柄输入</span>' : '开始录制<span class="button-hint">记录手柄输入</span>';
+        recordButton.classList.toggle('is-active', recording);
+        topbarState.textContent = recording ? '录制中' : running ? '运行中' : '待命';
+        addLog(recording ? '开始录制脚本。' : '脚本录制已停止。');
+      });
+
+      clearLogButton.addEventListener('click', () => {
+        clearLogs();
+      });
+
+      clearCentralLogButton.addEventListener('click', clearLogs);
+
+      scriptEditor.addEventListener('input', () => {
+        updateLineNumbers();
+        editorStatus.textContent = '未保存';
+      });
+
+      scriptEditor.addEventListener('scroll', () => {
+        lineNumbers.scrollTop = scriptEditor.scrollTop;
+      });
+
+      document.querySelector('#controllerButton').addEventListener('click', openController);
+      document.querySelector('#headerControllerButton').addEventListener('click', openController);
+
+      document.querySelector('#closeControllerButton').addEventListener('click', () => controllerDialog.close());
+
+      document.querySelector('#videoSourceButton').addEventListener('click', () => {
+        videoSourceDialog.showModal();
+        addLog('已打开视频源设置。');
+      });
+
+      document.querySelector('#closeVideoSourceButton').addEventListener('click', () => videoSourceDialog.close());
+
+      document.querySelector('#notificationButton').addEventListener('click', () => notificationDialog.showModal());
+      document.querySelector('#closeNotificationButton').addEventListener('click', () => notificationDialog.close());
+
+      document.querySelector('#quickVideoButton').addEventListener('click', () => {
+        quickVideoDialog.show();
+        addLog('已打开视频预览浮窗。');
+      });
+
+      document.querySelector('#closeQuickVideoButton').addEventListener('click', () => quickVideoDialog.close());
+
+      document.querySelector('#quickLogsButton').addEventListener('click', () => activatePage('日志中心'));
+
+      document.querySelector('#mappingButton').addEventListener('click', () => {
+        mappingDialog.showModal();
+        addLog('已打开按键映射。');
+      });
+
+      document.querySelector('#closeMappingButton').addEventListener('click', () => mappingDialog.close());
+
+      document.querySelector('#helpButton').addEventListener('click', () => {
+        helpDialog.showModal();
+        addLog('已打开脚本编辑帮助。');
+      });
+
+      document.querySelector('#closeHelpButton').addEventListener('click', () => helpDialog.close());
+
+      renderCentralLogs();
+      updatePageDescription(currentPage.textContent);
+    </script>
+  </body>
+</html>
