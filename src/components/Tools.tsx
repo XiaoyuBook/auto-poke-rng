@@ -52,13 +52,12 @@ function Controller({ onInput }: { onInput: (key: string) => void }) {
   </>;
 }
 
-export function VideoPreview({ openSource }: { openSource: () => void }) {
+export function VideoPreview() {
   return (
     <section className="video-preview-content" aria-label="视频画面">
       <div className="preview-stage">
         <div className="preview-frame"><MonitorPlay size={28} /><strong>等待视频源连接</strong></div>
       </div>
-      <footer className="video-preview-footer"><span><span className="status-dot warning" />未连接视频源</span><button className="button" onClick={openSource}>选择视频源</button></footer>
     </section>
   );
 }

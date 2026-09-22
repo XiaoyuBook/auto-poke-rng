@@ -3,11 +3,10 @@ import { FileClock, MonitorPlay, PanelRightClose, Pin, PinOff } from 'lucide-rea
 import type { PanelTool } from './desktop';
 import { usePanelWindows } from './usePanelWindows';
 import { LogsPanel } from './components/LogsPanel';
-import { ToolsDialog, VideoPreview } from './components/Tools';
+import { VideoPreview } from './components/Tools';
 
 export function DetachedPanel({ tool }: { tool: PanelTool }) {
   const { state, setLogSource, error, setError } = usePanelWindows();
-  const [sourceOpen, setSourceOpen] = useState(false);
   const [platform, setPlatform] = useState('win32');
   const api = window.desktop?.panels;
   const title = tool === 'video' ? '视频预览' : '日志中心';
@@ -34,8 +33,7 @@ export function DetachedPanel({ tool }: { tool: PanelTool }) {
     </header>
     <div className="floating-panel-body">
       {error && <p className="panel-error" role="alert">{error}</p>}
-      {tool === 'video' ? <VideoPreview openSource={() => setSourceOpen(true)} /> : <LogsPanel logs={state.logs} source={state.logSource} setSource={setLogSource} clear={() => perform(api?.clearLogs())} />}
+      {tool === 'video' ? <VideoPreview /> : <LogsPanel logs={state.logs} source={state.logSource} setSource={setLogSource} clear={() => perform(api?.clearLogs())} />}
     </div>
-    {sourceOpen && <ToolsDialog modal="video" close={() => setSourceOpen(false)} onInput={() => {}} />}
   </main>;
 }
