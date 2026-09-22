@@ -1,6 +1,6 @@
 export type Page = '首页' | '脚本编辑';
 export type GameId = 'frlg' | 'bdsp' | 'swsh';
-export type Modal = 'controller' | 'video' | 'notification' | 'mapping' | 'help';
+export type Modal = 'controller' | 'video' | 'notification' | 'mapping' | 'help' | 'settings';
 export type LogEntry = {
   id: string;
   time: string;

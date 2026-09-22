@@ -1,13 +1,14 @@
 import { useState } from 'react';
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Bell, Gamepad2, MonitorPlay, Tv } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Bell, Gamepad2, MonitorPlay, Settings, Tv } from 'lucide-react';
 import type { Modal } from '../workspace';
 import { Dialog } from './Dialog';
 
 export function ToolsDialog({ modal, close, onInput }: { modal: Modal; close: () => void; onInput: (key: string) => void }) {
-  const titles: Record<Modal, string> = { video: '视频源', controller: '虚拟手柄', notification: '通知', mapping: '按键映射', help: '脚本编辑帮助' };
+  const titles: Record<Modal, string> = { video: '视频源', controller: '虚拟手柄', notification: '通知', mapping: '按键映射', help: '脚本编辑帮助', settings: '设置' };
   return (
     <Dialog title={titles[modal]} close={close}>
       <div className="dialog-body">
+        {modal === 'settings' && <div className="settings-placeholder"><Settings size={26} /><p>暂无可调整的设置</p><small>设置项将在后续版本中加入。</small></div>}
         {modal === 'video' && <>
           <p className="dialog-intro">选择脚本与视频预览使用的画面来源。</p>
           <div className="device-state"><Tv size={19} /><div><strong>尚未连接视频源</strong><p>设备采集将在后续版本接入。</p></div><span className="status-dot warning" /></div>

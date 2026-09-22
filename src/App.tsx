@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Check, ChevronDown, CircleHelp, FileClock, Gamepad2, Home, Keyboard,
-  MonitorPlay, PanelLeftClose, PanelLeftOpen, Search, TerminalSquare, Tv,
+  MonitorPlay, PanelLeftClose, PanelLeftOpen, Search, Settings, TerminalSquare, Tv,
 } from 'lucide-react';
 import { CommandPalette, type CommandAction } from './components/CommandPalette';
 import { LogsPanel } from './components/LogsPanel';
@@ -39,6 +39,7 @@ export default function App({ connections = initialConnections }: { connections?
   const [toast, setToast] = useState('');
   const switcher = useRef<HTMLDivElement>(null);
   const gameButton = useRef<HTMLButtonElement>(null);
+  const settingsButton = useRef<HTMLButtonElement>(null);
   const dockButtons = useRef<Partial<Record<PanelTool, HTMLButtonElement | null>>>({});
   const activeGame = games.find(item => item.id === game)!;
   const script = library.active?.body || '';
@@ -52,6 +53,11 @@ export default function App({ connections = initialConnections }: { connections?
     setGameMenuOpen(false);
     if (next === 'notification') setUnread(false);
     setModal(next);
+  };
+
+  const closeModal = () => {
+    setModal(null);
+    if (modal === 'settings') requestAnimationFrame(() => settingsButton.current?.focus());
   };
 
   const showPanel = (tool: PanelTool) => {
@@ -182,6 +188,7 @@ export default function App({ connections = initialConnections }: { connections?
     { label: '虚拟手柄', keywords: 'controller gamepad', icon: <Gamepad2 size={16} />, run: () => openModal('controller') },
     { label: '按键映射', keywords: 'keyboard mapping', icon: <Keyboard size={16} />, run: () => openModal('mapping') },
     { label: '脚本编辑帮助', keywords: 'help', icon: <CircleHelp size={16} />, run: () => openModal('help') },
+    { label: '设置', keywords: 'settings preferences', icon: <Settings size={16} />, run: () => openModal('settings') },
   ];
 
   return (
@@ -227,7 +234,10 @@ export default function App({ connections = initialConnections }: { connections?
         </nav>
         <footer className="sidebar-footer">
           <span className="brand-mark" aria-hidden="true" />
-          <div><span>Auto Poke RNG</span><small>界面预览 · {version}</small></div>
+          <div className="sidebar-brand"><span>Auto Poke RNG</span><small>界面预览 · {version}</small></div>
+          <button ref={settingsButton} className={'icon-button sidebar-settings ' + (modal === 'settings' ? 'active' : '')}
+            type="button" title="设置" aria-label="设置" aria-haspopup="dialog" aria-expanded={modal === 'settings'}
+            onClick={() => openModal('settings')}><Settings size={16} /></button>
         </footer>
       </aside>
 
@@ -269,7 +279,7 @@ export default function App({ connections = initialConnections }: { connections?
         minimize={minimizePanel} restore={() => showPanel(toolPanel.tool)} toggleExpanded={() => setToolPanel(current => current && { ...current, expanded: !current.expanded })} close={closePanel}>
         {toolPanel.tool === 'video' ? <VideoPreview /> : <LogsPanel logs={logs} source={panelWindows.logSource} setSource={setLogSource} clear={() => setLogs([])} />}
       </FloatingSidePanel>}
-      {modal && <ToolsDialog modal={modal} close={() => setModal(null)} onInput={key => { if (recording) addLog('输入预览：' + key, '手柄'); }} />}
+      {modal && <ToolsDialog modal={modal} close={closeModal} onInput={key => { if (recording) addLog('输入预览：' + key, '手柄'); }} />}
       {paletteOpen && <CommandPalette actions={actions} close={() => setPaletteOpen(false)} />}
       {(toast || panelError) && <div className="toast" role="status"><Check size={15} />{toast || panelError}</div>}
     </div>
