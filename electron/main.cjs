@@ -1,5 +1,18 @@
 const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('node:path');
+const { registerPanelWindows } = require('./panel-windows.cjs');
+
+let mainWindow = null;
+let panels;
+
+function loadWindow(window, query = {}) {
+  if (!app.isPackaged) {
+    const url = new URL('http://127.0.0.1:5173');
+    url.search = new URLSearchParams(query).toString();
+    return window.loadURL(url.toString());
+  }
+  return window.loadFile(path.join(__dirname, '..', 'dist', 'index.html'), { query });
+}
 
 function createWindow() {
   const window = new BrowserWindow({
@@ -17,12 +30,9 @@ function createWindow() {
       sandbox: true,
     },
   });
-
-  if (!app.isPackaged) {
-    window.loadURL('http://127.0.0.1:5173');
-  } else {
-    window.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
-  }
+  mainWindow = window;
+  void loadWindow(window);
+  window.on('closed', () => { mainWindow = null; panels.closeAll(); });
 
   window.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
@@ -32,6 +42,7 @@ function createWindow() {
 
 app.whenReady().then(() => {
   ipcMain.handle('app:metadata', () => ({ name: 'Auto Poke RNG', version: app.getVersion(), platform: process.platform }));
+  panels = registerPanelWindows({ getMainWindow: () => mainWindow, loadWindow });
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

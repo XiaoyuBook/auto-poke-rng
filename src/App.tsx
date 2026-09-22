@@ -9,6 +9,7 @@ import { FloatingSidePanel, type PanelState, type PanelTool } from './components
 import { ScriptWorkspace } from './components/ScriptWorkspace';
 import { ToolsDialog, VideoPreview } from './components/Tools';
 import { createLog, games, readDrafts, type GameId, type LogEntry, type Modal, type Page } from './workspace';
+import { usePanelWindows } from './usePanelWindows';
 
 export default function App() {
   const [page, setPage] = useState<Page>('脚本编辑');
@@ -25,6 +26,9 @@ export default function App() {
   const [modal, setModal] = useState<Modal | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [toolPanel, setToolPanel] = useState<PanelState | null>(null);
+  const [detaching, setDetaching] = useState(false);
+  const { state: panelWindows, setLogSource, error: panelError } = usePanelWindows();
+  const nativePanels = window.desktop?.panels;
   const [unread, setUnread] = useState(true);
   const [version, setVersion] = useState('0.1.0');
   const [toast, setToast] = useState('');
@@ -47,10 +51,15 @@ export default function App() {
   };
 
   const showPanel = (tool: PanelTool) => {
+    if (panelWindows.detached.includes(tool)) {
+      void nativePanels?.open(tool).catch(() => setToast('无法打开独立窗口，请重试。'));
+      return;
+    }
     setToolPanel(current => ({ tool, minimized: false, expanded: current?.expanded ?? false }));
   };
 
   const togglePanel = (tool: PanelTool) => {
+    if (panelWindows.detached.includes(tool)) { showPanel(tool); return; }
     setToolPanel(current => ({ tool, minimized: current?.tool === tool && !current.minimized, expanded: current?.expanded ?? false }));
   };
 
@@ -63,6 +72,26 @@ export default function App() {
     if (toolPanel) dockButtons.current[toolPanel.tool]?.focus();
     setToolPanel(current => current && { ...current, minimized: true });
   };
+
+  const detachPanel = async () => {
+    if (!toolPanel || !nativePanels || detaching) return;
+    const tool = toolPanel.tool;
+    setDetaching(true);
+    try {
+      await nativePanels.open(tool);
+      setToolPanel(current => current?.tool === tool ? null : current);
+    } catch { setToast('弹出窗口失败，面板仍保留在当前工作区。'); }
+    finally { setDetaching(false); }
+  };
+
+  useEffect(() => nativePanels?.onAction(action => {
+    if (action.type === 'clear-logs') setLogs([]);
+    if (action.type === 'dock') setToolPanel(current => ({ tool: action.tool, minimized: false, expanded: current?.expanded ?? false }));
+  }), [nativePanels]);
+
+  useEffect(() => {
+    void nativePanels?.publishLogs(logs).catch(() => setToast('独立窗口的日志同步失败，请重新打开窗口。'));
+  }, [logs, nativePanels]);
 
   const saveDraft = useCallback(() => {
     try {
@@ -225,18 +254,19 @@ export default function App() {
       </main>
 
       <div className="quick-dock" role="toolbar" aria-label="快捷工具">
-        <button ref={node => { dockButtons.current.video = node; }} className={'icon-button ' + (toolPanel?.tool === 'video' && !toolPanel.minimized ? 'active' : '')}
-          title="视频预览" aria-label="视频预览" aria-expanded={toolPanel?.tool === 'video' && !toolPanel.minimized} aria-controls={toolPanel?.tool === 'video' ? 'floating-tool-panel' : undefined} aria-haspopup="dialog" onClick={() => togglePanel('video')}><MonitorPlay size={18} /></button>
-        <button ref={node => { dockButtons.current.logs = node; }} className={'icon-button ' + (toolPanel?.tool === 'logs' && !toolPanel.minimized ? 'active' : '')}
-          title="日志中心" aria-label="日志中心" aria-expanded={toolPanel?.tool === 'logs' && !toolPanel.minimized} aria-controls={toolPanel?.tool === 'logs' ? 'floating-tool-panel' : undefined} aria-haspopup="dialog" onClick={() => togglePanel('logs')}><FileClock size={18} /></button>
+        <button ref={node => { dockButtons.current.video = node; }} className={'icon-button ' + (panelWindows.detached.includes('video') || toolPanel?.tool === 'video' && !toolPanel.minimized ? 'active' : '')}
+          title={panelWindows.detached.includes('video') ? '显示视频独立窗口' : '视频预览'} aria-label="视频预览" aria-expanded={toolPanel?.tool === 'video' && !toolPanel.minimized} aria-controls={toolPanel?.tool === 'video' ? 'floating-tool-panel' : undefined} aria-haspopup="dialog" onClick={() => togglePanel('video')}><MonitorPlay size={18} />{panelWindows.detached.includes('video') && <span className="detached-indicator" />}</button>
+        <button ref={node => { dockButtons.current.logs = node; }} className={'icon-button ' + (panelWindows.detached.includes('logs') || toolPanel?.tool === 'logs' && !toolPanel.minimized ? 'active' : '')}
+          title={panelWindows.detached.includes('logs') ? '显示日志独立窗口' : '日志中心'} aria-label="日志中心" aria-expanded={toolPanel?.tool === 'logs' && !toolPanel.minimized} aria-controls={toolPanel?.tool === 'logs' ? 'floating-tool-panel' : undefined} aria-haspopup="dialog" onClick={() => togglePanel('logs')}><FileClock size={18} />{panelWindows.detached.includes('logs') && <span className="detached-indicator" />}</button>
       </div>
       {toolPanel && <FloatingSidePanel state={toolPanel} title={toolPanel.tool === 'video' ? '视频预览' : '日志中心'} icon={toolPanel.tool === 'video' ? <MonitorPlay size={16} /> : <FileClock size={16} />}
+        detach={nativePanels ? detachPanel : undefined} detaching={detaching}
         minimize={minimizePanel} restore={() => showPanel(toolPanel.tool)} toggleExpanded={() => setToolPanel(current => current && { ...current, expanded: !current.expanded })} close={closePanel}>
-        {toolPanel.tool === 'video' ? <VideoPreview openSource={() => openModal('video')} /> : <LogsPanel logs={logs} clear={() => setLogs([])} />}
+        {toolPanel.tool === 'video' ? <VideoPreview openSource={() => openModal('video')} /> : <LogsPanel logs={logs} source={panelWindows.logSource} setSource={setLogSource} clear={() => setLogs([])} />}
       </FloatingSidePanel>}
       {modal && <ToolsDialog modal={modal} close={() => setModal(null)} onInput={key => { if (recording) addLog('输入预览：' + key, '手柄'); }} />}
       {paletteOpen && <CommandPalette actions={actions} close={() => setPaletteOpen(false)} />}
-      {toast && <div className="toast" role="status"><Check size={15} />{toast}</div>}
+      {(toast || panelError) && <div className="toast" role="status"><Check size={15} />{toast || panelError}</div>}
     </div>
   );
 }

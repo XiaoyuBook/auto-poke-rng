@@ -184,9 +184,20 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .quick-dock { position: fixed; z-index: 10; right: 22px; bottom: 22px; display: flex; flex-direction: column; gap: 2px; padding: 4px; border: 1px solid #393d3d; border-radius: 8px; background: #202323; box-shadow: 0 4px 12px #0002; }
 .quick-dock .icon-button { width: 32px; height: 32px; }
 .quick-dock .icon-button.active { background: #323737; }
-.floating-side-panel { position: fixed; z-index: 12; right: 74px; bottom: 22px; display: flex; flex-direction: column; width: min(400px, calc(100vw - 96px)); height: min(600px, calc(100dvh - 96px)); overflow: hidden; border: 1px solid #3e4242; border-radius: 12px; outline: none; background: #1d2020; box-shadow: 0 16px 48px #0005; -webkit-app-region: no-drag; }
+.floating-side-panel { position: fixed; z-index: 12; right: 74px; bottom: 22px; display: flex; flex-direction: column; width: min(var(--panel-width, 400px), calc(100vw - 96px)); height: min(var(--panel-height, 600px), calc(100dvh - 86px)); overflow: hidden; border: 1px solid #3e4242; border-radius: 12px; outline: none; background: #1d2020; box-shadow: 0 16px 48px #0005; -webkit-app-region: no-drag; }
 .floating-side-panel[data-expanded="true"] { width: min(760px, calc(100vw - 96px)); height: calc(100dvh - 86px); }
-.floating-side-panel[data-minimized="true"] { width: min(400px, calc(100vw - 96px)); height: auto; }
+.floating-side-panel[data-minimized="true"] { width: min(var(--panel-width, 400px), calc(100vw - 96px)); height: auto; }
+.panel-resize-handle { position: absolute; z-index: 2; padding: 0; border: 0; background: transparent; touch-action: none; }
+.panel-resize-handle:hover, .panel-resize-handle:focus-visible { background: #8996d033; }
+.resize-left { left: 0; top: 12px; bottom: 12px; width: 6px; cursor: ew-resize; }
+.resize-top { left: 12px; right: 12px; top: 0; height: 6px; cursor: ns-resize; }
+.resize-corner { left: 0; top: 0; width: 14px; height: 14px; cursor: nwse-resize; }
+.detached-indicator { position: absolute; right: 3px; top: 3px; width: 4px; height: 4px; border-radius: 50%; background: var(--accent); }
+.detached-panel { display: flex; flex-direction: column; height: 100%; min-height: 0; background: #1d2020; }
+.detached-panel-header { display: flex; align-items: center; gap: 8px; height: 46px; flex: 0 0 auto; padding: 0 144px 0 14px; color: var(--secondary); -webkit-app-region: drag; user-select: none; }
+.detached-panel-header h1 { flex: 1; min-width: 0; font-size: 13px; font-weight: 500; white-space: nowrap; }
+.detached-panel[data-platform="darwin"] .detached-panel-header { padding: 0 14px 0 80px; }
+.panel-error { margin: 8px 16px; color: var(--red); font-size: 12px; }
 .floating-panel-header { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 12px 0 18px; color: var(--secondary); flex: 0 0 auto; }
 .floating-panel-header h2 { flex: 1; min-width: 0; font-size: 13px; font-weight: 500; }
 .floating-panel-actions { display: flex; align-items: center; gap: 1px; }
@@ -200,8 +211,8 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .floating-panel-body .logs-table td, .floating-panel-body .logs-table th { padding-right: 8px; padding-left: 4px; }
 .floating-panel-body .log-filter select { background: #1d2020; }
 .video-preview-content { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-.preview-stage { display: flex; align-items: center; justify-content: center; flex: 1; min-height: 0; padding: 0 12px 12px; overflow: auto; }
-.preview-frame { width: 100%; max-height: 100%; aspect-ratio: 16 / 9; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; border: 1px solid var(--line); border-radius: 8px; background: #141717; color: var(--muted); }
+.preview-stage { display: flex; align-items: center; justify-content: center; flex: 1; min-height: 0; padding: 0 12px 12px; overflow: auto; container-type: size; }
+.preview-frame { width: min(100%, calc(100cqh * 16 / 9)); flex-shrink: 0; aspect-ratio: 16 / 9; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; border: 1px solid var(--line); border-radius: 8px; background: #141717; color: var(--muted); }
 .preview-frame strong { color: var(--secondary); font-size: 13px; font-weight: 400; }
 .video-preview-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--line-soft); font-size: 12px; color: var(--muted); }
 .video-preview-footer > span { display: flex; align-items: center; gap: 6px; }
