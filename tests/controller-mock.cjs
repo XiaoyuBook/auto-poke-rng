@@ -25,6 +25,8 @@ app.whenReady().then(async () => {
   assert.equal(ports.some(item => item.id === 'mock'), true, 'mock serial port is enumerated');
   await js('window.desktop.devices.controller.connect("mock")');
   await until(async () => (await state()).controller.status === 'connected', 'mock controller connected');
+  const neutral = (await state()).controller.report;
+  assert.deepEqual(neutral, { buttons: 0, hat: 8, lx: 128, ly: 128, rx: 128, ry: 128 }, 'mock connection starts with a neutral report');
 
   await js('window.desktop.overlay.setMapping({A:"KeyL",LSUp:"KeyW"})');
   await js('window.desktop.overlay.toggle()');
