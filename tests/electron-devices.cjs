@@ -86,7 +86,7 @@ app.whenReady().then(async()=>{
   if (!await js(main,"Boolean(document.querySelector('[aria-label=\"选择脚本：验证\"]'))")) await js(main,"document.querySelector('[aria-label=\"文件夹：测试\"]').click()");
   await until(()=>js(main,"Boolean(document.querySelector('[aria-label=\"选择脚本：验证\"]'))"),'script folder opened');
   await js(main,"document.querySelector('[aria-label=\"选择脚本：验证\"]').click()");
-  await until(()=>js(main,"document.querySelector('textarea')?.value.includes('A 50')"),'script selected');
+  await until(()=>js(main,"document.querySelector('.cm-content')?.textContent.includes('A 50')"),'script selected');
   await js(main,"Array.from(document.querySelectorAll('button')).find(x=>x.textContent==='开始运行').click()");
   await until(()=>js(main,"document.querySelector('.log-stream')?.textContent.includes('脚本执行完成')"),'native execution finished');
   assert.equal(await js(main,'window.desktop.devices.getState().then(x=>x.controller.status)'),'connected');

@@ -4,11 +4,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
 import type { DesktopApi } from './desktop';
 import type { ScriptFile, ScriptFilesApi, ScriptListing } from './scriptLibrary';
+import { EditorView } from '@codemirror/view';
 
 let disk: ScriptListing;
 let api: ScriptFilesApi;
 const file = (path: string, body: string): ScriptFile => ({ path, name: path.split('/').at(-1)!.slice(0, -4), body, revision: body });
-const edit = (body: string) => fireEvent.change(screen.getByRole('textbox', { name: '脚本内容' }), { target: { value: body } });
+const edit = (body: string) => act(() => {
+  const view = EditorView.findFromDOM(screen.getByRole('textbox', { name: '脚本内容' }))!;
+  view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: body } });
+});
 const select = (name: string) => fireEvent.click(screen.getByRole('button', { name: '选择脚本：' + name }));
 const openBdsp = () => fireEvent.click(screen.getByRole('button', { name: '文件夹：珍钻复刻' }));
 async function openApp() {
@@ -44,6 +48,8 @@ beforeEach(() => {
   // jsdom does not implement the native dialog API; Electron supplies focus management.
   HTMLDialogElement.prototype.showModal = function () { this.open = true; };
   HTMLDialogElement.prototype.close = function () { this.open = false; };
+  Range.prototype.getClientRects = () => [] as unknown as DOMRectList;
+  Range.prototype.getBoundingClientRect = () => new DOMRect();
 });
 
 describe('project script folders', () => {
@@ -231,7 +237,7 @@ describe('workspace interactions', () => {
 
   it('keeps edits and log filters while the floating panel expands, minimizes, and restores', async () => {
     await openApp();
-    fireEvent.change(screen.getByRole('textbox', { name: '脚本内容' }), { target: { value: '# 工作中的草稿' } });
+    edit('# 工作中的草稿');
     fireEvent.click(screen.getByRole('button', { name: '日志中心' }));
     const panel = screen.getByRole('dialog', { name: '日志中心' });
     expect(panel.getAttribute('aria-modal')).toBe('false');

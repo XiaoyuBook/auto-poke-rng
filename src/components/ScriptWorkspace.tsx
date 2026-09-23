@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { CircleHelp, Circle, FileCode2, Gamepad2, Keyboard, Play, Save, Square, TerminalSquare } from 'lucide-react';
+import { ChevronsDownUp, ChevronsUpDown, CircleHelp, Circle, FileCode2, Gamepad2, Keyboard, Play, Save, Square, TerminalSquare } from 'lucide-react';
 import { formatElapsed, type LogEntry, type Modal } from '../workspace';
 import type { ScriptProgress } from '../devices';
 import type { ScriptValidation } from '../useScriptValidation';
+import { ScriptEditor, type ScriptEditorHandle } from './ScriptEditor';
 
 interface Props {
   scriptId: string;
@@ -33,57 +34,18 @@ interface Props {
 }
 
 export function ScriptWorkspace(props: Props) {
-  const lineNumbers = useRef<HTMLSpanElement>(null);
-  const editor = useRef<HTMLTextAreaElement>(null);
-  const highlightLayer = useRef<HTMLDivElement>(null);
+  const editor = useRef<ScriptEditorHandle>(null);
   const logStream = useRef<HTMLDivElement>(null);
   const followLogs = useRef(true);
-  const { onCursorChange, scriptId } = props;
   const [follow, setFollow] = useState(true);
-  const sourceLines = props.script.split('\n');
   const diagnostic = props.validation.diagnostic;
   const errorLine = diagnostic?.source === props.scriptId ? diagnostic.line : undefined;
-  const syncScroll = () => {
-    const field = editor.current;
-    if (!field) return;
-    if (lineNumbers.current) lineNumbers.current.style.transform = `translateY(${-field.scrollTop}px)`;
-    if (highlightLayer.current) highlightLayer.current.style.transform = `translateY(${-field.scrollTop}px)`;
-  };
-  const revealLine = (line: number) => {
-    const field = editor.current;
-    if (!field) return;
-    const top = 12 + (line - 1) * 24;
-    if (top < field.scrollTop || top + 24 > field.scrollTop + field.clientHeight) {
-      field.scrollTop = Math.max(0, top - field.clientHeight / 2);
-      syncScroll();
-    }
-  };
-  useEffect(() => {
-    editor.current?.setSelectionRange(0, 0);
-    if (editor.current) editor.current.scrollTop = 0;
-    if (lineNumbers.current) lineNumbers.current.style.transform = 'translateY(0)';
-    if (highlightLayer.current) highlightLayer.current.style.transform = 'translateY(0)';
-    onCursorChange({ line: 1, column: 1 });
-  }, [onCursorChange, scriptId]);
   useEffect(() => {
     if (logStream.current && followLogs.current) logStream.current.scrollTop = logStream.current.scrollHeight;
   }, [props.logs]);
-  useEffect(() => {
-    if (follow && props.runningLine) revealLine(props.runningLine);
-  }, [follow, props.runningLine, scriptId]);
   useEffect(() => { if (props.running) setFollow(true); }, [props.running]);
-  const updateCursor = () => {
-    const field = editor.current;
-    if (!field) return;
-    const beforeCursor = field.value.slice(0, field.selectionStart).split('\n');
-    onCursorChange({ line: beforeCursor.length, column: beforeCursor.at(-1)!.length + 1 });
-  };
   const locateError = () => {
-    if (!errorLine || !editor.current) return;
-    const offset = sourceLines.slice(0, errorLine - 1).reduce((total, line) => total + line.length + 1, 0);
-    editor.current.focus();
-    editor.current.setSelectionRange(offset, offset + (sourceLines[errorLine - 1]?.length || 0));
-    revealLine(errorLine); updateCursor();
+    if (errorLine) { setFollow(false); editor.current?.revealLine(errorLine); }
   };
 
   return <section className="script-workspace" aria-label="脚本工作区">
@@ -112,6 +74,9 @@ export function ScriptWorkspace(props: Props) {
         <span className="toolbar-separator" />
         <button className={'editor-tool-button ' + (props.virtualControllerOpen ? 'active' : '')} aria-pressed={props.virtualControllerOpen} onClick={props.toggleVirtualController}><Gamepad2 size={14} /><span>虚拟手柄</span></button>
         <button className="editor-tool-button" onClick={() => props.openModal('mapping')}><Keyboard size={14} /><span>按键映射</span></button>
+        <span className="toolbar-separator" />
+        <button className="editor-tool-button fold-tool" aria-label="全部折叠" title="全部折叠 (Ctrl+Alt+[)" disabled={!props.scriptId} onClick={() => editor.current?.foldAll()}><ChevronsDownUp size={14} /></button>
+        <button className="editor-tool-button fold-tool" aria-label="全部展开" title="全部展开 (Ctrl+Alt+])" disabled={!props.scriptId} onClick={() => editor.current?.unfoldAll()}><ChevronsUpDown size={14} /></button>
         <button className="editor-tool-button script-help" onClick={() => props.openModal('help')}><CircleHelp size={14} /><span>帮助</span></button>
       </div>
       {props.running && window.desktop?.devices && <section className="execution-preview" aria-label="脚本执行位置">
@@ -129,20 +94,10 @@ export function ScriptWorkspace(props: Props) {
           {!props.runningLine && <small>显示本次运行源码；当前编辑内容与执行位置不同。</small>}
         </>}
       </section>}
-      {props.scriptId ? <div className="editor-surface">
-        <pre className="line-numbers" aria-hidden="true"><span ref={lineNumbers} className="line-number-list">{sourceLines.map((_, index) => {
-          const running = props.runningLine === index + 1;
-          return <span key={index} data-line={index + 1} className={(errorLine === index + 1 ? 'has-syntax-error ' : '') + (running ? 'is-running' : '')} title={errorLine === index + 1 ? diagnostic?.message : undefined}>{index + 1}</span>;
-        })}</span></pre>
-        <div className="editor-code-wrap">
-          <div ref={highlightLayer} className="editor-highlight-layer" aria-hidden="true">
-            {sourceLines.map((_, index) => <div key={index} data-line={index + 1} className={'editor-line-mark' + (errorLine === index + 1 ? ' has-syntax-error' : '') + (props.runningLine === index + 1 ? ' is-running' : '')} />)}
-          </div>
-          <textarea ref={editor} aria-label="脚本内容" value={props.script} wrap="off" spellCheck={false} autoCapitalize="off"
-          onChange={event => { props.onChange(event.target.value); updateCursor(); }} onSelect={updateCursor}
-          onScroll={syncScroll} onWheel={() => setFollow(false)} placeholder="# 在此输入脚本" />
-        </div>
-      </div> : <div className="empty-state editor-empty"><FileCode2 size={26} /><h2>选择一个脚本</h2><p>展开左侧文件夹，选择脚本开始编辑</p></div>}
+      {props.scriptId ? <ScriptEditor ref={editor} scriptId={props.scriptId} value={props.script}
+        onChange={props.onChange} onCursorChange={props.onCursorChange} onManualBrowse={() => setFollow(false)}
+        runningLine={props.runningLine} followLine={follow ? props.runningLine : undefined} errorLine={errorLine} message={diagnostic?.message}
+      /> : <div className="empty-state editor-empty"><FileCode2 size={26} /><h2>选择一个脚本</h2><p>展开左侧文件夹，选择脚本开始编辑</p></div>}
       {props.scriptId && <div className={'syntax-status ' + props.validation.state} role="status" aria-label="语法检查">
         {props.validation.state === 'checking' && '正在检查语法…'}
         {props.validation.state === 'valid' && '语法检查通过'}

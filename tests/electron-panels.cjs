@@ -7,6 +7,7 @@ const { promisify } = require('node:util');
 const { registerPanelWindows } = require('../electron/panel-windows.cjs');
 const { registerDevices } = require('../electron/devices.cjs');
 const { registerScriptFiles } = require('../electron/script-files.cjs');
+const { editorHelpers } = require('./editor-helpers.cjs');
 
 // Fail automation immediately instead of showing Electron's uncaught-error dialog.
 const fail = error => { console.error(error); app.exit(1); };
@@ -113,28 +114,21 @@ app.whenReady().then(async () => {
   await loadWindow(main);
   await evaluate(main, 'localStorage.clear()');
   await loadWindow(main);
-  await until(() => evaluate(main, 'Boolean(document.querySelector("textarea"))'), 'workspace ready');
+  const editor = editorHelpers(main);
+  await until(() => evaluate(main, 'Boolean(document.querySelector(".cm-content"))'), 'workspace ready');
   console.log('Workspace ready');
   assert.equal(await evaluate(main, 'document.querySelectorAll(".library-folder-button").length'), 2);
   await click(main, '文件夹：珍钻复刻');
   await click(main, '选择脚本：菜单');
-  assert.equal(await evaluate(main, 'document.querySelector("textarea").value'), '# 珍钻测试\npress X');
-  await evaluate(main, `(() => {
-    const field = document.querySelector('textarea');
-    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(field, '# 保存到磁盘');
-    field.dispatchEvent(new Event('input', { bubbles: true }));
-  })()`);
+  assert.equal(await editor.read(), '# 珍钻测试\npress X');
+  await editor.edit('# 保存到磁盘');
   await click(main, '保存脚本');
   await until(() => fs.readFileSync(path.join(scriptRoot, '珍钻复刻', '菜单.rng'), 'utf8') === '# 保存到磁盘', 'script saved through preload IPC');
   await click(main, '选择脚本：确认');
-  assert.equal(await evaluate(main, 'document.querySelector("textarea").value'), '# 火红测试\npress A');
+  assert.equal(await editor.read(), '# 火红测试\npress A');
   await click(main, '选择脚本：菜单');
   console.log('Project folder discovery, selection, and disk save passed');
-  await evaluate(main, `(() => {
-    const field = document.querySelector('textarea');
-    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(field, '# unsaved detached test');
-    field.dispatchEvent(new Event('input', { bubbles: true }));
-  })()`);
+  await editor.edit('# unsaved detached test');
   await click(main, '日志中心');
   const original = await panelBounds(main);
   const handle = await evaluate(main, `(() => {
@@ -182,7 +176,7 @@ app.whenReady().then(async () => {
   await until(() => evaluate(logs, `document.querySelector('.logs-table')?.textContent.includes('脚本执行完成')`), 'real script host logs reach detached window');
   await evaluate(logs, `Array.from(document.querySelectorAll('button')).find(b => b.textContent === '清空日志').click()`);
   await until(() => evaluate(main, 'window.desktop.panels.getState().then(s => s.logs.length === 0)'), 'clear logs reaches main window');
-  assert.equal(await evaluate(main, 'document.querySelector("textarea").value'), '# unsaved detached test');
+  assert.equal(await editor.read(), '# unsaved detached test');
   await click(logs, '窗口置顶');
   await until(() => logs.isAlwaysOnTop(), 'always on top');
   await click(logs, '取消置顶');
@@ -328,7 +322,7 @@ app.whenReady().then(async () => {
   await until(() => evaluate(main, `document.querySelector('[aria-label="日志中心"]').dataset.state === 'closed'`), 'closing window clears dock state');
   await click(main, '日志中心');
   await until(() => evaluate(main, 'Boolean(document.querySelector(".floating-side-panel"))'), 'closed tool opens inline again');
-  assert.equal(await evaluate(main, 'document.querySelector("textarea").value'), '# unsaved detached test');
+  assert.equal(await editor.read(), '# unsaved detached test');
   main.setContentSize(1100, 680);
   await delay(100);
   const smallerViewport = await evaluate(main, '({ width: innerWidth, height: innerHeight })');
