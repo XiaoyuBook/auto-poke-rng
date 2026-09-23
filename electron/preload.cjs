@@ -24,6 +24,7 @@ contextBridge.exposeInMainWorld('desktop', {
     },
     execution: {
       start: script => ipcRenderer.invoke('execution:start', script),
+      validate: script => ipcRenderer.invoke('execution:validate', script),
       stop: () => ipcRenderer.invoke('execution:stop'),
     },
     video: {

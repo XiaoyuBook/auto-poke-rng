@@ -21,6 +21,10 @@ import { ControllerOverlayApp } from './components/ControllerOverlayApp';
 import { KeyMappingDialog } from './components/KeyMappingDialog';
 import { loadControllerMapping, type MappingAction } from './controllerMapping';
 import { useDevices } from './useDevices';
+import type { ScriptProgress } from './devices';
+import { useScriptValidation } from './useScriptValidation';
+
+interface ScriptRun { folder: string; scriptName: string; path: string; text: string; started: number; progress?: ScriptProgress }
 
 export default function App({ connections = initialConnections }: { connections?: DeviceConnections }) {
   if (new URLSearchParams(window.location.search).get('window') === 'controller-overlay') {
@@ -33,7 +37,8 @@ export default function App({ connections = initialConnections }: { connections?
   const [game, setGame] = useState<GameId>('frlg');
   const [gameMenuOpen, setGameMenuOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
-  const [run, setRun] = useState<{ folder: string; scriptName: string; started: number } | null>(null);
+  const [run, setRun] = useState<ScriptRun | null>(null);
+  const currentRun = useRef<{ runId?: string; started: number } | null>(null);
   const startingRun = useRef<Promise<unknown> | null>(null);
   const [recording, setRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -57,6 +62,7 @@ export default function App({ connections = initialConnections }: { connections?
   const dockButtons = useRef<Partial<Record<PanelTool, HTMLButtonElement | null>>>({});
   const activeGame = games.find(item => item.id === game)!;
   const script = library.active?.body || '';
+  const validation = useScriptValidation(library.active?.path || '', script);
   const saved = library.saved;
   const overlayApi = window.desktop?.overlay;
   const scriptRef = useRef(script);
@@ -88,10 +94,19 @@ export default function App({ connections = initialConnections }: { connections?
   }, []);
 
   useEffect(() => window.desktop?.devices?.onEvent(event => {
+    const activeRun = currentRun.current;
+    if (!activeRun || (activeRun.runId && activeRun.runId !== event.runId)) return;
+    activeRun.runId = event.runId;
     if (event.event === 'script.started') addLog('脚本已通过预检，开始执行。', '脚本', 'success');
+    if (event.event === 'script.progress' && event.source && typeof event.line === 'number') {
+      const progress: ScriptProgress = { source: event.source, line: event.line, column: event.column || 1, action: event.action || '', text: event.text || '', loops: event.loops, caller: event.caller };
+      setRun(current => current ? { ...current, progress } : current);
+    }
     if (event.event === 'script.log' && event.message) addLog(event.message, '脚本');
     if (event.event === 'script.done') {
-      setRun(current => { if (current) setElapsed(Math.floor((Date.now() - current.started) / 1000)); return null; });
+      currentRun.current = null;
+      setElapsed(Math.floor((Date.now() - activeRun.started) / 1000));
+      setRun(null);
       addLog(event.status === 'completed' ? '脚本执行完成，伊机控保持连接。' : event.status === 'cancelled' ? '脚本已停止，按键已释放。' : '脚本执行失败：' + event.message, '脚本', event.status === 'failed' ? 'warning' : 'info');
     }
   }), [addLog]);
@@ -217,11 +232,12 @@ export default function App({ connections = initialConnections }: { connections?
     window.desktop?.getMetadata().then(data => setVersion(data.version)).catch(() => undefined);
   }, []);
 
+  const runStarted = run?.started;
   useEffect(() => {
-    if (!run) return;
-    const timer = window.setInterval(() => setElapsed(Math.floor((Date.now() - run.started) / 1000)), 250);
+    if (runStarted === undefined) return;
+    const timer = window.setInterval(() => setElapsed(Math.floor((Date.now() - runStarted) / 1000)), 250);
     return () => window.clearInterval(timer);
-  }, [run]);
+  }, [runStarted]);
 
   useEffect(() => {
     if (!toast) return;
@@ -266,18 +282,24 @@ export default function App({ connections = initialConnections }: { connections?
     if (api) {
       if (run) {
         void Promise.resolve(startingRun.current).then(() => api.stop()).catch(error => { setToast(error.message); addLog(error.message, '脚本', 'warning'); });
+      } else if (validation.state === 'invalid') {
+        setToast(validation.diagnostic?.message || '请先修正脚本错误。');
       } else if (library.active && !startingRun.current) {
+        const { path, name, body } = library.active;
+        const folder = parentFolder(path) || 'scripts';
+        const attempt = { started: Date.now(), runId: undefined as string | undefined };
+        currentRun.current = attempt;
+        setElapsed(0); setRun({ folder, scriptName: name, path, text: body, started: attempt.started });
         const start = async () => {
           if (overlayApi) await overlayApi.setActive(false);
-          const folder = parentFolder(library.active!.path) || 'scripts';
-          setElapsed(0); setRun({ folder, scriptName: library.active!.name, started: Date.now() });
-          addLog(folder + ' · ' + library.active!.name + '：准备执行。', '脚本');
-          const pending = api.start({ text: scriptRef.current, path: library.active!.path });
-          startingRun.current = pending;
-          try { await pending; } catch (error) { setRun(null); setToast(error instanceof Error ? error.message : String(error)); addLog(error instanceof Error ? error.message : String(error), '脚本', 'warning'); }
-          finally { startingRun.current = null; }
+          addLog(folder + ' · ' + name + '：准备执行。', '脚本');
+          const { runId } = await api.start({ text: body, path });
+          if (currentRun.current === attempt) attempt.runId = runId;
         };
-        void start().catch(error => { setRun(null); setToast(error instanceof Error ? error.message : String(error)); addLog(error instanceof Error ? error.message : String(error), '脚本', 'warning'); });
+        startingRun.current = start().catch(error => {
+          if (currentRun.current === attempt) { currentRun.current = null; setRun(null); }
+          setToast(scriptError(error)); addLog(scriptError(error), '脚本', 'warning');
+        }).finally(() => { startingRun.current = null; });
       }
       return;
     }
@@ -289,7 +311,7 @@ export default function App({ connections = initialConnections }: { connections?
       setElapsed(0);
       const scriptName = library.active.name.trim() || '未命名脚本';
       const folder = parentFolder(library.active.path) || 'scripts';
-      setRun({ folder, scriptName, started: Date.now() });
+      setRun({ folder, scriptName, path: library.active.path, text: script, started: Date.now() });
       addLog(folder + ' · ' + scriptName + '：开始运行演示，不向设备发送操作。', '脚本', 'success');
     }
   };
@@ -398,7 +420,9 @@ export default function App({ connections = initialConnections }: { connections?
             onChange={body => library.update({ body })} onRename={name => library.update({ name })} onCursorChange={setCursor} saved={saved}
             busy={library.busy} statusLabel={!library.active ? '' : library.active.missing ? '文件已移除 · 编辑保留' : library.active.diskChanged ? '外部已修改 · 编辑保留' : saved ? '已保存' : '未保存'} onSave={saveDraft}
             library={<ScriptLibrary {...library} selectedPath={library.active?.path} />}
-            logs={logs} clearLogs={() => setLogs([])} running={Boolean(run)} runningName={run?.scriptName} recording={recording} elapsed={elapsed} toggleRunning={toggleRunning} toggleRecording={toggleRecording} openModal={openModal}
+            logs={logs} clearLogs={() => setLogs([])} running={Boolean(run)} runningName={run?.scriptName}
+            runningLine={run && run.path === library.active?.path && run.text === script && run.progress?.source === run.path ? run.progress.line : undefined}
+            progress={run?.progress} validation={validation} recording={recording} elapsed={elapsed} toggleRunning={toggleRunning} toggleRecording={toggleRecording} openModal={openModal}
             virtualControllerOpen={virtualControllerOpen} toggleVirtualController={() => void toggleVirtualController()} />}
           {page === '首页' && <div className="empty-state home-empty"><Home size={28} /><h2>开始你的工作</h2><p>当前游戏为{activeGame.label}，打开脚本编辑开始配置操作。</p><button className="button" onClick={() => setPage('脚本编辑')}><TerminalSquare size={15} />打开脚本编辑</button></div>}
         </div>

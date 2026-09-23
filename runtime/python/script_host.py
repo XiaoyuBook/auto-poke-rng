@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "clients"))
 from easycon.native.engine import EasyConScriptEngine
 from easycon.native.errors import ScriptCancelled
 from easycon.native.ast import Call, CallStatement
+from easycon.native.trace import ExecutionTrace
 
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stdin.reconfigure(encoding="utf-8")
@@ -29,6 +30,32 @@ request_number = 0
 def emit(payload):
     with output_lock:
         print(json.dumps(payload, ensure_ascii=False), flush=True)
+
+
+def source_name(source, config):
+    path = Path(source)
+    if path.is_absolute():
+        try:
+            return path.relative_to(config["rootDirectory"]).as_posix()
+        except (ValueError, KeyError):
+            return path.as_posix()
+    return source
+
+
+def error_details(error, config):
+    location = getattr(error, "location", None)
+    if location is None:
+        return {}
+    return {"source": source_name(location.source, config), "line": location.line, "column": location.column}
+
+
+def validation_result(config, error=None):
+    if error is None:
+        return {"event": "script.validation", "valid": True}
+    return {
+        "event": "script.validation", "valid": False,
+        "diagnostic": {"message": getattr(error, "message", str(error)), **error_details(error, config)},
+    }
 
 
 def request(method, params):
@@ -94,6 +121,37 @@ def normalize_preview_aliases(text):
 
 def run(config, program):
     frames = None
+    trace = ExecutionTrace()
+    finished = threading.Event()
+    sources = {unit.source: unit.text.splitlines() for unit in (*program.ast.libraries, program.ast.main)}
+    sources[config["name"]] = config["text"].splitlines()
+    last_point = None
+
+    def publish_latest():
+        nonlocal last_point
+        point = trace.snapshot().point
+        if point is None or point is last_point:
+            return
+        last_point = point
+        location = point.location
+        lines = sources.get(location.source, [])
+        emit({
+            "event": "script.progress", "source": source_name(location.source, config), "line": location.line,
+            "column": location.column, "action": point.action,
+            "text": lines[location.line - 1] if 0 < location.line <= len(lines) else "",
+            "caller": {"source": source_name(point.caller.source, config), "line": point.caller.line} if point.caller else None,
+            "loops": [{
+                "source": source_name(item.location.source, config), "line": item.location.line,
+                "column": item.location.column, "iteration": item.iteration, "total": item.total,
+            } for item in point.loops],
+        })
+
+    def report_progress():
+        while not finished.wait(0.1):
+            publish_latest()
+
+    reporter = None
+    result = {"event": "script.done", "status": "completed"}
     try:
         root = Path(config["scriptDir"])
         def preflight(node):
@@ -133,31 +191,46 @@ def run(config, program):
             getters = labels.external_getters(read_frame)
         # Compile + asset preflight before taking controller ownership or sending input.
         request("script.acquire", {})
+        trace.begin(config["name"])
         emit({"event": "script.started"})
+        reporter = threading.Thread(target=report_progress, daemon=True)
+        reporter.start()
         program.run(gamepad=RemoteGamepad(), waiter=RemoteWaiter(), external_getters=getters,
-                    cancel_event=cancelled, output=lambda message: emit({"event": "script.log", "message": str(message)}))
-        emit({"event": "script.done", "status": "completed"})
+                    cancel_event=cancelled, output=lambda message: emit({"event": "script.log", "message": str(message)}),
+                    trace=trace.record)
     except ScriptCancelled:
-        emit({"event": "script.done", "status": "cancelled"})
+        result["status"] = "cancelled"
     except Exception as error:
-        emit({"event": "script.done", "status": "failed", "message": str(error)})
+        result.update(status="failed", message=str(error), **error_details(error, config))
     finally:
+        finished.set()
+        if reporter is not None:
+            reporter.join()
+        publish_latest()
+        emit(result)
         if frames is not None:
             frames.close()
 
 
 def main():
     config = json.loads(sys.stdin.readline())
+    command = config.get("command", "run")
     try:
         program = EasyConScriptEngine().compile(normalize_preview_aliases(config["text"]),
                                                source=config["name"], script_dir=Path(config["scriptDir"]))
+        if command == "validate":
+            emit(validation_result(config))
+            return
         if program.requires_image_search:
             # Native extension initialization can flush C stdio on Windows. Import
             # before another thread blocks on stdin, which otherwise holds its CRT
             # stream lock and can deadlock NumPy/OpenCV initialization.
             from easycon.native import image_labels  # noqa: F401
     except Exception as error:
-        emit({"event": "script.done", "status": "failed", "message": str(error)})
+        if command == "validate":
+            emit(validation_result(config, error))
+        else:
+            emit({"event": "script.done", "status": "failed", "phase": "compile", "message": str(error), **error_details(error, config)})
         return
     worker = threading.Thread(target=run, args=(config, program), daemon=True)
     worker.start()

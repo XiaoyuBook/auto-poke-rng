@@ -80,6 +80,7 @@ function registerDevices({ ipcMain, getWindows, loadWindow, rootDirectory = path
   handle('controller:reset', () => controller.call('controller.reset'));
   handle('controller:stop', async () => { await runner.stop(); if (controller.child) await controller.call('controller.stop'); });
   handle('execution:start', args => runner.start(args));
+  handle('execution:validate', args => runner.validate(args));
   handle('execution:stop', () => runner.stop());
   handle('video:list', args => video.call('video.list', args, 15000));
   handle('video:connect', async args => {
@@ -113,7 +114,7 @@ function registerDevices({ ipcMain, getWindows, loadWindow, rootDirectory = path
   return {
     stopInputs: async () => { await runner.stop(); if (controller.child) await controller.call('controller.stop'); },
     controllerOverlay,
-    close: async () => { closing = true; clearVideoTimers(); clearInterval(controllerTimer); await runner.stop().catch(() => {}); await controllerOverlay.close(); await Promise.allSettled([video.close(), controller.close()]); },
+    close: async () => { closing = true; clearVideoTimers(); clearInterval(controllerTimer); ++runner.validationVersion; runner.cancelValidation?.(); await runner.stop().catch(() => {}); await controllerOverlay.close(); await Promise.allSettled([video.close(), controller.close()]); },
     getState: () => state,
   };
 }

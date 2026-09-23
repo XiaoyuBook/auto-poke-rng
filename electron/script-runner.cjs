@@ -6,10 +6,10 @@ class ScriptRunner {
   constructor({ controller, rootDirectory, getVideo, emit }) {
     Object.assign(this, { controller, rootDirectory, getVideo, emit });
     this.current = null;
+    this.validationVersion = 0;
+    this.cancelValidation = null;
   }
-  async start({ text, path: relative }) {
-    if (this.current) throw new Error('已有脚本正在运行。');
-    if (typeof text !== 'string' || Buffer.byteLength(text, 'utf8') > 1024 * 1024 || !text.trim()) throw new Error('脚本内容无效。');
+  async resolveScript(relative) {
     if (typeof relative !== 'string' || !relative || relative.includes('\\') || relative.includes(':') || relative.split('/').some(part => !part || part === '..' || part === '.') || !/\.rng$/i.test(relative)) throw new Error('脚本路径无效。');
     const root = path.resolve(this.rootDirectory), absolute = path.resolve(root, relative);
     if (!absolute.startsWith(root + path.sep)) throw new Error('脚本必须位于脚本目录内。');
@@ -19,19 +19,69 @@ class ScriptRunner {
       currentPath = part ? path.join(currentPath, part) : currentPath;
       if ((await fs.lstat(currentPath)).isSymbolicLink()) throw new Error('脚本目录不允许链接。');
     }
+    return { root, absolute };
+  }
+  pythonPath() {
+    const localPython = path.join(__dirname, '..', '.deps', 'script-python', 'Scripts', 'python.exe');
+    return process.env.AUTO_POKE_PYTHON || (require('node:fs').existsSync(localPython) ? localPython : 'python');
+  }
+  async validate({ text, path: relative }) {
+    if (typeof text !== 'string' || Buffer.byteLength(text, 'utf8') > 1024 * 1024) throw new Error('脚本内容无效。');
+    const version = ++this.validationVersion;
+    this.cancelValidation?.();
+    const { root, absolute } = await this.resolveScript(relative);
+    if (version !== this.validationVersion) return { cancelled: true };
+    const child = spawn(this.pythonPath(), ['-u', path.join(__dirname, '..', 'runtime', 'python', 'script_host.py')], {
+      windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, PYTHONUTF8: '1', PYTHONDONTWRITEBYTECODE: '1' },
+    });
+    let buffer = '', diagnostic = '', settled = false;
+    let timer;
+    const result = new Promise((resolve, reject) => {
+      const finish = (callback, value) => {
+        if (settled) return;
+        settled = true; clearTimeout(timer); callback(value);
+        if (version === this.validationVersion) this.cancelValidation = null;
+      };
+      this.cancelValidation = () => { child.kill(); finish(resolve, { cancelled: true }); };
+      timer = setTimeout(() => { child.kill(); finish(reject, new Error('语法检查超时。')); }, 15000);
+      child.stdout.setEncoding('utf8');
+      child.stdout.on('data', data => {
+        buffer += data;
+        if (buffer.length > 2 * 1024 * 1024) { child.kill(); finish(reject, new Error('语法检查输出超过限制。')); return; }
+        let newline;
+        while ((newline = buffer.indexOf('\n')) >= 0) {
+          const line = buffer.slice(0, newline); buffer = buffer.slice(newline + 1);
+          let message;
+          try { message = JSON.parse(line); } catch { child.kill(); finish(reject, new Error('语法检查返回了无效结果。')); return; }
+          if (message.event === 'script.validation') finish(resolve, message);
+        }
+      });
+      child.stderr.on('data', data => { diagnostic = (diagnostic + data.toString('utf8')).slice(-3000); });
+      child.once('error', error => finish(reject, error));
+      child.stdin.on('error', error => finish(reject, error));
+      child.once('exit', code => {
+        if (!settled) finish(reject, new Error(diagnostic || `语法检查进程意外退出 (${code})`));
+      });
+    });
+    child.stdin.end(JSON.stringify({ command: 'validate', text, name: relative, scriptDir: path.dirname(absolute), rootDirectory: root }) + '\n');
+    return result;
+  }
+  async start({ text, path: relative }) {
+    if (this.current) throw new Error('已有脚本正在运行。');
+    if (typeof text !== 'string' || Buffer.byteLength(text, 'utf8') > 1024 * 1024 || !text.trim()) throw new Error('脚本内容无效。');
+    const { root, absolute } = await this.resolveScript(relative);
     const state = await this.controller.call('controller.status');
     if (state.status !== 'connected') throw new Error('请先连接伊机控。');
     // Recheck after asynchronous preflight to reject simultaneous run requests.
     if (this.current) throw new Error('已有脚本正在运行。');
     const run = { id: crypto.randomUUID(), owner: '', stopped: false, child: null, done: null, finished: false };
     this.current = run;
-    const localPython = path.join(__dirname, '..', '.deps', 'script-python', 'Scripts', 'python.exe');
-    const child = spawn(process.env.AUTO_POKE_PYTHON || (require('node:fs').existsSync(localPython) ? localPython : 'python'), ['-u', path.join(__dirname, '..', 'runtime', 'python', 'script_host.py')], {
+    const child = spawn(this.pythonPath(), ['-u', path.join(__dirname, '..', 'runtime', 'python', 'script_host.py')], {
       windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, PYTHONUTF8: '1', PYTHONDONTWRITEBYTECODE: '1' },
     });
     run.child = child;
     let buffer = '', diagnostic = '';
-    const finish = async (status, message = '') => {
+    const finish = async (status, message = '', details = {}) => {
       if (run.finished) return;
       run.finished = true;
       this.controller.off('offline', onOffline);
@@ -48,7 +98,7 @@ class ScriptRunner {
       const cleanup = setTimeout(() => child.kill(), 2000);
       child.once('exit', () => clearTimeout(cleanup));
       if (this.current === run) this.current = null;
-      this.emit({ event: 'script.done', runId: run.id, status, message });
+      this.emit({ event: 'script.done', ...details, runId: run.id, status, message });
       run.resolveDone?.();
     };
     run.done = new Promise(resolve => { run.resolveDone = resolve; });
@@ -75,6 +125,7 @@ class ScriptRunner {
         const line = buffer.slice(0, newline); buffer = buffer.slice(newline + 1);
         let message;
         try { message = JSON.parse(line); } catch { child.kill(); void finish('failed', '脚本进程协议错误。'); return; }
+        if (run.finished) continue;
         if (message.event === 'request') {
           void (async () => {
             try {
@@ -92,11 +143,14 @@ class ScriptRunner {
             } catch (error) { if (!run.finished && !child.stdin.destroyed) child.stdin.write(JSON.stringify({ id: message.id, error: error.message }) + '\n'); }
           })();
         } else if (message.event === 'script.started') { clearTimeout(startupTimer); this.emit({ ...message, runId: run.id }); }
-        else if (message.event === 'script.done') void finish(run.stopped ? 'cancelled' : message.status, message.message);
+        else if (message.event === 'script.done') void finish(run.stopped ? 'cancelled' : message.status, message.message, {
+          phase: message.phase, source: message.source, line: message.line, column: message.column,
+        });
         else if (message.event === 'script.log') this.emit({ ...message, runId: run.id });
+        else if (message.event === 'script.progress') this.emit({ ...message, runId: run.id });
       }
     });
-    child.stdin.write(JSON.stringify({ text, name: relative, scriptDir: path.dirname(absolute), video: this.getVideo() }) + '\n');
+    child.stdin.write(JSON.stringify({ text, name: relative, scriptDir: path.dirname(absolute), rootDirectory: root, video: this.getVideo() }) + '\n');
     return { runId: run.id };
   }
   async stop(failureReason = '') {

@@ -8,10 +8,13 @@ export interface VideoState extends DeviceState {
 }
 export interface DevicesState { video: VideoState; controller: DeviceState }
 export interface Snapshot { url: string; session: string; sequence: string; width: number; height: number }
+export interface ScriptDiagnostic { message: string; source?: string; line?: number; column?: number }
+export interface ScriptProgress { source: string; line: number; column: number; action: string; text: string; caller?: { source: string; line: number } | null; loops?: { source: string; line: number; column: number; iteration: number; total?: number | null }[] }
+export interface ScriptEvent extends Partial<ScriptProgress> { event: string; runId: string; status?: string; message?: string; phase?: string }
 export interface DevicesApi {
   getState: () => Promise<DevicesState>;
   onState: (listener: (state: DevicesState) => void) => () => void;
-  onEvent: (listener: (event: { event: string; runId: string; status?: string; message?: string }) => void) => () => void;
+  onEvent: (listener: (event: ScriptEvent) => void) => () => void;
   controller: {
     list: () => Promise<{ id: string; name: string }[]>;
     connect: (port: string) => Promise<void>;
@@ -24,6 +27,7 @@ export interface DevicesApi {
   };
   execution: {
     start: (script: { text: string; path: string }) => Promise<{ runId: string }>;
+    validate: (script: { text: string; path: string }) => Promise<{ valid?: boolean; cancelled?: boolean; diagnostic?: ScriptDiagnostic }>;
     stop: () => Promise<void>;
   };
   video: {

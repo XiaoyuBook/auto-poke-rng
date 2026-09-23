@@ -15,6 +15,7 @@
     "test:controller-mock": "npm run build && node tests/run-electron.cjs controller-mock.cjs",
     "test:controller-overlay": "npm run build && node tests/run-electron.cjs controller-overlay.cjs",
     "test:mapping": "npm run build && node tests/run-electron.cjs key-mapping.cjs",
+    "test:script-editor": "npm run build && node tests/run-electron.cjs script-editor.cjs",
     "test": "vitest run",
     "test:electron": "npm run build && node tests/run-electron.cjs",
     "start": "electron .",
