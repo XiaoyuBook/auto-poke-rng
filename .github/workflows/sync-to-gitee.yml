@@ -1,0 +1,57 @@
+name: Sync to Gitee
+
+on:
+  push:
+    branches:
+      - "**"
+    tags:
+      - "**"
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    if: github.repository == 'XiaoyuBook/auto-poke-rng'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        if: github.event.deleted != true
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Sync branch or tag to Gitee
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_ACCESS_TOKEN_AUTO_POKE_RNG }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF: ${{ github.ref }}
+          DELETED: ${{ github.event.deleted }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$GITEE_TOKEN" ]]; then
+            echo "Missing repository secret: GITEE_ACCESS_TOKEN_AUTO_POKE_RNG"
+            exit 1
+          fi
+
+          auth_header="$(printf 'shekongsk:%s' "$GITEE_TOKEN" | base64 -w 0)"
+
+          if [[ "$DELETED" == "true" ]]; then
+            git init --quiet
+            git remote add gitee https://gitee.com/shekongsk/auto-poke-rng.git
+            git -c "http.https://gitee.com/.extraheader=AUTHORIZATION: basic ${auth_header}" \
+              push gitee --delete "$REF"
+            exit 0
+          fi
+
+          git remote add gitee https://gitee.com/shekongsk/auto-poke-rng.git
+
+          if [[ "$REF_TYPE" == "branch" ]]; then
+            git -c "http.https://gitee.com/.extraheader=AUTHORIZATION: basic ${auth_header}" \
+              push --force gitee "HEAD:${REF}"
+          elif [[ "$REF_TYPE" == "tag" ]]; then
+            git -c "http.https://gitee.com/.extraheader=AUTHORIZATION: basic ${auth_header}" \
+              push --force gitee "${REF}:${REF}"
+          fi
