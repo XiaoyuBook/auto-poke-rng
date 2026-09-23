@@ -23,35 +23,36 @@ jobs:
           persist-credentials: false
 
       - name: Sync branch or tag to Gitee
+        shell: python
         env:
           GITEE_TOKEN: ${{ secrets.GITEE_ACCESSS_TOKEN_AUTO_POKE_RNG }}
           REF_TYPE: ${{ github.ref_type }}
           REF: ${{ github.ref }}
           DELETED: ${{ github.event.deleted }}
         run: |
-          set -euo pipefail
+          import base64
+          import os
+          import subprocess
 
-          if [[ -z "$GITEE_TOKEN" ]]; then
-            echo "Missing repository secret: GITEE_ACCESSS_TOKEN_AUTO_POKE_RNG"
-            exit 1
-          fi
+          token = os.environ['GITEE_TOKEN']
+          if not token:
+              raise SystemExit('GITEE_ACCESSS_TOKEN_AUTO_POKE_RNG is missing')
 
-          auth_header="$(printf 'gitee.com:%s' "$GITEE_TOKEN" | base64 -w 0)"
+          auth = base64.b64encode(('shekongsk:' + token).encode()).decode()
+          print('::add-mask::' + auth, flush=True)
+          env = dict(
+              os.environ,
+              GIT_CONFIG_COUNT='1',
+              GIT_CONFIG_KEY_0='http.https://gitee.com/.extraheader',
+              GIT_CONFIG_VALUE_0='Authorization: Basic ' + auth,
+          )
+          gitee_url = 'https://gitee.com/shekongsk/auto-poke-rng.git'
+          ref = os.environ['REF']
 
-          if [[ "$DELETED" == "true" ]]; then
-            git init --quiet
-            git remote add gitee https://gitee.com/shekongsk/auto-poke-rng.git
-            git -c "http.https://gitee.com/.extraheader=AUTHORIZATION: basic ${auth_header}" \
-              push gitee --delete "$REF"
-            exit 0
-          fi
-
-          git remote add gitee https://gitee.com/shekongsk/auto-poke-rng.git
-
-          if [[ "$REF_TYPE" == "branch" ]]; then
-            git -c "http.https://gitee.com/.extraheader=AUTHORIZATION: basic ${auth_header}" \
-              push --force gitee "HEAD:${REF}"
-          elif [[ "$REF_TYPE" == "tag" ]]; then
-            git -c "http.https://gitee.com/.extraheader=AUTHORIZATION: basic ${auth_header}" \
-              push --force gitee "${REF}:${REF}"
-          fi
+          if os.environ['DELETED'].lower() == 'true':
+              subprocess.run(['git', 'init', '--quiet'], check=True)
+              subprocess.run(['git', 'push', gitee_url, '--delete', ref], env=env, check=True)
+          elif os.environ['REF_TYPE'] == 'branch':
+              subprocess.run(['git', 'push', '--force', gitee_url, f'HEAD:{ref}'], env=env, check=True)
+          elif os.environ['REF_TYPE'] == 'tag':
+              subprocess.run(['git', 'push', '--force', gitee_url, f'{ref}:{ref}'], env=env, check=True)
