@@ -23,6 +23,8 @@ npm run setup:runtime
 npm run dev
 ```
 
+也可以直接运行 `start-gui.bat`。这个入口会自动设置 `AUTO_POKE_TEST_DEVICES=1`，因此伊机控连接面板会提供“测试手柄（模拟）” mock 串口，适合联调虚拟手柄和按键映射；生产启动不会启用模拟设备。
+
 构建渲染层资源：
 
 ```bash
