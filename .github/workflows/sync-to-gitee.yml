@@ -36,7 +36,7 @@ jobs:
             exit 1
           fi
 
-          auth_header="$(printf 'shekongsk:%s' "$GITEE_TOKEN" | base64 -w 0)"
+          auth_header="$(printf 'oauth2:%s' "$GITEE_TOKEN" | base64 -w 0)"
 
           if [[ "$DELETED" == "true" ]]; then
             git init --quiet
