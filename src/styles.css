@@ -441,7 +441,7 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .key-mapping-header { display: flex; align-items: center; justify-content: space-between; flex: 0 0 58px; padding: 0 18px 0 20px; border-bottom: 1px solid var(--line); background: var(--canvas); }
 .key-mapping-header h2 { font-size: 15px; font-weight: 500; }
 .key-mapping-content { flex: 1; min-height: 0; padding: 18px 20px 0; overflow: auto; }
-.mapping-diagram { position: relative; width: 100%; max-width: 825px; margin: 0 auto; aspect-ratio: 999 / 610; background-color: var(--mapping-canvas); background-position: top center; background-repeat: no-repeat; background-size: 100% auto; border-radius: 7px; }
+.mapping-diagram { position: relative; width: 100%; max-width: 825px; margin: 0 auto; aspect-ratio: 999 / 610; background-color: var(--mapping-canvas); background-position: top center; background-repeat: no-repeat; background-size: 100% 136.0656%; border-radius: 7px; }
 .mapping-key-button { position: absolute; display: grid; place-items: center; min-width: 22px; min-height: 19px; padding: 0; border: 1px solid var(--mapping-key-border); border-radius: 4px; background: var(--mapping-key-surface); color: #1f3e55; box-shadow: 0 1px 1px #0001; font: 11px var(--mono); cursor: pointer; transform: translate(-50%, -50%); }
 .mapping-key-button:hover { border-color: #7eae98; background: #f7fffb; }
 .mapping-key-button.selected { z-index: 2; border: 2px solid var(--green); background: #eaf7f1; color: #087c58; box-shadow: 0 0 0 2px #087c5830; }

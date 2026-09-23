@@ -94,7 +94,6 @@ class ControllerInputManager extends EventEmitter {
       } catch { /* state broadcast will report the failure */ }
     }
     this.setState({ visible: true, mode: this.state.active ? 'active' : 'standby' });
-    if (this.connected && !this.locked) await this.setActive(true);
   }
 
   async hide() {
@@ -102,13 +101,19 @@ class ControllerInputManager extends EventEmitter {
   }
 
   async toggle() {
-    if (!this.state.visible) return this.show();
+    if (!this.state.visible) {
+      await this.show();
+      return this.setActive(true);
+    }
     if (this.state.active) return this.setActive(false, true);
     return this.setActive(true);
   }
 
   async toggleActive() {
-    if (!this.state.visible) return this.show();
+    if (!this.state.visible) {
+      await this.show();
+      return this.setActive(true);
+    }
     return this.setActive(!this.state.active);
   }
 

@@ -81,7 +81,7 @@ app.whenReady().then(async()=>{
   assert.equal(await js(main,"document.querySelector('[aria-label^=\"A：\"]').getAttribute('aria-label')"),'A：P');
   await js(main,"document.querySelector('.mapping-reset').click();document.querySelector('.key-mapping-actions .primary').click()");
   await until(()=>js(main,"!document.querySelector('[aria-label=\"按键设置\"]')"),'key mapping saved');
-  await until(()=>js(main,'window.desktop.overlay.getState().then(x=>x.active)'),'mapping restores virtual controller');
+  await until(()=>js(main,'window.desktop.overlay.getState().then(x=>!x.active)'),'mapping restores virtual controller standby');
   await js(main,"window.desktop.overlay.hide()");
   if (!await js(main,"Boolean(document.querySelector('[aria-label=\"选择脚本：验证\"]'))")) await js(main,"document.querySelector('[aria-label=\"文件夹：测试\"]').click()");
   await until(()=>js(main,"Boolean(document.querySelector('[aria-label=\"选择脚本：验证\"]'))"),'script folder opened');

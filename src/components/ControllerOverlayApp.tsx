@@ -61,7 +61,7 @@ export function ControllerOverlayApp() {
   const stick = (side: 'left' | 'right', x: number, y: number, click: boolean) => {
     const active = side === 'left' ? pressed('LCLICK') : pressed('RCLICK');
     return <div className={'overlay-stick ' + side + (active ? ' pressed' : '')}>
-      <span className="overlay-stick-ring" /><span className="overlay-stick-knob" style={{ left: `${8 + x * 9}%`, top: `${8 + y * 9}%` }} />
+      <span className="overlay-stick-ring" /><span className="overlay-stick-knob" style={{ left: `${40 * ((x + 1) / 2)}%`, top: `${40 * ((y + 1) / 2)}%` }} />
       {click && <span className="overlay-stick-label" />}
     </div>;
   };

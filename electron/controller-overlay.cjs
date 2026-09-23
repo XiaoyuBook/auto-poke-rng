@@ -45,7 +45,16 @@ function registerControllerOverlay({ getMainWindow, getWindows, loadWindow, cont
     broadcast();
     return state;
   };
-  const toggle = () => state.visible ? hide() : show();
+  const toggle = async () => {
+    if (state.visible) return hide();
+    const window = ensureWindow();
+    window.showInactive();
+    window.setAlwaysOnTop(true, 'floating');
+    await input.toggle();
+    state = input.getState();
+    broadcast();
+    return state;
+  };
   const toggleActive = async () => {
     if (!state.visible) return show();
     await input.toggleActive();

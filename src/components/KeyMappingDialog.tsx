@@ -80,7 +80,7 @@ export function KeyMappingDialog({ close, onSaved }: Props) {
           return <button key={definition.id} className={'mapping-key-button ' + (selected ? 'selected' : '') + (mapping[definition.id] ? '' : ' unbound')}
             style={{ left: `${(definition.x + definition.width / 2) / 999 * 100}%`, top: `${(definition.y + definition.height / 2) / 610 * 100}%`, width: `${definition.width / 999 * 100}%`, height: `${definition.height / 610 * 100}%` }}
             aria-label={`${definition.label}：${keyDisplay(mapping[definition.id])}`} aria-pressed={selected} onClick={() => select(definition.id)}>
-            <span>{keyDisplay(mapping[definition.id])}</span>
+            <span>{mapping[definition.id] ? keyDisplay(mapping[definition.id]) : ''}</span>
           </button>;
         })}
       </div>
