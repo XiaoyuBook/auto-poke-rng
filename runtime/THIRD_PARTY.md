@@ -7,6 +7,7 @@
 | [nlohmann/json](https://github.com/nlohmann/json/tree/v3.12.0) | 3.12.0，MIT | JSON 编解码和参数检查 |
 | [EasyCon](https://github.com/EasyConNS/EasyCon) | 用户提供的 auto-bdsp-rng/third_party/EasyCon 源码快照 | `SwitchReport.cs`、`NintendoSwitchPriv.cs`、`TTLSerialClient.cs` 对应的串口协议与 30ms 发送语义，GPL-3.0 |
 | EasyCon VPad resources | 用户提供的 auto-bdsp-rng `ui/vpad_assets` 快照，源自 EasyCon `VPad/Resources` | Joy-Con 状态浮窗素材，GPL-3.0；文件保留原样 |
+| auto-bdsp-rng controller overlay | `ui/controller_overlay.py` 的绘制坐标、图层顺序及 SwitchHat 枚举 | `JoyConGraphic.tsx` 将 100×100 绘制移植为 SVG，并改进控件描边和缩放。`JoyCon-transparent.png` 按原版去白底，并消除外沿抗锯齿像素的白色杂边；生成脚本为 `tools/prepare-vpad-assets.py`，原素材另行保留；GPL-3.0 |
 | auto-bdsp-rng controller background | 用户提供的 auto-bdsp-rng `ui/controller_bg.png` | 图形化按键映射窗口背景，随参考项目 GPL-3.0 条款使用 |
 | Auto Poke RNG dark controller background | 由上述 `controller_bg.png` 转换为当前深色主题的派生素材 | 仅调整背景与轮廓颜色，保留原版几何布局；随参考项目 GPL-3.0 条款使用 |
 | frlg-auto-rng | 提交 `4d2b7b50d64e83a3ae35456c29b6bf6f7fd6ee32`，`easycon/native` | 原有解释器、编译校验、图像标签匹配原样复用；逐文件 hash 见 vendor-manifest.json |

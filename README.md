@@ -60,6 +60,8 @@ npm run build
 
 运行桌面窗口集成检查：`npm run test:electron`。检查会使用独立测试配置与临时脚本目录启动 Electron，验证目录展开、文件选择与保存、真实指针缩放、独立窗口的移动与缩放、弹出／收回、日志同步、窗口置顶及关闭清理，并在 `node_modules/.tmp/panel-window-review/` 保存渲染截图。开发测试入口位于 `tests/run-electron.cjs`，不占用用户脚本目录。
 
+虚拟手柄画面回归：`npm run test:controller-overlay`。使用 C++ mock 串口驱动实际 Electron 浮窗，验证 80/100/120/160 尺寸下的摇杆中心、按钮尺寸、中立高亮、移动、按下、八方向和释放后的画面；截图保存在 `node_modules/.tmp/controller-overlay-review/`。该测试不安装全局键盘钩子。可设置 `AUTO_POKE_TEST_DPI=2` 验证 200% 系统缩放，生成截图在对应的 `dpi-2` 子目录。
+
 ## 计划支持的作品
 
 - 《宝可梦 晶灿钻石／明亮珍珠》（BDSP）

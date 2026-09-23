@@ -25,9 +25,9 @@ function registerControllerOverlay({ getMainWindow, getWindows, loadWindow, cont
   const ensureWindow = () => {
     if (overlay && !overlay.isDestroyed()) return overlay;
     overlay = new BrowserWindow({
-      width: 100, height: 100, show: false, frame: false, transparent: true, resizable: false,
+      width: Math.round(100 * state.scale), height: Math.round(100 * state.scale), show: false, frame: false, transparent: true, resizable: false,
       movable: true, focusable: false, skipTaskbar: true, hasShadow: false, backgroundColor: '#00000000',
-      alwaysOnTop: true, webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true },
+      alwaysOnTop: true, webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false },
     });
     overlay.setAlwaysOnTop(true, 'floating');
     overlay.on('closed', () => { overlay = null; state = { ...state, visible: false, active: false, mode: 'off' }; void input.hide(); broadcast(); });
@@ -82,8 +82,14 @@ function registerControllerOverlay({ getMainWindow, getWindows, loadWindow, cont
   };
   const setScale = value => {
     const scale = Math.min(2, Math.max(0.8, Number(value) || 1));
-    state = { ...state, scale };
-    if (overlay && !overlay.isDestroyed()) overlay.setSize(Math.round(100 * scale), Math.round(100 * scale));
+    input.setState({ scale });
+    if (overlay && !overlay.isDestroyed()) {
+      // Windows pins a non-resizable window to its current size. Unlock only
+      // for this synchronous programmatic resize, then restore the tool policy.
+      overlay.setResizable(true);
+      overlay.setSize(Math.round(100 * scale), Math.round(100 * scale));
+      overlay.setResizable(false);
+    }
     broadcast();
     return state;
   };

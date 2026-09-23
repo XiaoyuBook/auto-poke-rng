@@ -458,24 +458,13 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .controller-overlay-root { width: 100vw; height: 100vh; overflow: hidden; background: transparent; }
 .controller-overlay { position: relative; width: 100vw; height: 100vh; overflow: hidden; cursor: pointer; user-select: none; opacity: .5; }
 .controller-overlay.active { opacity: 1; }
-.controller-overlay img { pointer-events: none; }
-.overlay-base, .overlay-layer { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
-.overlay-layer { display: block; }
-.shoulder-l, .shoulder-zl { z-index: 2; }.shoulder-r, .shoulder-zr { z-index: 3; }
-.overlay-stick { position: absolute; z-index: 5; width: 25%; height: 25%; }
-.overlay-stick.left { left: 11%; top: 21%; }.overlay-stick.right { left: 63%; top: 52%; }
-.overlay-stick-ring { position: absolute; inset: 8%; border: 1px solid #0008; border-radius: 50%; background: #32323299; }
-.overlay-stick-knob { position: absolute; width: 60%; height: 60%; transform: translate(-50%, -50%); border: 1px solid #000; border-radius: 50%; background: #323232; }
-.overlay-stick.moved .overlay-stick-ring { background: #00ff00cc; }
-.overlay-stick.pressed .overlay-stick-knob { background: #25ff9a; }
-.overlay-hat { position: absolute; z-index: 5; left: 15%; top: 55%; width: 18%; height: 18%; }
-.overlay-hat i { position: absolute; width: 24%; height: 24%; border-radius: 2px; background: #323232; }.overlay-hat i:nth-child(1) { left: 38%; top: 0; }.overlay-hat i:nth-child(2) { left: 38%; bottom: 0; }.overlay-hat i:nth-child(3) { left: 0; top: 38%; }.overlay-hat i:nth-child(4) { right: 0; top: 38%; }
-.overlay-hat i.pressed, .overlay-face i.pressed, .overlay-system i.pressed { background: #21e68c; }
-.overlay-face { position: absolute; z-index: 5; left: 63%; top: 21%; width: 26%; height: 25%; }
-.overlay-face i { position: absolute; width: 22%; height: 22%; border-radius: 50%; background: #323232; }.overlay-face i:nth-child(1) { left: 38%; top: 0; }.overlay-face i:nth-child(2) { left: 0; top: 38%; }.overlay-face i:nth-child(3) { right: 0; top: 38%; }.overlay-face i:nth-child(4) { left: 38%; bottom: 0; }
-.overlay-system { position: absolute; z-index: 5; inset: 0; }.overlay-system i { position: absolute; width: 5%; height: 5%; border-radius: 2px; background: #323232; }.overlay-system i:nth-child(1) { left: 29%; top: 12%; }.overlay-system i:nth-child(2) { left: 65%; top: 12%; }.overlay-system i:nth-child(3) { left: 27%; top: 82%; }.overlay-system i:nth-child(4) { left: 67%; top: 82%; }
-.overlay-script-lights { position: absolute; z-index: 6; left: 47%; top: 32%; display: grid; gap: 10%; width: 5%; height: 20%; }.overlay-script-lights i { width: 100%; aspect-ratio: 1; background: #0003; }.overlay-script-lights i.ready { background: #0008; }.overlay-script-lights i.running { background: #fff; animation: overlay-light 900ms ease-in-out infinite alternate; }.overlay-script-lights i:nth-child(2) { animation-delay: 120ms; }.overlay-script-lights i:nth-child(3) { animation-delay: 240ms; }.overlay-script-lights i:nth-child(4) { animation-delay: 360ms; }
-@keyframes overlay-light { from { opacity: .35; } to { opacity: 1; } }
+.joycon-graphic { display: block; width: 100%; height: 100%; pointer-events: none; }
+.joycon-lights[data-running="true"] .joycon-light { animation: joycon-light-edge 900ms steps(1, end) infinite; }
+.joycon-lights[data-running="true"] .joycon-light:nth-child(1) { animation-delay: -450ms; }
+.joycon-lights[data-running="true"] .joycon-light:nth-child(2) { animation-name: joycon-light-inner; animation-delay: -600ms; }
+.joycon-lights[data-running="true"] .joycon-light:nth-child(3) { animation-name: joycon-light-inner; animation-delay: -150ms; }
+@keyframes joycon-light-edge { 0% { fill-opacity: 1; } 16.667%, 100% { fill-opacity: .2; } }
+@keyframes joycon-light-inner { 0%, 33.333% { fill-opacity: 1; } 16.667%, 50%, 100% { fill-opacity: .2; } }
 
 .command-dialog { width: min(540px, calc(100vw - 40px)); margin-top: max(60px, 16vh); }
 .command-dialog .dialog-header { display: none; }
