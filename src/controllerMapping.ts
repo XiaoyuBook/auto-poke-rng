@@ -23,6 +23,16 @@ export interface MappingDefinition {
 
 export type ControllerMapping = Record<string, string | null>;
 
+// Supported by controller-input.cjs's Windows key translation. Modifier keys
+// and combinations are deliberately excluded from the single-key editor.
+export function isSupportedMappingCode(code: string): boolean {
+  return /^(Key[A-Z]|Digit[0-9]|Numpad[0-9]|F([1-9]|1[0-9]|2[0-4]))$/.test(code)
+    || ['Enter', 'Space', 'Tab', 'Backspace', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+      'Home', 'End', 'PageUp', 'PageDown', 'Insert', 'Delete', 'CapsLock', 'NumLock', 'ScrollLock',
+      'Equal', 'Minus', 'BracketLeft', 'BracketRight', 'Backslash', 'Semicolon', 'Quote', 'Backquote',
+      'Comma', 'Period', 'Slash', 'NumpadAdd', 'NumpadSubtract', 'NumpadMultiply', 'NumpadDivide', 'ContextMenu'].includes(code);
+}
+
 // Coordinates mirror the original EasyCon mapping dialog's 999 × 610 design.
 export const MAPPING_DEFINITIONS: MappingDefinition[] = [
   { id: 'ZL', label: 'ZL', group: 'shoulder', action: { kind: 'button', key: 'ZL' }, x: 280, y: 134, width: 62, height: 41 },

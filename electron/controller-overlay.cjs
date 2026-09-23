@@ -5,6 +5,7 @@ const { ControllerInputManager } = require('./controller-input.cjs');
 function registerControllerOverlay({ getMainWindow, getWindows, loadWindow, controller }) {
   let overlay = null;
   let state = { visible: false, active: false, mode: 'off', scale: 1 };
+  let mappingRestore = null;
   const input = new ControllerInputManager({ controller, broadcast: value => { state = { ...state, ...value }; broadcast(); } });
   const broadcast = () => {
     for (const window of getWindows()) if (!window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send('controller-overlay:state', state);
@@ -35,6 +36,7 @@ function registerControllerOverlay({ getMainWindow, getWindows, loadWindow, cont
     return overlay;
   };
   const show = async () => {
+    if (mappingRestore) return state;
     const window = ensureWindow();
     await input.show();
     state = input.getState();
@@ -56,6 +58,7 @@ function registerControllerOverlay({ getMainWindow, getWindows, loadWindow, cont
     return state;
   };
   const toggle = async () => {
+    if (mappingRestore) return state;
     if (state.visible) return hide();
     const window = ensureWindow();
     await input.toggle();
@@ -67,13 +70,40 @@ function registerControllerOverlay({ getMainWindow, getWindows, loadWindow, cont
     return state;
   };
   const toggleActive = async () => {
+    if (mappingRestore) return state;
     if (!state.visible) return show();
     await input.toggleActive();
     state = input.getState();
     broadcast();
     return state;
   };
-  const setActive = async active => { await input.setActive(Boolean(active), !active && state.visible === false); state = input.getState(); broadcast(); return state; };
+  const setActive = async active => {
+    if (mappingRestore) return state;
+    await input.setActive(Boolean(active), !active && state.visible === false); state = input.getState(); broadcast(); return state;
+  };
+  const suspendForMapping = async () => {
+    if (mappingRestore) return state;
+    mappingRestore = input.getState();
+    try { await input.suspend(); return input.getState(); }
+    catch (error) { mappingRestore = null; throw error; }
+  };
+  const resumeAfterMapping = async () => {
+    const previous = mappingRestore;
+    mappingRestore = null;
+    if (!previous) return state;
+    if (!previous.visible || !input.connected || !state.visible) {
+      if (!previous.visible) await input.hide();
+      return input.getState();
+    }
+    if (previous.active && !input.locked) await input.setActive(true);
+    else {
+      // Restore the standby hook (Escape only), never enable mapped keys.
+      await input.ensureChild();
+      input.sendChild({ command: 'enabled', value: false });
+      input.setState({ active: false, mode: 'standby' });
+    }
+    return input.getState();
+  };
   const resetPosition = () => {
     if (!overlay || overlay.isDestroyed()) return;
     const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
@@ -102,7 +132,8 @@ function registerControllerOverlay({ getMainWindow, getWindows, loadWindow, cont
   handle('controller-overlay:toggle', toggle);
   handle('controller-overlay:toggle-active', toggleActive);
   handle('controller-overlay:set-active', args => setActive(Boolean(args?.active)));
-  handle('controller-overlay:suspend', async () => { await input.suspend(); state = input.getState(); broadcast(); return state; });
+  handle('controller-overlay:suspend', suspendForMapping);
+  handle('controller-overlay:resume', resumeAfterMapping);
   handle('controller-overlay:set-mapping', args => { input.setMapping(args?.mapping || {}); return input.getState(); });
   handle('controller-overlay:reset-position', resetPosition);
   handle('controller-overlay:move-by', args => moveBy(args?.dx, args?.dy));

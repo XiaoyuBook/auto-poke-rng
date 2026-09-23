@@ -185,7 +185,7 @@ class ControllerInputManager extends EventEmitter {
         }
       });
       child.stdin.on('error', () => {});
-      child.stdin.write(JSON.stringify({ command: 'start', keys: [...this.codeToAction.keys()] }) + '\n');
+      child.stdin.write(JSON.stringify({ command: 'start', keys: [...this.codeToAction.keys()], enabled: false }) + '\n');
     });
     try { await this.starting; } finally { this.starting = null; }
   }

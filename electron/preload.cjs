@@ -43,6 +43,7 @@ contextBridge.exposeInMainWorld('desktop', {
     toggleActive: () => ipcRenderer.invoke('controller-overlay:toggle-active'),
     setActive: active => ipcRenderer.invoke('controller-overlay:set-active', { active }),
     suspend: () => ipcRenderer.invoke('controller-overlay:suspend'),
+    resume: () => ipcRenderer.invoke('controller-overlay:resume'),
     setMapping: mapping => ipcRenderer.invoke('controller-overlay:set-mapping', { mapping }),
     resetPosition: () => ipcRenderer.invoke('controller-overlay:reset-position'),
     moveBy: (dx, dy) => ipcRenderer.invoke('controller-overlay:move-by', { dx, dy }),

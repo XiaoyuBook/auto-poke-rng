@@ -75,13 +75,13 @@ app.whenReady().then(async()=>{
   await until(()=>js(main,'window.desktop.overlay.getState().then(x=>!x.active)'),'mapping suspends virtual controller');
   await js(main,"document.querySelector('[aria-label^=\"A：\"]').click()");
   await delay(50);
-  await js(main,"window.dispatchEvent(new KeyboardEvent('keydown',{key:'p',code:'KeyP',bubbles:true}))");
+  await js(main,"document.querySelector('.key-mapping-dialog').dispatchEvent(new KeyboardEvent('keydown',{key:'p',code:'KeyP',bubbles:true}))");
   await delay(50);
   fs.writeFileSync(path.join(output,'mapping.png'),(await main.webContents.capturePage()).toPNG());
   assert.equal(await js(main,"document.querySelector('[aria-label^=\"A：\"]').getAttribute('aria-label')"),'A：P');
   await js(main,"document.querySelector('.mapping-reset').click();document.querySelector('.key-mapping-actions .primary').click()");
   await until(()=>js(main,"!document.querySelector('[aria-label=\"按键设置\"]')"),'key mapping saved');
-  await until(()=>js(main,'window.desktop.overlay.getState().then(x=>!x.active)'),'mapping restores virtual controller standby');
+  await until(()=>js(main,'window.desktop.overlay.getState().then(x=>x.active)'),'mapping restores previous active state');
   await js(main,"window.desktop.overlay.hide()");
   if (!await js(main,"Boolean(document.querySelector('[aria-label=\"选择脚本：验证\"]'))")) await js(main,"document.querySelector('[aria-label=\"文件夹：测试\"]').click()");
   await until(()=>js(main,"Boolean(document.querySelector('[aria-label=\"选择脚本：验证\"]'))"),'script folder opened');

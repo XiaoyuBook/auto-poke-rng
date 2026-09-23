@@ -19,7 +19,7 @@ import { GlobalTools, initialConnections, type DeviceConnections } from './compo
 import { VirtualControllerWindow } from './components/VirtualControllerWindow';
 import { ControllerOverlayApp } from './components/ControllerOverlayApp';
 import { KeyMappingDialog } from './components/KeyMappingDialog';
-import { loadControllerMapping, type ControllerMapping, type MappingAction } from './controllerMapping';
+import { loadControllerMapping, type MappingAction } from './controllerMapping';
 import { useDevices } from './useDevices';
 
 export default function App({ connections = initialConnections }: { connections?: DeviceConnections }) {
@@ -42,7 +42,7 @@ export default function App({ connections = initialConnections }: { connections?
   const [logs, setLogs] = useState<LogEntry[]>(() => [createLog('工作区已就绪，等待运行脚本。')]);
   const [modal, setModal] = useState<Modal | null>(null);
   const [virtualControllerOpen, setVirtualControllerOpen] = useState(false);
-  const mappingRestore = useRef<{ visible: boolean; active: boolean } | null>(null);
+  const mappingOpening = useRef(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [toolPanel, setToolPanel] = useState<PanelState | null>(null);
   const [detaching, setDetaching] = useState(false);
@@ -134,20 +134,19 @@ export default function App({ connections = initialConnections }: { connections?
     setGameMenuOpen(false);
     if (next === 'notification') setUnread(false);
     if (next === 'mapping' && overlayApi) {
-      void overlayApi.getState().then(value => {
-        mappingRestore.current = { visible: value.visible, active: value.active };
-        if (value.active) void overlayApi.suspend();
-      }).catch(() => {});
+      if (mappingOpening.current || modal === 'mapping') return;
+      mappingOpening.current = true;
+      void overlayApi.suspend().then(() => setModal(next))
+        .catch(error => setToast('无法暂停键盘控制：' + error.message))
+        .finally(() => { mappingOpening.current = false; });
+      return;
     }
     setModal(next);
   };
 
   const closeModal = () => {
     if (modal === 'mapping' && overlayApi) {
-      const restore = mappingRestore.current;
-      mappingRestore.current = null;
-      if (restore?.visible) void overlayApi.show();
-      if (restore?.active) void overlayApi.setActive(true);
+      void overlayApi.resume().catch(error => setToast('无法恢复虚拟手柄：' + error.message));
     }
     setModal(null);
     if (modal === 'settings') requestAnimationFrame(() => settingsButton.current?.focus());
@@ -423,7 +422,7 @@ export default function App({ connections = initialConnections }: { connections?
         minimize={minimizePanel} restore={() => showPanel(toolPanel.tool)} toggleExpanded={() => setToolPanel(current => current && { ...current, expanded: !current.expanded })} close={closePanel}>
         {toolPanel.tool === 'video' ? <VideoPreview labelsOpen={panelWindows.videoLabelsOpen} /> : <LogsPanel logs={logs} source={panelWindows.logSource} setSource={setLogSource} clear={() => setLogs([])} />}
       </FloatingSidePanel>}
-      {modal === 'mapping' && <><div className="key-mapping-backdrop" onClick={closeModal} /><KeyMappingDialog close={closeModal} onSaved={mapping => { void overlayApi?.setMapping(mapping as ControllerMapping); }} /></>}
+      {modal === 'mapping' && <KeyMappingDialog close={closeModal} onSaved={async mapping => { await overlayApi?.setMapping(mapping); }} />}
       {modal && modal !== 'mapping' && <ToolsDialog modal={modal} close={closeModal} onInput={key => { if (recording) addLog('输入预览：' + key, '手柄'); }} />}
       {!overlayApi && virtualControllerOpen && <VirtualControllerWindow close={() => setVirtualControllerOpen(false)} onInput={key => { if (recording) addLog('输入预览：' + key, '手柄'); }} />}
       {paletteOpen && <CommandPalette actions={actions} close={() => setPaletteOpen(false)} />}

@@ -83,11 +83,11 @@ class KeyboardHook:
         self.proc = None
         self.thread: threading.Thread | None = None
 
-    def start(self, keys: list[int]) -> None:
+    def start(self, keys: list[int], enabled: bool = True) -> None:
         with self.lock:
             self.mapped_keys = {int(key) for key in keys}
             self.keys = self.mapped_keys | {VK_ESCAPE, VK_LCONTROL, VK_RCONTROL, VK_CONTROL}
-            self.enabled = True
+            self.enabled = bool(enabled)
         self.thread = threading.Thread(target=self._run, name="AutoPoke keyboard hook", daemon=True)
         self.thread.start()
         for _ in range(500):
@@ -199,7 +199,7 @@ def main() -> int:
             name = command.get("command")
             if name == "start":
                 hook = KeyboardHook()
-                hook.start(command.get("keys", []))
+                hook.start(command.get("keys", []), enabled=bool(command.get("enabled", True)))
             elif name == "keys" and hook:
                 hook.set_keys(command.get("keys", []))
             elif name == "enabled" and hook:

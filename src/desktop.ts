@@ -32,6 +32,7 @@ export interface ControllerOverlayApi {
   toggleActive: () => Promise<ControllerOverlayState>;
   setActive: (active: boolean) => Promise<ControllerOverlayState>;
   suspend: () => Promise<ControllerOverlayState>;
+  resume: () => Promise<ControllerOverlayState>;
   setMapping: (mapping: Record<string, string | null>) => Promise<ControllerOverlayState>;
   resetPosition: () => Promise<void>;
   moveBy: (dx: number, dy: number) => Promise<void>;
