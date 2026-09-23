@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Check, ChevronDown, CircleHelp, FileClock, Gamepad2, Home, Keyboard,
   MonitorPlay, PanelLeftClose, PanelLeftOpen, Search, Settings, TerminalSquare, Tv,
@@ -11,7 +11,7 @@ import { ScriptLibrary } from './components/ScriptLibrary';
 import { QuickTools } from './components/QuickTools';
 import { ToolsDialog } from './components/Tools';
 import { VideoPreview, VideoLabelsButton } from './components/VideoPreview';
-import { createLog, games, type GameId, type LogEntry, type Modal, type Page } from './workspace';
+import { createLog, games, isEasyConLog, type GameId, type LogEntry, type Modal, type Page } from './workspace';
 import { usePanelWindows } from './usePanelWindows';
 import { useScriptLibrary } from './useScriptLibrary';
 import { parentFolder, scriptError } from './scriptLibrary';
@@ -45,6 +45,7 @@ export default function App({ connections = initialConnections }: { connections?
   const library = useScriptLibrary();
   const { save: saveScript } = library;
   const [logs, setLogs] = useState<LogEntry[]>(() => [createLog('工作区已就绪，等待运行脚本。')]);
+  const easyConLogs = useMemo(() => logs.filter(isEasyConLog), [logs]);
   const [modal, setModal] = useState<Modal | null>(null);
   const [virtualControllerOpen, setVirtualControllerOpen] = useState(false);
   const mappingOpening = useRef(false);
@@ -420,7 +421,7 @@ export default function App({ connections = initialConnections }: { connections?
             onChange={body => library.update({ body })} onRename={name => library.update({ name })} onCursorChange={setCursor} saved={saved}
             busy={library.busy} statusLabel={!library.active ? '' : library.active.missing ? '文件已移除 · 编辑保留' : library.active.diskChanged ? '外部已修改 · 编辑保留' : saved ? '已保存' : '未保存'} onSave={saveDraft}
             library={<ScriptLibrary {...library} selectedPath={library.active?.path} />}
-            logs={logs} clearLogs={() => setLogs([])} running={Boolean(run)} runningName={run?.scriptName}
+            logs={easyConLogs} clearLogs={() => setLogs(entries => entries.filter(log => !isEasyConLog(log)))} running={Boolean(run)} runningName={run?.scriptName}
             runningLine={run && run.path === library.active?.path && run.text === script && run.progress?.source === run.path ? run.progress.line : undefined}
             progress={run?.progress} validation={validation} recording={recording} elapsed={elapsed} toggleRunning={toggleRunning} toggleRecording={toggleRecording} openModal={openModal}
             virtualControllerOpen={virtualControllerOpen} toggleVirtualController={() => void toggleVirtualController()} />}

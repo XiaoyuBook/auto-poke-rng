@@ -9,6 +9,8 @@ export type LogEntry = {
   level: 'info' | 'success' | 'warning';
 };
 
+export const isEasyConLog = (log: LogEntry) => log.source === '脚本' || log.source === '手柄';
+
 export const games = [
   { id: 'frlg', label: '火叶', generation: '第三世代', detail: 'FRLG · Switch', color: '#d8817c' },
   { id: 'bdsp', label: '珍钻复刻', generation: '第八世代', detail: 'BDSP · Switch', color: '#84a0c6' },

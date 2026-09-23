@@ -120,7 +120,7 @@ export function ScriptWorkspace(props: Props) {
         }}>
           {props.logs.length ? props.logs.map(log => <div className="log-entry" key={log.id}>
             <span className="log-time">{log.time}</span><p><span className={'status-dot ' + log.level} />{log.message}</p>
-          </div>) : <p className="empty-log">暂无日志，新的运行记录会显示在这里。</p>}
+          </div>) : <p className="empty-log">暂无伊机控日志，脚本运行和手柄操作记录会显示在这里。</p>}
         </div>
       </section>
     </section>

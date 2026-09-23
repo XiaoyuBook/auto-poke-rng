@@ -202,13 +202,22 @@ describe('workspace interactions', () => {
     expect(screen.queryByRole('dialog', { name: '快速查找' })).toBeNull();
   });
 
-  it('preserves the running script folder and timer across browsing, and really clears logs', async () => {
+  it('keeps script and controller logs in the editor and clears them without removing system logs', async () => {
     await openApp();
+    const editorLogs = () => within(screen.getByRole('region', { name: '运行日志' }));
+    expect(editorLogs().queryByText('工作区已就绪，等待运行脚本。')).toBeNull();
+    expect((editorLogs().getByRole('button', { name: '清屏' }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: '开始录制' }));
+    await editorLogs().findByText('开始录制，虚拟手柄输入会按时间写入当前脚本。');
+    fireEvent.click(screen.getByRole('button', { name: '停止录制' }));
+    expect(editorLogs().getByText('录制完成，输入已写入当前脚本。')).toBeTruthy();
     vi.useFakeTimers();
     fireEvent.click(screen.getByRole('button', { name: '开始运行' }));
+    expect(editorLogs().getByText(/开始运行演示/)).toBeTruthy();
     act(() => vi.advanceTimersByTime(2100));
     expect(screen.getByLabelText('执行时长').textContent).toBe('00:00:02');
     changeGame('珍钻复刻');
+    expect(editorLogs().queryByText('已切换查看：珍钻复刻。')).toBeNull();
     expect(screen.getByText('火红 · 演示运行中')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '首页' }));
     act(() => vi.advanceTimersByTime(1000));
@@ -217,9 +226,18 @@ describe('workspace interactions', () => {
     fireEvent.click(screen.getByRole('button', { name: '停止运行' }));
     act(() => vi.advanceTimersByTime(2000));
     expect(screen.getByLabelText('执行时长').textContent).toBe('00:00:03');
+    expect(editorLogs().getByText('运行演示已停止。')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '清屏' }));
+    expect(editorLogs().queryByText('运行演示已停止。')).toBeNull();
+    expect(editorLogs().queryByText('录制完成，输入已写入当前脚本。')).toBeNull();
+    expect((editorLogs().getByRole('button', { name: '清屏' }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(screen.getByRole('button', { name: '日志中心' }));
-    expect(screen.getByRole('heading', { name: '暂无日志' })).toBeTruthy();
+    const logCenter = within(screen.getByRole('dialog', { name: '日志中心' }));
+    expect(logCenter.getByText('工作区已就绪，等待运行脚本。')).toBeTruthy();
+    expect(logCenter.getByText('已切换查看：珍钻复刻。')).toBeTruthy();
+    expect(logCenter.queryByText('运行演示已停止。')).toBeNull();
+    fireEvent.click(logCenter.getByRole('button', { name: '清空日志' }));
+    expect(logCenter.getByRole('heading', { name: '暂无日志' })).toBeTruthy();
   });
 
   it('opens video without replacing the editor and clears the notification indicator', async () => {
