@@ -33,7 +33,7 @@ export function ControllerOverlayApp() {
   }, []);
   const report = controller.status === 'connected' && controller.report ? controller.report : centerReport;
   const pressed = (name: keyof typeof bit) => Boolean(report.buttons & bit[name]);
-  const hats: Record<number, string> = { 1: 'up', 2: 'down', 3: 'down right', 4: 'down', 5: 'down left', 6: 'left', 7: 'up left', 8: 'right', 9: 'up right' };
+  const hats: Record<number, string> = { 0: 'up', 1: 'up right', 2: 'right', 3: 'down right', 4: 'down', 5: 'down left', 6: 'left', 7: 'up left', 8: '' };
   const hat = hats[report.hat] || '';
   const toggle = () => { if (api) void api.toggleActive(); };
   const hide = () => { if (api) void api.hide(); };
