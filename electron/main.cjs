@@ -49,7 +49,12 @@ app.whenReady().then(() => {
   ipcMain.handle('app:metadata', () => ({ name: 'Auto Poke RNG', version: app.getVersion(), platform: process.platform }));
   panels = registerPanelWindows({ getMainWindow: () => mainWindow, loadWindow });
   registerScriptFiles({ getMainWindow: () => mainWindow, rootDirectory: path.join(app.getAppPath(), 'scripts') });
-  devices = registerDevices({ ipcMain, getWindows: () => BrowserWindow.getAllWindows(), loadWindow, testMode: process.env.AUTO_POKE_TEST_DEVICES === '1' });
+  // The unpackaged GUI is the local development entry point. Keep mock
+  // hardware available there even when a shell drops environment variables;
+  // packaged production builds remain real-device only unless explicitly
+  // launched with the test flag.
+  const testDevices = !app.isPackaged || process.env.AUTO_POKE_TEST_DEVICES === '1';
+  devices = registerDevices({ ipcMain, getWindows: () => BrowserWindow.getAllWindows(), loadWindow, testMode: testDevices });
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
