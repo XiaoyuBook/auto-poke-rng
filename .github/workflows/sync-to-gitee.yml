@@ -24,7 +24,7 @@ jobs:
 
       - name: Sync branch or tag to Gitee
         env:
-          GITEE_TOKEN: ${{ secrets.GITEE_ACCESS_TOKEN }}
+          GITEE_TOKEN: ${{ secrets.GITEE_ACCESSS_TOKEN_AUTO_POKE_RNG }}
           REF_TYPE: ${{ github.ref_type }}
           REF: ${{ github.ref }}
           DELETED: ${{ github.event.deleted }}
@@ -32,7 +32,7 @@ jobs:
           set -euo pipefail
 
           if [[ -z "$GITEE_TOKEN" ]]; then
-            echo "Missing repository secret: GITEE_ACCESS_TOKEN"
+            echo "Missing repository secret: GITEE_ACCESSS_TOKEN_AUTO_POKE_RNG"
             exit 1
           fi
 
