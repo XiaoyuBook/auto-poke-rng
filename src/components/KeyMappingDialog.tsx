@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Check, RotateCcw, Trash2, X } from 'lucide-react';
-import bgUrl from '../assets/controller_bg.png';
+import bgUrl from '../assets/controller_bg_dark.png';
 import {
   DEFAULT_CONTROLLER_MAPPING,
   MAPPING_DEFINITIONS,

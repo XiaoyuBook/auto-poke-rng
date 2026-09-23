@@ -153,6 +153,15 @@ export default function App({ connections = initialConnections }: { connections?
     if (modal === 'settings') requestAnimationFrame(() => settingsButton.current?.focus());
   };
 
+  const toggleVirtualController = useCallback(async () => {
+    if (devices.controller.status !== 'connected') {
+      setToast('请先在左上角“伊机控”中连接单片机。');
+      return;
+    }
+    if (overlayApi) await overlayApi.toggle();
+    else setVirtualControllerOpen(value => !value);
+  }, [devices.controller.status, overlayApi]);
+
   const showPanel = (tool: PanelTool) => {
     if (panelWindows.detached.includes(tool)) {
       void nativePanels?.open(tool).catch(() => setToast('无法打开独立窗口，请重试。'));
@@ -317,7 +326,7 @@ export default function App({ connections = initialConnections }: { connections?
     { label: '视频预览', keywords: 'video preview', icon: <MonitorPlay size={16} />, run: () => showPanel('video') },
     { label: '日志中心', keywords: 'logs history', icon: <FileClock size={16} />, run: () => showPanel('logs') },
     { label: '视频源', keywords: 'tv source', icon: <Tv size={16} />, run: () => openModal('video') },
-    { label: '虚拟手柄', keywords: 'controller gamepad', icon: <Gamepad2 size={16} />, run: () => void (overlayApi ? overlayApi.toggle() : setVirtualControllerOpen(value => !value)) },
+    { label: '虚拟手柄', keywords: 'controller gamepad', icon: <Gamepad2 size={16} />, run: () => void toggleVirtualController() },
     { label: '按键映射', keywords: 'keyboard mapping', icon: <Keyboard size={16} />, run: () => openModal('mapping') },
     { label: '脚本编辑帮助', keywords: 'help', icon: <CircleHelp size={16} />, run: () => openModal('help') },
     { label: '设置', keywords: 'settings preferences', icon: <Settings size={16} />, run: () => openModal('settings') },
@@ -391,7 +400,7 @@ export default function App({ connections = initialConnections }: { connections?
             busy={library.busy} statusLabel={!library.active ? '' : library.active.missing ? '文件已移除 · 编辑保留' : library.active.diskChanged ? '外部已修改 · 编辑保留' : saved ? '已保存' : '未保存'} onSave={saveDraft}
             library={<ScriptLibrary {...library} selectedPath={library.active?.path} />}
             logs={logs} clearLogs={() => setLogs([])} running={Boolean(run)} runningName={run?.scriptName} recording={recording} elapsed={elapsed} toggleRunning={toggleRunning} toggleRecording={toggleRecording} openModal={openModal}
-            virtualControllerOpen={virtualControllerOpen} toggleVirtualController={() => void (overlayApi ? overlayApi.toggle() : setVirtualControllerOpen(value => !value))} />}
+            virtualControllerOpen={virtualControllerOpen} toggleVirtualController={() => void toggleVirtualController()} />}
           {page === '首页' && <div className="empty-state home-empty"><Home size={28} /><h2>开始你的工作</h2><p>当前游戏为{activeGame.label}，打开脚本编辑开始配置操作。</p><button className="button" onClick={() => setPage('脚本编辑')}><TerminalSquare size={15} />打开脚本编辑</button></div>}
         </div>
         <footer className="workspace-footer" aria-label="工作区状态与工具">

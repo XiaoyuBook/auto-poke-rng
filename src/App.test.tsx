@@ -168,16 +168,13 @@ describe('workspace interactions', () => {
     expect(document.querySelector('.app-shell')?.getAttribute('data-collapsed')).toBe('false');
   });
 
-  it('toggles the virtual controller overlay from the script toolbar', async () => {
+  it('requires an EasyCon connection before opening the virtual controller', async () => {
     await openApp();
     const toggle = screen.getByRole('button', { name: '虚拟手柄' });
     expect(toggle.getAttribute('aria-pressed')).toBe('false');
     fireEvent.click(toggle);
-    expect(screen.getByRole('dialog', { name: '虚拟手柄' })).toBeTruthy();
-    expect(toggle.getAttribute('aria-pressed')).toBe('true');
-    expect(screen.getByText('单片机未连接')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: '关闭虚拟手柄' }));
     expect(screen.queryByRole('dialog', { name: '虚拟手柄' })).toBeNull();
+    expect(screen.getByText('请先在左上角“伊机控”中连接单片机。')).toBeTruthy();
     expect(toggle.getAttribute('aria-pressed')).toBe('false');
   });
 

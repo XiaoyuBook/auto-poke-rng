@@ -16,6 +16,11 @@ function registerControllerOverlay({ getMainWindow, getWindows, loadWindow, cont
   input.on('input', event => {
     for (const window of getWindows()) if (!window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send('controller-overlay:input', event);
   });
+  input.on('disconnected', () => {
+    if (overlay && !overlay.isDestroyed()) overlay.hide();
+    state = { ...state, visible: false, active: false, mode: 'off' };
+    broadcast();
+  });
 
   const ensureWindow = () => {
     if (overlay && !overlay.isDestroyed()) return overlay;
@@ -31,10 +36,15 @@ function registerControllerOverlay({ getMainWindow, getWindows, loadWindow, cont
   };
   const show = async () => {
     const window = ensureWindow();
-    state = { ...state, visible: true, mode: state.active ? 'active' : 'standby' };
+    await input.show();
+    state = input.getState();
+    if (!state.visible) {
+      window.hide();
+      broadcast();
+      return state;
+    }
     window.showInactive();
     window.setAlwaysOnTop(true, 'floating');
-    await input.show();
     broadcast();
     return state;
   };
@@ -48,10 +58,11 @@ function registerControllerOverlay({ getMainWindow, getWindows, loadWindow, cont
   const toggle = async () => {
     if (state.visible) return hide();
     const window = ensureWindow();
-    window.showInactive();
-    window.setAlwaysOnTop(true, 'floating');
     await input.toggle();
     state = input.getState();
+    if (!state.visible) { window.hide(); broadcast(); return state; }
+    window.showInactive();
+    window.setAlwaysOnTop(true, 'floating');
     broadcast();
     return state;
   };

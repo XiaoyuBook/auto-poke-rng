@@ -16,9 +16,9 @@
   --green: #84b39a;
   --red: #d48181;
   --yellow: #c7ad72;
-  --mapping-canvas: #f2f1ee;
-  --mapping-key-surface: #ffffff;
-  --mapping-key-border: #d1ddd7;
+  --mapping-canvas: #252929;
+  --mapping-key-surface: #2b3030;
+  --mapping-key-border: #4b5553;
   --mono: "Cascadia Code", Consolas, monospace;
 }
 
@@ -442,10 +442,10 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .key-mapping-header h2 { font-size: 15px; font-weight: 500; }
 .key-mapping-content { flex: 1; min-height: 0; padding: 18px 20px 0; overflow: auto; }
 .mapping-diagram { position: relative; width: 100%; max-width: 825px; margin: 0 auto; aspect-ratio: 999 / 610; background-color: var(--mapping-canvas); background-position: top center; background-repeat: no-repeat; background-size: 100% 136.0656%; border-radius: 7px; }
-.mapping-key-button { position: absolute; display: grid; place-items: center; min-width: 22px; min-height: 19px; padding: 0; border: 1px solid var(--mapping-key-border); border-radius: 4px; background: var(--mapping-key-surface); color: #1f3e55; box-shadow: 0 1px 1px #0001; font: 11px var(--mono); cursor: pointer; transform: translate(-50%, -50%); }
-.mapping-key-button:hover { border-color: #7eae98; background: #f7fffb; }
-.mapping-key-button.selected { z-index: 2; border: 2px solid var(--green); background: #eaf7f1; color: #087c58; box-shadow: 0 0 0 2px #087c5830; }
-.mapping-key-button.unbound { color: #9aa39f; font-family: var(--sans); font-size: 9px; }
+.mapping-key-button { position: absolute; display: grid; place-items: center; min-width: 22px; min-height: 19px; padding: 0; border: 1px solid var(--mapping-key-border); border-radius: 4px; background: var(--mapping-key-surface); color: #c8d4d1; box-shadow: 0 1px 1px #0005; font: 11px var(--mono); cursor: pointer; transform: translate(-50%, -50%); }
+.mapping-key-button:hover { border-color: var(--green); background: #34413d; }
+.mapping-key-button.selected { z-index: 2; border: 2px solid var(--green); background: #273f36; color: #b5e7ce; box-shadow: 0 0 0 2px #84b39a30; }
+.mapping-key-button.unbound { color: transparent; }
 .mapping-hint-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 46px; color: var(--muted); font-size: 12px; }
 .mapping-hint-row > span.active { color: var(--secondary); }
 .mapping-delete { display: inline-flex; align-items: center; gap: 5px; color: var(--green); }
