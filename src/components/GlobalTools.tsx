@@ -14,16 +14,16 @@ const connectionLabels: Record<ConnectionStatus, string> = {
 interface Props {
   connections: DeviceConnections;
   unread: boolean;
-  open: (tool: 'video' | 'controller' | 'notification') => void;
+  open: (tool: 'video' | 'easycon' | 'notification') => void;
 }
 
 export function GlobalTools({ connections, unread, open }: Props) {
   return <div className="sidebar-actions" role="group" aria-label="全局工具">
     {([
       { tool: 'video', name: '视频源', icon: <Tv size={16} /> },
-      { tool: 'controller', name: '虚拟手柄', icon: <Gamepad2 size={16} /> },
+      { tool: 'easycon', name: '伊机控', icon: <Gamepad2 size={16} /> },
     ] as const).map(({ tool, name, icon }) => {
-      const status = connections[tool];
+      const status = tool === 'easycon' ? connections.controller : connections.video;
       const label = name + '：' + connectionLabels[status];
       return <button key={tool} className="icon-button" type="button" title={label} aria-label={label}
         data-connection-status={status} onClick={() => open(tool)}>

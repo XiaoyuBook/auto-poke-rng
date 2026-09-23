@@ -23,6 +23,8 @@ interface Props {
   toggleRunning: () => void;
   toggleRecording: () => void;
   openModal: (modal: Modal) => void;
+  virtualControllerOpen: boolean;
+  toggleVirtualController: () => void;
 }
 
 export function ScriptWorkspace(props: Props) {
@@ -72,7 +74,7 @@ export function ScriptWorkspace(props: Props) {
           {props.recording ? <Square size={13} /> : <Circle size={13} />}<span>{props.recording ? '停止录制' : '开始录制'}</span>
         </button>
         <span className="toolbar-separator" />
-        <button className="editor-tool-button" onClick={() => props.openModal('controller')}><Gamepad2 size={14} /><span>虚拟手柄</span></button>
+        <button className={'editor-tool-button ' + (props.virtualControllerOpen ? 'active' : '')} aria-pressed={props.virtualControllerOpen} onClick={props.toggleVirtualController}><Gamepad2 size={14} /><span>虚拟手柄</span></button>
         <button className="editor-tool-button" onClick={() => props.openModal('mapping')}><Keyboard size={14} /><span>按键映射</span></button>
         <button className="editor-tool-button script-help" onClick={() => props.openModal('help')}><CircleHelp size={14} /><span>帮助</span></button>
       </div>

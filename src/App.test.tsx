@@ -161,11 +161,24 @@ describe('workspace interactions', () => {
     const nav = screen.getByRole('navigation', { name: '工作区' });
     expect(within(nav).getAllByRole('button').map(button => button.textContent)).toEqual(['首页', '脚本编辑']);
     const globalTools = screen.getByRole('group', { name: '全局工具' });
-    expect(within(globalTools).getAllByRole('button').map(button => button.getAttribute('aria-label'))).toEqual(['视频源：未尝试连接', '虚拟手柄：未尝试连接', '通知：有未读通知']);
+    expect(within(globalTools).getAllByRole('button').map(button => button.getAttribute('aria-label'))).toEqual(['视频源：未尝试连接', '伊机控：未尝试连接', '通知：有未读通知']);
     fireEvent.click(screen.getByRole('button', { name: '收起侧栏' }));
     expect(document.querySelector('.app-shell')?.getAttribute('data-collapsed')).toBe('true');
     fireEvent.click(screen.getByRole('button', { name: '展开侧栏' }));
     expect(document.querySelector('.app-shell')?.getAttribute('data-collapsed')).toBe('false');
+  });
+
+  it('toggles the virtual controller overlay from the script toolbar', async () => {
+    await openApp();
+    const toggle = screen.getByRole('button', { name: '虚拟手柄' });
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(toggle);
+    expect(screen.getByRole('dialog', { name: '虚拟手柄' })).toBeTruthy();
+    expect(toggle.getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByText('单片机未连接')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '关闭虚拟手柄' }));
+    expect(screen.queryByRole('dialog', { name: '虚拟手柄' })).toBeNull();
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
   });
 
   it('filters commands, handles no results, and opens a result with Enter', async () => {

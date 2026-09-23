@@ -112,6 +112,7 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .status-dot { display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: var(--muted); flex-shrink: 0; vertical-align: middle; }
 .status-dot.success { background: var(--green); }
 .status-dot.warning { background: var(--yellow); }
+.status-dot.failed { background: var(--red); }
 .workspace-content { flex: 1; min-height: 0; padding: 24px; overflow: auto; }
 
 .script-workspace { height: 100%; min-height: 455px; display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 24px; }
@@ -403,6 +404,25 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .controller-center output { font-size: 12px; }
 .controller-center button { width: 24px; height: 20px; border-radius: 4px; }
 .dialog-footnote { margin-top: 18px; color: var(--muted); font-size: 12px; }
+
+.controller-status-line { display: flex; align-items: center; gap: 8px; min-height: 28px; margin: -8px 0 8px; color: var(--secondary); font-size: 12px; }
+.virtual-controller-window { position: fixed; z-index: 20; right: 22px; bottom: 72px; display: flex; flex-direction: column; width: min(430px, calc(100vw - 44px)); max-height: calc(100dvh - 104px); overflow: hidden; border: 1px solid #414848; border-radius: 11px; background: #202323; color: var(--text); box-shadow: 0 16px 48px #0008; }
+.virtual-controller-header { display: flex; align-items: center; gap: 9px; min-height: 48px; padding: 0 12px 0 18px; border-bottom: 1px solid #333939; color: var(--secondary); }
+.virtual-controller-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex: 1; min-width: 0; }
+.virtual-controller-heading h2 { color: var(--text); font-size: 13px; font-weight: 600; }
+.virtual-controller-state { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 11px; white-space: nowrap; }
+.virtual-controller-state.connected { color: var(--green); }
+.virtual-controller-state.locked { color: var(--yellow); }
+.virtual-controller-state.connecting { color: var(--yellow); }
+.virtual-controller-state.failed { color: var(--red); }
+.virtual-controller-state.connected .status-dot { background: var(--green); }
+.virtual-controller-state.locked .status-dot { background: var(--yellow); }
+.virtual-controller-state.connecting .status-dot { background: var(--yellow); }
+.virtual-controller-state.failed .status-dot { background: var(--red); }
+.virtual-controller-body { overflow: auto; padding: 18px 22px 22px; }
+.virtual-controller-body .dialog-intro { margin-bottom: 16px; }
+.virtual-controller-body .controller-preview { min-height: 148px; }
+.virtual-controller-body .dialog-footnote { margin-bottom: 0; }
 
 .command-dialog { width: min(540px, calc(100vw - 40px)); margin-top: max(60px, 16vh); }
 .command-dialog .dialog-header { display: none; }
