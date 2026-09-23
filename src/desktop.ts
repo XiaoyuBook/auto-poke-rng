@@ -23,9 +23,27 @@ export interface PanelWindowsApi {
   onState: (listener: (state: PanelWindowState) => void) => () => void;
   onAction: (listener: (action: PanelAction) => void) => () => void;
 }
+export interface ControllerOverlayState { visible: boolean; active: boolean; mode: 'off' | 'standby' | 'active'; scale: number }
+export interface ControllerOverlayApi {
+  getState: () => Promise<ControllerOverlayState>;
+  show: () => Promise<ControllerOverlayState>;
+  hide: () => Promise<ControllerOverlayState>;
+  toggle: () => Promise<ControllerOverlayState>;
+  toggleActive: () => Promise<ControllerOverlayState>;
+  setActive: (active: boolean) => Promise<ControllerOverlayState>;
+  suspend: () => Promise<ControllerOverlayState>;
+  setMapping: (mapping: Record<string, string | null>) => Promise<ControllerOverlayState>;
+  resetPosition: () => Promise<void>;
+  moveBy: (dx: number, dy: number) => Promise<void>;
+  setScale: (scale: number) => Promise<ControllerOverlayState>;
+  onState: (listener: (state: ControllerOverlayState) => void) => () => void;
+  onInput: (listener: (event: unknown) => void) => () => void;
+  onError: (listener: (error: { message: string }) => void) => () => void;
+}
 
 export interface DesktopApi {
   devices?: import('./devices').DevicesApi;
+  overlay?: ControllerOverlayApi;
   getMetadata: () => Promise<{ name: string; version: string; platform: string }>;
   panels: PanelWindowsApi;
   scripts: ScriptFilesApi;

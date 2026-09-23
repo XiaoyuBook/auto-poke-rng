@@ -1,10 +1,13 @@
 const { RuntimeClient } = require('./runtime-client.cjs');
 const { ScriptRunner, addSequenceApi } = require('./script-runner.cjs');
+const { registerControllerOverlay } = require('./controller-overlay.cjs');
 const path = require('node:path');
 
-function registerDevices({ ipcMain, getWindows, rootDirectory = path.join(__dirname, '..', 'scripts'), testMode = false }) {
+function registerDevices({ ipcMain, getWindows, loadWindow, rootDirectory = path.join(__dirname, '..', 'scripts'), testMode = false }) {
   const video = new RuntimeClient({ role: 'video', testMode });
   const controller = addSequenceApi(new RuntimeClient({ role: 'controller', testMode }));
+  const openWindow = loadWindow || ((window, query) => window.loadFile(path.join(__dirname, '..', 'dist', 'index.html'), { query }));
+  const controllerOverlay = registerControllerOverlay({ controller, getMainWindow: () => getWindows().find(window => !window.isDestroyed()), getWindows, loadWindow: openWindow });
   let state = { video: { status: 'idle' }, controller: { status: 'idle' } };
   let snapshot = null;
   let connectTimer, frameTimer, healthBusy = false, closing = false;
@@ -23,6 +26,7 @@ function registerDevices({ ipcMain, getWindows, rootDirectory = path.join(__dirn
   controller.on('event', message => {
     if (message.event === 'controller.state') {
       state = { ...state, controller: message.state }; broadcast();
+      controllerOverlay.handleScriptState(message.state);
       if (message.state.status !== 'connected') clearInterval(controllerTimer);
     }
   });
@@ -108,7 +112,8 @@ function registerDevices({ ipcMain, getWindows, rootDirectory = path.join(__dirn
   });
   return {
     stopInputs: async () => { await runner.stop(); if (controller.child) await controller.call('controller.stop'); },
-    close: async () => { closing = true; clearVideoTimers(); clearInterval(controllerTimer); await runner.stop().catch(() => {}); await Promise.allSettled([video.close(), controller.close()]); },
+    controllerOverlay,
+    close: async () => { closing = true; clearVideoTimers(); clearInterval(controllerTimer); await runner.stop().catch(() => {}); await controllerOverlay.close(); await Promise.allSettled([video.close(), controller.close()]); },
     getState: () => state,
   };
 }

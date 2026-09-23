@@ -37,7 +37,7 @@ function createWindow() {
   mainWindow = window;
   window.webContents.on('render-process-gone', () => { void devices?.stopInputs().catch(() => {}); });
   void loadWindow(window);
-  window.on('closed', () => { mainWindow = null; panels.closeAll(); });
+  window.on('closed', () => { mainWindow = null; panels.closeAll(); void devices?.controllerOverlay?.close(); });
 
   window.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
@@ -49,7 +49,7 @@ app.whenReady().then(() => {
   ipcMain.handle('app:metadata', () => ({ name: 'Auto Poke RNG', version: app.getVersion(), platform: process.platform }));
   panels = registerPanelWindows({ getMainWindow: () => mainWindow, loadWindow });
   registerScriptFiles({ getMainWindow: () => mainWindow, rootDirectory: path.join(app.getAppPath(), 'scripts') });
-  devices = registerDevices({ ipcMain, getWindows: () => BrowserWindow.getAllWindows(), testMode: process.env.AUTO_POKE_TEST_DEVICES === '1' });
+  devices = registerDevices({ ipcMain, getWindows: () => BrowserWindow.getAllWindows(), loadWindow, testMode: process.env.AUTO_POKE_TEST_DEVICES === '1' });
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

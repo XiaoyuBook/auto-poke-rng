@@ -17,9 +17,15 @@ import { useScriptLibrary } from './useScriptLibrary';
 import { parentFolder, scriptError } from './scriptLibrary';
 import { GlobalTools, initialConnections, type DeviceConnections } from './components/GlobalTools';
 import { VirtualControllerWindow } from './components/VirtualControllerWindow';
+import { ControllerOverlayApp } from './components/ControllerOverlayApp';
+import { KeyMappingDialog } from './components/KeyMappingDialog';
+import { loadControllerMapping, type ControllerMapping, type MappingAction } from './controllerMapping';
 import { useDevices } from './useDevices';
 
 export default function App({ connections = initialConnections }: { connections?: DeviceConnections }) {
+  if (new URLSearchParams(window.location.search).get('window') === 'controller-overlay') {
+    return <div className="controller-overlay-root"><ControllerOverlayApp /></div>;
+  }
   const devices = useDevices();
   const actualConnections = window.desktop?.devices ? { video: devices.video.status, controller: devices.controller.status } : connections;
   const [page, setPage] = useState<Page>('脚本编辑');
@@ -36,6 +42,7 @@ export default function App({ connections = initialConnections }: { connections?
   const [logs, setLogs] = useState<LogEntry[]>(() => [createLog('工作区已就绪，等待运行脚本。')]);
   const [modal, setModal] = useState<Modal | null>(null);
   const [virtualControllerOpen, setVirtualControllerOpen] = useState(false);
+  const mappingRestore = useRef<{ visible: boolean; active: boolean } | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [toolPanel, setToolPanel] = useState<PanelState | null>(null);
   const [detaching, setDetaching] = useState(false);
@@ -51,6 +58,30 @@ export default function App({ connections = initialConnections }: { connections?
   const activeGame = games.find(item => item.id === game)!;
   const script = library.active?.body || '';
   const saved = library.saved;
+  const overlayApi = window.desktop?.overlay;
+  const scriptRef = useRef(script);
+  const recordingRef = useRef(false);
+  const recordingClock = useRef(0);
+  const recordedDirections = useRef({ LS: new Set<string>(), RS: new Set<string>(), hat: new Set<string>() });
+  scriptRef.current = script;
+
+  useEffect(() => {
+    if (!overlayApi) return;
+    let alive = true;
+    void overlayApi.getState().then(value => { if (alive) setVirtualControllerOpen(value.visible); }).catch(() => {});
+    const unsubscribe = overlayApi.onState(value => {
+      if (!alive) return;
+      setVirtualControllerOpen(value.visible);
+      if (!value.active && recordingRef.current) {
+        recordingRef.current = false;
+        setRecording(false);
+      }
+    });
+    void overlayApi.setMapping(loadControllerMapping()).catch(() => {});
+    const savedScale = Number(localStorage.getItem('auto-poke-rng:controller-overlay-scale'));
+    if (savedScale) void overlayApi.setScale(savedScale).catch(() => {});
+    return () => { alive = false; unsubscribe(); };
+  }, [overlayApi]);
 
   const addLog = useCallback((message: string, source: LogEntry['source'] = '系统', level: LogEntry['level'] = 'info') => {
     setLogs(entries => [...entries, createLog(message, source, level)].slice(-500));
@@ -65,13 +96,59 @@ export default function App({ connections = initialConnections }: { connections?
     }
   }), [addLog]);
 
+  const appendRecordedCommands = useCallback((commands: string[], timestamp: number) => {
+    if (!commands.length || !library.active) return;
+    const wait = recordingClock.current ? Math.max(0, Math.round(timestamp - recordingClock.current)) : 0;
+    const lines = [...(wait > 0 ? [`WAIT ${wait}`] : []), ...commands];
+    const current = scriptRef.current;
+    const body = (current && !current.endsWith('\n') ? current + '\n' : current) + lines.join('\n') + '\n';
+    scriptRef.current = body;
+    library.update({ body });
+    recordingClock.current = timestamp;
+  }, [library]);
+
+  useEffect(() => {
+    if (!overlayApi) return;
+    return overlayApi.onInput(value => {
+      if (!recordingRef.current) return;
+      const event = value as { action?: MappingAction; down?: boolean; timestamp?: number };
+      const action = event.action;
+      if (!action) return;
+      const down = Boolean(event.down);
+      const timestamp = Number(event.timestamp) || Date.now();
+      if (action.kind === 'button') {
+        appendRecordedCommands([`${action.key.replaceAll('_', '')} ${down ? 'DOWN' : 'UP'}`], timestamp);
+        return;
+      }
+      const directions = recordedDirections.current[action.side];
+      if (down) directions.add(action.direction); else directions.delete(action.direction);
+      const up = directions.has('UP'), downDirection = directions.has('DOWN');
+      const left = directions.has('LEFT'), right = directions.has('RIGHT');
+      const vertical = up && !downDirection ? 'UP' : downDirection && !up ? 'DOWN' : '';
+      const horizontal = left && !right ? 'LEFT' : right && !left ? 'RIGHT' : '';
+      appendRecordedCommands([`${action.side} ${vertical}${horizontal || (vertical ? '' : 'RESET')}`], timestamp);
+    });
+  }, [appendRecordedCommands, overlayApi]);
+
   const openModal = (next: Modal) => {
     setGameMenuOpen(false);
     if (next === 'notification') setUnread(false);
+    if (next === 'mapping' && overlayApi) {
+      void overlayApi.getState().then(value => {
+        mappingRestore.current = { visible: value.visible, active: value.active };
+        if (value.active) void overlayApi.suspend();
+      }).catch(() => {});
+    }
     setModal(next);
   };
 
   const closeModal = () => {
+    if (modal === 'mapping' && overlayApi) {
+      const restore = mappingRestore.current;
+      mappingRestore.current = null;
+      if (restore?.visible) void overlayApi.show();
+      if (restore?.active) void overlayApi.setActive(true);
+    }
     setModal(null);
     if (modal === 'settings') requestAnimationFrame(() => settingsButton.current?.focus());
   };
@@ -181,13 +258,18 @@ export default function App({ connections = initialConnections }: { connections?
     if (api) {
       if (run) {
         void Promise.resolve(startingRun.current).then(() => api.stop()).catch(error => { setToast(error.message); addLog(error.message, '脚本', 'warning'); });
-      } else if (library.active) {
-        const folder = parentFolder(library.active.path) || 'scripts';
-        setElapsed(0); setRun({ folder, scriptName: library.active.name, started: Date.now() });
-        addLog(folder + ' · ' + library.active.name + '：准备执行。', '脚本');
-        const pending = api.start({ text: script, path: library.active.path });
-        startingRun.current = pending;
-        void pending.catch(error => { setRun(null); setToast(error.message); addLog(error.message, '脚本', 'warning'); }).finally(() => { startingRun.current = null; });
+      } else if (library.active && !startingRun.current) {
+        const start = async () => {
+          if (overlayApi) await overlayApi.setActive(false);
+          const folder = parentFolder(library.active!.path) || 'scripts';
+          setElapsed(0); setRun({ folder, scriptName: library.active!.name, started: Date.now() });
+          addLog(folder + ' · ' + library.active!.name + '：准备执行。', '脚本');
+          const pending = api.start({ text: scriptRef.current, path: library.active!.path });
+          startingRun.current = pending;
+          try { await pending; } catch (error) { setRun(null); setToast(error instanceof Error ? error.message : String(error)); addLog(error instanceof Error ? error.message : String(error), '脚本', 'warning'); }
+          finally { startingRun.current = null; }
+        };
+        void start().catch(error => { setRun(null); setToast(error instanceof Error ? error.message : String(error)); addLog(error instanceof Error ? error.message : String(error), '脚本', 'warning'); });
       }
       return;
     }
@@ -205,8 +287,28 @@ export default function App({ connections = initialConnections }: { connections?
   };
 
   const toggleRecording = () => {
-    setRecording(value => !value);
-    addLog(recording ? '已停止输入录制预览。' : '开始输入录制预览，可在虚拟手柄中点击按键。', '手柄');
+    if (!recording) {
+      const start = async () => {
+        if (overlayApi && !(await overlayApi.getState()).active) {
+          addLog('请先启用虚拟手柄，再开始录制。', '手柄', 'warning');
+          return;
+        }
+        recordingRef.current = true;
+        setRecording(true);
+        recordingClock.current = 0;
+        recordedDirections.current = { LS: new Set(), RS: new Set(), hat: new Set() };
+        await window.desktop?.devices?.controller.reset().catch(() => {});
+        addLog('开始录制，虚拟手柄输入会按时间写入当前脚本。', '手柄');
+      };
+      void start().catch(error => addLog(error instanceof Error ? error.message : String(error), '手柄', 'warning'));
+      return;
+    }
+    recordingRef.current = false;
+    setRecording(false);
+    recordingClock.current = 0;
+    recordedDirections.current = { LS: new Set(), RS: new Set(), hat: new Set() };
+    void window.desktop?.devices?.controller.reset().catch(() => {});
+    addLog('录制完成，输入已写入当前脚本。', '手柄');
   };
 
   const actions: CommandAction[] = [
@@ -215,7 +317,7 @@ export default function App({ connections = initialConnections }: { connections?
     { label: '视频预览', keywords: 'video preview', icon: <MonitorPlay size={16} />, run: () => showPanel('video') },
     { label: '日志中心', keywords: 'logs history', icon: <FileClock size={16} />, run: () => showPanel('logs') },
     { label: '视频源', keywords: 'tv source', icon: <Tv size={16} />, run: () => openModal('video') },
-    { label: '虚拟手柄', keywords: 'controller gamepad', icon: <Gamepad2 size={16} />, run: () => setVirtualControllerOpen(true) },
+    { label: '虚拟手柄', keywords: 'controller gamepad', icon: <Gamepad2 size={16} />, run: () => void (overlayApi ? overlayApi.toggle() : setVirtualControllerOpen(value => !value)) },
     { label: '按键映射', keywords: 'keyboard mapping', icon: <Keyboard size={16} />, run: () => openModal('mapping') },
     { label: '脚本编辑帮助', keywords: 'help', icon: <CircleHelp size={16} />, run: () => openModal('help') },
     { label: '设置', keywords: 'settings preferences', icon: <Settings size={16} />, run: () => openModal('settings') },
@@ -289,7 +391,7 @@ export default function App({ connections = initialConnections }: { connections?
             busy={library.busy} statusLabel={!library.active ? '' : library.active.missing ? '文件已移除 · 编辑保留' : library.active.diskChanged ? '外部已修改 · 编辑保留' : saved ? '已保存' : '未保存'} onSave={saveDraft}
             library={<ScriptLibrary {...library} selectedPath={library.active?.path} />}
             logs={logs} clearLogs={() => setLogs([])} running={Boolean(run)} runningName={run?.scriptName} recording={recording} elapsed={elapsed} toggleRunning={toggleRunning} toggleRecording={toggleRecording} openModal={openModal}
-            virtualControllerOpen={virtualControllerOpen} toggleVirtualController={() => setVirtualControllerOpen(value => !value)} />}
+            virtualControllerOpen={virtualControllerOpen} toggleVirtualController={() => void (overlayApi ? overlayApi.toggle() : setVirtualControllerOpen(value => !value))} />}
           {page === '首页' && <div className="empty-state home-empty"><Home size={28} /><h2>开始你的工作</h2><p>当前游戏为{activeGame.label}，打开脚本编辑开始配置操作。</p><button className="button" onClick={() => setPage('脚本编辑')}><TerminalSquare size={15} />打开脚本编辑</button></div>}
         </div>
         <footer className="workspace-footer" aria-label="工作区状态与工具">
@@ -312,8 +414,9 @@ export default function App({ connections = initialConnections }: { connections?
         minimize={minimizePanel} restore={() => showPanel(toolPanel.tool)} toggleExpanded={() => setToolPanel(current => current && { ...current, expanded: !current.expanded })} close={closePanel}>
         {toolPanel.tool === 'video' ? <VideoPreview labelsOpen={panelWindows.videoLabelsOpen} /> : <LogsPanel logs={logs} source={panelWindows.logSource} setSource={setLogSource} clear={() => setLogs([])} />}
       </FloatingSidePanel>}
-      {modal && <ToolsDialog modal={modal} close={closeModal} onInput={key => { if (recording) addLog('输入预览：' + key, '手柄'); }} />}
-      {virtualControllerOpen && <VirtualControllerWindow close={() => setVirtualControllerOpen(false)} onInput={key => { if (recording) addLog('输入预览：' + key, '手柄'); }} />}
+      {modal === 'mapping' && <><div className="key-mapping-backdrop" onClick={closeModal} /><KeyMappingDialog close={closeModal} onSaved={mapping => { void overlayApi?.setMapping(mapping as ControllerMapping); }} /></>}
+      {modal && modal !== 'mapping' && <ToolsDialog modal={modal} close={closeModal} onInput={key => { if (recording) addLog('输入预览：' + key, '手柄'); }} />}
+      {!overlayApi && virtualControllerOpen && <VirtualControllerWindow close={() => setVirtualControllerOpen(false)} onInput={key => { if (recording) addLog('输入预览：' + key, '手柄'); }} />}
       {paletteOpen && <CommandPalette actions={actions} close={() => setPaletteOpen(false)} />}
       {(toast || panelError) && <div className="toast" role="status"><Check size={15} />{toast || panelError}</div>}
     </div>

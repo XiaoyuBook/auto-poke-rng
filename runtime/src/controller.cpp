@@ -16,13 +16,14 @@ std::array<uint8_t,8> SwitchReport::bytes() const {
 static const std::map<std::string,uint16_t> buttons={{"Y",1},{"B",2},{"A",4},{"X",8},{"L",16},{"R",32},{"ZL",64},{"ZR",128},
     {"MINUS",256},{"PLUS",512},{"LCLICK",1024},{"RCLICK",2048},{"HOME",4096},{"CAPTURE",8192}};
 static const std::map<std::string,unsigned> hats={{"UP",1},{"TOP",1},{"DOWN",2},{"LEFT",4},{"RIGHT",8},
-    {"TOP_RIGHT",9},{"UP_RIGHT",9},{"DOWN_RIGHT",10},{"DOWN_LEFT",6},{"TOP_LEFT",5},{"UP_LEFT",5}};
+    {"TOP_RIGHT",9},{"UP_RIGHT",9},{"UPRIGHT",9},{"DOWN_RIGHT",10},{"DOWNRIGHT",10},{"DOWN_LEFT",6},{"DOWNLEFT",6},{"TOP_LEFT",5},{"UP_LEFT",5},{"UPLEFT",5}};
 static std::string key_name(std::string key) {
     std::transform(key.begin(),key.end(),key.begin(),[](unsigned char c){return char(std::toupper(c));});
     if (key=="+") key="PLUS"; if (key=="-") key="MINUS"; return key;
 }
 void ControllerService::emit_state() {
     state_["running"]=running_.load(); state_["owned"]=!owner_.empty();
+    state_["report"]={{"buttons",report_.buttons},{"hat",report_.hat},{"lx",report_.lx},{"ly",report_.ly},{"rx",report_.rx},{"ry",report_.ry}};
     emit_({{"event","controller.state"},{"state",state_}});
 }
 void ControllerService::connected() {
@@ -55,14 +56,14 @@ void ControllerService::button(const std::string& raw,bool down) {
         bool up=(directions_&1)&&!(directions_&2),bottom=(directions_&2)&&!(directions_&1),left=(directions_&4)&&!(directions_&8),right=(directions_&8)&&!(directions_&4);
         report_.hat=up ? (left?7:right?1:0) : bottom ? (left?5:right?3:4) : left?6:right?2:8;
     } else throw Error("INVALID_ARGUMENT","不支持的按键: "+raw);
-    send();
+    send(); emit_state();
 }
 void ControllerService::stick(const std::string& side,int x,int y) {
     if(side=="LS") {report_.lx=uint8_t(x);report_.ly=uint8_t(y);} else if(side=="RS") {report_.rx=uint8_t(x);report_.ry=uint8_t(y);}
     else throw Error("INVALID_ARGUMENT","摇杆必须是 LS 或 RS");
-    send();
+    send(); emit_state();
 }
-void ControllerService::neutral() { report_={}; directions_=0; if(state_.value("status","")=="connected") send(); }
+void ControllerService::neutral() { report_={}; directions_=0; if(state_.value("status","")=="connected") send(); emit_state(); }
 void ControllerService::stop_actions() {
     cancelled_=true; wake_.notify_all();
     if(actions_.joinable()) actions_.join();

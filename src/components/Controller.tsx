@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Gamepad2 } from 'lucide-react';
 import { useDevices } from '../useDevices';
-import { resolveKeyboardButton, type ControllerButton } from '../controllerMapping';
+import { loadControllerMapping, resolveKeyboardButton, type ControllerButton } from '../controllerMapping';
 
 export function Controller({ onInput }: { onInput: (key: string) => void }) {
   const { controller } = useDevices();
@@ -9,6 +9,7 @@ export function Controller({ onInput }: { onInput: (key: string) => void }) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [lastInput, setLastInput] = useState('等待输入');
+  const [mapping] = useState(loadControllerMapping);
   const held = useRef(new Set<ControllerButton>());
   const clicking = useRef<Promise<void> | null>(null);
   const connected = controller.status === 'connected';
@@ -32,7 +33,7 @@ export function Controller({ onInput }: { onInput: (key: string) => void }) {
     };
     const keydown = (event: KeyboardEvent) => {
       if (!ready.current || clicking.current || event.repeat || event.ctrlKey || event.metaKey || event.altKey || /INPUT|TEXTAREA|SELECT/.test((event.target as HTMLElement)?.tagName)) return;
-      const key = resolveKeyboardButton(event.key);
+      const key = resolveKeyboardButton(event.key, mapping);
       if (!key || held.current.has(key)) return;
       event.preventDefault();
       held.current.add(key);
@@ -40,7 +41,7 @@ export function Controller({ onInput }: { onInput: (key: string) => void }) {
       void api.key(key, true).catch(reportError);
     };
     const keyup = (event: KeyboardEvent) => {
-      const key = resolveKeyboardButton(event.key);
+      const key = resolveKeyboardButton(event.key, mapping);
       if (!key || !held.current.delete(key)) return;
       event.preventDefault();
       releaseAfterClick(() => api.key(key, false));
@@ -54,7 +55,7 @@ export function Controller({ onInput }: { onInput: (key: string) => void }) {
       window.removeEventListener('blur', release);
       release();
     };
-  }, [api]);
+  }, [api, mapping]);
 
   const press = (key: ControllerButton) => {
     setLastInput(key);

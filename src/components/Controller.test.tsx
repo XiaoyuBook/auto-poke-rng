@@ -17,13 +17,13 @@ it.each(['keyup', 'blur', 'unmount'])('releases held input after an in-flight cl
   } } as unknown as DesktopApi;
   const view = render(<Controller onInput={() => {}} />);
   await waitFor(() => expect((screen.getByRole('button', { name: 'B' }) as HTMLButtonElement).disabled).toBe(false));
-  fireEvent.keyDown(window, { key: 'a' });
+  fireEvent.keyDown(window, { key: 'l' });
   expect(key).toHaveBeenCalledWith('A', true);
   fireEvent.click(screen.getByRole('button', { name: 'B' }));
   // Extra clicks must not queue delayed presses that survive a later stop.
   fireEvent.click(screen.getByRole('button', { name: 'X' }));
   expect(press).toHaveBeenCalledTimes(1);
-  if (kind === 'keyup') fireEvent.keyUp(window, { key: 'a' });
+  if (kind === 'keyup') fireEvent.keyUp(window, { key: 'l' });
   else if (kind === 'blur') fireEvent.blur(window);
   else view.unmount();
   expect(key).toHaveBeenCalledTimes(1);

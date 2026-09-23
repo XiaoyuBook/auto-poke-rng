@@ -1,6 +1,7 @@
 export type DeviceStatus = 'idle' | 'connecting' | 'connected' | 'failed';
 export interface VideoDevice { id: string; name: string; backend: string; index: number }
-export interface DeviceState { status: DeviceStatus; message?: string; code?: string; name?: string; running?: boolean; owned?: boolean }
+export interface ControllerReport { buttons: number; hat: number; lx: number; ly: number; rx: number; ry: number }
+export interface DeviceState { status: DeviceStatus; message?: string; code?: string; name?: string; running?: boolean; owned?: boolean; report?: ControllerReport }
 export interface VideoState extends DeviceState {
   deviceId?: string; backend?: string; width?: number; height?: number; reportedFps?: number;
   session?: string; previewUrl?: string;
