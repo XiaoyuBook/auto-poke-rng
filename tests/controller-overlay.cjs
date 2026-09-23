@@ -118,14 +118,63 @@ app.whenReady().then(async () => {
   assert.equal(released.green, 0);
   assert.ok(released.image.toPNG().equals(fs.readFileSync(path.join(output, 'neutral-160.png'))), 'release reproduces the original neutral pixels');
 
-  devices.controllerOverlay.input.setState({ active: false, mode: 'standby' });
+  // Exercise captured keyboard input while the hardware queue is held up.
+  // This uses the real input manager/IPC/renderer but never installs an OS hook.
+  const input = devices.controllerOverlay.input;
+  input.setMapping({ LSUp: 'KeyW', LSDown: 'KeyS', LSLeft: 'KeyA', LSRight: 'KeyD', A: 'KeyL' });
+  let resumeSerial;
+  input.pending = new Promise(resolve => { resumeSerial = resolve; });
+  try {
+    for (const [vk, x, y] of [[87, 128, 0], [65, 0, 128], [83, 128, 255], [68, 255, 128]]) {
+      input.handleKey({ vk, down: true });
+      await until(() => js(overlay, 'document.querySelector("[data-stick=left]").dataset.moved === "true"'), 'WASD moves the stick before serial completion');
+      const g = await geometry();
+      const direction = delta => Math.abs(delta) < .01 ? 0 : Math.sign(delta);
+      assert.equal(direction(g.sticks[0].knob.x - g.sticks[0].ring.x), Math.sign(x - 128));
+      assert.equal(direction(g.sticks[0].knob.y - g.sticks[0].ring.y), Math.sign(y - 128));
+      input.handleKey({ vk, down: false });
+      await checkNeutral();
+    }
+    for (const vk of [87, 65, 76]) input.handleKey({ vk, down: true });
+    await until(() => js(overlay, 'document.querySelector("[data-control=A]").dataset.pressed === "true"'), 'mapped button lights up immediately');
+    assert.equal((await geometry()).moved, 1);
+    assert.ok((await snapshot('keyboard-wasd-and-a')).green > 20);
+    // A late hardware report cannot overwrite more recent local input.
+    await command('window.desktop.devices.controller.reset()');
+    assert.equal(await js(overlay, 'document.querySelector("[data-control=A]").dataset.pressed'), 'true');
+    // Reopening/reloading the renderer gets held inputs from the state snapshot.
+    await overlay.webContents.reload();
+    await until(() => js(overlay, 'document.querySelector("[data-control=A]")?.dataset.pressed === "true"'), 'held keyboard snapshot survives renderer reload');
+    for (const vk of [87, 65, 76]) input.handleKey({ vk, down: false });
+    await checkNeutral();
+  } finally {
+    resumeSerial();
+    await input.pending;
+  }
+
+  await input.setActive(false);
   await until(() => js(overlay, 'Boolean(document.querySelector(".controller-overlay.standby"))'), 'standby presentation');
   await checkNeutral();
   assert.equal((await snapshot('standby')).green, 0);
+
+  // A script takes over after manual input: its reports and running lights
+  // must replace the local keyboard snapshot, with no stale A/W highlight.
+  input.setState({ active: true, mode: 'active' });
+  input.handleKey({ vk: 87, down: true });
+  input.handleKey({ vk: 76, down: true });
+  await input.pending;
+  const { owner } = await input.controller.call('controller.acquire');
+  await input.controller.call('controller.key', { owner, key: 'B', down: true });
+  await until(() => js(overlay, 'document.querySelector("[data-control=B]").dataset.pressed === "true"'), 'script-owned button state');
+  assert.equal(await js(overlay, 'document.querySelector("[data-control=A]").dataset.pressed'), 'false');
+  assert.equal((await geometry()).moved, 0);
+  assert.equal(await js(overlay, 'document.querySelector(".joycon-lights").dataset.running'), 'true');
+  await input.controller.call('controller.release', { owner });
+  await checkNeutral();
   await command('window.desktop.devices.controller.disconnect()');
   await until(async () => !(await command('window.desktop.overlay.getState()')).visible, 'disconnect hides overlay');
   await devices.close();
   clearTimeout(timeout);
-  console.log('PASS: actual overlay pixels and geometry at 80/100/120/160; neutral, movement, clicks, eight hat directions, release and standby.');
+  console.log('PASS: overlay pixels at 80/100/120/160; movement, buttons, hats, immediate WASD/key feedback during serial delay, renderer reload, release and standby.');
   app.exit(0);
 }).catch(async error => { console.error(error); if (devices) await devices.close(); clearTimeout(timeout); app.exit(1); });

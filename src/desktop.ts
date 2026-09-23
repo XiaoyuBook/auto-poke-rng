@@ -23,7 +23,10 @@ export interface PanelWindowsApi {
   onState: (listener: (state: PanelWindowState) => void) => () => void;
   onAction: (listener: (action: PanelAction) => void) => () => void;
 }
-export interface ControllerOverlayState { visible: boolean; active: boolean; mode: 'off' | 'standby' | 'active'; scale: number }
+export interface ControllerOverlayState {
+  visible: boolean; active: boolean; mode: 'off' | 'standby' | 'active'; scale: number;
+  inputReport?: import('./devices').ControllerReport | null;
+}
 export interface ControllerOverlayApi {
   getState: () => Promise<ControllerOverlayState>;
   show: () => Promise<ControllerOverlayState>;

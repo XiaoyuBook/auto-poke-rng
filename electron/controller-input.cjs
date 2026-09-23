@@ -34,17 +34,22 @@ function stickValue(directions) {
 }
 
 class ControllerInputManager extends EventEmitter {
-  constructor({ controller, broadcast }) {
+  constructor({ controller, broadcast, spawnKeyboard = spawn }) {
     super();
     this.controller = controller;
     this.broadcast = broadcast;
-    this.state = { visible: false, active: false, mode: 'off', scale: 1 };
+    this.spawnKeyboard = spawnKeyboard;
+    this.state = { visible: false, active: false, mode: 'off', scale: 1, inputReport: null };
     this.mapping = {};
     this.codeToAction = new Map();
     this.pressedButtons = new Set();
     this.sticks = { LS: new Set(), RS: new Set() };
     this.child = null;
     this.starting = null;
+    this.stopping = null;
+    this.activationVersion = 0;
+    this.inputVersion = 0;
+    this.closed = false;
     this.pending = Promise.resolve();
     this.connected = false;
     this.locked = false;
@@ -54,19 +59,22 @@ class ControllerInputManager extends EventEmitter {
       this.connected = next.status === 'connected';
       this.locked = Boolean(next.running || next.owned);
       if (!this.connected) {
-        void this.releaseAll();
-        this.setState({ active: false, visible: false, mode: 'off' });
-        this.emit('disconnected');
+        this.disconnect();
       } else if (this.locked && this.state.active) {
         void this.setActive(false);
       }
     });
     controller.on('offline', () => {
-      this.connected = false;
-      void this.releaseAll();
-      this.setState({ active: false, visible: false, mode: 'off' });
-      this.emit('disconnected');
+      this.disconnect();
     });
+  }
+
+  disconnect() {
+    this.connected = false;
+    // Disable the OS hook immediately, independently of any outstanding serial
+    // request. Hiding the overlay alone does not stop Python swallowing keys.
+    void this.setActive(false, true);
+    this.emit('disconnected');
   }
 
   getState() { return { ...this.state }; }
@@ -88,9 +96,12 @@ class ControllerInputManager extends EventEmitter {
   }
 
   async show() {
+    if (this.closed) return false;
+    const version = this.activationVersion;
     if (!this.connected) {
       try {
         const current = await this.controller.call('controller.status');
+        if (version !== this.activationVersion || this.closed) return false;
         this.connected = current?.status === 'connected';
         this.locked = Boolean(current?.running || current?.owned);
       } catch { /* state broadcast will report the failure */ }
@@ -104,6 +115,7 @@ class ControllerInputManager extends EventEmitter {
   }
 
   async hide() {
+    if (this.closed) return;
     await this.setActive(false, true);
   }
 
@@ -125,21 +137,26 @@ class ControllerInputManager extends EventEmitter {
   }
 
   async setActive(active, hide = false) {
-    const wanted = Boolean(active) && this.connected && !this.locked;
+    const version = ++this.activationVersion;
+    const wanted = Boolean(active) && this.connected && !this.locked && !this.closed;
     if (wanted) {
       try {
         await this.ensureChild();
+        // A disconnect/hide/ownership change may arrive while the hook starts.
+        if (version !== this.activationVersion || !this.connected || this.locked || this.closed) return;
         this.sendChild({ command: 'enabled', value: true });
         this.setState({ visible: true, active: true, mode: 'active' });
       } catch (error) {
+        if (version !== this.activationVersion) return;
         this.emit('error', error);
         this.setState({ active: false, mode: this.state.visible ? 'standby' : 'off' });
+        await this.stopChild();
       }
     } else {
       if (this.child) this.sendChild({ command: 'enabled', value: false });
-      await this.releaseAll();
-      this.setState({ active: false, visible: hide ? false : this.state.visible, mode: hide ? 'off' : 'standby' });
-      if (hide) await this.stopChild();
+      const visible = !hide && this.state.visible;
+      this.setState({ active: false, visible, mode: visible ? 'standby' : 'off' });
+      await Promise.all([this.releaseAll(), hide ? this.stopChild() : undefined]);
     }
   }
 
@@ -149,15 +166,18 @@ class ControllerInputManager extends EventEmitter {
   }
 
   async ensureChild() {
-    if (this.child) return;
+    const version = this.activationVersion;
+    if (this.stopping) await this.stopping;
+    if (version !== this.activationVersion || !this.connected || this.closed) throw new Error('键盘捕获启动已取消。');
     if (this.starting) return this.starting;
+    if (this.child) return;
     const python = process.env.AUTO_POKE_PYTHON || (fs.existsSync(path.join(__dirname, '..', '.deps', 'script-python', 'Scripts', 'python.exe')) ? path.join(__dirname, '..', '.deps', 'script-python', 'Scripts', 'python.exe') : 'python');
     const script = path.join(__dirname, '..', 'runtime', 'python', 'keyboard_host.py');
     this.starting = new Promise((resolve, reject) => {
-      const child = spawn(python, ['-u', script], { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, PYTHONUTF8: '1', PYTHONDONTWRITEBYTECODE: '1' } });
+      const child = this.spawnKeyboard(python, ['-u', script], { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, PYTHONUTF8: '1', PYTHONDONTWRITEBYTECODE: '1' } });
       this.child = child;
       let buffer = '', diagnostic = '';
-      const timer = setTimeout(() => { reject(new Error('系统级键盘捕获启动超时。')); child.kill(); }, 8000);
+      const timer = setTimeout(() => { finish(new Error('系统级键盘捕获启动超时。')); child.kill(); }, 8000);
       let settled = false;
       const finish = error => {
         if (settled) return;
@@ -165,15 +185,22 @@ class ControllerInputManager extends EventEmitter {
         clearTimeout(timer);
         if (error) reject(error); else resolve();
       };
-      child.once('error', error => { this.child = null; finish(error); });
+      child.once('error', error => { if (this.child === child) this.child = null; finish(error); });
       child.once('exit', code => {
-        if (this.child === child) this.child = null;
-        if (code && code !== 0) this.emit('error', new Error(diagnostic || `键盘捕获进程退出（${code}）`));
+        const unexpected = this.child === child;
+        if (unexpected) this.child = null;
+        const error = new Error(diagnostic || `键盘捕获进程退出（${code}）`);
+        finish(error);
+        if (unexpected) {
+          void this.setActive(false);
+          this.emit('error', error);
+        }
       });
       child.stderr.setEncoding('utf8');
       child.stderr.on('data', chunk => { diagnostic = (diagnostic + chunk).slice(-2000); });
       child.stdout.setEncoding('utf8');
       child.stdout.on('data', chunk => {
+        if (this.child !== child) return;
         buffer += chunk;
         let end;
         while ((end = buffer.indexOf('\n')) >= 0) {
@@ -197,7 +224,7 @@ class ControllerInputManager extends EventEmitter {
   handleKey(message) {
     const vk = Number(message.vk), down = Boolean(message.down);
     if (vk === 0x1b) {
-      if (!down) return;
+      if (!down || !this.state.visible || !this.connected || this.closed) return;
       if (message.control) void this.hide();
       else void this.toggleActive();
       return;
@@ -214,11 +241,27 @@ class ControllerInputManager extends EventEmitter {
       this.enqueue(() => this.controller.call('controller.key', { key: action.key, down }));
     } else {
       const directions = this.sticks[action.side];
+      if (directions.has(action.direction) === down) return;
       if (down) directions.add(action.direction); else directions.delete(action.direction);
       const value = stickValue(directions);
       this.enqueue(() => this.controller.call('controller.stick', { side: action.side, x: value.x, y: value.y }));
     }
+    // Publish the held-key snapshot before waiting for the serial queue. The
+    // renderer can also fetch it if it loads after the first key-down.
+    this.setState({ inputReport: this.getInputReport() });
     this.emit('input', { id, action, down, timestamp: Date.now() });
+  }
+
+  getInputReport() {
+    const bits = { Y: 1, B: 2, A: 4, X: 8, L: 16, R: 32, ZL: 64, ZR: 128, MINUS: 256, PLUS: 512, LCLICK: 1024, RCLICK: 2048, HOME: 4096, CAPTURE: 8192 };
+    const hats = { UP: 1, DOWN: 2, LEFT: 4, RIGHT: 8, UP_LEFT: 5, UP_RIGHT: 9, DOWN_LEFT: 6, DOWN_RIGHT: 10 };
+    let buttons = 0, directions = 0;
+    for (const key of this.pressedButtons) { buttons |= bits[key] || 0; directions |= hats[key] || 0; }
+    const up = (directions & 1) && !(directions & 2), down = (directions & 2) && !(directions & 1);
+    const left = (directions & 4) && !(directions & 8), right = (directions & 8) && !(directions & 4);
+    const hat = up ? (left ? 7 : right ? 1 : 0) : down ? (left ? 5 : right ? 3 : 4) : left ? 6 : right ? 2 : 8;
+    const ls = stickValue(this.sticks.LS), rs = stickValue(this.sticks.RS);
+    return { buttons, hat, lx: ls.x, ly: ls.y, rx: rs.x, ry: rs.y };
   }
 
   mappingAction(id) {
@@ -239,27 +282,40 @@ class ControllerInputManager extends EventEmitter {
   }
 
   enqueue(action) {
-    this.pending = this.pending.then(action).catch(error => this.emit('error', error));
+    const version = this.inputVersion;
+    this.pending = this.pending.then(() => {
+      if (version === this.inputVersion && this.connected) return action();
+    }).catch(error => { if (version === this.inputVersion) this.emit('error', error); });
     return this.pending;
   }
 
   async releaseAll() {
-    if (!this.pressedButtons.size && !this.sticks.LS.size && !this.sticks.RS.size) return;
+    ++this.inputVersion;
     this.pressedButtons.clear(); this.sticks.LS.clear(); this.sticks.RS.clear();
-    if (this.connected) await this.enqueue(() => this.controller.call('controller.reset')).catch(() => {});
+    this.setState({ inputReport: null });
+    // Even with no held keys, an in-flight key-down or a superseded release
+    // can still leave the device pressed. The latest deactivation owns reset.
+    if (this.connected && !this.locked) await this.enqueue(() => this.controller.call('controller.reset')).catch(() => {});
   }
 
-  async close() {
-    await this.releaseAll();
-    await this.stopChild();
+  close() {
+    if (!this.closing) {
+      this.closed = true;
+      this.closing = this.setActive(false, true);
+    }
+    return this.closing;
   }
 
   async stopChild() {
     if (this.child) {
       this.sendChild({ command: 'stop' });
       const child = this.child; this.child = null;
-      await new Promise(resolve => { const timer = setTimeout(() => { child.kill(); resolve(); }, 1500); child.once('exit', () => { clearTimeout(timer); resolve(); }); });
+      this.stopping = new Promise(resolve => { const timer = setTimeout(() => { child.kill(); resolve(); }, 1500); child.once('exit', () => { clearTimeout(timer); resolve(); }); });
+      child.stdin.end();
     }
+    const stopping = this.stopping;
+    await stopping;
+    if (this.stopping === stopping) this.stopping = null;
   }
 }
 

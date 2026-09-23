@@ -20,7 +20,9 @@ export function ControllerOverlayApp() {
     document.body.style.background = 'transparent';
     return () => { document.body.style.background = previous; };
   }, []);
-  const report = controller.status === 'connected' && controller.report ? controller.report : NEUTRAL_REPORT;
+  const report = controller.status !== 'connected' ? NEUTRAL_REPORT
+    : state.active && !controller.running && !controller.owned && state.inputReport
+      ? state.inputReport : controller.report || NEUTRAL_REPORT;
   const toggle = () => { if (api) void api.toggleActive(); };
   const hide = () => { if (api) void api.hide(); };
   const down = (event: React.PointerEvent) => {

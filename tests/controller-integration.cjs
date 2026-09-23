@@ -5,9 +5,36 @@ const os = require('node:os');
 const path = require('node:path');
 const { RuntimeClient } = require('../electron/runtime-client.cjs');
 const { ScriptRunner, addSequenceApi } = require('../electron/script-runner.cjs');
+const { ControllerInputManager } = require('../electron/controller-input.cjs');
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 // Independent golden report from EasyCon's 7-byte big-endian / 7-bit packing protocol.
 const neutral = [0,0,1,8,4,2,1,128];
+for (const failure of ['disconnect', 'offline']) {
+  test(`real keyboard hook exits after controller ${failure}`, { timeout: 10000, skip: process.platform !== 'win32' }, async () => {
+    const client = new RuntimeClient({ role: 'controller', testMode: true });
+    const errors = [];
+    const input = new ControllerInputManager({ controller: client, broadcast: () => {} });
+    input.on('error', error => errors.push(error));
+    // Keep ordinary typing available while verifying the real Windows hook.
+    input.setMapping({ A: 'F24' });
+    try {
+      await client.call('controller.connect', { port: 'mock' });
+      await input.toggle();
+      assert.equal(input.getState().active, true);
+      const child = input.child;
+      const exited = new Promise(resolve => child.once('exit', resolve));
+      if (failure === 'disconnect') await client.call('controller.disconnect');
+      else client.terminate();
+      await exited;
+      assert.equal(input.child, null, 'keyboard process has been stopped');
+      assert.equal(input.getState().active, false);
+      assert.equal(input.getState().visible, false);
+      assert.equal(input.getState().mode, 'off');
+      assert.deepEqual(errors, []);
+    } finally { await input.close(); await client.close(); }
+  });
+}
+
 test('EasyCon persistent COM session, golden packets, cancellation and exclusive script owner', { timeout:15000 }, async () => {
   const client=addSequenceApi(new RuntimeClient({ role:'controller', testMode:true }));
   try {
