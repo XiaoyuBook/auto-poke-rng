@@ -82,6 +82,7 @@ export default function App({ connections = initialConnections }: { connections?
   const gameButton = useRef<HTMLButtonElement>(null);
   const settingsButton = useRef<HTMLButtonElement>(null);
   const videoRegion = useRef<HTMLElement>(null);
+  const logRegion = useRef<HTMLElement>(null);
   const videoResize = useRef<{ startX: number; width: number } | null>(null);
   const dockButtons = useRef<Partial<Record<PanelTool, HTMLButtonElement | null>>>({});
   const activeGame = games.find(item => item.id === game)!;
@@ -538,12 +539,20 @@ export default function App({ connections = initialConnections }: { connections?
               <LogsPanel logs={logs} source={panelWindows.logSource} setSource={setLogSource} clear={() => setLogs([])} />
             </FloatingSidePanel>}
           </div>
-          <aside className="workspace-video-corner">
+          <aside className="workspace-right-rail" aria-label="固定工作区侧栏">
             <section ref={videoRegion} className="persistent-video" aria-label="视频预览" tabIndex={-1} onContextMenu={openVideoContextMenu}>
               <VideoPreview previewOnly />
               <button className="video-resize-handle" type="button" aria-label="调整视频预览大小" title="拖动调整视频大小，保持 16:9"
                 onPointerDown={startVideoResize} onPointerMove={resizeVideo} onPointerUp={finishVideoResize} onPointerCancel={finishVideoResize}
                 onLostPointerCapture={() => { videoResize.current = null; }} onKeyDown={nudgeVideoSize}><Maximize2 size={13} aria-hidden="true" /></button>
+            </section>
+            <section ref={logRegion} className="persistent-logs" aria-labelledby="persistent-logs-title" aria-hidden={paletteOpen || undefined} tabIndex={-1}>
+              <header className="persistent-logs-header">
+                <FileClock size={15} />
+                <h2 id="persistent-logs-title">日志中心</h2>
+                <span>{logs.length} 条记录</span>
+              </header>
+              <LogsPanel logs={logs} source={panelWindows.logSource} setSource={setLogSource} clear={() => setLogs([])} />
             </section>
           </aside>
         </div>

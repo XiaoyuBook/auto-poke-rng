@@ -44,11 +44,11 @@ async function assertInlineLabelsFit(window) {
     const canvas = labels.querySelector('.label-snapshot-section').getBoundingClientRect();
     const video = document.querySelector('.persistent-video').getBoundingClientRect();
     return !labels.hidden && canvas.right <= video.left
-      && content.getBoundingClientRect().top >= video.bottom
-      && content.getBoundingClientRect().right >= video.right - 1
+      && content.getBoundingClientRect().top >= canvas.bottom
+      && content.getBoundingClientRect().right <= video.left
       && content.scrollWidth <= content.clientWidth + 1
       && getComputedStyle(content).overflowY === 'auto';
-  })()`), true, 'inline label controls use the area below video without covering it');
+  })()`), true, 'inline label controls stay below the snapshot inside the left workspace');
 }
 async function assertLabelWorkspaceFits(window) {
   const layout = await evaluate(window, `(() => {
@@ -134,6 +134,13 @@ app.whenReady().then(async () => {
   const editor = editorHelpers(main);
   await until(() => evaluate(main, 'Boolean(document.querySelector(".cm-content"))'), 'workspace ready');
   console.log('Workspace ready');
+  const scriptColumns = await evaluate(main, `(() => {
+    const library = document.querySelector('.script-library').getBoundingClientRect();
+    const editorColumn = document.querySelector('.editor-column').getBoundingClientRect();
+    return { sameRow: Math.abs(library.top - editorColumn.top) < 1, libraryRight: library.right, editorLeft: editorColumn.left };
+  })()`);
+  assert.equal(scriptColumns.sameRow, true, 'script library stays in the left column of the editor');
+  assert.ok(scriptColumns.libraryRight <= scriptColumns.editorLeft, 'script library does not move above the editor');
   const pinnedBounds = await videoBounds(main);
   await evaluate(main, `document.querySelector('.video-resize-handle').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))`);
   await until(async () => (await videoBounds(main)).width > pinnedBounds.width, 'video resize handle');
@@ -160,11 +167,21 @@ app.whenReady().then(async () => {
   }
   await until(async () => Math.abs((await videoBounds(main)).width - pinnedBounds.width) < 1, 'video resize second restore');
   const workspaceVideoLayout = await evaluate(main, `(() => {
-    const logs = document.querySelector('.execution-console').getBoundingClientRect();
+    const primary = document.querySelector('.workspace-primary').getBoundingClientRect();
+    const rail = document.querySelector('.workspace-right-rail').getBoundingClientRect();
+    const logs = document.querySelector('.persistent-logs').getBoundingClientRect();
     const video = document.querySelector('.persistent-video').getBoundingClientRect();
-    return { logs: { top: logs.top, left: logs.left, right: logs.right }, video: { bottom: video.bottom, left: video.left, right: video.right } };
+    return {
+      primary: { right: primary.right },
+      rail: { left: rail.left, right: rail.right },
+      logs: { top: logs.top, left: logs.left, right: logs.right },
+      video: { bottom: video.bottom, left: video.left, right: video.right },
+    };
   })()`);
-  assert.ok(workspaceVideoLayout.logs.top >= workspaceVideoLayout.video.bottom && workspaceVideoLayout.logs.left < workspaceVideoLayout.video.left && workspaceVideoLayout.logs.right >= workspaceVideoLayout.video.right - 20, 'workspace content extends underneath the video instead of reserving a full-height right column');
+  assert.ok(workspaceVideoLayout.primary.right < workspaceVideoLayout.video.left, 'left workspace remains separate from the fixed right rail');
+  assert.ok(workspaceVideoLayout.logs.top >= workspaceVideoLayout.video.bottom, 'logs stay below the persistent video');
+  assert.ok(Math.abs(workspaceVideoLayout.logs.left - workspaceVideoLayout.video.left) < 1 && Math.abs(workspaceVideoLayout.logs.right - workspaceVideoLayout.video.right) < 1, 'logs align to the video width in the fixed right rail');
+  assert.ok(Math.abs(workspaceVideoLayout.rail.left - workspaceVideoLayout.video.left) < 1 && Math.abs(workspaceVideoLayout.rail.right - workspaceVideoLayout.video.right) < 1, 'the right rail stays fixed to the video column');
   assert.equal(await evaluate(main, `Boolean(document.querySelector('.quick-dock [aria-label="视频预览"]'))`), false, 'video no longer uses the footer dock');
   await evaluate(main, `document.querySelector('.nav-item[title="首页"]').click()`);
   assert.deepEqual(await videoBounds(main), pinnedBounds, 'video stays in place on home page');
@@ -183,7 +200,7 @@ app.whenReady().then(async () => {
   await click(main, '选择脚本：菜单');
   console.log('Project folder discovery, selection, and disk save passed');
   await editor.edit('# unsaved detached test');
-  await click(main, '日志中心');
+  await evaluate(main, `document.querySelector('.quick-dock [aria-label="日志中心"]').click()`);
   const original = await panelBounds(main);
   const handle = await evaluate(main, `(() => {
     const r = document.querySelector('.resize-corner').getBoundingClientRect();
@@ -201,7 +218,7 @@ app.whenReady().then(async () => {
   assert.ok(Math.abs(resized.bottom - original.bottom) < 1);
   await click(main, '展开面板');
   assert.ok((await panelBounds(main)).y >= pinnedBounds.bottom, 'expanded logs use the area below video');
-  assert.ok((await panelBounds(main)).right >= pinnedBounds.right, 'expanded logs extend across the workspace');
+  assert.ok((await panelBounds(main)).right <= pinnedBounds.x, 'expanded logs stay inside the left workspace');
   assert.deepEqual(await videoBounds(main), pinnedBounds, 'logs do not move video');
   await click(main, '还原面板大小');
   assert.deepEqual(await panelBounds(main), resized);
