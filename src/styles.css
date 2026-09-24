@@ -149,6 +149,8 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .workspace-labels .image-label-grid { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; column-gap: 0; }
 .workspace-labels .label-snapshot-section { grid-column: 1; grid-row: 1; }
 .workspace-labels .label-details { display: grid; grid-column: 1; grid-row: 2; grid-template-columns: minmax(0, 1fr); gap: 22px; min-height: 0; overflow-y: auto; }
+.workspace-labels .label-form-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 16px; }
+.workspace-labels .label-form-fields > label { grid-template-columns: auto minmax(0, 1fr); gap: 6px; min-width: 0; }
 .workspace-labels .label-reference-section { min-height: 230px; }
 
 .script-workspace { height: 100%; min-height: 455px; display: grid; grid-template-columns: 168px minmax(0, 1fr); gap: 20px; }
