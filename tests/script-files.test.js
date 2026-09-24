@@ -114,4 +114,21 @@ describe('project script files', () => {
     await expect(store.labelSave({ ...valid, target: { x: 90, y: 90, width: 20, height: 20 } })).rejects.toThrow('坐标');
     await expect(store.labelSave({ ...valid, searchMethod: 999 })).rejects.toThrow('搜索方法');
   });
+
+  it('stores OCR labels as expected text instead of image base64', async () => {
+    await put('火红/确认.rng');
+    const saved = await store.labelSave({
+      folder: '火红', name: '状态文字', searchMethod: 107, threshold: 88,
+      range: { x: 0, y: 0, width: 160, height: 60 }, target: { x: 8, y: 12, width: 120, height: 30 },
+      imageBase64: '  READY  ',
+    });
+    expect(saved.imageBase64).toBe('READY');
+    expect(JSON.parse(await fs.readFile(path.join(root, '火红', 'ImgLabel', '状态文字.IL'), 'utf8')).ImgBase64).toBe('READY');
+    await expect(store.labelSave({
+      folder: '火红', name: '空文字', searchMethod: 107, threshold: 88,
+      range: validRect(), target: { x: 1, y: 1, width: 2, height: 2 }, imageBase64: '   ',
+    })).rejects.toThrow('文本');
+  });
 });
+
+function validRect() { return { x: 0, y: 0, width: 10, height: 10 }; }

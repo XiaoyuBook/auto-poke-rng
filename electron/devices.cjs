@@ -1,10 +1,12 @@
 const { RuntimeClient } = require('./runtime-client.cjs');
+const { OcrClient } = require('./ocr-client.cjs');
 const { ScriptRunner, addSequenceApi } = require('./script-runner.cjs');
 const { registerControllerOverlay } = require('./controller-overlay.cjs');
 const path = require('node:path');
 
 function registerDevices({ ipcMain, getWindows, loadWindow, rootDirectory = path.join(__dirname, '..', 'scripts'), testMode = false }) {
   const video = new RuntimeClient({ role: 'video', testMode });
+  const ocr = new OcrClient();
   const controller = addSequenceApi(new RuntimeClient({ role: 'controller', testMode }));
   const openWindow = loadWindow || ((window, query) => window.loadFile(path.join(__dirname, '..', 'dist', 'index.html'), { query }));
   const controllerOverlay = registerControllerOverlay({ controller, getMainWindow: () => getWindows().find(window => !window.isDestroyed()), getWindows, loadWindow: openWindow });
@@ -98,6 +100,7 @@ function registerDevices({ ipcMain, getWindows, loadWindow, rootDirectory = path
     updateVideo({ status: 'idle' });
   });
   handle('video:get-snapshot', () => snapshot);
+  handle('video:ocr', args => ocr.read(args?.imageBase64, args?.language || ''));
   handle('video:snapshot', async () => {
     const source = state.video;
     if (source.status !== 'connected') throw new Error('请先连接视频源。');
@@ -114,7 +117,7 @@ function registerDevices({ ipcMain, getWindows, loadWindow, rootDirectory = path
   return {
     stopInputs: async () => { await runner.stop(); if (controller.child) await controller.call('controller.stop'); },
     controllerOverlay,
-    close: async () => { closing = true; clearVideoTimers(); clearInterval(controllerTimer); ++runner.validationVersion; runner.cancelValidation?.(); await runner.stop().catch(() => {}); await controllerOverlay.close(); await Promise.allSettled([video.close(), controller.close()]); },
+    close: async () => { closing = true; clearVideoTimers(); clearInterval(controllerTimer); ++runner.validationVersion; runner.cancelValidation?.(); await runner.stop().catch(() => {}); await controllerOverlay.close(); await Promise.allSettled([video.close(), controller.close(), ocr.close()]); },
     getState: () => state,
   };
 }

@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 import sys
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import numpy as np
 
@@ -58,7 +59,7 @@ class OcrAdapterTests(unittest.TestCase):
         with self.assertRaisesRegex(OcrRuntimeError, "uint8 BGR"):
             reader.read(np.zeros((80, 100), dtype=np.uint8), language="en")
 
-    def test_tesser_detect_label_uses_shared_reader(self):
+    def test_ocr_text_label_uses_shared_reader(self):
         label_path = self.root / "status.IL"
         label_path.write_text(
             '{"searchMethod":107,"ImgBase64":"HELLO",'
@@ -74,6 +75,20 @@ class OcrAdapterTests(unittest.TestCase):
         self.assertEqual(label.search_method, SearchMethod.TESSER_DETECT)
         self.assertEqual(result.script_value, 90)
         self.assertEqual(result.recognized_text, "HELLO")
+
+    def test_ocr_text_label_default_uses_selected_rapidocr_reader(self):
+        label_path = self.root / "status.IL"
+        label_path.write_text(
+            '{"searchMethod":107,"ImgBase64":"READY",'
+            '"RangeX":0,"RangeY":0,"RangeWidth":40,"RangeHeight":40,'
+            '"TargetX":2,"TargetY":3,"TargetWidth":20,"TargetHeight":16}',
+            encoding="utf-8",
+        )
+        label = ImageLabel.load(label_path)
+        with patch("easycon.native.ocr.read_ocr", return_value=("READY", 0.8)) as reader:
+            result = label.search(np.zeros((40, 40, 3), dtype=np.uint8))
+        reader.assert_called_once()
+        self.assertEqual(result.script_value, 80)
 
 
 if __name__ == "__main__":

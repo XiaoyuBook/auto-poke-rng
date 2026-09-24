@@ -36,6 +36,7 @@ export interface DevicesApi {
     disconnect: () => Promise<void>;
     snapshot: () => Promise<Snapshot>;
     getSnapshot: () => Promise<Snapshot | null>;
+    ocr: (imageBase64: string, language?: string) => Promise<{ text: string; confidence: number }>;
     onSnapshot: (listener: (snapshot: Snapshot) => void) => () => void;
   };
 }

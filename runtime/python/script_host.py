@@ -277,7 +277,7 @@ def main():
                 from easycon.native import ocr
                 ocr.preload_dependencies()
             elif program.requires_image_search:
-                # A .IL TESSER_DETECT label is discovered after the script
+                # A .IL OCR text label is discovered after the script
                 # worker starts. Import the native OCR stack here as well so
                 # that its first use cannot race the stdin reader.
                 from easycon.native import ocr

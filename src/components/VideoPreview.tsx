@@ -26,7 +26,7 @@ export function VideoPreview({ labelsOpen = false, labelFolder = '' }: { labelsO
 }
 
 type SelectionKind = 'range' | 'target';
-type MatchResult = { score: number; maxScore: number; elapsedMs: number; liveUrl: string; targetUrl: string; x: number; y: number };
+type MatchResult = { score: number; maxScore: number; elapsedMs: number; liveUrl: string; targetUrl: string; x: number; y: number; recognizedText?: string };
 const blankRect = (): LabelRect => ({ x: 0, y: 0, width: 0, height: 0 });
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 const rectFromPoints = (start: { x: number; y: number }, end: { x: number; y: number }): LabelRect => ({
@@ -35,6 +35,20 @@ const rectFromPoints = (start: { x: number; y: number }, end: { x: number; y: nu
 });
 const rectInside = (rect: LabelRect, width: number, height: number) => rect.x >= 0 && rect.y >= 0
   && rect.width > 0 && rect.height > 0 && rect.x + rect.width <= width && rect.y + rect.height <= height;
+function stringSimilarity(left: string, right: string): number {
+  if (!left && !right) return 1;
+  if (!left || !right) return 0;
+  if (left === right) return 1;
+  const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let row = 1; row <= left.length; row++) {
+    const current = [row];
+    for (let column = 1; column <= right.length; column++) {
+      current.push(Math.min(previous[column] + 1, current[column - 1] + 1, previous[column - 1] + (left[row - 1] === right[column - 1] ? 0 : 1)));
+    }
+    for (let index = 0; index < current.length; index++) previous[index] = current[index];
+  }
+  return Math.max(0, 1 - previous[right.length] / Math.max(left.length, right.length));
+}
 
 function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -104,6 +118,7 @@ function ImageLabelWorkspace({ active, labelFolder }: { active: boolean; labelFo
   const [range, setRange] = useState<LabelRect>(blankRect);
   const [target, setTarget] = useState<LabelRect>(blankRect);
   const [name, setName] = useState('');
+  const [expectedText, setExpectedText] = useState('');
   const [searchMethod, setSearchMethod] = useState('template');
   const [threshold, setThreshold] = useState(95);
   const [labels, setLabels] = useState<LabelRecord[]>([]);
@@ -162,7 +177,8 @@ function ImageLabelWorkspace({ active, labelFolder }: { active: boolean; labelFo
     try {
       const full = await read(labelFolder, item.name);
       setName(full.name); setRange(full.range); setTarget(full.target); setThreshold(full.threshold || 95);
-      setSearchMethod(full.searchMethod === 2 ? 'color' : 'template'); setNotice(`已加载标签“${full.name}”。`);
+      setSearchMethod(full.searchMethod === 107 ? 'ocr' : full.searchMethod === 2 ? 'color' : 'template');
+      setExpectedText(full.searchMethod === 107 ? full.imageBase64 || '' : ''); setNotice(`已加载标签“${full.name}”。`);
     } catch (error) { setNotice(error instanceof Error ? error.message : String(error)); }
   };
   const performSearch = useCallback(async () => {
@@ -170,15 +186,25 @@ function ImageLabelWorkspace({ active, labelFolder }: { active: boolean; labelFo
     if (range.width <= 0 || range.height <= 0 || target.width <= 0 || target.height <= 0) throw new Error('请先圈选搜索范围和搜索目标。');
     if (!rectInside(range, snapshot.width, snapshot.height) || !rectInside(target, snapshot.width, snapshot.height)) throw new Error('圈选区域必须位于截图范围内。');
     if (target.x < range.x || target.y < range.y || target.x + target.width > range.x + range.width || target.y + target.height > range.y + range.height) throw new Error('搜索目标必须位于搜索范围内。');
+    if (searchMethod === 'ocr' && !expectedText.trim()) throw new Error('请填写 OCR 期望文本。');
     const targetUrl = await cropImage(snapshot.url, target);
     const videoApi = window.desktop?.devices?.video;
     if (!videoApi) throw new Error('请使用桌面应用连接视频源。');
     const started = performance.now(); const live = await videoApi.snapshot();
-    const result = await matchImage(live.url, targetUrl, range, target);
+    let result: { score: number; x: number; y: number; recognizedText?: string };
+    if (searchMethod === 'ocr') {
+      const liveTargetUrl = await cropImage(live.url, target);
+      const encoded = liveTargetUrl.split(',')[1] || '';
+      const recognized = await videoApi.ocr(encoded);
+      const text = recognized.text.trim();
+      result = { score: stringSimilarity(text, expectedText.trim()) * recognized.confidence * 100, x: target.x, y: target.y, recognizedText: text };
+    } else {
+      result = await matchImage(live.url, targetUrl, range, target);
+    }
     const liveTargetUrl = await cropImage(live.url, { x: result.x, y: result.y, width: target.width, height: target.height });
     setMatch(current => ({ ...result, maxScore: Math.max(current?.maxScore || 0, result.score), elapsedMs: Math.round(performance.now() - started), liveUrl: liveTargetUrl, targetUrl }));
-    setNotice(`识别完成：${result.score.toFixed(1)}% · ${Math.round(performance.now() - started)} ms`);
-  }, [range, snapshot, target]);
+    setNotice(`识别完成：${result.score.toFixed(1)}%${result.recognizedText === undefined ? '' : ` · “${result.recognizedText}”`} · ${Math.round(performance.now() - started)} ms`);
+  }, [expectedText, range, searchMethod, snapshot, target]);
   const startDynamic = () => {
     if (dynamicTesting) { if (dynamicTimer.current !== null) window.clearInterval(dynamicTimer.current); dynamicTimer.current = null; setDynamicTesting(false); setNotice('动态测试已停止。'); return; }
     void performSearch().then(() => {
@@ -194,8 +220,9 @@ function ImageLabelWorkspace({ active, labelFolder }: { active: boolean; labelFo
     if (range.width <= 0 || range.height <= 0 || target.width <= 0 || target.height <= 0) throw new Error('请先圈选搜索范围和搜索目标。');
     if (!rectInside(range, snapshot.width, snapshot.height) || !rectInside(target, snapshot.width, snapshot.height)) throw new Error('圈选区域必须位于截图范围内。');
     if (target.x < range.x || target.y < range.y || target.x + target.width > range.x + range.width || target.y + target.height > range.y + range.height) throw new Error('搜索目标必须位于搜索范围内。');
-    const imageBase64 = (await cropImage(snapshot.url, target)).split(',')[1];
-    const item = await save({ folder: labelFolder, name: name.trim(), searchMethod: searchMethod === 'color' ? 2 : 5, threshold, range, target, imageBase64 });
+    if (searchMethod === 'ocr' && !expectedText.trim()) throw new Error('请填写 OCR 期望文本。');
+    const imageBase64 = searchMethod === 'ocr' ? expectedText.trim() : (await cropImage(snapshot.url, target)).split(',')[1];
+    const item = await save({ folder: labelFolder, name: name.trim(), searchMethod: searchMethod === 'ocr' ? 107 : searchMethod === 'color' ? 2 : 5, threshold, range, target, imageBase64 });
     setLabels(current => [...current.filter(label => label.name !== item.name), { ...item, imageBase64: undefined }].sort((a, b) => a.name.localeCompare(b.name, 'zh-CN')));
     setNotice(`已保存标签“${item.name}”。`);
   };
@@ -234,7 +261,8 @@ function ImageLabelWorkspace({ active, labelFolder }: { active: boolean; labelFo
           <div className="label-parameter-body">
             <div className="label-form-fields">
               <label><span>标签名称</span><input type="text" placeholder="输入标签名称" aria-label="标签名称" value={name} onChange={event => setName(event.target.value)} /></label>
-              <label><span>搜索方法</span><select aria-label="搜索方法" value={searchMethod} onChange={event => setSearchMethod(event.target.value)}><option value="template">模板匹配</option><option value="color">颜色匹配</option></select></label>
+              <label><span>搜索方法</span><select aria-label="搜索方法" value={searchMethod} onChange={event => setSearchMethod(event.target.value)}><option value="template">模板匹配</option><option value="color">颜色匹配</option><option value="ocr">OCR 文本匹配</option></select></label>
+              {searchMethod === 'ocr' && <label><span>期望文本</span><input type="text" placeholder="输入识别文本" aria-label="OCR 期望文本" value={expectedText} onChange={event => setExpectedText(event.target.value)} /></label>}
               <label><span>最低匹配度</span><div className="label-threshold"><input type="number" aria-label="最低匹配度" min={0} max={100} value={threshold} onChange={event => setThreshold(clamp(Math.round(Number(event.target.value) || 0), 0, 100))} /><span>%</span></div></label>
             </div>
             <section className="label-match-preview" aria-label="动态测试对照">

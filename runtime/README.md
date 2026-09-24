@@ -71,7 +71,7 @@ HTTP 只监听 `127.0.0.1` 随机端口，要求当前运行时 token。程序�
 
 脚本宿主提供仅编译的 `validate` 模式，返回首个错误的文件、行列和原因；不会申请手柄控制权、读取视频或执行代码。编辑器检查支持取消过期请求，同一时间仅保留最新检查。执行时复用解释器的 `ExecutionTrace`，独立采样线程每 100ms 发布最新 `script.progress`，携带执行源码行、动作、调用点和循环次数；快速循环不会逐行堆积 IPC，终止前会刷新最后位置并关闭采样线程。
 
-脚本支持 `OCR(x, y, w, h, lang)`，使用 PP-OCRv6 small + RapidOCR 3.9.2 + ONNX Runtime CPU；`lang` 支持 `zh-Hans`、`zh-Hant`、`en` 和 `ja`，调用会读取当前共享视频帧并返回文本。`.IL` 的 `TESSER_DETECT` 标签复用同一模型。`setup:runtime` 会下载并校验固定 SHA-256 的模型文件。Amiibo 命令仍会在发按键前明确拒绝；视频预览中的搜图标签面板支持截图、圈选、搜索测试、动态测试和 `ImgLabel/*.IL` 保存。没有增加另一套完整脚本语言，也没有引用两个旧项目的绝对路径。
+脚本支持 `OCR(x, y, w, h, lang)`，使用 PP-OCRv6 small + RapidOCR 3.9.2 + ONNX Runtime CPU；`lang` 支持 `zh-Hans`、`zh-Hant`、`en` 和 `ja`，调用会读取当前共享视频帧并返回文本。`.IL` 的 OCR 文本标签使用 EasyCon 兼容的 `searchMethod:107/TESSER_DETECT` 编号，但实际复用同一 RapidOCR 模型。`setup:runtime` 会下载并校验固定 SHA-256 的模型文件。Amiibo 命令仍会在发按键前明确拒绝；视频预览中的搜图标签面板支持截图、圈选、搜索测试、动态测试、OCR 文本测试和 `ImgLabel/*.IL` 保存。没有增加另一套完整脚本语言，也没有引用两个旧项目的绝对路径。
 
 ## 验证
 

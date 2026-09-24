@@ -180,7 +180,10 @@ function createScriptStore(rootDirectory) {
   const labelSave = ({ folder = '', name, searchMethod, threshold, range, target, imageBase64 }) => serialize(async () => {
     const trimmedName = typeof name === 'string' ? name.trim() : '';
     if (!validLabelName(trimmedName)) throw new Error('图像标签名称无效。');
-    if (!imageBase64 || typeof imageBase64 !== 'string' || !/^[A-Za-z0-9+/]+={0,2}$/.test(imageBase64) || Buffer.byteLength(imageBase64, 'base64') > MAX_LABEL_BYTES) {
+    const method = Number(searchMethod);
+    if (method === 107) {
+      if (typeof imageBase64 !== 'string' || !imageBase64.trim() || imageBase64.length > 2000) throw new Error('图像标签文本无效或过长。');
+    } else if (!imageBase64 || typeof imageBase64 !== 'string' || !/^[A-Za-z0-9+/]+={0,2}$/.test(imageBase64) || Buffer.byteLength(imageBase64, 'base64') > MAX_LABEL_BYTES) {
       throw new Error('图像标签截图无效或过大。');
     }
     const rect = value => value && Number.isInteger(value.x) && Number.isInteger(value.y)
@@ -190,7 +193,7 @@ function createScriptStore(rootDirectory) {
       || target.x + target.width > range.x + range.width || target.y + target.height > range.y + range.height) {
       throw new Error('图像标签的范围和目标坐标无效。');
     }
-    if (![0, 1, 2, 3, 4, 5, 9, 107].includes(Number(searchMethod))) throw new Error('图像标签搜索方法无效。');
+    if (![0, 1, 2, 3, 4, 5, 9, 107].includes(method)) throw new Error('图像标签搜索方法无效。');
     const directory = await resolveLabelDirectory(folder, { allowMissing: true });
     await fs.mkdir(directory, { recursive: true });
     const rootInfo = await fs.lstat(path.dirname(directory));
@@ -198,7 +201,7 @@ function createScriptStore(rootDirectory) {
     const absolute = path.join(directory, trimmedName + '.IL');
     const relative = labelPath(folder, trimmedName);
     const data = {
-      searchMethod: Number(searchMethod), threshold: Math.max(0, Math.min(100, Number(threshold) || 0)), ImgBase64: imageBase64,
+      searchMethod: method, threshold: Math.max(0, Math.min(100, Number(threshold) || 0)), ImgBase64: method === 107 ? imageBase64.trim() : imageBase64,
       RangeX: range.x, RangeY: range.y, RangeWidth: range.width, RangeHeight: range.height,
       TargetX: target.x, TargetY: target.y, TargetWidth: target.width, TargetHeight: target.height,
     };

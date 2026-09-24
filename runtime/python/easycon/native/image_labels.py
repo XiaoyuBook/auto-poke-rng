@@ -33,6 +33,7 @@ class SearchMethod(IntEnum):
     EDGE_DETECT_LAPLACIAN = 12
     EDGE_DETECT_CANNY = 13
     MASKED_SQ_DIFF_NORMED = 14
+    # Legacy EasyCon on-disk name; the application injects RapidOCR for this method.
     TESSER_DETECT = 107
 
     @property
@@ -189,17 +190,14 @@ def _match_template(
     return tuple(map(int, max_location)), float((max_value + 1.0) / 2.0)
 
 
-def _default_tesseract_reader(frame: np.ndarray) -> tuple[str, float]:
-    """Run the same bundled Tesseract 5 runtime used by EasyCon."""
+def _default_ocr_reader(frame: np.ndarray) -> tuple[str, float]:
+    """Run the selected PP-OCRv6/RapidOCR runtime for OCR labels."""
 
-    from easycon.native.tesseract import (
-        TesseractRuntimeError,
-        read_tesseract,
-    )
+    from easycon.native.ocr import OcrRuntimeError, read_ocr
 
     try:
-        return read_tesseract(frame)
-    except TesseractRuntimeError as exc:
+        return read_ocr(frame)
+    except OcrRuntimeError as exc:
         raise ImageLabelError(str(exc)) from exc
 
 
@@ -264,7 +262,7 @@ class ImageLabel:
         if self.search_method is SearchMethod.TESSER_DETECT:
             target_slices = _validate_rect(self.target_rect, image, field_name="Target")
             target = image[target_slices].copy()
-            recognized, confidence = (ocr_reader or _default_tesseract_reader)(target)
+            recognized, confidence = (ocr_reader or _default_ocr_reader)(target)
             expected = self.image_base64
             score = string_match_simple(recognized.strip(), expected) * float(confidence) * 100.0
             relative = (

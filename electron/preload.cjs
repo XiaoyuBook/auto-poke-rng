@@ -33,6 +33,7 @@ contextBridge.exposeInMainWorld('desktop', {
       disconnect: () => ipcRenderer.invoke('video:disconnect'),
       snapshot: () => ipcRenderer.invoke('video:snapshot'),
       getSnapshot: () => ipcRenderer.invoke('video:get-snapshot'),
+      ocr: (imageBase64, language = '') => ipcRenderer.invoke('video:ocr', { imageBase64, language }),
       onSnapshot: listener => subscribe('video:snapshot-updated', listener),
     },
   },
