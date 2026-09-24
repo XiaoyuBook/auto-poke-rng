@@ -1,8 +1,55 @@
-param([string]$OpenCVDir, [switch]$ConfigureOnly)
+param(
+    [string]$OpenCVDir,
+    [string]$CMake,
+    [switch]$ConfigureOnly
+)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path $PSScriptRoot -Parent
 $depsRoot = Join-Path $projectRoot '.deps'
 New-Item -ItemType Directory -Force $depsRoot | Out-Null
+
+function Get-CMakeExecutable([string]$Requested) {
+    $candidates = @()
+    if ($Requested) {
+        $command = Get-Command $Requested -CommandType Application -ErrorAction SilentlyContinue
+        if ($command) { $candidates += $command.Source }
+        elseif (Test-Path -LiteralPath $Requested -PathType Leaf) { $candidates += $Requested }
+    } else {
+        $command = Get-Command cmake.exe -CommandType Application -ErrorAction SilentlyContinue
+        if ($command) { $candidates += $command.Source }
+
+        $vswhereCandidates = @(
+            (Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'),
+            (Join-Path ${env:ProgramFiles} 'Microsoft Visual Studio/Installer/vswhere.exe')
+        )
+        foreach ($vswhere in $vswhereCandidates) {
+            if (Test-Path -LiteralPath $vswhere -PathType Leaf) {
+                $found = & $vswhere -latest -products '*' -find 'Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe' 2>$null
+                if ($found) { $candidates += ($found | Select-Object -First 1) }
+            }
+        }
+
+        foreach ($defaultPath in @(
+            (Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/2022/BuildTools/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe'),
+            (Join-Path ${env:ProgramFiles} 'CMake/bin/cmake.exe')
+        )) {
+            if (Test-Path -LiteralPath $defaultPath -PathType Leaf) { $candidates += $defaultPath }
+        }
+    }
+
+    foreach ($candidate in ($candidates | Select-Object -Unique)) {
+        if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+            $versionLine = (& $candidate --version 2>$null | Select-Object -First 1)
+            if ($versionLine -match 'cmake version ([0-9.]+)') {
+                $version = [version]$matches[1]
+                if ($version -ge [version]'3.24') { return $candidate }
+            }
+        }
+    }
+    throw 'CMake 3.24 or newer was not found. Install it, add it to PATH, or pass -CMake <path>.'
+}
+
+$cmakeExecutable = Get-CMakeExecutable $CMake
 if (-not $OpenCVDir) {
     $OpenCVDir = Join-Path $depsRoot 'opencv/build'
     if (-not (Test-Path "$OpenCVDir/OpenCVConfig.cmake")) {
@@ -34,9 +81,9 @@ if (-not $OpenCVDir) {
         }
     }
 }
-& cmake -S "$projectRoot/runtime" -B "$projectRoot/runtime/build" -G 'Visual Studio 17 2022' -A x64 "-DOpenCV_DIR=$OpenCVDir"
+& $cmakeExecutable -S "$projectRoot/runtime" -B "$projectRoot/runtime/build" -G 'Visual Studio 17 2022' -A x64 "-DOpenCV_DIR=$OpenCVDir"
 if ($LASTEXITCODE -ne 0) { throw 'Runtime configuration failed.' }
 if (-not $ConfigureOnly) {
-    & cmake --build "$projectRoot/runtime/build" --config Release --parallel 4
+    & $cmakeExecutable --build "$projectRoot/runtime/build" --config Release --parallel 4
     if ($LASTEXITCODE -ne 0) { throw 'Runtime build failed.' }
 }

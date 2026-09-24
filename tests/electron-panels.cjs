@@ -84,7 +84,7 @@ async function assertAboveMain(main, tool) {
     return (bytes.length === 8 ? bytes.readBigUInt64LE() : bytes.readUInt32LE()).toString();
   };
   const { stdout } = await promisify(execFile)('powershell.exe', [
-    '-NoProfile', '-NonInteractive', '-File', path.join(__dirname, 'window-order.ps1'),
+    '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', path.join(__dirname, 'window-order.ps1'),
     '-MainHandle', nativeHandle(main), '-ToolHandle', nativeHandle(tool),
   ], { windowsHide: true, timeout: 10000 });
   assert.deepEqual(JSON.parse(stdout.trim()), { aboveMain: true, minimized: false, visible: true },

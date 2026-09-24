@@ -4,14 +4,14 @@ Windows x64 / C++20，供所有游戏模块共享。采集使用 OpenCV 4.12.0 �
 
 ## 构建和启动
 
-需要 VS 2022 C++ Build Tools、Windows SDK、CMake 3.24+ 和 Python 3.12+。在项目根目录执行：
+需要 VS 2022 C++ Build Tools、Windows SDK、CMake 3.24+ 和 Python 3.12+。构建脚本会自动查找 PATH、VS 2022 Build Tools 和常见安装目录中的 CMake；Python 3.14 使用 requirements.txt 中单独固定的兼容轮子。在项目根目录执行：
 
 ```powershell
 npm run setup:runtime
 npm run dev
 ```
 
-`setup:runtime` 下载固定版本的官方 OpenCV Windows SDK，检查 SHA-256，并构建 C++ 程序；脚本引擎依赖安装到本项目 `.deps/script-python`，不改动系统 Python 环境。脚本会查找 PATH 和默认安装目录中的 7-Zip，未找到时使用校验后的 OpenCV 官方包自带的解压器，无需额外安装 7-Zip。CMake 下载的两个单头文件库同样校验固定 SHA-256。已有 OpenCV SDK 可以通过 `tools/build-runtime.ps1 -OpenCVDir <path>` 指定。
+`setup:runtime` 下载固定版本的官方 OpenCV Windows SDK，检查 SHA-256，并构建 C++ 程序；脚本引擎依赖安装到本项目 `.deps/script-python`，不改动系统 Python 环境。默认优先使用 `py -3.12`，也可通过 `tools/setup-script-host.ps1 -Python <path>` 指定解释器。脚本会查找 PATH 和默认安装目录中的 7-Zip，未找到时使用校验后的 OpenCV 官方包自带的解压器，无需额外安装 7-Zip。CMake 下载的两个单头文件库同样校验固定 SHA-256。已有 OpenCV SDK 可以通过 `tools/build-runtime.ps1 -OpenCVDir <path>` 指定；CMake 不在 PATH 时可通过 `-CMake <path>` 指定。
 
 可单独执行 `npm run build:runtime`。输出为 `runtime/bin/Release/poke-runtime.exe` 及同目录 OpenCV DLL。`AUTO_POKE_RUNTIME` 可指定运行时路径，`AUTO_POKE_PYTHON` 可指定脚本解释器；默认使用本项目虚拟环境，缺失时尝试 PATH 中的 Python。构建产物和依赖不入库。
 
@@ -77,10 +77,13 @@ HTTP 只监听 `127.0.0.1` 随机端口，要求当前运行时 token。程序�
 
 ```powershell
 npm run test:runtime
+npm run test:devices:regression
 npm test
 npm run test:devices
 npm run test:electron
 ```
+
+`test:runtime` 包含公共设备审查回归，`test:devices:regression` 可单独运行这些用例。编号、前提、正确行为和覆盖边界见 [公共设备回归资产](../docs/DEVICE_REGRESSIONS.md)，运行环境见 [测试说明](../tests/README.md)。当前 DEV-001 至 DEV-005 尚未修复，因此包含它们的测试会明确失败；视频断连后的任务策略单独保留为 TODO。
 
 `--test-mode` 才允许 synthetic/mock；普通构建运行不会把模拟设备当作真设备。测试覆盖多消费者、跨 Python/C++ 共享内存、原版 `.IL` 搜图端到端、缺帧、会话切换、设备占用、包编码、函数导入、连续脚本、运行错误后的按键释放、取消、独占控制、设备进程退出、Electron 实际接线与旧布局回归。界面验证截图保存在 `node_modules/.tmp/device-review`。
 
