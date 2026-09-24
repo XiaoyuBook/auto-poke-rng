@@ -187,23 +187,24 @@ describe('workspace interactions', () => {
     expect(within(screen.getByRole('region', { name: 'OCR识别预览' })).getByText('等待视频帧')).toBeTruthy();
   });
 
-  it('opens static data search, keeps the persistent video, and applies a selected result', async () => {
+  it('opens static data search, keeps the persistent video, and generates only after clicking generate', async () => {
     await openApp();
     const videoFrame = screen.getByRole('region', { name: '视频预览' }).querySelector('.preview-frame');
     fireEvent.click(screen.getByRole('button', { name: '定点数据' }));
     expect(screen.getByRole('heading', { name: '定点数据', level: 2 })).toBeTruthy();
-    expect(screen.getByRole('region', { name: '定点搜索条件' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: '定点数据参数' })).toBeTruthy();
     expect(screen.getByRole('region', { name: '定点搜索结果' })).toBeTruthy();
     expect(screen.getByRole('region', { name: '视频预览' }).querySelector('.preview-frame')).toBe(videoFrame);
-    fireEvent.change(screen.getByLabelText('初始 Seed'), { target: { value: 'DEADBEEF' } });
-    fireEvent.click(screen.getByRole('button', { name: '搜索定点结果' }));
+    expect(within(screen.getByRole('region', { name: '定点搜索结果' })).getByText('尚未生成结果')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Seed 0'), { target: { value: 'DEADBEEF' } });
+    fireEvent.click(screen.getByRole('button', { name: '生成' }));
     const table = screen.getByRole('region', { name: '定点搜索结果' });
     const resultRows = within(table).getAllByRole('row');
     expect(resultRows.length).toBeGreaterThan(1);
     fireEvent.click(resultRows[1]);
-    expect((screen.getByRole('button', { name: '应用为自动定点目标' }) as HTMLButtonElement).disabled).toBe(false);
-    fireEvent.click(screen.getByRole('button', { name: '应用为自动定点目标' }));
-    expect(screen.getByText(/已应用 Advance/)).toBeTruthy();
+    expect((screen.getByRole('button', { name: '复制选中行' }) as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: '复制选中行' }));
+    expect((screen.getByRole('button', { name: '复制选中行' }) as HTMLButtonElement).disabled).toBe(false);
   });
 
   it('requires an EasyCon connection before opening the virtual controller', async () => {
