@@ -21,6 +21,7 @@ import { ControllerOverlayApp } from './components/ControllerOverlayApp';
 import { KeyMappingDialog } from './components/KeyMappingDialog';
 import { OcrWorkspace } from './components/OcrWorkspace';
 import { StaticDataWorkspace } from './components/StaticDataWorkspace';
+import { BdspHomeWorkspace } from './components/BdspProfileCard';
 import { loadControllerMapping, type MappingAction } from './controllerMapping';
 import { useDevices } from './useDevices';
 import type { ScriptProgress } from './devices';
@@ -271,6 +272,7 @@ export default function App({ connections = initialConnections }: { connections?
   };
 
   const navigateToPage = (next: Page) => {
+    if ((next === '定点数据' || next === 'OCR 设置') && game !== 'bdsp') return;
     setPage(next);
     if (inlineLabelsOpen) setVideoLabelsOpen(false);
   };
@@ -447,7 +449,10 @@ export default function App({ connections = initialConnections }: { connections?
   const actions: CommandAction[] = [
     { label: '首页', keywords: 'home', icon: <Home size={16} />, run: () => navigateToPage('首页') },
     { label: '脚本编辑', keywords: 'script editor', icon: <TerminalSquare size={16} />, run: () => navigateToPage('脚本编辑') },
-    { label: '定点数据', keywords: 'static pokemon pokefinder encounter', icon: <Dices size={16} />, run: () => navigateToPage('定点数据') },
+    ...(game === 'bdsp' ? [
+      { label: '定点数据', keywords: 'static pokemon pokefinder encounter', icon: <Dices size={16} />, run: () => navigateToPage('定点数据') },
+      { label: 'OCR 设置', keywords: 'ocr recognition', icon: <ScanText size={16} />, run: () => navigateToPage('OCR 设置') },
+    ] : []),
     { label: '视频预览', keywords: 'video preview', icon: <MonitorPlay size={16} />, run: () => showPanel('video') },
     { label: '日志中心', keywords: 'logs history', icon: <FileClock size={16} />, run: () => showPanel('logs') },
     { label: '视频源', keywords: 'tv source', icon: <Tv size={16} />, run: () => openModal('video') },
@@ -481,6 +486,7 @@ export default function App({ connections = initialConnections }: { connections?
                   <button key={item.id} role="menuitemradio" aria-checked={item.id === game} className={'game-option ' + (item.id === game ? 'selected' : '')}
                     onClick={() => {
                       setGame(item.id); setGameMenuOpen(false); gameButton.current?.focus();
+                      if (item.id !== 'bdsp' && (page === '定点数据' || page === 'OCR 设置')) setPage('首页');
                       if (item.id !== game) addLog('已切换查看：' + item.label + '。');
                     }}>
                     <span className="game-mark" style={{ background: item.color }} />
@@ -497,8 +503,8 @@ export default function App({ connections = initialConnections }: { connections?
         <nav className="sidebar-nav" aria-label="工作区">
           <NavItem label="首页" icon={<Home size={16} />} active={page === '首页'} onClick={() => navigateToPage('首页')} />
           <NavItem label="脚本编辑" icon={<TerminalSquare size={16} />} active={page === '脚本编辑'} onClick={() => navigateToPage('脚本编辑')} />
-          <NavItem label="定点数据" icon={<Dices size={16} />} active={page === '定点数据'} onClick={() => navigateToPage('定点数据')} />
-          <NavItem label="OCR 设置" icon={<ScanText size={16} />} active={page === 'OCR 设置'} onClick={() => navigateToPage('OCR 设置')} />
+          {game === 'bdsp' && <NavItem label="定点数据" icon={<Dices size={16} />} active={page === '定点数据'} onClick={() => navigateToPage('定点数据')} />}
+          {game === 'bdsp' && <NavItem label="OCR 设置" icon={<ScanText size={16} />} active={page === 'OCR 设置'} onClick={() => navigateToPage('OCR 设置')} />}
         </nav>
         <footer className="sidebar-footer">
           <span className="brand-mark" aria-hidden="true" />
@@ -535,7 +541,7 @@ export default function App({ connections = initialConnections }: { connections?
                 labelButton={<VideoLabelsButton variant="tool" expanded={panelWindows.videoLabelsOpen} toggle={toggleVideoLabels} />} />}
               {page === 'OCR 设置' && <OcrWorkspace overlayTarget={ocrOverlayHost} previewTarget={ocrPreviewHost} />}
               {page === '定点数据' && <StaticDataWorkspace onLog={message => addLog(message, '系统', 'success')} />}
-              {page === '首页' && <div className="empty-state home-empty"><Home size={28} /><h2>开始你的工作</h2><p>当前游戏为{activeGame.label}，打开脚本编辑开始配置操作。</p><button className="button" onClick={() => navigateToPage('脚本编辑')}><TerminalSquare size={15} />打开脚本编辑</button></div>}
+              {page === '首页' && (game === 'bdsp' ? <BdspHomeWorkspace onOpenScript={() => navigateToPage('脚本编辑')} /> : <div className="empty-state home-empty"><Home size={28} /><h2>开始你的工作</h2><p>当前游戏为{activeGame.label}，打开脚本编辑开始配置操作。</p><button className="button" onClick={() => navigateToPage('脚本编辑')}><TerminalSquare size={15} />打开脚本编辑</button></div>)}
             </div>
             <section className="workspace-labels" aria-label="标签工作区" hidden={!inlineLabelsOpen}>
               <VideoPreview labelsOnly labelsOpen={inlineLabelsOpen} labelFolder={labelFolder} referenceTarget={labelReferenceHost} onCloseLabels={() => setVideoLabelsOpen(false)} />

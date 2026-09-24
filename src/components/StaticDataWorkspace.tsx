@@ -117,7 +117,6 @@ function csvDownload(rows: StaticResult[], species: string, showStats: boolean) 
 }
 
 export function StaticDataWorkspace({ onLog }: { onLog?: (message: string) => void }) {
-  const [profile, setProfile] = useState({ name: '-', tid: '12345', sid: '54321', dex: false, charm: false, oval: false });
   const [targetIndex, setTargetIndex] = useState(0);
   const [seed0, setSeed0] = useState('');
   const [seed1, setSeed1] = useState('');
@@ -159,17 +158,6 @@ export function StaticDataWorkspace({ onLog }: { onLog?: (message: string) => vo
   return <section className="static-workspace" aria-label="定点数据工作区">
     <div className="static-settings-content">
       <header className="static-workspace-heading"><div><Dices size={17} /><div><h2>定点数据</h2><p>按 BDSP 定点生成器参数搜索并筛选结果。</p></div></div><span className="static-source-badge"><Database size={12} /> PokéFinder · BDSP Static</span></header>
-
-      <section className="static-profile-card" aria-label="存档信息">
-        <label>名称<input aria-label="存档名称" value={profile.name} onChange={event => setProfile(current => ({ ...current, name: event.target.value }))} /></label><button className="button static-manage" type="button" disabled>管理</button>
-        <label>TID<input aria-label="TID" value={profile.tid} onChange={event => setProfile(current => ({ ...current, tid: event.target.value.replace(/\D/g, '').slice(0, 5) }))} /></label>
-        <label>SID<input aria-label="SID" value={profile.sid} onChange={event => setProfile(current => ({ ...current, sid: event.target.value.replace(/\D/g, '').slice(0, 5) }))} /></label>
-        <label>TSV<input aria-label="TSV" value={String((Number(profile.tid) ^ Number(profile.sid)) >>> 0)} readOnly /></label>
-        <span className="static-profile-game">游戏 <strong>晶灿钻石</strong></span>
-        <label className="static-check"><input type="checkbox" checked={profile.dex} onChange={event => setProfile(current => ({ ...current, dex: event.target.checked }))} />全国图鉴</label>
-        <label className="static-check"><input type="checkbox" checked={profile.charm} onChange={event => setProfile(current => ({ ...current, charm: event.target.checked }))} />闪耀护符</label>
-        <label className="static-check"><input type="checkbox" checked={profile.oval} onChange={event => setProfile(current => ({ ...current, oval: event.target.checked }))} />圆形护符</label>
-      </section>
 
       <section className="static-config-card" aria-label="定点数据参数">
         <div className="static-config-column" aria-label="乱数信息"><header><Dices size={14} /><h3>乱数信息</h3></header>

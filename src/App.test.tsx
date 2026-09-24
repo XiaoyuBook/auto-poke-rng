@@ -165,7 +165,15 @@ describe('workspace interactions', () => {
   it('keeps the original navigation and lets the sidebar be reopened', async () => {
     await openApp();
     const nav = screen.getByRole('navigation', { name: '工作区' });
+    expect(within(nav).getAllByRole('button').map(button => button.textContent)).toEqual(['首页', '脚本编辑']);
+    expect(screen.queryByRole('button', { name: '定点数据' })).toBeNull();
+    changeGame('珍钻复刻');
     expect(within(nav).getAllByRole('button').map(button => button.textContent)).toEqual(['首页', '脚本编辑', '定点数据', 'OCR 设置']);
+    fireEvent.click(screen.getByRole('button', { name: '首页' }));
+    expect(screen.getByRole('region', { name: '存档信息' })).toBeTruthy();
+    changeGame('火叶');
+    expect(within(nav).getAllByRole('button').map(button => button.textContent)).toEqual(['首页', '脚本编辑']);
+    expect(screen.queryByRole('region', { name: '存档信息' })).toBeNull();
     const globalTools = screen.getByRole('group', { name: '全局工具' });
     expect(within(globalTools).getAllByRole('button').map(button => button.getAttribute('aria-label'))).toEqual(['视频源：未尝试连接', '伊机控：未尝试连接', 'QQ 通知：未配置']);
     fireEvent.click(screen.getByRole('button', { name: '收起侧栏' }));
@@ -176,6 +184,7 @@ describe('workspace interactions', () => {
 
   it('opens OCR settings with a selectable ROI over the persistent video', async () => {
     await openApp();
+    changeGame('珍钻复刻');
     const video = screen.getByRole('region', { name: '视频预览' });
     const frame = within(video).getByLabelText('视频画面');
     fireEvent.click(screen.getByRole('button', { name: 'OCR 设置' }));
@@ -189,6 +198,7 @@ describe('workspace interactions', () => {
 
   it('opens static data search, keeps the persistent video, and generates only after clicking generate', async () => {
     await openApp();
+    changeGame('珍钻复刻');
     const videoFrame = screen.getByRole('region', { name: '视频预览' }).querySelector('.preview-frame');
     fireEvent.click(screen.getByRole('button', { name: '定点数据' }));
     expect(screen.getByRole('heading', { name: '定点数据', level: 2 })).toBeTruthy();
