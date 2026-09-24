@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import {
   Check, ChevronDown, CircleHelp, FileClock, Gamepad2, Home, Keyboard, Maximize2,
-  MonitorPlay, PanelLeftClose, PanelLeftOpen, Search, Settings, TerminalSquare, Tv,
+  MonitorPlay, PanelLeftClose, PanelLeftOpen, ScanText, Search, Settings, TerminalSquare, Tv,
 } from 'lucide-react';
 import { CommandPalette, type CommandAction } from './components/CommandPalette';
 import { LogsPanel } from './components/LogsPanel';
@@ -19,6 +19,7 @@ import { GlobalTools, initialConnections, type DeviceConnections } from './compo
 import { VirtualControllerWindow } from './components/VirtualControllerWindow';
 import { ControllerOverlayApp } from './components/ControllerOverlayApp';
 import { KeyMappingDialog } from './components/KeyMappingDialog';
+import { OcrWorkspace } from './components/OcrWorkspace';
 import { loadControllerMapping, type MappingAction } from './controllerMapping';
 import { useDevices } from './useDevices';
 import type { ScriptProgress } from './devices';
@@ -79,6 +80,8 @@ export default function App({ connections = initialConnections }: { connections?
   const [videoContextMenu, setVideoContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [videoWidth, setVideoWidth] = useState(readVideoWidth);
   const [labelReferenceHost, setLabelReferenceHost] = useState<HTMLDivElement | null>(null);
+  const [ocrOverlayHost, setOcrOverlayHost] = useState<HTMLDivElement | null>(null);
+  const [ocrPreviewHost, setOcrPreviewHost] = useState<HTMLDivElement | null>(null);
   const switcher = useRef<HTMLDivElement>(null);
   const gameButton = useRef<HTMLButtonElement>(null);
   const settingsButton = useRef<HTMLButtonElement>(null);
@@ -492,6 +495,7 @@ export default function App({ connections = initialConnections }: { connections?
         <nav className="sidebar-nav" aria-label="工作区">
           <NavItem label="首页" icon={<Home size={16} />} active={page === '首页'} onClick={() => navigateToPage('首页')} />
           <NavItem label="脚本编辑" icon={<TerminalSquare size={16} />} active={page === '脚本编辑'} onClick={() => navigateToPage('脚本编辑')} />
+          <NavItem label="OCR 设置" icon={<ScanText size={16} />} active={page === 'OCR 设置'} onClick={() => navigateToPage('OCR 设置')} />
         </nav>
         <footer className="sidebar-footer">
           <span className="brand-mark" aria-hidden="true" />
@@ -526,6 +530,7 @@ export default function App({ connections = initialConnections }: { connections?
                 progress={run?.progress} validation={validation} recording={recording} elapsed={elapsed} toggleRunning={toggleRunning} toggleRecording={toggleRecording} openModal={openModal}
                 virtualControllerOpen={virtualControllerOpen} toggleVirtualController={() => void toggleVirtualController()}
                 labelButton={<VideoLabelsButton variant="tool" expanded={panelWindows.videoLabelsOpen} toggle={toggleVideoLabels} />} />}
+              {page === 'OCR 设置' && <OcrWorkspace overlayTarget={ocrOverlayHost} previewTarget={ocrPreviewHost} />}
               {page === '首页' && <div className="empty-state home-empty"><Home size={28} /><h2>开始你的工作</h2><p>当前游戏为{activeGame.label}，打开脚本编辑开始配置操作。</p><button className="button" onClick={() => navigateToPage('脚本编辑')}><TerminalSquare size={15} />打开脚本编辑</button></div>}
             </div>
             <section className="workspace-labels" aria-label="标签工作区" hidden={!inlineLabelsOpen}>
@@ -540,12 +545,14 @@ export default function App({ connections = initialConnections }: { connections?
           <aside className="workspace-right-rail" aria-label="固定工作区侧栏">
             <section ref={videoRegion} className="persistent-video" aria-label="视频预览" tabIndex={-1} onContextMenu={openVideoContextMenu}>
               <VideoPreview previewOnly />
+              <div ref={setOcrOverlayHost} className="video-roi-host" aria-hidden={page !== 'OCR 设置' || undefined} hidden={page !== 'OCR 设置'} />
               <button className="video-resize-handle" type="button" aria-label="调整视频预览大小" title="拖动调整视频大小，保持 16:9"
                 onPointerDown={startVideoResize} onPointerMove={resizeVideo} onPointerUp={finishVideoResize} onPointerCancel={finishVideoResize}
                 onLostPointerCapture={() => { videoResize.current = null; }} onKeyDown={nudgeVideoSize}><Maximize2 size={13} aria-hidden="true" /></button>
             </section>
             <div ref={setLabelReferenceHost} className="persistent-label-reference" aria-label="搜图标签与标注步骤" aria-hidden={!inlineLabelsOpen || undefined} hidden={!inlineLabelsOpen} />
-            <section ref={logRegion} className="persistent-logs" aria-labelledby="persistent-logs-title" aria-hidden={paletteOpen || inlineLabelsOpen || undefined} tabIndex={-1}>
+            <div ref={setOcrPreviewHost} className="persistent-ocr-preview" aria-hidden={page !== 'OCR 设置' || undefined} hidden={page !== 'OCR 设置'} />
+            <section ref={logRegion} className="persistent-logs" aria-labelledby="persistent-logs-title" aria-hidden={paletteOpen || inlineLabelsOpen || page === 'OCR 设置' || undefined} hidden={inlineLabelsOpen || page === 'OCR 设置'} tabIndex={-1}>
               <header className="persistent-logs-header">
                 <FileClock size={15} />
                 <h2 id="persistent-logs-title">日志中心</h2>
@@ -562,7 +569,7 @@ export default function App({ connections = initialConnections }: { connections?
               <span className="workspace-cursor">行 {cursor.line}，列 {cursor.column}</span>
               <span>UTF-8</span>
               <span>{script.split('\n').length} 行</span>
-            </> : <span>{activeGame.label}</span>}
+            </> : page === 'OCR 设置' ? <span>OCR 设置</span> : <span>{activeGame.label}</span>}
           </div>
           <QuickTools panel={toolPanel} detached={panelWindows.detached} toggle={togglePanel} buttons={dockButtons.current} />
         </footer>

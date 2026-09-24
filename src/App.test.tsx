@@ -165,13 +165,27 @@ describe('workspace interactions', () => {
   it('keeps the original navigation and lets the sidebar be reopened', async () => {
     await openApp();
     const nav = screen.getByRole('navigation', { name: '工作区' });
-    expect(within(nav).getAllByRole('button').map(button => button.textContent)).toEqual(['首页', '脚本编辑']);
+    expect(within(nav).getAllByRole('button').map(button => button.textContent)).toEqual(['首页', '脚本编辑', 'OCR 设置']);
     const globalTools = screen.getByRole('group', { name: '全局工具' });
     expect(within(globalTools).getAllByRole('button').map(button => button.getAttribute('aria-label'))).toEqual(['视频源：未尝试连接', '伊机控：未尝试连接', 'QQ 通知：未配置']);
     fireEvent.click(screen.getByRole('button', { name: '收起侧栏' }));
     expect(document.querySelector('.app-shell')?.getAttribute('data-collapsed')).toBe('true');
     fireEvent.click(screen.getByRole('button', { name: '展开侧栏' }));
     expect(document.querySelector('.app-shell')?.getAttribute('data-collapsed')).toBe('false');
+  });
+
+  it('opens OCR settings with a selectable ROI over the persistent video', async () => {
+    await openApp();
+    const video = screen.getByRole('region', { name: '视频预览' });
+    const frame = within(video).getByLabelText('视频画面');
+    fireEvent.click(screen.getByRole('button', { name: 'OCR 设置' }));
+    expect(screen.getByRole('heading', { name: 'OCR 设置', level: 2 })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'OCR识别参数' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'OCR识别区域' })).toBeTruthy();
+    expect(screen.getByLabelText('OCR识别区域框选')).toBeTruthy();
+    expect(within(video).getByLabelText('视频画面')).toBe(frame);
+    fireEvent.click(screen.getByRole('button', { name: '测试识别' }));
+    expect(screen.getByText('等待视频帧识别')).toBeTruthy();
   });
 
   it('requires an EasyCon connection before opening the virtual controller', async () => {

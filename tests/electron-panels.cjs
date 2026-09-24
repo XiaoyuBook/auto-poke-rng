@@ -141,6 +141,13 @@ app.whenReady().then(async () => {
   })()`);
   assert.equal(scriptColumns.sameRow, true, 'script library stays in the left column of the editor');
   assert.ok(scriptColumns.libraryRight <= scriptColumns.editorLeft, 'script library does not move above the editor');
+  await evaluate(main, `document.querySelector('.nav-item[title="OCR 设置"]').click()`);
+  await until(() => evaluate(main, 'Boolean(document.querySelector(".ocr-workspace"))'), 'OCR workspace ready');
+  assert.equal(await evaluate(main, 'Boolean(document.querySelector(".video-roi-overlay"))'), true, 'OCR mode overlays an ROI selector on the persistent video');
+  assert.equal(await evaluate(main, 'Boolean(document.querySelector(".persistent-ocr-preview")) && !document.querySelector(".persistent-ocr-preview").hidden'), true, 'OCR mode shows the recognition preview below video');
+  await capture(main, 'ocr-workspace');
+  await evaluate(main, `document.querySelector('.nav-item[title="脚本编辑"]').click()`);
+  await until(() => evaluate(main, 'Boolean(document.querySelector(".cm-content"))'), 'script workspace restored after OCR');
   const pinnedBounds = await videoBounds(main);
   await evaluate(main, `document.querySelector('.video-resize-handle').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))`);
   await until(async () => (await videoBounds(main)).width > pinnedBounds.width, 'video resize handle');
