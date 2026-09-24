@@ -184,8 +184,8 @@ describe('workspace interactions', () => {
     expect(screen.getByRole('region', { name: 'OCR识别区域' })).toBeTruthy();
     expect(screen.getByLabelText('OCR识别区域框选')).toBeTruthy();
     expect(within(video).getByLabelText('视频画面')).toBe(frame);
-    fireEvent.click(screen.getByRole('button', { name: '测试识别' }));
-    expect(screen.getByText('等待视频帧识别')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '测试当前项' }));
+    expect(within(screen.getByRole('region', { name: 'OCR识别预览' })).getByText('等待视频帧')).toBeTruthy();
   });
 
   it('requires an EasyCon connection before opening the virtual controller', async () => {
