@@ -167,6 +167,7 @@ def run(config, program):
         getters = {}
         extern_functions = {}
         ocr_reader = None
+        ocr_runtime = None
         labels = None
         if program.requires_video:
             from frames import Frames
@@ -201,9 +202,12 @@ def run(config, program):
                 label_uses_ocr = False
 
             if program.requires_ocr or label_uses_ocr:
-                from easycon.native.ocr import read_ocr
+                from easycon.native.ocr import RapidOcrReader
 
-                ocr_reader = lambda image: read_ocr(image)
+                # Load dependencies and model before taking the controller lease.
+                # An unavailable model must never leave an acquired lease behind.
+                ocr_runtime = RapidOcrReader()
+                ocr_reader = lambda image: ocr_runtime.read(image)
 
                 def ocr_region(x, y, width, height, language):
                     try:
@@ -214,7 +218,7 @@ def run(config, program):
                     frame_height, frame_width = frame.shape[:2]
                     if width <= 0 or height <= 0 or x < 0 or y < 0 or x + width > frame_width or y + height > frame_height:
                         raise RuntimeError(f"OCR 区域超出视频帧范围: {(x, y, width, height)} / {frame_width}x{frame_height}")
-                    text, _confidence = read_ocr(
+                    text, _confidence = ocr_runtime.read(
                         frame[y:y + height, x:x + width].copy(), language=str(language)
                     )
                     return text
@@ -223,6 +227,9 @@ def run(config, program):
 
             if labels is not None:
                 getters = labels.external_getters(read_frame, ocr_reader=ocr_reader)
+            # Fail before controller.acquire when a required video source has
+            # not published a usable frame yet.
+            read_frame()
         # Compile + asset preflight before taking controller ownership or sending input.
         request("script.acquire", {})
         trace.begin(config["name"])
@@ -267,7 +274,14 @@ def main():
             if program.requires_image_search:
                 from easycon.native import image_labels  # noqa: F401
             if program.requires_ocr:
-                from easycon.native import ocr  # noqa: F401
+                from easycon.native import ocr
+                ocr.preload_dependencies()
+            elif program.requires_image_search:
+                # A .IL TESSER_DETECT label is discovered after the script
+                # worker starts. Import the native OCR stack here as well so
+                # that its first use cannot race the stdin reader.
+                from easycon.native import ocr
+                ocr.preload_dependencies()
     except Exception as error:
         if command == "validate":
             emit(validation_result(config, error))

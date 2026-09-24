@@ -12,7 +12,7 @@ PP-OCRv6 medium + OpenVINO 保留为后续精度备选，当前不默认安装�
 
 ## 接入边界
 
-脚本内置函数 `OCR(x, y, w, h, lang)` 从当前共享视频帧复制指定 ROI，返回置信度至少为 0.5 的识别文本；`lang` 接受 `zh-Hans`、`zh-Hant`、`en`、`ja` 及常用别名。PP-OCRv6 small 是统一多语言权重，语言参数用于校验调用意图，不会按调用创建第二套模型。ROI 必须是正整数并完全位于当前帧内；没有视频帧时脚本在取得控制权前失败。
+脚本内置函数 `OCR(x, y, w, h, lang)` 从当前共享视频帧复制指定 ROI，返回置信度至少为 0.5 的识别文本；`lang` 接受 `zh-Hans`、`zh-Hant`、`en`、`ja` 及常用别名。PP-OCRv6 small 是统一多语言权重，语言参数用于校验调用意图，不会按调用创建第二套模型。ROI 必须是正整数并完全位于当前帧内；RapidOCR/ONNX Runtime 初始化和首帧检查都在取得控制权前完成，没有模型或视频帧时不会发送脚本按键。输出保留通过过滤的原始行首尾空白，只过滤全空白行。
 
 `.IL` 的 `TESSER_DETECT` 标签复用同一个识别器和置信度过滤。模型权重不入库，由 `npm run setup:runtime` 下载到 `.deps/ocr-models` 并按清单校验；脚本宿主提前导入 OCR 原生依赖，避免 Windows 下首次导入与 stdin 线程互锁。
 

@@ -79,6 +79,33 @@ target.mkdir()
     assert.equal(ocrDone?.status, 'completed', ocrDone?.message);
     assert.ok(events.some(event => event.event === 'script.started' && event.requiresVideo));
     assert.ok(events.some(event => event.event === 'script.log'));
+    const historyBeforeMissingModels = (await controller.call('controller.debug')).history.length;
+    const missingModels = fs.mkdtempSync(path.join(os.tmpdir(), 'poke-missing-ocr-'));
+    const previousModels = process.env.AUTO_POKE_OCR_MODELS;
+    process.env.AUTO_POKE_OCR_MODELS = missingModels;
+    try {
+      events.length = 0;
+      await runner.start({ text: ocrScript, path: 'ocr.rng' });
+      await runner.current.done;
+      const missingDone = events.find(event => event.event === 'script.done');
+      assert.equal(missingDone?.status, 'failed');
+      assert.match(missingDone?.message || '', /缺少 PP-OCRv6 small 模型/);
+      assert.equal((await controller.call('controller.debug')).history.length, historyBeforeMissingModels);
+    } finally {
+      if (previousModels === undefined) delete process.env.AUTO_POKE_OCR_MODELS;
+      else process.env.AUTO_POKE_OCR_MODELS = previousModels;
+      fs.rmSync(missingModels, { recursive: true, force: true });
+    }
+    const historyBeforeMissingFrame = (await controller.call('controller.debug')).history.length;
+    await client.call('video.stop');
+    events.length = 0;
+    await runner.start({ text: ocrScript, path: 'ocr.rng' });
+    await runner.current.done;
+    const missingFrameDone = events.find(event => event.event === 'script.done');
+    assert.equal(missingFrameDone?.status, 'failed');
+    assert.match(missingFrameDone?.message || '', /视频帧暂不可用|stopped|stale|WinError 2/i);
+    assert.equal((await controller.call('controller.debug')).history.length, historyBeforeMissingFrame);
+    state = await connected(client);
     events.length = 0;
     const dependent = '$score = @目标\nWAIT 60000';
     fs.writeFileSync(path.join(root, 'dependent.rng'), dependent);

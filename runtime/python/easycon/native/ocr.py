@@ -50,13 +50,16 @@ def resolve_model_root(root: str | Path | None = None) -> Path:
     """Resolve the installed model directory, with an eval-artifact fallback."""
 
     candidates: list[Path] = []
+    explicit = root is not None
     if root is not None:
         candidates.append(Path(root))
     requested = os.environ.get("AUTO_POKE_OCR_MODELS")
     if requested:
+        explicit = True
         candidates.append(Path(requested))
-    project = _project_root()
-    candidates.extend((project / ".deps" / "ocr-models", project / ".deps" / "ocr-eval" / "models"))
+    if not explicit:
+        project = _project_root()
+        candidates.extend((project / ".deps" / "ocr-models", project / ".deps" / "ocr-eval" / "models"))
     for candidate in candidates:
         resolved = candidate.expanduser().resolve()
         if all((resolved / filename).is_file() for filename in _MODEL_FILES):
@@ -79,10 +82,20 @@ def _text_and_confidence(output: Any) -> tuple[str, float]:
     raw_scores = getattr(output, "scores", None)
     texts = [str(value) for value in ([] if raw_texts is None else raw_texts)]
     scores = [float(value) for value in ([] if raw_scores is None else raw_scores)]
-    accepted = [(text.strip(), score) for text, score in zip(texts, scores, strict=False) if score >= 0.5 and text.strip()]
+    accepted = [(text, score) for text, score in zip(texts, scores, strict=False) if score >= 0.5 and text.strip()]
     if not accepted:
         return "", 0.0
     return "\n".join(text for text, _ in accepted), min(score for _, score in accepted)
+
+
+def preload_dependencies() -> None:
+    """Import RapidOCR and ONNX Runtime before the script stdin loop blocks."""
+
+    try:
+        import onnxruntime  # noqa: F401
+        import rapidocr  # noqa: F401
+    except Exception as exc:
+        raise OcrRuntimeError(f"PP-OCR 运行依赖初始化失败: {exc}") from exc
 
 
 class RapidOcrReader:
@@ -92,6 +105,7 @@ class RapidOcrReader:
         self.root = resolve_model_root(root)
         try:
             if engine_factory is None:
+                preload_dependencies()
                 from rapidocr import EngineType, LangRec, ModelType, OCRVersion, RapidOCR
 
                 engine_factory = RapidOCR
@@ -166,4 +180,4 @@ def reset_cached_runtime() -> None:
         _runtime = None
 
 
-__all__ = ["OcrRuntimeError", "RapidOcrReader", "SUPPORTED_LANGUAGES", "read_ocr", "reset_cached_runtime", "resolve_model_root"]
+__all__ = ["OcrRuntimeError", "RapidOcrReader", "SUPPORTED_LANGUAGES", "preload_dependencies", "read_ocr", "reset_cached_runtime", "resolve_model_root"]

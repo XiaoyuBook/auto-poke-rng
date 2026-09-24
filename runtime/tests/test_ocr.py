@@ -37,10 +37,10 @@ class OcrAdapterTests(unittest.TestCase):
         self.directory.cleanup()
 
     def test_filters_low_scores_and_preserves_lines(self):
-        engine = _FakeEngine(SimpleNamespace(txts=[" first ", "ignored", "second"], scores=[0.9, 0.49, 0.8]))
+        engine = _FakeEngine(SimpleNamespace(txts=[" first ", "ignored", "second "], scores=[0.9, 0.49, 0.8]))
         reader = RapidOcrReader(self.root, engine_factory=lambda **_: engine)
         text, score = reader.read(np.zeros((80, 100, 3), dtype=np.uint8), language="ja")
-        self.assertEqual(text, "first\nsecond")
+        self.assertEqual(text, " first \nsecond ")
         self.assertEqual(score, 0.8)
         self.assertEqual(engine.images[0][1], {"use_det": True, "use_cls": False})
 
