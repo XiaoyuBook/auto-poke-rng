@@ -58,6 +58,9 @@ if (-not $venvVersion -or ([version]$venvVersion.Trim() -lt [version]'3.12')) {
 
 & $venvPython -m pip install --disable-pip-version-check --upgrade --index-url $IndexUrl -r "$projectRoot/runtime/python/requirements.txt"
 if ($LASTEXITCODE -ne 0) { throw 'Installing script host dependencies failed.' }
-$checkCode = 'import sys, cv2, numpy; print(sys.version_info[:3], numpy.__version__, cv2.__version__)'
+$ocrModels = Join-Path $projectRoot '.deps/ocr-models'
+& $venvPython (Join-Path $projectRoot 'tools/setup-ocr-models.py') --root $ocrModels
+if ($LASTEXITCODE -ne 0) { throw 'Installing OCR model assets failed.' }
+$checkCode = 'import sys, cv2, numpy, onnxruntime, rapidocr; print(sys.version_info[:3], numpy.__version__, cv2.__version__, onnxruntime.__version__)'
 & $venvPython -c $checkCode
 if ($LASTEXITCODE -ne 0) { throw 'The script host dependency check failed.' }

@@ -155,7 +155,7 @@ def run(config, program):
     try:
         root = Path(config["scriptDir"])
         def preflight(node):
-            if isinstance(node, (Call, CallStatement)) and node.name.upper() in {"OCR", "AMIIBO"}:
+            if isinstance(node, (Call, CallStatement)) and node.name.upper() in {"AMIIBO"}:
                 raise RuntimeError(f"当前公共运行时尚未接入 {node.name.upper()}，脚本未执行任何按键")
             if is_dataclass(node):
                 for field in fields(node):
@@ -165,20 +165,17 @@ def run(config, program):
                     preflight(item)
         preflight(program.ast)
         getters = {}
-        if program.requires_image_search:
+        extern_functions = {}
+        ocr_reader = None
+        labels = None
+        if program.requires_video:
             from frames import Frames
             import numpy as np
-            from easycon.native.image_labels import load_image_labels, SearchMethod
+
             descriptor = config.get("video", {}).get("sharedMemory")
             if not descriptor:
-                raise RuntimeError("脚本需要搜图，请先连接视频源")
+                raise RuntimeError("脚本需要搜图或 OCR，请先连接视频源")
             frames = Frames(descriptor)
-            labels = load_image_labels([root])
-            missing = program.external_labels.difference(labels.labels)
-            if missing:
-                raise RuntimeError("找不到搜图标签: " + ", ".join(sorted(missing)))
-            if any(labels.labels[name].search_method == SearchMethod.TESSER_DETECT for name in program.external_labels):
-                raise RuntimeError("OCR 标签需要另行接入模型")
 
             def read_frame():
                 # A label lookup may legitimately reuse a still-fresh latest frame.
@@ -188,18 +185,56 @@ def run(config, program):
                     raise RuntimeError("视频帧暂不可用")
                 return np.frombuffer(frame.bgr, dtype=np.uint8).reshape(frame.height, frame.width, 3)
 
-            getters = labels.external_getters(read_frame)
+            if program.requires_image_search:
+                from easycon.native.image_labels import load_image_labels, SearchMethod
+
+                labels = load_image_labels([root])
+                missing = program.external_labels.difference(labels.labels)
+                if missing:
+                    raise RuntimeError("找不到搜图标签: " + ", ".join(sorted(missing)))
+
+                label_uses_ocr = any(
+                    labels.labels[name].search_method == SearchMethod.TESSER_DETECT
+                    for name in program.external_labels
+                )
+            else:
+                label_uses_ocr = False
+
+            if program.requires_ocr or label_uses_ocr:
+                from easycon.native.ocr import read_ocr
+
+                ocr_reader = lambda image: read_ocr(image)
+
+                def ocr_region(x, y, width, height, language):
+                    try:
+                        x, y, width, height = (int(x), int(y), int(width), int(height))
+                    except (TypeError, ValueError) as exc:
+                        raise RuntimeError("OCR 区域坐标必须是整数") from exc
+                    frame = read_frame()
+                    frame_height, frame_width = frame.shape[:2]
+                    if width <= 0 or height <= 0 or x < 0 or y < 0 or x + width > frame_width or y + height > frame_height:
+                        raise RuntimeError(f"OCR 区域超出视频帧范围: {(x, y, width, height)} / {frame_width}x{frame_height}")
+                    text, _confidence = read_ocr(
+                        frame[y:y + height, x:x + width].copy(), language=str(language)
+                    )
+                    return text
+
+                extern_functions["OCR"] = ocr_region
+
+            if labels is not None:
+                getters = labels.external_getters(read_frame, ocr_reader=ocr_reader)
         # Compile + asset preflight before taking controller ownership or sending input.
         request("script.acquire", {})
         trace.begin(config["name"])
         emit({
             "event": "script.started",
-            "requiresVideo": program.requires_image_search,
-            "videoSession": config.get("video", {}).get("session") if program.requires_image_search else None,
+            "requiresVideo": program.requires_video,
+            "videoSession": config.get("video", {}).get("session") if program.requires_video else None,
         })
         reporter = threading.Thread(target=report_progress, daemon=True)
         reporter.start()
         program.run(gamepad=RemoteGamepad(), waiter=RemoteWaiter(), external_getters=getters,
+                    extern_functions=extern_functions,
                     cancel_event=cancelled, output=lambda message: emit({"event": "script.log", "message": str(message)}),
                     trace=trace.record)
     except ScriptCancelled:
@@ -225,11 +260,14 @@ def main():
         if command == "validate":
             emit(validation_result(config))
             return
-        if program.requires_image_search:
+        if program.requires_image_search or program.requires_ocr:
             # Native extension initialization can flush C stdio on Windows. Import
             # before another thread blocks on stdin, which otherwise holds its CRT
             # stream lock and can deadlock NumPy/OpenCV initialization.
-            from easycon.native import image_labels  # noqa: F401
+            if program.requires_image_search:
+                from easycon.native import image_labels  # noqa: F401
+            if program.requires_ocr:
+                from easycon.native import ocr  # noqa: F401
     except Exception as error:
         if command == "validate":
             emit(validation_result(config, error))

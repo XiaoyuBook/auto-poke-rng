@@ -41,6 +41,14 @@ function Get-CTestExecutable([string]$Requested) {
 }
 
 $ctestExecutable = Get-CTestExecutable $CTest
+$pythonPath = if ($env:AUTO_POKE_PYTHON) { $env:AUTO_POKE_PYTHON } else { Join-Path $projectRoot '.deps/script-python/Scripts/python.exe' }
+if (-not (Test-Path -LiteralPath $pythonPath -PathType Leaf)) {
+    $python = Get-Command python.exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($python) { $pythonPath = $python.Source }
+}
+if (-not (Test-Path -LiteralPath $pythonPath -PathType Leaf)) { throw 'Python 3.12+ was not found.' }
+& $pythonPath -X utf8 -m unittest runtime/tests/test_ocr.py
+if ($LASTEXITCODE -ne 0) { throw 'OCR adapter tests failed.' }
 & $ctestExecutable --test-dir (Join-Path $projectRoot 'runtime/build') -C Release --output-on-failure
 if ($LASTEXITCODE -ne 0) { throw 'C++ runtime tests failed.' }
 

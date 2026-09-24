@@ -52,7 +52,8 @@ export function ScriptHelp() {
       <HelpRow code="RAND(max) / TIME()" detail="生成 0 到 max-1 的随机整数；TIME 返回脚本已运行的毫秒数。" />
       <HelpRow code="LEN(value) / APPEND(array, value)" detail="读取字符串或数组长度；返回追加元素后的新数组。" />
       <HelpRow code="BEEP(freq, ms)" detail="播放指定频率和时长的提示音。" />
-      <HelpRow code="AMIIBO(index) / OCR(x, y, w, h, lang)" detail="语法已保留；当前公共运行时尚未接入这两项执行能力。" />
+      <HelpRow code="OCR(x, y, w, h, lang)" detail="读取当前视频帧指定区域的文字；lang 支持 zh-Hans、zh-Hant、en、ja，需要已连接视频源。PP-OCRv6 small 会返回置信度过滤后的文本。" />
+      <HelpRow code="AMIIBO(index)" detail="语法已保留；当前公共运行时尚未接入 Amiibo 执行能力。" />
     </HelpSection>
 
     <div className="help-shortcuts"><span><kbd>Ctrl K</kbd> 快速查找</span><span><kbd>Ctrl S</kbd> 保存当前文件</span></div>

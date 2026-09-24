@@ -71,6 +71,15 @@ target.mkdir()
     assert.equal((await controller.call('controller.status')).status, 'connected');
     assert.equal((await client.call('video.status')).session, state.session);
     events.length = 0;
+    const ocrScript = '$text = OCR(0, 0, 320, 120, "en")\nPRINT $text\nA 35';
+    fs.writeFileSync(path.join(root, 'ocr.rng'), ocrScript);
+    await runner.start({ text: ocrScript, path: 'ocr.rng' });
+    await runner.current.done;
+    const ocrDone = events.find(event => event.event === 'script.done');
+    assert.equal(ocrDone?.status, 'completed', ocrDone?.message);
+    assert.ok(events.some(event => event.event === 'script.started' && event.requiresVideo));
+    assert.ok(events.some(event => event.event === 'script.log'));
+    events.length = 0;
     const dependent = '$score = @目标\nWAIT 60000';
     fs.writeFileSync(path.join(root, 'dependent.rng'), dependent);
     await runner.start({ text: dependent, path: 'dependent.rng' });

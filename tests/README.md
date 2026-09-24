@@ -6,7 +6,7 @@
 | --- | --- |
 | `npm test` | Vitest 单元和组件测试 |
 | `npm run test:devices:regression` | 公共伊机控、视频源、Python 帧读取及测试启动器的审查回归 |
-| `npm run test:runtime` | CTest 核心测试、原有 Node 集成测试，以及全部设备审查回归 |
+| `npm run test:runtime` | OCR 适配器单测、CTest 核心测试、脚本/设备 Node 集成测试，以及全部设备审查回归 |
 | `npm run test:devices` | 构建界面后，在真实 Electron 中验证模拟设备接线 |
 | `npm run test:electron` | 桌面窗口、面板、脚本文件等集成验证 |
 

@@ -7,3 +7,4 @@ dist/
 runtime/build/
 runtime/bin/
 __pycache__/
+AGENTS.md

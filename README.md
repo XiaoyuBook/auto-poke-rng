@@ -8,7 +8,7 @@
 
 项目已接入 C++20 公共视频采集和伊机控运行时：多个预览/识别消费者共享同一视频源，串口保持连接，脚本通过复用的 EasyCon 引擎执行。游戏乱数流程后续接入。设备架构、依赖来源和边界见 [runtime/README.md](runtime/README.md)。
 
-公共 OCR 已完成模型选型：采用 PP-OCRv6 small，支持简中、繁中、英文和日文；当前尚未接入应用。候选实测、模型哈希、复现方式和适用限制见 [OCR 选型报告](docs/OCR_SELECTION.md)。
+公共 OCR 已接入脚本运行时和 `.IL` 的 `TESSER_DETECT` 标签：采用 PP-OCRv6 small，支持简中、繁中、英文和日文。首次安装 `setup:runtime` 会下载并校验模型；候选实测、模型哈希、复现方式和适用限制见 [OCR 选型报告](docs/OCR_SELECTION.md)。
 
 ## 开发环境
 

@@ -112,13 +112,16 @@ def _statement_expressions(statement: Statement) -> tuple[Expression, ...]:
     return ()
 
 
-def _program_metadata(program: Program) -> tuple[frozenset[str], bool, frozenset[str]]:
+def _program_metadata(program: Program) -> tuple[frozenset[str], bool, frozenset[str], bool]:
     from easycon.native.ast import CallStatement
 
     labels: set[str] = set()
     has_gamepad_actions = False
     ocr_languages: set[str] = set()
+    has_ocr = False
     def record_ocr(arguments):
+        nonlocal has_ocr
+        has_ocr = True
         if len(arguments) == 5 and isinstance(arguments[4], Literal):
             ocr_languages.add(str(arguments[4].value))
     pending = [statement for unit in (*program.libraries, program.main) for statement in unit.statements]
@@ -138,7 +141,7 @@ def _program_metadata(program: Program) -> tuple[frozenset[str], bool, frozenset
                 elif isinstance(node, Call) and node.name.upper() == "OCR":
                     record_ocr(node.arguments)
         pending.extend(_statement_children(statement))
-    return frozenset(labels), has_gamepad_actions, frozenset(ocr_languages)
+    return frozenset(labels), has_gamepad_actions, frozenset(ocr_languages), has_ocr
 
 
 @dataclass(frozen=True, slots=True)
@@ -148,10 +151,19 @@ class ScriptProgram:
     external_labels: frozenset[str]
     has_gamepad_actions: bool
     ocr_languages: frozenset[str] = frozenset()
+    has_ocr: bool = False
 
     @property
     def requires_image_search(self) -> bool:
         return bool(self.external_labels)
+
+    @property
+    def requires_ocr(self) -> bool:
+        return self.has_ocr
+
+    @property
+    def requires_video(self) -> bool:
+        return self.requires_image_search or self.requires_ocr
 
     def run(
         self,
@@ -198,8 +210,8 @@ class EasyConScriptEngine:
         self._validate_imports((main, *libraries), root)
         ast = Program(main, libraries)
         validate_program(ast)
-        external_labels, has_gamepad_actions, ocr_languages = _program_metadata(ast)
-        return ScriptProgram(ast, source, external_labels, has_gamepad_actions, ocr_languages)
+        external_labels, has_gamepad_actions, ocr_languages, has_ocr = _program_metadata(ast)
+        return ScriptProgram(ast, source, external_labels, has_gamepad_actions, ocr_languages, has_ocr)
 
     def compile_text(
         self,
