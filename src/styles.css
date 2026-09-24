@@ -136,13 +136,19 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .persistent-logs .logs-toolbar { margin-bottom: 10px; padding: 10px 0; }
 .persistent-logs .logs-table-scroll { padding-bottom: 12px; }
 .workspace-content[data-labels-open="true"] .persistent-logs { display: none; }
+.persistent-label-reference { display: flex; flex: 1; min-width: 0; min-height: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: #171a1a; }
+.persistent-label-reference[hidden] { display: none; }
+.persistent-label-reference > .label-reference-section { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.18fr); gap: 14px; width: 100%; min-height: 0; padding: 12px; border-top: 0; overflow: hidden; }
+.persistent-label-reference .label-library, .persistent-label-reference .label-instructions { min-height: 0; }
+.persistent-label-reference .label-library-items { overflow-y: auto; }
+.persistent-label-reference .label-instructions { overflow-y: auto; }
 .workspace-labels { height: 100%; min-height: 0; display: flex; flex-direction: column; }
 .workspace-labels-header { display: flex; align-items: center; justify-content: space-between; min-height: 48px; padding: 0; }
 .workspace-labels-header h2 { color: var(--secondary); font-size: 13px; font-weight: 500; }
 .workspace-labels .image-label-content { padding-inline: 0; }
 .workspace-labels .image-label-grid { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; column-gap: 0; }
 .workspace-labels .label-snapshot-section { grid-column: 1; grid-row: 1; }
-.workspace-labels .label-details { display: grid; grid-column: 1; grid-row: 2; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 22px; min-height: 0; overflow-y: auto; }
+.workspace-labels .label-details { display: grid; grid-column: 1; grid-row: 2; grid-template-columns: minmax(0, 1fr); gap: 22px; min-height: 0; overflow-y: auto; }
 .workspace-labels .label-reference-section { min-height: 230px; }
 
 .script-workspace { height: 100%; min-height: 455px; display: grid; grid-template-columns: 168px minmax(0, 1fr); gap: 20px; }

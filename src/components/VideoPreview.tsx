@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { createPortal } from 'react-dom';
 import { Camera, CircleHelp, Focus, Image, ImagePlus, MonitorPlay, Play, Save, ScanSearch, Search, Tag, Tags } from 'lucide-react';
 import { useDevices } from '../useDevices';
 import type { Snapshot } from '../devices';
@@ -18,12 +19,12 @@ export function VideoLabelsButton({ expanded, toggle, variant = 'icon' }: { expa
     aria-expanded={expanded} onClick={toggle}><Tags size={15} /></button>;
 }
 
-export function VideoPreview({ labelsOpen = false, labelFolder = '', previewOnly = false, labelsOnly = false }: { labelsOpen?: boolean; labelFolder?: string; previewOnly?: boolean; labelsOnly?: boolean }) {
+export function VideoPreview({ labelsOpen = false, labelFolder = '', previewOnly = false, labelsOnly = false, referenceTarget = null }: { labelsOpen?: boolean; labelFolder?: string; previewOnly?: boolean; labelsOnly?: boolean; referenceTarget?: HTMLElement | null }) {
   return <section className="video-preview-content" aria-label="视频画面" data-labels-open={labelsOpen}>
     {!labelsOnly && !labelsOpen && <div className="preview-stage">
       <div className="preview-frame"><LiveVideo /></div>
     </div>}
-    {!previewOnly && <div className="image-label-content" hidden={!labelsOpen}><ImageLabelWorkspace active={labelsOpen} labelFolder={labelFolder} cornerLayout={labelsOnly} /></div>}
+    {!previewOnly && <div className="image-label-content" hidden={!labelsOpen}><ImageLabelWorkspace active={labelsOpen} labelFolder={labelFolder} cornerLayout={labelsOnly} referenceTarget={referenceTarget} /></div>}
   </section>;
 }
 
@@ -98,7 +99,7 @@ async function matchImage(liveUrl: string, templateUrl: string, range: LabelRect
   return best;
 }
 
-function ImageLabelWorkspace({ active, labelFolder, cornerLayout }: { active: boolean; labelFolder: string; cornerLayout: boolean }) {
+function ImageLabelWorkspace({ active, labelFolder, cornerLayout, referenceTarget }: { active: boolean; labelFolder: string; cornerLayout: boolean; referenceTarget?: HTMLElement | null }) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   useEffect(() => {
     const api = window.desktop?.devices?.video;
@@ -228,6 +229,8 @@ function ImageLabelWorkspace({ active, labelFolder, cornerLayout }: { active: bo
     setLabels(current => [...current.filter(label => label.name !== item.name), { ...item, imageBase64: undefined }].sort((a, b) => a.name.localeCompare(b.name, 'zh-CN')));
     setNotice(`已保存标签“${item.name}”。`);
   };
+  const referencePanel = <LabelReference labels={labels} filter={filter} onFilterChange={setFilter} loadLabel={loadLabel} />;
+  const renderedReferencePanel = referenceTarget ? createPortal(referencePanel, referenceTarget) : referencePanel;
 
   return <div className="image-label-workspace" aria-label="图像标签工作区">
     <div className="image-label-grid">
@@ -283,28 +286,38 @@ function ImageLabelWorkspace({ active, labelFolder, cornerLayout }: { active: bo
         </div>
       </section>
 
-      <div className="label-reference-section">
-        <section className="label-library" aria-label="搜图标签">
-          <header className="label-section-heading"><h4><Tag size={14} />搜图标签</h4><span>{labels.length}</span></header>
-          <div className="label-list-search"><Search size={13} /><input type="search" aria-label="搜索图像标签" placeholder="搜索标签…" value={filter} onChange={event => setFilter(event.target.value)} /></div>
-          <div className="label-library-items" aria-label="标签列表" tabIndex={0}>
-            {labels.filter(label => label.name.toLocaleLowerCase().includes(filter.toLocaleLowerCase())).length ? labels.filter(label => label.name.toLocaleLowerCase().includes(filter.toLocaleLowerCase())).map(label => <button className="label-library-item" key={label.path} onDoubleClick={() => void loadLabel(label)} onClick={() => void loadLabel(label)}><Tag size={14} /><span>{label.name}</span></button>) : <div className="label-library-empty"><Tags size={24} /><strong>还没有标签</strong><span>保存后在这里选择标签</span></div>}
-          </div>
-          <p className="label-library-hint">双击标签可加载到画布</p>
-        </section>
-        <section className="label-instructions" aria-label="标注说明">
-          <header className="label-section-heading"><h4><CircleHelp size={14} />标注步骤</h4></header>
-          <ol>
-            <li><span>01</span><div><strong>截取画面</strong><p>从右上角实时画面截图，左侧保留静态帧。</p></div></li>
-            <li><span className="range">02</span><div><strong>圈选搜索范围</strong><p>用红框限定在哪一片区域搜索。</p></div></li>
-            <li><span className="target">03</span><div><strong>圈选搜索目标</strong><p>用绿框标出需要识别的图像。</p></div></li>
-            <li><span>04</span><div><strong>测试并保存</strong><p>检查匹配结果，命名并保存标签。</p></div></li>
-          </ol>
-        </section>
-      </div>
+      {renderedReferencePanel}
     </div>
     </div>
     <footer className="label-workspace-note" role="status">{notice || '截图后选择红框或绿框，在静态画面上拖动圈选。'}</footer>
+  </div>;
+}
+
+function LabelReference({ labels, filter, onFilterChange, loadLabel }: {
+  labels: LabelRecord[];
+  filter: string;
+  onFilterChange: (value: string) => void;
+  loadLabel: (item: LabelRecord) => void | Promise<void>;
+}) {
+  const filtered = labels.filter(label => label.name.toLocaleLowerCase().includes(filter.toLocaleLowerCase()));
+  return <div className="label-reference-section" aria-label="搜图标签与标注步骤">
+    <section className="label-library" aria-label="搜图标签">
+      <header className="label-section-heading"><h4><Tag size={14} />搜图标签</h4><span>{labels.length}</span></header>
+      <div className="label-list-search"><Search size={13} /><input type="search" aria-label="搜索图像标签" placeholder="搜索标签…" value={filter} onChange={event => onFilterChange(event.target.value)} /></div>
+      <div className="label-library-items" aria-label="标签列表" tabIndex={0}>
+        {filtered.length ? filtered.map(label => <button className="label-library-item" key={label.path} onDoubleClick={() => void loadLabel(label)} onClick={() => void loadLabel(label)}><Tag size={14} /><span>{label.name}</span></button>) : <div className="label-library-empty"><Tags size={24} /><strong>还没有标签</strong><span>保存后在这里选择标签</span></div>}
+      </div>
+      <p className="label-library-hint">双击标签可加载到画布</p>
+    </section>
+    <section className="label-instructions" aria-label="标注说明">
+      <header className="label-section-heading"><h4><CircleHelp size={14} />标注步骤</h4></header>
+      <ol>
+        <li><span>01</span><div><strong>截取画面</strong><p>从右上角实时画面截图，左侧保留静态帧。</p></div></li>
+        <li><span className="range">02</span><div><strong>圈选搜索范围</strong><p>用红框限定在哪一片区域搜索。</p></div></li>
+        <li><span className="target">03</span><div><strong>圈选搜索目标</strong><p>用绿框标出需要识别的图像。</p></div></li>
+        <li><span>04</span><div><strong>测试并保存</strong><p>检查匹配结果，命名并保存标签。</p></div></li>
+      </ol>
+    </section>
   </div>;
 }
 

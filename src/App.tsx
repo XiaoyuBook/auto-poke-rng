@@ -78,6 +78,7 @@ export default function App({ connections = initialConnections }: { connections?
   const [toast, setToast] = useState('');
   const [videoContextMenu, setVideoContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [videoWidth, setVideoWidth] = useState(readVideoWidth);
+  const [labelReferenceHost, setLabelReferenceHost] = useState<HTMLDivElement | null>(null);
   const switcher = useRef<HTMLDivElement>(null);
   const gameButton = useRef<HTMLButtonElement>(null);
   const settingsButton = useRef<HTMLButtonElement>(null);
@@ -531,7 +532,7 @@ export default function App({ connections = initialConnections }: { connections?
               <header className="workspace-labels-header"><h2>图像标签</h2>
                 <button className="icon-button" title="关闭图像标签" aria-label="关闭图像标签" onClick={() => setVideoLabelsOpen(false)}><X size={15} /></button>
               </header>
-              <VideoPreview labelsOnly labelsOpen={inlineLabelsOpen} labelFolder={labelFolder} />
+              <VideoPreview labelsOnly labelsOpen={inlineLabelsOpen} labelFolder={labelFolder} referenceTarget={labelReferenceHost} />
             </section>
             {toolPanel?.tool === 'logs' && <FloatingSidePanel contained state={toolPanel} title="日志中心" icon={<FileClock size={16} />}
               detach={nativePanels ? detachPanel : undefined} detaching={detaching}
@@ -546,6 +547,7 @@ export default function App({ connections = initialConnections }: { connections?
                 onPointerDown={startVideoResize} onPointerMove={resizeVideo} onPointerUp={finishVideoResize} onPointerCancel={finishVideoResize}
                 onLostPointerCapture={() => { videoResize.current = null; }} onKeyDown={nudgeVideoSize}><Maximize2 size={13} aria-hidden="true" /></button>
             </section>
+            <div ref={setLabelReferenceHost} className="persistent-label-reference" aria-label="搜图标签与标注步骤" aria-hidden={!inlineLabelsOpen || undefined} hidden={!inlineLabelsOpen} />
             <section ref={logRegion} className="persistent-logs" aria-labelledby="persistent-logs-title" aria-hidden={paletteOpen || inlineLabelsOpen || undefined} tabIndex={-1}>
               <header className="persistent-logs-header">
                 <FileClock size={15} />
