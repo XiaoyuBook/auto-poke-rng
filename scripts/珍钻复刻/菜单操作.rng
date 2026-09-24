@@ -1,7 +1,0 @@
-# 打开菜单、确认并退出
-
-press X
-wait 1000
-press A
-wait 800
-press B
