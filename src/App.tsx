@@ -513,7 +513,7 @@ export default function App({ connections = initialConnections }: { connections?
           </div>
         </header>
 
-        <div className="workspace-content" style={{ '--video-width': `${videoWidth}px` } as CSSProperties}>
+        <div className="workspace-content" data-labels-open={inlineLabelsOpen || undefined} style={{ '--video-width': `${videoWidth}px` } as CSSProperties}>
           <div className="workspace-primary">
             <div className="workspace-page" hidden={inlineLabelsOpen}>
               {page === '脚本编辑' && <ScriptWorkspace scriptId={library.active?.path || ''} scriptName={library.active?.name || ''} script={script}
@@ -546,7 +546,7 @@ export default function App({ connections = initialConnections }: { connections?
                 onPointerDown={startVideoResize} onPointerMove={resizeVideo} onPointerUp={finishVideoResize} onPointerCancel={finishVideoResize}
                 onLostPointerCapture={() => { videoResize.current = null; }} onKeyDown={nudgeVideoSize}><Maximize2 size={13} aria-hidden="true" /></button>
             </section>
-            <section ref={logRegion} className="persistent-logs" aria-labelledby="persistent-logs-title" aria-hidden={paletteOpen || undefined} tabIndex={-1}>
+            <section ref={logRegion} className="persistent-logs" aria-labelledby="persistent-logs-title" aria-hidden={paletteOpen || inlineLabelsOpen || undefined} tabIndex={-1}>
               <header className="persistent-logs-header">
                 <FileClock size={15} />
                 <h2 id="persistent-logs-title">日志中心</h2>

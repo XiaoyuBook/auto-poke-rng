@@ -355,6 +355,7 @@ app.whenReady().then(async () => {
   await until(() => video.isDestroyed(), 'video labels docked');
   await until(() => evaluate(main, 'document.querySelector(".workspace-labels")?.hidden === false'), 'inline labels retain expanded mode');
   assert.deepEqual(await videoBounds(main), pinnedBounds, 'labels do not move or resize video');
+  assert.equal(await evaluate(main, 'getComputedStyle(document.querySelector(".persistent-logs")).display'), 'none', 'inline labels hide the persistent log area');
   await assertInlineLabelsFit(main);
   await capture(main, 'inline-video-labels');
   const labelMainSize = main.getContentSize();
@@ -366,6 +367,7 @@ app.whenReady().then(async () => {
   await delay(150);
   await click(main, '标签');
   await until(() => evaluate(main, 'document.querySelector(".workspace-labels")?.hidden === true'), 'script workspace restored');
+  assert.notEqual(await evaluate(main, 'getComputedStyle(document.querySelector(".persistent-logs")).display'), 'none', 'closing labels restores the persistent log area');
   assert.deepEqual(await videoBounds(main), pinnedBounds, 'closing labels preserves video bounds');
   await click(main, '标签');
   await until(() => evaluate(main, 'document.querySelector(".workspace-labels")?.hidden === false'), 'inline labels reopened');
