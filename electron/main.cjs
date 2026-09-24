@@ -48,7 +48,7 @@ function createWindow() {
 app.whenReady().then(() => {
   ipcMain.handle('app:metadata', () => ({ name: 'Auto Poke RNG', version: app.getVersion(), platform: process.platform }));
   panels = registerPanelWindows({ getMainWindow: () => mainWindow, loadWindow });
-  registerScriptFiles({ getMainWindow: () => mainWindow, rootDirectory: path.join(app.getAppPath(), 'scripts') });
+  registerScriptFiles({ getMainWindow: () => mainWindow, getLabelWindows: () => [panels.getVideoWindow()], rootDirectory: path.join(app.getAppPath(), 'scripts') });
   // The unpackaged GUI is the local development entry point. Keep mock
   // hardware available there even when a shell drops environment variables;
   // packaged production builds remain real-device only unless explicitly

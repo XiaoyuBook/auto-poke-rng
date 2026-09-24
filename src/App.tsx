@@ -44,6 +44,12 @@ export default function App({ connections = initialConnections }: { connections?
   const [elapsed, setElapsed] = useState(0);
   const library = useScriptLibrary();
   const { save: saveScript } = library;
+  const activeLabelFolder = parentFolder(library.active?.path || '');
+  const panelQuery = new URLSearchParams(window.location.search).get('panel');
+  const labelFolder = panelQuery ? localStorage.getItem('auto-poke-rng:label-folder') || '' : activeLabelFolder;
+  useEffect(() => {
+    if (!panelQuery) localStorage.setItem('auto-poke-rng:label-folder', activeLabelFolder);
+  }, [activeLabelFolder, panelQuery]);
   const [logs, setLogs] = useState<LogEntry[]>(() => [createLog('工作区已就绪，等待运行脚本。')]);
   const easyConLogs = useMemo(() => logs.filter(isEasyConLog), [logs]);
   const [modal, setModal] = useState<Modal | null>(null);
@@ -445,7 +451,7 @@ export default function App({ connections = initialConnections }: { connections?
         wide={toolPanel.tool === 'video' && panelWindows.videoLabelsOpen}
         actions={toolPanel.tool === 'video' && <VideoLabelsButton expanded={panelWindows.videoLabelsOpen} toggle={() => setVideoLabelsOpen(!panelWindows.videoLabelsOpen)} />}
         minimize={minimizePanel} restore={() => showPanel(toolPanel.tool)} toggleExpanded={() => setToolPanel(current => current && { ...current, expanded: !current.expanded })} close={closePanel}>
-        {toolPanel.tool === 'video' ? <VideoPreview labelsOpen={panelWindows.videoLabelsOpen} /> : <LogsPanel logs={logs} source={panelWindows.logSource} setSource={setLogSource} clear={() => setLogs([])} />}
+        {toolPanel.tool === 'video' ? <VideoPreview labelsOpen={panelWindows.videoLabelsOpen} labelFolder={labelFolder} /> : <LogsPanel logs={logs} source={panelWindows.logSource} setSource={setLogSource} clear={() => setLogs([])} />}
       </FloatingSidePanel>}
       {modal === 'mapping' && <KeyMappingDialog close={closeModal} onSaved={async mapping => { await overlayApi?.setMapping(mapping); }} />}
       {modal && modal !== 'mapping' && <ToolsDialog modal={modal} close={closeModal} onInput={key => { if (recording) addLog('输入预览：' + key, '手柄'); }} />}

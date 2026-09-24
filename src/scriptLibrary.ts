@@ -16,6 +16,20 @@ export interface ScriptFilesApi {
   list: () => Promise<ScriptListing>;
   create: (folder: string) => Promise<ScriptFile>;
   save: (script: { path: string; name: string; body: string; expectedRevision: string }) => Promise<ScriptFile>;
+  labelsList?: (folder?: string) => Promise<LabelListing>;
+  labelRead?: (folder: string, name: string) => Promise<LabelRecord>;
+  labelSave?: (label: LabelSaveRequest) => Promise<LabelRecord>;
+}
+
+export interface LabelRect { x: number; y: number; width: number; height: number }
+export interface LabelRecord {
+  name: string; path: string; searchMethod: number; threshold: number;
+  imageBase64?: string; range: LabelRect; target: LabelRect;
+}
+export interface LabelListing { folder: string; labels: LabelRecord[]; warnings: string[] }
+export interface LabelSaveRequest {
+  folder: string; name: string; searchMethod: number; threshold: number;
+  range: LabelRect; target: LabelRect; imageBase64: string;
 }
 
 export interface LibraryScript extends ScriptFile {

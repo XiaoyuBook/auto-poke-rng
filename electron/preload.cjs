@@ -57,6 +57,9 @@ contextBridge.exposeInMainWorld('desktop', {
     list: () => ipcRenderer.invoke('scripts:list'),
     create: folder => ipcRenderer.invoke('scripts:create', { folder }),
     save: script => ipcRenderer.invoke('scripts:save', script),
+    labelsList: folder => ipcRenderer.invoke('scripts:labels-list', { folder }),
+    labelRead: (folder, name) => ipcRenderer.invoke('scripts:label-read', { folder, name }),
+    labelSave: label => ipcRenderer.invoke('scripts:label-save', label),
   },
   panels: {
     open: tool => ipcRenderer.invoke('panels:open', tool),

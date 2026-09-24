@@ -108,7 +108,7 @@ app.whenReady().then(async () => {
   fs.mkdirSync(path.join(scriptRoot, '珍钻复刻'));
   fs.writeFileSync(path.join(scriptRoot, '火红', '确认.rng'), '# 火红测试\npress A');
   fs.writeFileSync(path.join(scriptRoot, '珍钻复刻', '菜单.rng'), '# 珍钻测试\npress X');
-  registerScriptFiles({ getMainWindow: () => main, rootDirectory: scriptRoot });
+  registerScriptFiles({ getMainWindow: () => main, getLabelWindows: () => [manager.getVideoWindow()], rootDirectory: scriptRoot });
   const devices = registerDevices({ ipcMain, getWindows: () => BrowserWindow.getAllWindows(), rootDirectory: scriptRoot, testMode: true });
   main.on('closed', () => { main = null; manager.closeAll(); });
   await loadWindow(main);
@@ -304,6 +304,8 @@ app.whenReady().then(async () => {
   console.log('The following rejected IPC call is an expected sender-permission check.');
   assert.equal(await evaluate(video, `window.desktop.panels.open('logs').then(() => false, () => true)`), true, 'tool windows cannot create other windows');
   assert.equal(await evaluate(video, `window.desktop.scripts.list().then(() => false, () => true)`), true, 'tool windows cannot access project script files');
+  assert.equal(await evaluate(video, `window.desktop.scripts.labelsList('').then(value => Array.isArray(value.labels), () => false)`), true, 'video tool can access image labels');
+  assert.equal(await evaluate(logs, `window.desktop.scripts.labelsList('').then(() => false, () => true)`), true, 'log tool cannot access image labels');
   assert.equal(await evaluate(logs, `window.desktop.panels.setVideoLabelsOpen(true).then(() => false, () => true)`), true, 'log windows cannot change video layout');
   await click(logs, '收回主窗口');
   await until(() => logs.isDestroyed(), 'log window docked');

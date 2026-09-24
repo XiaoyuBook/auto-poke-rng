@@ -182,6 +182,7 @@ function registerPanelWindows({ getMainWindow, loadWindow }) {
   });
 
   return {
+    getVideoWindow: () => windows.get('video')?.window,
     closeAll: () => {
       for (const { window } of [...windows.values()]) if (!window.isDestroyed()) window.destroy();
     },

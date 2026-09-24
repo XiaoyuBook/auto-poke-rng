@@ -80,4 +80,38 @@ describe('project script files', () => {
     expect(listing.files).toHaveLength(1);
     expect(listing.warnings[0]).toContain('大文件.rng');
   });
+
+  it('saves, lists, reads, and replaces image labels in a script folder', async () => {
+    await put('火红/确认.rng');
+    const label = {
+      folder: '火红', name: '菜单按钮', searchMethod: 5, threshold: 92,
+      range: { x: 10, y: 20, width: 300, height: 180 },
+      target: { x: 80, y: 60, width: 64, height: 32 },
+      imageBase64: Buffer.from('synthetic-template').toString('base64'),
+    };
+    const saved = await store.labelSave(label);
+    expect(saved).toMatchObject({ name: '菜单按钮', path: '火红/ImgLabel/菜单按钮.IL', searchMethod: 5, threshold: 92, range: label.range, target: label.target, imageBase64: label.imageBase64 });
+    const onDisk = JSON.parse(await fs.readFile(path.join(root, '火红', 'ImgLabel', '菜单按钮.IL'), 'utf8'));
+    expect(onDisk).toMatchObject({ searchMethod: 5, threshold: 92, ImgBase64: label.imageBase64, RangeX: 10, TargetWidth: 64 });
+    expect((await store.labelsList({ folder: '火红' })).labels).toEqual([expect.objectContaining({ name: '菜单按钮', imageBase64: undefined, range: label.range })]);
+    expect(await store.labelRead({ folder: '火红', name: '菜单按钮' })).toMatchObject(saved);
+
+    const replacement = await store.labelSave({ ...label, threshold: 97, target: { x: 90, y: 70, width: 48, height: 24 } });
+    expect(replacement.threshold).toBe(97);
+    expect(replacement.target).toEqual({ x: 90, y: 70, width: 48, height: 24 });
+    expect((await store.labelsList({ folder: '火红' })).labels).toHaveLength(1);
+  });
+
+  it('rejects unsafe image label paths, data, and rectangles', async () => {
+    await put('火红/确认.rng');
+    const valid = {
+      folder: '火红', name: '安全', searchMethod: 5, threshold: 90,
+      range: { x: 0, y: 0, width: 100, height: 100 }, target: { x: 10, y: 10, width: 20, height: 20 }, imageBase64: 'YWJj',
+    };
+    for (const name of ['../越界', 'bad/name', 'CON']) await expect(store.labelSave({ ...valid, name })).rejects.toThrow('名称');
+    await expect(store.labelSave({ ...valid, folder: '../outside' })).rejects.toThrow();
+    await expect(store.labelSave({ ...valid, imageBase64: 'not base64!' })).rejects.toThrow('截图');
+    await expect(store.labelSave({ ...valid, target: { x: 90, y: 90, width: 20, height: 20 } })).rejects.toThrow('坐标');
+    await expect(store.labelSave({ ...valid, searchMethod: 999 })).rejects.toThrow('搜索方法');
+  });
 });
