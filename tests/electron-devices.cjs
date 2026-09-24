@@ -32,10 +32,23 @@ app.whenReady().then(async()=>{
   await js(main,`(()=>{const select=document.querySelector('[aria-label="视频设备"]');select.value='synthetic';select.dispatchEvent(new Event('change',{bubbles:true}));})()`);
   await js(main,`Array.from(document.querySelectorAll('button')).find(x=>x.textContent==='连接视频源').click()`);
   await until(()=>js(main,"Boolean(document.querySelector('[aria-label=\"视频源：连接成功\"]'))"),'real connection state');
-  await js(main,"document.querySelector('[aria-label=\"关闭视频源\"]').click();document.querySelector('[aria-label=\"视频预览\"]').click()");
+  await js(main,"document.querySelector('[aria-label=\"关闭视频源\"]').click()");
   await until(()=>js(main,"document.querySelector('.preview-frame img')?.naturalWidth>0"),'inline live frames decoded');
+  const pinnedVideo = await js(main, `(() => {
+    window.pinnedVideoImage = document.querySelector('.persistent-video img');
+    const r = document.querySelector('.persistent-video').getBoundingClientRect();
+    return { x: r.x, y: r.y, width: r.width, height: r.height };
+  })()`);
+  fs.writeFileSync(path.join(output,'video-pinned.png'),(await main.webContents.capturePage()).toPNG());
+  await js(main,"document.querySelector('[title=\"首页\"]').click()");
+  assert.deepEqual(await js(main, `(() => {
+    const r = document.querySelector('.persistent-video').getBoundingClientRect();
+    return { x: r.x, y: r.y, width: r.width, height: r.height };
+  })()`), pinnedVideo, 'navigation keeps preview position and size');
+  assert.equal(await js(main,"document.querySelector('.persistent-video img') === window.pinnedVideoImage"),true,'navigation preserves the live image element');
+  await js(main,"document.querySelector('[title=\"脚本编辑\"]').click()");
   await js(main,"document.querySelector('[aria-label=\"标签\"]').click()");
-  await until(()=>js(main,"document.querySelector('.label-monitor-frame img')?.naturalWidth>0"),'labels live consumer');
+  await until(()=>js(main,"document.querySelector('.workspace-labels')?.hidden === false && document.querySelector('.persistent-video img')?.naturalWidth>0"),'labels reuse the pinned live preview');
   await js(main,"Array.from(document.querySelectorAll('button')).find(x=>x.textContent==='截图').click()");
   await until(()=>js(main,"document.querySelector('.snapshot-video')?.naturalWidth===1920"),'snapshot retains source resolution');
   assert.equal(await js(main,`(()=>{
@@ -46,14 +59,19 @@ app.whenReady().then(async()=>{
   await delay(200);
   fs.writeFileSync(path.join(output,'video-inline.png'),(await main.webContents.capturePage()).toPNG());
   const original=await js(main,'window.desktop.devices.getState().then(x=>x.video.session)');
-  await js(main,"document.querySelector('[aria-label=\"弹出为独立窗口\"]').click()");
+  await js(main,"document.querySelector('.persistent-video').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:1200,clientY:120}))");
+  await js(main,"document.querySelector('[aria-label=\"弹出视频窗口\"]').click()");
   await until(()=>BrowserWindow.getAllWindows().length===2,'detached video');
   const detached=BrowserWindow.getAllWindows().find(x=>x!==main);
   await until(()=>js(detached,"document.querySelector('.label-monitor-frame img')?.naturalWidth>0"),'detached live consumer');
   await until(()=>js(detached,"document.querySelector('.snapshot-video')?.naturalWidth===1920"),'snapshot survives detach');
   assert.equal(await js(main,'window.desktop.devices.getState().then(x=>x.video.session)'),original);
+  assert.equal(await js(main,"document.querySelector('.persistent-video img') === window.pinnedVideoImage"),true,'opening another video window preserves the pinned preview');
   detached.close();
   assert.equal(await js(main,'window.desktop.devices.getState().then(x=>x.video.status)'),'connected');
+  await until(()=>js(main,"window.desktop.panels.getState().then(x=>!x.detached.includes('video'))"),'video window closed');
+  await js(main,"document.querySelector('[title=\"脚本编辑\"]').click()");
+  await until(()=>js(main,"document.querySelector('.workspace-labels').hidden"),'script workspace visible');
   await js(main,"document.querySelector('[aria-label=\"伊机控：未尝试连接\"]').click()");
   await until(()=>js(main,"Array.from(document.querySelectorAll('option')).some(x=>x.value==='mock')"),'serial ports enumerated');
   await js(main,`(()=>{const select=document.querySelector('[aria-label="伊机控串口"]');select.value='mock';select.dispatchEvent(new Event('change',{bubbles:true}));})()`);

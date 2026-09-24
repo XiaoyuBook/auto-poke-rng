@@ -36,11 +36,12 @@ interface Props {
   detach?: () => void;
   detaching?: boolean;
   wide?: boolean;
+  contained?: boolean;
   actions?: ReactNode;
   children: ReactNode;
 }
 
-export function FloatingSidePanel({ title, icon, state, minimize, restore, toggleExpanded, close, detach, detaching, wide = false, actions, children }: Props) {
+export function FloatingSidePanel({ title, icon, state, minimize, restore, toggleExpanded, close, detach, detaching, wide = false, contained = false, actions, children }: Props) {
   const panel = useRef<HTMLElement>(null);
   const [size, setSize] = useState(readSize);
   const drag = useRef<{ x: number; y: number; size: Size; edge: ResizeEdge } | null>(null);
@@ -74,7 +75,7 @@ export function FloatingSidePanel({ title, icon, state, minimize, restore, toggl
   return (
     <section ref={panel} id="floating-tool-panel" className="floating-side-panel"
       style={{ '--panel-width': size.width + 'px', '--panel-height': size.height + 'px' } as CSSProperties}
-      data-expanded={state.expanded} data-minimized={state.minimized} data-wide={wide}
+      data-expanded={state.expanded} data-minimized={state.minimized} data-wide={wide} data-contained={contained}
       role="dialog" aria-modal="false" aria-labelledby={titleId} tabIndex={-1}
       onKeyDown={event => {
         if (event.key === 'Escape') { event.stopPropagation(); close(); }

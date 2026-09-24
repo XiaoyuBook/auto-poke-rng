@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import {
   Check, ChevronDown, CircleHelp, FileClock, Gamepad2, Home, Keyboard,
-  MonitorPlay, PanelLeftClose, PanelLeftOpen, Search, Settings, TerminalSquare, Tv,
+  MonitorPlay, PanelLeftClose, PanelLeftOpen, Search, Settings, TerminalSquare, Tv, X,
 } from 'lucide-react';
 import { CommandPalette, type CommandAction } from './components/CommandPalette';
 import { LogsPanel } from './components/LogsPanel';
@@ -64,20 +64,33 @@ export default function App({ connections = initialConnections }: { connections?
   const { state: notificationState, error: notificationError } = useQQState();
   const [version, setVersion] = useState('0.1.0');
   const [toast, setToast] = useState('');
+  const [videoContextMenu, setVideoContextMenu] = useState<{ x: number; y: number } | null>(null);
   const switcher = useRef<HTMLDivElement>(null);
   const gameButton = useRef<HTMLButtonElement>(null);
   const settingsButton = useRef<HTMLButtonElement>(null);
+  const videoRegion = useRef<HTMLElement>(null);
   const dockButtons = useRef<Partial<Record<PanelTool, HTMLButtonElement | null>>>({});
   const activeGame = games.find(item => item.id === game)!;
   const script = library.active?.body || '';
   const validation = useScriptValidation(library.active?.path || '', script);
   const saved = library.saved;
+  const videoDetached = panelWindows.detached.includes('video');
+  const inlineLabelsOpen = panelWindows.videoLabelsOpen && !videoDetached;
   const overlayApi = window.desktop?.overlay;
   const scriptRef = useRef(script);
   const recordingRef = useRef(false);
   const recordingClock = useRef(0);
   const recordedDirections = useRef({ LS: new Set<string>(), RS: new Set<string>(), hat: new Set<string>() });
   scriptRef.current = script;
+
+  useEffect(() => {
+    if (!videoContextMenu) return;
+    const close = () => setVideoContextMenu(null);
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') close(); };
+    window.addEventListener('pointerdown', close);
+    window.addEventListener('keydown', onKeyDown);
+    return () => { window.removeEventListener('pointerdown', close); window.removeEventListener('keydown', onKeyDown); };
+  }, [videoContextMenu]);
 
   useEffect(() => {
     if (!overlayApi) return;
@@ -184,6 +197,7 @@ export default function App({ connections = initialConnections }: { connections?
   }, [devices.controller.status, overlayApi]);
 
   const showPanel = (tool: PanelTool) => {
+    if (tool === 'video') { videoRegion.current?.focus(); return; }
     if (panelWindows.detached.includes(tool)) {
       void nativePanels?.open(tool).catch(() => setToast('无法打开独立窗口，请重试。'));
       return;
@@ -217,9 +231,36 @@ export default function App({ connections = initialConnections }: { connections?
     finally { setDetaching(false); }
   };
 
+  const openVideoWindow = async () => {
+    setVideoContextMenu(null);
+    if (!nativePanels || detaching) return;
+    setDetaching(true);
+    try { await nativePanels.open('video'); }
+    catch { setToast('无法打开独立视频窗口，右上角预览仍可使用。'); }
+    finally { setDetaching(false); }
+  };
+
+  const navigateToPage = (next: Page) => {
+    setPage(next);
+    if (inlineLabelsOpen) setVideoLabelsOpen(false);
+  };
+
+  const toggleVideoLabels = () => {
+    setVideoLabelsOpen(!panelWindows.videoLabelsOpen);
+    if (videoDetached) void openVideoWindow();
+  };
+
+  const openVideoContextMenu = (event: ReactMouseEvent<HTMLElement>) => {
+    event.preventDefault();
+    setVideoContextMenu({
+      x: Math.min(event.clientX, Math.max(8, window.innerWidth - 180)),
+      y: Math.min(event.clientY, Math.max(8, window.innerHeight - 54)),
+    });
+  };
+
   useEffect(() => nativePanels?.onAction(action => {
     if (action.type === 'clear-logs') setLogs([]);
-    if (action.type === 'dock') setToolPanel(current => ({ tool: action.tool, minimized: false, expanded: current?.expanded ?? false }));
+    if (action.type === 'dock' && action.tool === 'logs') setToolPanel(current => ({ tool: 'logs', minimized: false, expanded: current?.expanded ?? false }));
   }), [nativePanels]);
 
   useEffect(() => {
@@ -349,8 +390,8 @@ export default function App({ connections = initialConnections }: { connections?
   };
 
   const actions: CommandAction[] = [
-    { label: '首页', keywords: 'home', icon: <Home size={16} />, run: () => setPage('首页') },
-    { label: '脚本编辑', keywords: 'script editor', icon: <TerminalSquare size={16} />, run: () => setPage('脚本编辑') },
+    { label: '首页', keywords: 'home', icon: <Home size={16} />, run: () => navigateToPage('首页') },
+    { label: '脚本编辑', keywords: 'script editor', icon: <TerminalSquare size={16} />, run: () => navigateToPage('脚本编辑') },
     { label: '视频预览', keywords: 'video preview', icon: <MonitorPlay size={16} />, run: () => showPanel('video') },
     { label: '日志中心', keywords: 'logs history', icon: <FileClock size={16} />, run: () => showPanel('logs') },
     { label: '视频源', keywords: 'tv source', icon: <Tv size={16} />, run: () => openModal('video') },
@@ -398,8 +439,8 @@ export default function App({ connections = initialConnections }: { connections?
         </div>
 
         <nav className="sidebar-nav" aria-label="工作区">
-          <NavItem label="首页" icon={<Home size={16} />} active={page === '首页'} onClick={() => setPage('首页')} />
-          <NavItem label="脚本编辑" icon={<TerminalSquare size={16} />} active={page === '脚本编辑'} onClick={() => setPage('脚本编辑')} />
+          <NavItem label="首页" icon={<Home size={16} />} active={page === '首页'} onClick={() => navigateToPage('首页')} />
+          <NavItem label="脚本编辑" icon={<TerminalSquare size={16} />} active={page === '脚本编辑'} onClick={() => navigateToPage('脚本编辑')} />
         </nav>
         <footer className="sidebar-footer">
           <span className="brand-mark" aria-hidden="true" />
@@ -423,15 +464,36 @@ export default function App({ connections = initialConnections }: { connections?
         </header>
 
         <div className="workspace-content">
-          {page === '脚本编辑' && <ScriptWorkspace scriptId={library.active?.path || ''} scriptName={library.active?.name || ''} script={script}
-            onChange={body => library.update({ body })} onRename={name => library.update({ name })} onCursorChange={setCursor} saved={saved}
-            busy={library.busy} statusLabel={!library.active ? '' : library.active.missing ? '文件已移除 · 编辑保留' : library.active.diskChanged ? '外部已修改 · 编辑保留' : saved ? '已保存' : '未保存'} onSave={saveDraft}
-            library={<ScriptLibrary {...library} selectedPath={library.active?.path} />}
-            logs={easyConLogs} clearLogs={() => setLogs(entries => entries.filter(log => !isEasyConLog(log)))} running={Boolean(run)} runningName={run?.scriptName}
-            runningLine={run && run.path === library.active?.path && run.text === script && run.progress?.source === run.path ? run.progress.line : undefined}
-            progress={run?.progress} validation={validation} recording={recording} elapsed={elapsed} toggleRunning={toggleRunning} toggleRecording={toggleRecording} openModal={openModal}
-            virtualControllerOpen={virtualControllerOpen} toggleVirtualController={() => void toggleVirtualController()} />}
-          {page === '首页' && <div className="empty-state home-empty"><Home size={28} /><h2>开始你的工作</h2><p>当前游戏为{activeGame.label}，打开脚本编辑开始配置操作。</p><button className="button" onClick={() => setPage('脚本编辑')}><TerminalSquare size={15} />打开脚本编辑</button></div>}
+          <div className="workspace-primary">
+            <div className="workspace-page" hidden={inlineLabelsOpen}>
+              {page === '脚本编辑' && <ScriptWorkspace scriptId={library.active?.path || ''} scriptName={library.active?.name || ''} script={script}
+                onChange={body => library.update({ body })} onRename={name => library.update({ name })} onCursorChange={setCursor} saved={saved}
+                busy={library.busy} statusLabel={!library.active ? '' : library.active.missing ? '文件已移除 · 编辑保留' : library.active.diskChanged ? '外部已修改 · 编辑保留' : saved ? '已保存' : '未保存'} onSave={saveDraft}
+                library={<ScriptLibrary {...library} selectedPath={library.active?.path} />}
+                logs={easyConLogs} clearLogs={() => setLogs(entries => entries.filter(log => !isEasyConLog(log)))} running={Boolean(run)} runningName={run?.scriptName}
+                runningLine={run && run.path === library.active?.path && run.text === script && run.progress?.source === run.path ? run.progress.line : undefined}
+                progress={run?.progress} validation={validation} recording={recording} elapsed={elapsed} toggleRunning={toggleRunning} toggleRecording={toggleRecording} openModal={openModal}
+                virtualControllerOpen={virtualControllerOpen} toggleVirtualController={() => void toggleVirtualController()}
+                labelButton={<VideoLabelsButton variant="tool" expanded={panelWindows.videoLabelsOpen} toggle={toggleVideoLabels} />} />}
+              {page === '首页' && <div className="empty-state home-empty"><Home size={28} /><h2>开始你的工作</h2><p>当前游戏为{activeGame.label}，打开脚本编辑开始配置操作。</p><button className="button" onClick={() => navigateToPage('脚本编辑')}><TerminalSquare size={15} />打开脚本编辑</button></div>}
+            </div>
+            <section className="workspace-labels" aria-label="标签工作区" hidden={!inlineLabelsOpen}>
+              <header className="workspace-labels-header"><h2>图像标签</h2>
+                <button className="icon-button" title="关闭图像标签" aria-label="关闭图像标签" onClick={() => setVideoLabelsOpen(false)}><X size={15} /></button>
+              </header>
+              <VideoPreview labelsOnly labelsOpen={inlineLabelsOpen} labelFolder={labelFolder} />
+            </section>
+            {toolPanel?.tool === 'logs' && <FloatingSidePanel contained state={toolPanel} title="日志中心" icon={<FileClock size={16} />}
+              detach={nativePanels ? detachPanel : undefined} detaching={detaching}
+              minimize={minimizePanel} restore={() => showPanel('logs')} toggleExpanded={() => setToolPanel(current => current && { ...current, expanded: !current.expanded })} close={closePanel}>
+              <LogsPanel logs={logs} source={panelWindows.logSource} setSource={setLogSource} clear={() => setLogs([])} />
+            </FloatingSidePanel>}
+          </div>
+          <aside className="workspace-video-corner">
+            <section ref={videoRegion} className="persistent-video" aria-label="视频预览" tabIndex={-1} onContextMenu={openVideoContextMenu}>
+              <VideoPreview previewOnly />
+            </section>
+          </aside>
         </div>
         <footer className="workspace-footer" aria-label="工作区状态与工具">
           <div className="workspace-status">
@@ -446,17 +508,13 @@ export default function App({ connections = initialConnections }: { connections?
         </footer>
       </main>
 
-      {toolPanel && <FloatingSidePanel state={toolPanel} title={toolPanel.tool === 'video' ? '视频预览' : '日志中心'} icon={toolPanel.tool === 'video' ? <MonitorPlay size={16} /> : <FileClock size={16} />}
-        detach={nativePanels ? detachPanel : undefined} detaching={detaching}
-        wide={toolPanel.tool === 'video' && panelWindows.videoLabelsOpen}
-        actions={toolPanel.tool === 'video' && <VideoLabelsButton expanded={panelWindows.videoLabelsOpen} toggle={() => setVideoLabelsOpen(!panelWindows.videoLabelsOpen)} />}
-        minimize={minimizePanel} restore={() => showPanel(toolPanel.tool)} toggleExpanded={() => setToolPanel(current => current && { ...current, expanded: !current.expanded })} close={closePanel}>
-        {toolPanel.tool === 'video' ? <VideoPreview labelsOpen={panelWindows.videoLabelsOpen} labelFolder={labelFolder} /> : <LogsPanel logs={logs} source={panelWindows.logSource} setSource={setLogSource} clear={() => setLogs([])} />}
-      </FloatingSidePanel>}
       {modal === 'mapping' && <KeyMappingDialog close={closeModal} onSaved={async mapping => { await overlayApi?.setMapping(mapping); }} />}
       {modal && modal !== 'mapping' && <ToolsDialog modal={modal} close={closeModal} onInput={key => { if (recording) addLog('输入预览：' + key, '手柄'); }} />}
       {!overlayApi && virtualControllerOpen && <VirtualControllerWindow close={() => setVirtualControllerOpen(false)} onInput={key => { if (recording) addLog('输入预览：' + key, '手柄'); }} />}
       {paletteOpen && <CommandPalette actions={actions} close={() => setPaletteOpen(false)} />}
+      {videoContextMenu && <div className="video-context-menu" role="menu" style={{ left: videoContextMenu.x, top: videoContextMenu.y }} onPointerDown={event => event.stopPropagation()}>
+        <button type="button" role="menuitem" aria-label="弹出视频窗口" onClick={() => void openVideoWindow()}>弹出视频窗口</button>
+      </div>}
       {(toast || panelError) && <div className="toast" role="status"><Check size={15} />{toast || panelError}</div>}
     </div>
   );

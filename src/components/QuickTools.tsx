@@ -1,4 +1,4 @@
-import { ExternalLink, FileClock, Minus, MonitorPlay } from 'lucide-react';
+import { ExternalLink, FileClock, Minus } from 'lucide-react';
 import type { PanelTool } from '../desktop';
 import type { PanelState } from './FloatingSidePanel';
 
@@ -10,7 +10,6 @@ interface Props {
 }
 
 const tools = [
-  { id: 'video', label: '视频', title: '视频预览', icon: MonitorPlay },
   { id: 'logs', label: '日志', title: '日志中心', icon: FileClock },
 ] as const;
 

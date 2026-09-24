@@ -27,12 +27,29 @@ let hideTestWindows = true;
 app.on('browser-window-created', (_event, window) => window.on('show', () => { if (hideTestWindows) window.hide(); }));
 const timeout = setTimeout(() => { console.error('Electron panel checks timed out'); app.exit(1); }, 40000);
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-const evaluate = (window, code) => window.webContents.executeJavaScript(code);
+const evaluate = (window, code) => window.webContents.executeJavaScript(code).catch(error => { throw new Error(code + '\n' + error.message); });
 const click = (window, label) => evaluate(window, `document.querySelector('[aria-label="${label}"]').click()`);
 const panelBounds = window => evaluate(window, `(() => {
   const r = document.querySelector('.floating-side-panel').getBoundingClientRect();
   return { x: r.x, y: r.y, width: r.width, height: r.height, right: r.right, bottom: r.bottom };
 })()`);
+const videoBounds = window => evaluate(window, `(() => {
+  const r = document.querySelector('.persistent-video').getBoundingClientRect();
+  return { x: r.x, y: r.y, width: r.width, height: r.height, right: r.right, bottom: r.bottom };
+})()`);
+async function assertInlineLabelsFit(window) {
+  assert.equal(await evaluate(window, `(() => {
+    const labels = document.querySelector('.workspace-labels');
+    const content = labels.querySelector('.label-details');
+    const canvas = labels.querySelector('.label-snapshot-section').getBoundingClientRect();
+    const video = document.querySelector('.persistent-video').getBoundingClientRect();
+    return !labels.hidden && canvas.right <= video.left
+      && content.getBoundingClientRect().top >= video.bottom
+      && content.getBoundingClientRect().right >= video.right - 1
+      && content.scrollWidth <= content.clientWidth + 1
+      && getComputedStyle(content).overflowY === 'auto';
+  })()`), true, 'inline label controls use the area below video without covering it');
+}
 async function assertLabelWorkspaceFits(window) {
   const layout = await evaluate(window, `(() => {
     const content = document.querySelector('.image-label-content');
@@ -117,6 +134,19 @@ app.whenReady().then(async () => {
   const editor = editorHelpers(main);
   await until(() => evaluate(main, 'Boolean(document.querySelector(".cm-content"))'), 'workspace ready');
   console.log('Workspace ready');
+  const pinnedBounds = await videoBounds(main);
+  const workspaceVideoLayout = await evaluate(main, `(() => {
+    const logs = document.querySelector('.execution-console').getBoundingClientRect();
+    const video = document.querySelector('.persistent-video').getBoundingClientRect();
+    return { logs: { top: logs.top, left: logs.left, right: logs.right }, video: { bottom: video.bottom, left: video.left, right: video.right } };
+  })()`);
+  assert.ok(workspaceVideoLayout.logs.top >= workspaceVideoLayout.video.bottom && workspaceVideoLayout.logs.left < workspaceVideoLayout.video.left && workspaceVideoLayout.logs.right >= workspaceVideoLayout.video.right - 20, 'workspace content extends underneath the video instead of reserving a full-height right column');
+  assert.equal(await evaluate(main, `Boolean(document.querySelector('.quick-dock [aria-label="视频预览"]'))`), false, 'video no longer uses the footer dock');
+  await evaluate(main, `document.querySelector('.nav-item[title="首页"]').click()`);
+  assert.deepEqual(await videoBounds(main), pinnedBounds, 'video stays in place on home page');
+  await evaluate(main, `document.querySelector('.nav-item[title="脚本编辑"]').click()`);
+  assert.deepEqual(await videoBounds(main), pinnedBounds, 'video stays in place in script workspace');
+  await capture(main, 'persistent-video-workspace');
   assert.equal(await evaluate(main, 'document.querySelectorAll(".library-folder-button").length'), 2);
   await click(main, '文件夹：珍钻复刻');
   await click(main, '选择脚本：菜单');
@@ -146,6 +176,9 @@ app.whenReady().then(async () => {
   assert.ok(Math.abs(resized.right - original.right) < 1);
   assert.ok(Math.abs(resized.bottom - original.bottom) < 1);
   await click(main, '展开面板');
+  assert.ok((await panelBounds(main)).y >= pinnedBounds.bottom, 'expanded logs use the area below video');
+  assert.ok((await panelBounds(main)).right >= pinnedBounds.right, 'expanded logs extend across the workspace');
+  assert.deepEqual(await videoBounds(main), pinnedBounds, 'logs do not move video');
   await click(main, '还原面板大小');
   assert.deepEqual(await panelBounds(main), resized);
   console.log('Pointer resize and expand/restore passed');
@@ -156,7 +189,7 @@ app.whenReady().then(async () => {
     const select = document.querySelector('[aria-label="筛选日志来源"]');
     select.value = '脚本'; select.dispatchEvent(new Event('change', { bubbles: true }));
   })()`);
-  await until(() => evaluate(main, `document.querySelector('select').value === '脚本'`), 'filter selected');
+  await until(() => evaluate(main, `document.querySelector('[aria-label="筛选日志来源"]').value === '脚本'`), 'filter selected');
   await capture(main, 'resizable-panel');
   console.log('Inline snapshot captured');
   await click(main, '弹出为独立窗口');
@@ -194,9 +227,9 @@ app.whenReady().then(async () => {
   logs.show();
   main.focus();
   await until(() => main.isFocused(), 'main window can take focus while tool stays open');
-  await click(main, '视频预览');
   await assertAboveMain(main, logs);
-  await click(main, '弹出为独立窗口');
+  await evaluate(main, `document.querySelector('.persistent-video').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 1200, clientY: 120 }))`);
+  await click(main, '弹出视频窗口');
   await until(() => Boolean(findTool('video')), 'video window created');
   let video = findTool('video');
   await until(() => evaluate(video, 'Boolean(document.querySelector(".video-preview-content"))'), 'video ready');
@@ -279,22 +312,24 @@ app.whenReady().then(async () => {
   await until(() => evaluate(video, 'document.querySelector(".video-preview-content").dataset.labelsOpen === "true"'), 'labels reopened');
   await click(video, '收回主窗口');
   await until(() => video.isDestroyed(), 'video labels docked');
-  await until(() => evaluate(main, 'document.querySelector(".floating-side-panel")?.dataset.wide === "true"'), 'inline labels retain expanded mode');
-  await assertLabelWorkspaceFits(main);
+  await until(() => evaluate(main, 'document.querySelector(".workspace-labels")?.hidden === false'), 'inline labels retain expanded mode');
+  assert.deepEqual(await videoBounds(main), pinnedBounds, 'labels do not move or resize video');
+  await assertInlineLabelsFit(main);
   await capture(main, 'inline-video-labels');
   const labelMainSize = main.getContentSize();
   main.setContentSize(1100, 680);
   await delay(150);
-  await assertLabelWorkspaceFits(main);
+  await assertInlineLabelsFit(main);
   await capture(main, 'inline-video-labels-compact');
   main.setContentSize(...labelMainSize);
   await delay(150);
   await click(main, '标签');
-  await until(() => evaluate(main, 'document.querySelector(".floating-side-panel")?.dataset.wide === "false"'), 'inline preview restored');
-  assert.deepEqual(await panelBounds(main), resized, 'closing inline labels restores original preview bounds');
+  await until(() => evaluate(main, 'document.querySelector(".workspace-labels")?.hidden === true'), 'script workspace restored');
+  assert.deepEqual(await videoBounds(main), pinnedBounds, 'closing labels preserves video bounds');
   await click(main, '标签');
-  await until(() => evaluate(main, 'document.querySelector(".floating-side-panel")?.dataset.wide === "true"'), 'inline labels reopened');
-  await click(main, '弹出为独立窗口');
+  await until(() => evaluate(main, 'document.querySelector(".workspace-labels")?.hidden === false'), 'inline labels reopened');
+  await evaluate(main, `document.querySelector('.persistent-video').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 1200, clientY: 120 }))`);
+  await click(main, '弹出视频窗口');
   await until(() => Boolean(findTool('video')), 'label window detached again');
   video = findTool('video');
   await until(() => evaluate(video, 'document.querySelector(".video-preview-content")?.dataset.labelsOpen === "true"'), 'detaching retains label mode');
@@ -331,6 +366,9 @@ app.whenReady().then(async () => {
   const smallerPanel = await panelBounds(main);
   assert.ok(smallerPanel.x >= 22 && smallerPanel.y >= 63, 'resized panel remains within smaller workspace');
   assert.ok(smallerPanel.right <= smallerViewport.width && smallerPanel.bottom <= smallerViewport.height);
+  assert.ok(smallerPanel.y >= (await videoBounds(main)).bottom, 'compact log panel stays below video');
+  await click(main, '关闭日志中心');
+  await capture(main, 'corner-video-workspace-compact');
   assert.deepEqual(errors, [], 'no renderer errors');
   await devices.close();
   main.close();

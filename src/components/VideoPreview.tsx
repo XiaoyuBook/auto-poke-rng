@@ -11,17 +11,19 @@ function LiveVideo() {
     : <><MonitorPlay size={28} /><strong>{video.status === 'connecting' ? '正在连接视频源…' : video.status === 'failed' ? '视频源已中断' : '等待视频源连接'}</strong></>;
 }
 
-export function VideoLabelsButton({ expanded, toggle }: { expanded: boolean; toggle: () => void }) {
+export function VideoLabelsButton({ expanded, toggle, variant = 'icon' }: { expanded: boolean; toggle: () => void; variant?: 'icon' | 'tool' }) {
+  if (variant === 'tool') return <button className={'editor-tool-button label-tool ' + (expanded ? 'active' : '')} title="图像标签" aria-label="标签"
+    aria-expanded={expanded} onClick={toggle}><Tags size={14} /><span>图像标签</span></button>;
   return <button className={'icon-button ' + (expanded ? 'active' : '')} title="标签" aria-label="标签"
     aria-expanded={expanded} onClick={toggle}><Tags size={15} /></button>;
 }
 
-export function VideoPreview({ labelsOpen = false, labelFolder = '' }: { labelsOpen?: boolean; labelFolder?: string }) {
+export function VideoPreview({ labelsOpen = false, labelFolder = '', previewOnly = false, labelsOnly = false }: { labelsOpen?: boolean; labelFolder?: string; previewOnly?: boolean; labelsOnly?: boolean }) {
   return <section className="video-preview-content" aria-label="视频画面" data-labels-open={labelsOpen}>
-    {!labelsOpen && <div className="preview-stage">
+    {!labelsOnly && !labelsOpen && <div className="preview-stage">
       <div className="preview-frame"><LiveVideo /></div>
     </div>}
-    <div className="image-label-content" hidden={!labelsOpen}><ImageLabelWorkspace active={labelsOpen} labelFolder={labelFolder} /></div>
+    {!previewOnly && <div className="image-label-content" hidden={!labelsOpen}><ImageLabelWorkspace active={labelsOpen} labelFolder={labelFolder} cornerLayout={labelsOnly} /></div>}
   </section>;
 }
 
@@ -96,7 +98,7 @@ async function matchImage(liveUrl: string, templateUrl: string, range: LabelRect
   return best;
 }
 
-function ImageLabelWorkspace({ active, labelFolder }: { active: boolean; labelFolder: string }) {
+function ImageLabelWorkspace({ active, labelFolder, cornerLayout }: { active: boolean; labelFolder: string; cornerLayout: boolean }) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   useEffect(() => {
     const api = window.desktop?.devices?.video;
@@ -239,13 +241,14 @@ function ImageLabelWorkspace({ active, labelFolder }: { active: boolean; labelFo
         <div className="label-canvas-caption"><span>选择工具后拖动圈选</span><span>100%</span></div>
       </section>
 
-      <section className="label-monitor-section" aria-label="实时视频监视器">
+      {!cornerLayout && <section className="label-monitor-section" aria-label="实时视频监视器">
         <header className="label-section-heading"><h4><MonitorPlay size={14} />实时画面</h4></header>
         <div className="label-monitor-stage">
           <div className="label-monitor-frame">{active && <LiveVideo />}</div>
         </div>
-      </section>
+      </section>}
 
+      <div className="label-details">
       <section className="label-edit-section" aria-label="图像标签编辑">
         <div className="label-action-bar" role="toolbar" aria-label="截图与圈选工具">
           <button className="button" onClick={() => void captureSnapshot()}><Camera size={14} />截图</button>
@@ -299,6 +302,7 @@ function ImageLabelWorkspace({ active, labelFolder }: { active: boolean; labelFo
           </ol>
         </section>
       </div>
+    </div>
     </div>
     <footer className="label-workspace-note" role="status">{notice || '截图后选择红框或绿框，在静态画面上拖动圈选。'}</footer>
   </div>;

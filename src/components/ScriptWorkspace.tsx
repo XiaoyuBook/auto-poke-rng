@@ -31,6 +31,7 @@ interface Props {
   openModal: (modal: Modal) => void;
   virtualControllerOpen: boolean;
   toggleVirtualController: () => void;
+  labelButton?: ReactNode;
 }
 
 export function ScriptWorkspace(props: Props) {
@@ -51,6 +52,7 @@ export function ScriptWorkspace(props: Props) {
   return <section className="script-workspace" aria-label="脚本工作区">
     {props.library}
     <section className="editor-column" aria-label="脚本编辑器">
+      <div className="editor-main">
       <div className="editor-toolbar">
         <div className="editor-file">
           <FileCode2 size={16} />
@@ -74,6 +76,7 @@ export function ScriptWorkspace(props: Props) {
         <span className="toolbar-separator" />
         <button className={'editor-tool-button ' + (props.virtualControllerOpen ? 'active' : '')} aria-pressed={props.virtualControllerOpen} onClick={props.toggleVirtualController}><Gamepad2 size={14} /><span>虚拟手柄</span></button>
         <button className="editor-tool-button" onClick={() => props.openModal('mapping')}><Keyboard size={14} /><span>按键映射</span></button>
+        {props.labelButton}
         <span className="toolbar-separator" />
         <button className="editor-tool-button fold-tool" aria-label="全部折叠" title="全部折叠 (Ctrl+Alt+[)" disabled={!props.scriptId} onClick={() => editor.current?.foldAll()}><ChevronsDownUp size={14} /></button>
         <button className="editor-tool-button fold-tool" aria-label="全部展开" title="全部展开 (Ctrl+Alt+])" disabled={!props.scriptId} onClick={() => editor.current?.unfoldAll()}><ChevronsUpDown size={14} /></button>
@@ -107,6 +110,7 @@ export function ScriptWorkspace(props: Props) {
         </>}
         {props.validation.state === 'unavailable' && <><span>语法检查不可用 · {props.validation.message}</span><button className="text-button" onClick={props.validation.retry}>重试</button></>}
       </div>}
+      </div>
       <section className="execution-console" aria-label="运行日志">
         <header className="execution-header">
           <TerminalSquare size={14} /><h2>日志</h2>

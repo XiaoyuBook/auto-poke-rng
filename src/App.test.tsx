@@ -240,16 +240,30 @@ describe('workspace interactions', () => {
     expect(logCenter.getByRole('heading', { name: '暂无日志' })).toBeTruthy();
   });
 
-  it('opens video without replacing the editor and opens QQ settings without an invented unread indicator', async () => {
+  it('keeps video mounted across navigation and opens QQ settings without an invented unread indicator', async () => {
     await openApp();
-    fireEvent.click(screen.getByRole('button', { name: '视频预览' }));
-    expect(screen.getByRole('dialog', { name: '视频预览' })).toBeTruthy();
+    const video = screen.getByRole('region', { name: '视频预览' });
+    const frame = within(video).getByLabelText('视频画面');
+    expect(within(screen.getByRole('toolbar', { name: '快捷工具' })).queryByRole('button', { name: '视频预览' })).toBeNull();
     expect(screen.getByRole('textbox', { name: '脚本内容' })).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: '关闭视频预览' }));
+    fireEvent.click(screen.getByRole('button', { name: '首页' }));
+    expect(within(screen.getByRole('region', { name: '视频预览' })).getByLabelText('视频画面')).toBe(frame);
+    fireEvent.click(screen.getByRole('button', { name: '脚本编辑' }));
+    expect(within(video).getByLabelText('视频画面')).toBe(frame);
     fireEvent.click(screen.getByRole('button', { name: 'QQ 通知：未配置' }));
     expect(screen.getByRole('dialog', { name: 'QQ 通知' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '关闭QQ 通知' }));
     expect(screen.getByRole('button', { name: 'QQ 通知：未配置' }).querySelector('.tool-status-dot')).toBeNull();
+  });
+
+  it('opens the video action menu from the persistent preview', async () => {
+    await openApp();
+    const video = screen.getByRole('region', { name: '视频预览' });
+    fireEvent.contextMenu(video);
+    expect(screen.getByRole('menu')).toBeTruthy();
+    expect(screen.getByRole('menuitem', { name: '弹出视频窗口' })).toBeTruthy();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('menu')).toBeNull();
   });
 
   it('keeps edits and log filters while the floating panel expands, minimizes, and restores', async () => {
@@ -269,17 +283,26 @@ describe('workspace interactions', () => {
     fireEvent.click(screen.getByRole('button', { name: '日志中心' }));
     expect((within(panel).getByRole('combobox') as HTMLSelectElement).value).toBe('脚本');
     expect(screen.getByRole('textbox', { name: '脚本内容' }).textContent).toBe('# 工作中的草稿');
-    // Switching the dock tool replaces panel content, without stacking another panel.
-    fireEvent.click(screen.getByRole('button', { name: '视频预览' }));
-    expect(screen.queryByRole('dialog', { name: '日志中心' })).toBeNull();
+    const video = screen.getByRole('region', { name: '视频预览' });
     expect(screen.getAllByRole('dialog')).toHaveLength(1);
-    const video = screen.getByRole('dialog', { name: '视频预览' });
-    fireEvent.click(within(video).getByRole('button', { name: '收起视频预览' }));
-    fireEvent.click(within(video).getByRole('button', { name: '恢复视频预览' }));
-    expect(video.getAttribute('data-minimized')).toBe('false');
-    fireEvent.keyDown(video, { key: 'Escape' });
+    expect(video.querySelector('.preview-frame')).toBeTruthy();
+    fireEvent.keyDown(panel, { key: 'Escape' });
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: '视频预览' }));
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: '日志中心' }));
+    expect(screen.getByRole('region', { name: '视频预览' })).toBe(video);
+  });
+
+  it('edits image labels in the workspace without replacing the persistent video or losing script edits', async () => {
+    await openApp();
+    edit('# 标签编辑前的草稿');
+    const frame = screen.getByRole('region', { name: '视频预览' }).querySelector('.preview-frame');
+    fireEvent.click(screen.getByRole('button', { name: '标签' }));
+    expect(screen.getByRole('region', { name: '图像标签编辑' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: '视频预览' }).querySelector('.preview-frame')).toBe(frame);
+    fireEvent.click(screen.getByRole('button', { name: '关闭图像标签' }));
+    expect(screen.queryByRole('region', { name: '图像标签编辑' })).toBeNull();
+    expect(screen.getByRole('textbox', { name: '脚本内容' }).textContent).toBe('# 标签编辑前的草稿');
+    expect(screen.getByRole('region', { name: '视频预览' }).querySelector('.preview-frame')).toBe(frame);
   });
 
 
