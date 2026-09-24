@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import {
   Check, ChevronDown, CircleHelp, FileClock, Gamepad2, Home, Keyboard, Maximize2,
-  MonitorPlay, PanelLeftClose, PanelLeftOpen, Search, Settings, TerminalSquare, Tv, X,
+  MonitorPlay, PanelLeftClose, PanelLeftOpen, Search, Settings, TerminalSquare, Tv,
 } from 'lucide-react';
 import { CommandPalette, type CommandAction } from './components/CommandPalette';
 import { LogsPanel } from './components/LogsPanel';
@@ -529,10 +529,7 @@ export default function App({ connections = initialConnections }: { connections?
               {page === '首页' && <div className="empty-state home-empty"><Home size={28} /><h2>开始你的工作</h2><p>当前游戏为{activeGame.label}，打开脚本编辑开始配置操作。</p><button className="button" onClick={() => navigateToPage('脚本编辑')}><TerminalSquare size={15} />打开脚本编辑</button></div>}
             </div>
             <section className="workspace-labels" aria-label="标签工作区" hidden={!inlineLabelsOpen}>
-              <header className="workspace-labels-header"><h2>图像标签</h2>
-                <button className="icon-button" title="关闭图像标签" aria-label="关闭图像标签" onClick={() => setVideoLabelsOpen(false)}><X size={15} /></button>
-              </header>
-              <VideoPreview labelsOnly labelsOpen={inlineLabelsOpen} labelFolder={labelFolder} referenceTarget={labelReferenceHost} />
+              <VideoPreview labelsOnly labelsOpen={inlineLabelsOpen} labelFolder={labelFolder} referenceTarget={labelReferenceHost} onCloseLabels={() => setVideoLabelsOpen(false)} />
             </section>
             {toolPanel?.tool === 'logs' && <FloatingSidePanel contained state={toolPanel} title="日志中心" icon={<FileClock size={16} />}
               detach={nativePanels ? detachPanel : undefined} detaching={detaching}

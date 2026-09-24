@@ -343,6 +343,9 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .label-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 30px; flex: 0 0 auto; }
 .label-section-heading h4 { display: flex; align-items: center; gap: 7px; margin: 0; color: var(--secondary); font-size: 12px; font-weight: 500; }
 .label-section-heading > span { color: var(--muted); font-size: 10px; }
+.label-section-heading-actions { display: flex; align-items: center; gap: 8px; }
+.label-section-heading-actions > span { color: var(--muted); font-size: 10px; }
+.label-close-button { width: 25px; height: 25px; margin-right: -5px; }
 .label-section-heading h4 > svg { color: var(--muted); }
 .label-snapshot-section, .label-monitor-section { display: grid; grid-template-rows: 30px minmax(0, 1fr) 23px; min-height: 0; min-width: 0; }
 .label-snapshot-stage { display: flex; justify-content: center; align-items: center; flex: 1; min-height: 0; border: 1px solid #373d3d; border-radius: 7px; background: #171a1a; }

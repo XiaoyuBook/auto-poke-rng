@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { Camera, CircleHelp, Focus, Image, ImagePlus, MonitorPlay, Play, Save, ScanSearch, Search, Tag, Tags } from 'lucide-react';
+import { Camera, CircleHelp, Focus, Image, ImagePlus, MonitorPlay, Play, Save, ScanSearch, Search, Tag, Tags, X } from 'lucide-react';
 import { useDevices } from '../useDevices';
 import type { Snapshot } from '../devices';
 import type { LabelRecord, LabelRect } from '../scriptLibrary';
@@ -19,12 +19,12 @@ export function VideoLabelsButton({ expanded, toggle, variant = 'icon' }: { expa
     aria-expanded={expanded} onClick={toggle}><Tags size={15} /></button>;
 }
 
-export function VideoPreview({ labelsOpen = false, labelFolder = '', previewOnly = false, labelsOnly = false, referenceTarget = null }: { labelsOpen?: boolean; labelFolder?: string; previewOnly?: boolean; labelsOnly?: boolean; referenceTarget?: HTMLElement | null }) {
+export function VideoPreview({ labelsOpen = false, labelFolder = '', previewOnly = false, labelsOnly = false, referenceTarget = null, onCloseLabels }: { labelsOpen?: boolean; labelFolder?: string; previewOnly?: boolean; labelsOnly?: boolean; referenceTarget?: HTMLElement | null; onCloseLabels?: () => void }) {
   return <section className="video-preview-content" aria-label="视频画面" data-labels-open={labelsOpen}>
     {!labelsOnly && !labelsOpen && <div className="preview-stage">
       <div className="preview-frame"><LiveVideo /></div>
     </div>}
-    {!previewOnly && <div className="image-label-content" hidden={!labelsOpen}><ImageLabelWorkspace active={labelsOpen} labelFolder={labelFolder} cornerLayout={labelsOnly} referenceTarget={referenceTarget} /></div>}
+    {!previewOnly && <div className="image-label-content" hidden={!labelsOpen}><ImageLabelWorkspace active={labelsOpen} labelFolder={labelFolder} cornerLayout={labelsOnly} referenceTarget={referenceTarget} onCloseLabels={onCloseLabels} /></div>}
   </section>;
 }
 
@@ -99,7 +99,7 @@ async function matchImage(liveUrl: string, templateUrl: string, range: LabelRect
   return best;
 }
 
-function ImageLabelWorkspace({ active, labelFolder, cornerLayout, referenceTarget }: { active: boolean; labelFolder: string; cornerLayout: boolean; referenceTarget?: HTMLElement | null }) {
+function ImageLabelWorkspace({ active, labelFolder, cornerLayout, referenceTarget, onCloseLabels }: { active: boolean; labelFolder: string; cornerLayout: boolean; referenceTarget?: HTMLElement | null; onCloseLabels?: () => void }) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   useEffect(() => {
     const api = window.desktop?.devices?.video;
@@ -235,7 +235,7 @@ function ImageLabelWorkspace({ active, labelFolder, cornerLayout, referenceTarge
   return <div className="image-label-workspace" aria-label="图像标签工作区">
     <div className="image-label-grid">
       <section className="label-snapshot-section" aria-label="截图静态帧">
-        <header className="label-section-heading"><h4><Image size={14} />截图画布</h4><span>静态帧</span></header>
+        <header className="label-section-heading"><h4><Image size={14} />截图画布</h4><div className="label-section-heading-actions"><span>静态帧</span>{onCloseLabels && <button className="icon-button label-close-button" type="button" title="关闭图像标签" aria-label="关闭图像标签" onClick={onCloseLabels}><X size={15} /></button>}</div></header>
         <div className="label-snapshot-stage">
           <div className="label-snapshot-frame">
             {snapshot ? <div className="label-image-overlay-wrap"><img className="snapshot-video" src={snapshot.url} alt="截图静态帧" draggable={false} /><svg ref={svgRef} className="label-selection-overlay" viewBox={`0 0 ${snapshot.width} ${snapshot.height}`} preserveAspectRatio="xMidYMid meet" onPointerDown={beginSelection} onPointerMove={updateSelection} onPointerUp={endSelection} onPointerCancel={endSelection}><rect className="label-selection-range" x={range.x} y={range.y} width={range.width} height={range.height} /><rect className="label-selection-target" x={target.x} y={target.y} width={target.width} height={target.height} /></svg></div> : <><ImagePlus size={30} /><strong>尚未截图</strong><p>从右侧实时画面截取一帧，在这里圈选与标注</p></>}
@@ -289,7 +289,7 @@ function ImageLabelWorkspace({ active, labelFolder, cornerLayout, referenceTarge
       {renderedReferencePanel}
     </div>
     </div>
-    <footer className="label-workspace-note" role="status">{notice || '截图后选择红框或绿框，在静态画面上拖动圈选。'}</footer>
+    {!cornerLayout && <footer className="label-workspace-note" role="status">{notice || '截图后选择红框或绿框，在静态画面上拖动圈选。'}</footer>}
   </div>;
 }
 
