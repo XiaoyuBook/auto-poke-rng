@@ -266,6 +266,18 @@ describe('workspace interactions', () => {
     expect(screen.queryByRole('menu')).toBeNull();
   });
 
+  it('resizes the persistent video from its lower-left handle and remembers the width', async () => {
+    await openApp();
+    const workspace = document.querySelector('.workspace-content') as HTMLElement;
+    const handle = screen.getByRole('button', { name: '调整视频预览大小' });
+    const initial = Number.parseInt(workspace.style.getPropertyValue('--video-width'), 10);
+    fireEvent.keyDown(handle, { key: 'ArrowLeft' });
+    expect(Number.parseInt(workspace.style.getPropertyValue('--video-width'), 10)).toBe(initial + 16);
+    fireEvent.keyDown(handle, { key: 'ArrowRight' });
+    expect(Number.parseInt(workspace.style.getPropertyValue('--video-width'), 10)).toBe(initial);
+    expect(localStorage.getItem('auto-poke-rng:video-preview-width')).toBe(String(initial));
+  });
+
   it('keeps edits and log filters while the floating panel expands, minimizes, and restores', async () => {
     await openApp();
     edit('# 工作中的草稿');

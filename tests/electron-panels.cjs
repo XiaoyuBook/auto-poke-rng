@@ -135,6 +135,30 @@ app.whenReady().then(async () => {
   await until(() => evaluate(main, 'Boolean(document.querySelector(".cm-content"))'), 'workspace ready');
   console.log('Workspace ready');
   const pinnedBounds = await videoBounds(main);
+  await evaluate(main, `document.querySelector('.video-resize-handle').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))`);
+  await until(async () => (await videoBounds(main)).width > pinnedBounds.width, 'video resize handle');
+  const enlargedVideo = await videoBounds(main);
+  assert.equal(enlargedVideo.top, pinnedBounds.top, 'resizing keeps the video anchored at the top');
+  assert.ok(Math.abs(enlargedVideo.right - pinnedBounds.right) < 1, 'resizing keeps the video anchored at the right');
+  assert.ok(Math.abs(enlargedVideo.width / enlargedVideo.height - 16 / 9) < 0.02, 'resizing preserves the 16:9 video ratio');
+  await evaluate(main, `document.querySelector('.video-resize-handle').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))`);
+  await until(async () => Math.abs((await videoBounds(main)).width - pinnedBounds.width) < 1, 'video resize restore');
+  for (let index = 0; index < 9; index++) {
+    await evaluate(main, `document.querySelector('.video-resize-handle').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))`);
+    await delay(15);
+  }
+  const narrowToolbar = await evaluate(main, `(() => {
+    const help = [...document.querySelectorAll('.editor-tool-button')].find(button => button.textContent.includes('帮助'));
+    const toolbar = document.querySelector('.script-tools').getBoundingClientRect();
+    const rect = help.getBoundingClientRect();
+    return { visible: rect.width > 0 && rect.height > 0, inside: rect.right <= toolbar.right + 1, beforeVideo: rect.right <= document.querySelector('.persistent-video').getBoundingClientRect().left + 1 };
+  })()`);
+  assert.deepEqual(narrowToolbar, { visible: true, inside: true, beforeVideo: true }, 'script help remains visible when the video is enlarged');
+  for (let index = 0; index < 9; index++) {
+    await evaluate(main, `document.querySelector('.video-resize-handle').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))`);
+    await delay(15);
+  }
+  await until(async () => Math.abs((await videoBounds(main)).width - pinnedBounds.width) < 1, 'video resize second restore');
   const workspaceVideoLayout = await evaluate(main, `(() => {
     const logs = document.querySelector('.execution-console').getBoundingClientRect();
     const video = document.querySelector('.persistent-video').getBoundingClientRect();

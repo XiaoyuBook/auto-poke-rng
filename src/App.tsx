@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import {
-  Check, ChevronDown, CircleHelp, FileClock, Gamepad2, Home, Keyboard,
+  Check, ChevronDown, CircleHelp, FileClock, Gamepad2, Home, Keyboard, Maximize2,
   MonitorPlay, PanelLeftClose, PanelLeftOpen, Search, Settings, TerminalSquare, Tv, X,
 } from 'lucide-react';
 import { CommandPalette, type CommandAction } from './components/CommandPalette';
@@ -26,6 +26,18 @@ import { useScriptValidation } from './useScriptValidation';
 import { useQQState } from './notifications';
 
 interface ScriptRun { folder: string; scriptName: string; path: string; text: string; started: number; progress?: ScriptProgress }
+
+const videoWidthKey = 'auto-poke-rng:video-preview-width';
+const videoMinWidth = 260;
+function maxVideoWidth() { return Math.max(videoMinWidth, Math.min(520, Math.floor(window.innerWidth * 0.44))); }
+function clampVideoWidth(width: number) { return Math.min(Math.max(videoMinWidth, Math.round(width)), maxVideoWidth()); }
+function readVideoWidth() {
+  try {
+    const saved = Number(localStorage.getItem(videoWidthKey));
+    if (Number.isFinite(saved) && saved > 0) return clampVideoWidth(saved);
+  } catch { /* Use the responsive default when local storage is unavailable. */ }
+  return clampVideoWidth(window.innerWidth * 0.26);
+}
 
 export default function App({ connections = initialConnections }: { connections?: DeviceConnections }) {
   if (new URLSearchParams(window.location.search).get('window') === 'controller-overlay') {
@@ -65,10 +77,12 @@ export default function App({ connections = initialConnections }: { connections?
   const [version, setVersion] = useState('0.1.0');
   const [toast, setToast] = useState('');
   const [videoContextMenu, setVideoContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [videoWidth, setVideoWidth] = useState(readVideoWidth);
   const switcher = useRef<HTMLDivElement>(null);
   const gameButton = useRef<HTMLButtonElement>(null);
   const settingsButton = useRef<HTMLButtonElement>(null);
   const videoRegion = useRef<HTMLElement>(null);
+  const videoResize = useRef<{ startX: number; width: number } | null>(null);
   const dockButtons = useRef<Partial<Record<PanelTool, HTMLButtonElement | null>>>({});
   const activeGame = games.find(item => item.id === game)!;
   const script = library.active?.body || '';
@@ -82,6 +96,16 @@ export default function App({ connections = initialConnections }: { connections?
   const recordingClock = useRef(0);
   const recordedDirections = useRef({ LS: new Set<string>(), RS: new Set<string>(), hat: new Set<string>() });
   scriptRef.current = script;
+
+  useEffect(() => {
+    try { localStorage.setItem(videoWidthKey, String(videoWidth)); } catch { /* Keep the current size in memory. */ }
+  }, [videoWidth]);
+
+  useEffect(() => {
+    const onResize = () => setVideoWidth(current => clampVideoWidth(current));
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   useEffect(() => {
     if (!videoContextMenu) return;
@@ -256,6 +280,31 @@ export default function App({ connections = initialConnections }: { connections?
       x: Math.min(event.clientX, Math.max(8, window.innerWidth - 180)),
       y: Math.min(event.clientY, Math.max(8, window.innerHeight - 54)),
     });
+  };
+
+  const startVideoResize = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    videoResize.current = { startX: event.clientX, width: videoWidth };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const resizeVideo = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const start = videoResize.current;
+    if (!start) return;
+    setVideoWidth(clampVideoWidth(start.width + start.startX - event.clientX));
+  };
+
+  const finishVideoResize = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    videoResize.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+  };
+
+  const nudgeVideoSize = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
+    if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+    event.preventDefault();
+    const step = event.shiftKey ? 32 : 16;
+    setVideoWidth(current => clampVideoWidth(current + (event.key === 'ArrowLeft' ? step : -step)));
   };
 
   useEffect(() => nativePanels?.onAction(action => {
@@ -463,7 +512,7 @@ export default function App({ connections = initialConnections }: { connections?
           </div>
         </header>
 
-        <div className="workspace-content">
+        <div className="workspace-content" style={{ '--video-width': `${videoWidth}px` } as CSSProperties}>
           <div className="workspace-primary">
             <div className="workspace-page" hidden={inlineLabelsOpen}>
               {page === '脚本编辑' && <ScriptWorkspace scriptId={library.active?.path || ''} scriptName={library.active?.name || ''} script={script}
@@ -492,6 +541,9 @@ export default function App({ connections = initialConnections }: { connections?
           <aside className="workspace-video-corner">
             <section ref={videoRegion} className="persistent-video" aria-label="视频预览" tabIndex={-1} onContextMenu={openVideoContextMenu}>
               <VideoPreview previewOnly />
+              <button className="video-resize-handle" type="button" aria-label="调整视频预览大小" title="拖动调整视频大小，保持 16:9"
+                onPointerDown={startVideoResize} onPointerMove={resizeVideo} onPointerUp={finishVideoResize} onPointerCancel={finishVideoResize}
+                onLostPointerCapture={() => { videoResize.current = null; }} onKeyDown={nudgeVideoSize}><Maximize2 size={13} aria-hidden="true" /></button>
             </section>
           </aside>
         </div>
