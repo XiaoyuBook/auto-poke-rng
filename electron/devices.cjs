@@ -12,7 +12,7 @@ function registerDevices({ ipcMain, getWindows, loadWindow, rootDirectory = path
   const controllerOverlay = registerControllerOverlay({ controller, getMainWindow: () => getWindows().find(window => !window.isDestroyed()), getWindows, loadWindow: openWindow });
   let state = { video: { status: 'idle' }, controller: { status: 'idle' } };
   let snapshot = null;
-  let connectTimer, frameTimer, healthBusy = false, closing = false;
+  let connectTimer, frameTimer, healthBusy = false, closing = false, videoConnectInFlight = null;
   const broadcast = () => {
     for (const window of getWindows()) if (!window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send('devices:state', state);
   };
@@ -86,13 +86,35 @@ function registerDevices({ ipcMain, getWindows, loadWindow, rootDirectory = path
   handle('execution:stop', () => runner.stop());
   handle('video:list', args => video.call('video.list', args, 15000));
   handle('video:connect', async args => {
+    if (videoConnectInFlight) {
+      const error = Object.assign(new Error('视频源正在连接，请稍候。'), { code: 'BUSY' });
+      throw error;
+    }
+    if (state.video.status === 'connected') {
+      const error = Object.assign(new Error('视频源已经连接，请先断开当前视频源。'), { code: 'BUSY' });
+      throw error;
+    }
+    if (state.video.status === 'connecting') {
+      const error = Object.assign(new Error('视频源正在连接，请稍候。'), { code: 'BUSY' });
+      throw error;
+    }
     clearVideoTimers();
-    try {
-      await video.call('video.start', args, 5000);
-      if (state.video.status === 'connecting') connectTimer = setTimeout(() => {
-        updateVideo({ status: 'failed', message: '打开采集卡超时，请尝试另一个采集后端。' }); video.terminate();
-      }, 20000);
-    } catch (error) { updateVideo({ status: 'failed', message: error.message }); throw error; }
+    videoConnectInFlight = (async () => {
+      try {
+        await video.call('video.start', args, 5000);
+        if (state.video.status === 'connecting') connectTimer = setTimeout(() => {
+          updateVideo({ status: 'failed', message: '打开采集卡超时，请尝试另一个采集后端。' }); video.terminate();
+        }, 20000);
+      } catch (error) {
+        // A late start failure must never overwrite a healthy session that
+        // became active while the request was completing.
+        if (state.video.status !== 'connected') updateVideo({ status: 'failed', message: error.message });
+        throw error;
+      } finally {
+        videoConnectInFlight = null;
+      }
+    })();
+    return videoConnectInFlight;
   });
   handle('video:disconnect', async () => {
     clearVideoTimers();
@@ -115,7 +137,7 @@ function registerDevices({ ipcMain, getWindows, loadWindow, rootDirectory = path
     return snapshot;
   });
   return {
-    stopInputs: async () => { await runner.stop(); if (controller.child) await controller.call('controller.stop'); },
+    stopInputs: async () => { await runner.stop(); await controllerOverlay.suspend(); if (controller.child) await controller.call('controller.stop'); },
     controllerOverlay,
     close: async () => { closing = true; clearVideoTimers(); clearInterval(controllerTimer); ++runner.validationVersion; runner.cancelValidation?.(); await runner.stop().catch(() => {}); await controllerOverlay.close(); await Promise.allSettled([video.close(), controller.close(), ocr.close()]); },
     getState: () => state,

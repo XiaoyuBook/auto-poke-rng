@@ -83,7 +83,7 @@ npm run test:devices
 npm run test:electron
 ```
 
-`test:runtime` 包含公共设备审查回归，`test:devices:regression` 可单独运行这些用例。编号、前提、正确行为和覆盖边界见 [公共设备回归资产](../docs/DEVICE_REGRESSIONS.md)，运行环境见 [测试说明](../tests/README.md)。当前 DEV-001 至 DEV-005 尚未修复，因此包含它们的测试会明确失败；视频断连后的任务策略单独保留为 TODO。
+`test:runtime` 包含公共设备审查回归，`test:devices:regression` 可单独运行这些用例。编号、前提、正确行为和覆盖边界见 [公共设备回归资产](../docs/DEVICE_REGRESSIONS.md)，运行环境见 [测试说明](../tests/README.md)。DEV-001 至 DEV-006 已由回归用例覆盖；视频断连按脚本依赖停止，详见 DEV-007。
 
 `--test-mode` 才允许 synthetic/mock；普通构建运行不会把模拟设备当作真设备。测试覆盖多消费者、跨 Python/C++ 共享内存、原版 `.IL` 搜图端到端、缺帧、会话切换、设备占用、包编码、函数导入、连续脚本、运行错误后的按键释放、取消、独占控制、设备进程退出、Electron 实际接线与旧布局回归。界面验证截图保存在 `node_modules/.tmp/device-review`。
 

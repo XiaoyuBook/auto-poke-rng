@@ -3,6 +3,7 @@
 #include <array>
 #include <atomic>
 #include <condition_variable>
+#include <set>
 #include <thread>
 
 namespace poke {
@@ -21,7 +22,7 @@ class ControllerService {
     std::thread actions_;
     std::atomic<bool> cancelled_{false}, running_{false};
     SwitchReport report_;
-    unsigned directions_=0;
+    std::set<std::string> directions_;
     Clock::time_point next_report_{};
     std::string port_, owner_, operation_;
     Json state_={{"status","idle"}};
@@ -33,6 +34,7 @@ class ControllerService {
     void write(const uint8_t* bytes, size_t size);
     void send();
     void button(const std::string& key,bool down);
+    void update_hat();
     void stick(const std::string& side,int x,int y);
     void neutral();
     void disconnect();

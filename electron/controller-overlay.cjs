@@ -148,6 +148,7 @@ function registerControllerOverlay({ getMainWindow, getWindows, loadWindow, cont
     toggle,
     toggleActive,
     setMapping: mapping => input.setMapping(mapping),
+    suspend: () => input.suspend(),
     close: async () => { await input.close(); if (overlay && !overlay.isDestroyed()) overlay.close(); overlay = null; state = { visible: false, active: false, mode: 'off', scale: state.scale }; broadcast(); },
     handleScriptState: stateValue => {
       if (stateValue?.running || stateValue?.owned) void input.setActive(false);

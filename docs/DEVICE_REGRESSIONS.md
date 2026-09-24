@@ -14,19 +14,19 @@ npm run test:devices:regression
 npm run test:runtime
 ```
 
-DEV-001 至 DEV-005 是已确认但尚未修复的产品缺陷，用例断言正确行为，因此当前会失败并返回非零退出码。没有使用 skip、expected-failure 或反向断言隐藏缺陷。DEV-006 是测试入口缺陷，随接入测试一并修复。DEV-007 的视频依赖策略已确定，并由运行时集成测试覆盖。
+DEV-001 至 DEV-006 已修复，用例继续断言正确行为并作为公共设备回归保留。没有使用 skip、expected-failure 或反向断言隐藏缺陷。DEV-007 的视频依赖策略已确定，并由运行时集成测试覆盖。
 
-首次执行基线（2026-09-24，Windows、本地已构建运行时）：
+修复后验证（2026-09-24，Windows、本地已构建运行时）：
 
 | 执行范围 | 结果 |
 | --- | --- |
-| `npm test` | 9 个文件、44 项通过 |
+| `npm test` | 9 个文件、47 项通过 |
 | `npm run test:runtime` 中的 CTest | 1/1 通过 |
-| `npm run test:runtime` 中的 Node 测试 | 10 项通过、5 项失败；既有集成测试及视频依赖策略测试通过 |
-| `npm run test:devices:regression` | 2 项通过、5 项失败，退出码 1 |
-| DEV-004 内部 Python 用例 | 3 项正常路径通过，1 项时效断言失败；在 Node 汇总中合计为 1 项失败 |
+| `npm run test:runtime` 中的 Node 测试 | 15 项通过（含设备回归） |
+| `npm run test:devices:regression` | 7 项通过 |
+| DEV-004 内部 Python 用例 | 4 项通过 |
 
-失败均对应表内 DEV-001 至 DEV-005 的断言，没有新增夹具异常。DEV-006 在修复启动器前已复现失败，明确选择首个 Node 路径后通过。此基线记录的是测试资产建立时的状态，产品缺陷仍待修复。
+以上结果覆盖生产实现、mock 控制器、synthetic 视频和确定性共享内存夹具；真实采集卡、手柄和长时间运行仍由硬件验收确认。
 
 ## 用例与契约
 

@@ -53,15 +53,25 @@ class ControllerInputManager extends EventEmitter {
     this.pending = Promise.resolve();
     this.connected = false;
     this.locked = false;
+    this.controllerOwned = false;
+    this.deferredReset = false;
     controller.on('event', message => {
       if (message.event !== 'controller.state') return;
       const next = message.state || {};
+      const wasLocked = this.locked;
       this.connected = next.status === 'connected';
+      this.controllerOwned = Boolean(next.owned);
       this.locked = Boolean(next.running || next.owned);
       if (!this.connected) {
         this.disconnect();
       } else if (this.locked && this.state.active) {
         void this.setActive(false);
+      } else if (wasLocked && !this.locked && this.deferredReset && !this.controllerOwned) {
+        // A public controller sequence can temporarily block the manual input
+        // channel.  releaseAll() cannot reset while that sequence is running,
+        // so finish the handoff once the runtime reports the controller idle.
+        this.deferredReset = false;
+        void this.enqueue(() => this.controller.call('controller.reset')).catch(() => {});
       }
     });
     controller.on('offline', () => {
@@ -71,6 +81,8 @@ class ControllerInputManager extends EventEmitter {
 
   disconnect() {
     this.connected = false;
+    this.controllerOwned = false;
+    this.deferredReset = false;
     // Disable the OS hook immediately, independently of any outstanding serial
     // request. Hiding the overlay alone does not stop Python swallowing keys.
     void this.setActive(false, true);
@@ -238,7 +250,8 @@ class ControllerInputManager extends EventEmitter {
       if (down && this.pressedButtons.has(action.key)) return;
       if (!down && !this.pressedButtons.has(action.key)) return;
       if (down) this.pressedButtons.add(action.key); else this.pressedButtons.delete(action.key);
-      this.enqueue(() => this.controller.call('controller.key', { key: action.key, down }));
+      if (down) this.enqueue(() => this.controller.call('controller.key', { key: action.key, down }));
+      else this.enqueueRelease(action.key);
     } else {
       const directions = this.sticks[action.side];
       if (directions.has(action.direction) === down) return;
@@ -289,13 +302,36 @@ class ControllerInputManager extends EventEmitter {
     return this.pending;
   }
 
+  enqueueRelease(key) {
+    const version = this.inputVersion;
+    return this.enqueue(async () => {
+      // A public controller.sequence may own the runtime briefly after a
+      // physical key-up arrives.  Keep the release queued until the runtime
+      // accepts it, otherwise the native report can retain a stale button.
+      for (let attempt = 0; attempt < 80; attempt += 1) {
+        if (version !== this.inputVersion || !this.connected) return;
+        try {
+          await this.controller.call('controller.key', { key, down: false });
+          return;
+        } catch (error) {
+          const busy = error?.code === 'BUSY' || /busy|running|占用|动作正在执行/i.test(error?.message || '');
+          if (!busy || attempt === 79) throw error;
+          await new Promise(resolve => setTimeout(resolve, 25));
+        }
+      }
+    });
+  }
+
   async releaseAll() {
     ++this.inputVersion;
     this.pressedButtons.clear(); this.sticks.LS.clear(); this.sticks.RS.clear();
     this.setState({ inputReport: null });
-    // Even with no held keys, an in-flight key-down or a superseded release
-    // can still leave the device pressed. The latest deactivation owns reset.
-    if (this.connected && !this.locked) await this.enqueue(() => this.controller.call('controller.reset')).catch(() => {});
+    // A script owner must keep its own held state. A public sequence has no
+    // owner, so defer the neutral report until the running action finishes.
+    if (this.connected && !this.controllerOwned) {
+      if (this.locked) this.deferredReset = true;
+      else await this.enqueue(() => this.controller.call('controller.reset')).catch(() => {});
+    }
   }
 
   close() {

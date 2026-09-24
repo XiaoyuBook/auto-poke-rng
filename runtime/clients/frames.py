@@ -73,13 +73,18 @@ class Frames:
             if (magic, version, header_size, slots, capacity) != (b"PKFRAME1", 1, 64, self._slots, self._capacity):
                 raise RuntimeError("Invalid frame mapping")
             # On Windows perf_counter_ns uses QueryPerformanceCounter, matching qpc_ns.
-            if state != 1 or time.perf_counter_ns() - timestamp > max_age_ms * 1_000_000:
+            now_ns = time.perf_counter_ns()
+            max_age_ns = max_age_ms * 1_000_000
+            if state != 1 or now_ns - timestamp > max_age_ns:
                 raise RuntimeError("Video source stopped or frame is stale")
             candidates = []
             for index in range(slots):
                 address = self._view + 64 + index * (32 + capacity)
                 metadata = struct.unpack("<QQIIII", ctypes.string_at(address, 32))
-                if self.cursor < metadata[0] <= latest:
+                # The mapping header can be fresh while the selected slot is
+                # already too old. Filter each candidate before choosing the
+                # oldest/newest frame so next-frame reads honor max_age_ms.
+                if self.cursor < metadata[0] <= latest and now_ns - metadata[1] <= max_age_ns:
                     candidates.append((metadata, address))
             if not candidates:
                 return None

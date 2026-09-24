@@ -21,6 +21,14 @@ static std::string key_name(std::string key) {
     std::transform(key.begin(),key.end(),key.begin(),[](unsigned char c){return char(std::toupper(c));});
     if (key=="+") key="PLUS"; if (key=="-") key="MINUS"; return key;
 }
+static std::string direction_name(std::string key) {
+    if (key=="TOP") return "UP";
+    if (key=="TOP_RIGHT" || key=="UPRIGHT") return "UP_RIGHT";
+    if (key=="DOWNRIGHT") return "DOWN_RIGHT";
+    if (key=="DOWNLEFT") return "DOWN_LEFT";
+    if (key=="TOP_LEFT" || key=="UPLEFT") return "UP_LEFT";
+    return key;
+}
 void ControllerService::emit_state() {
     state_["running"]=running_.load(); state_["owned"]=!owner_.empty();
     state_["report"]={{"buttons",report_.buttons},{"hat",report_.hat},{"lx",report_.lx},{"ly",report_.ly},{"rx",report_.rx},{"ry",report_.ry}};
@@ -41,6 +49,17 @@ void ControllerService::write(const uint8_t* bytes,size_t size) {
         throw Error("SERIAL_WRITE","伊机控串口写入失败，请重新连接");
     }
 }
+void ControllerService::update_hat() {
+    bool up=false,down=false,left=false,right=false;
+    for (const auto& direction:directions_) {
+        if (direction=="UP" || direction=="UP_RIGHT" || direction=="UP_LEFT") up=true;
+        if (direction=="DOWN" || direction=="DOWN_RIGHT" || direction=="DOWN_LEFT") down=true;
+        if (direction=="LEFT" || direction=="UP_LEFT" || direction=="DOWN_LEFT") left=true;
+        if (direction=="RIGHT" || direction=="UP_RIGHT" || direction=="DOWN_RIGHT") right=true;
+    }
+    const bool only_up=up&&!down, only_down=down&&!up, only_left=left&&!right, only_right=right&&!left;
+    report_.hat=only_up ? (only_left?7:only_right?1:0) : only_down ? (only_left?5:only_right?3:4) : only_left?6:only_right?2:8;
+}
 void ControllerService::send() {
     connected();
     // Original EasyCon firmware report loop requires at least 30ms between reports.
@@ -52,9 +71,9 @@ void ControllerService::button(const std::string& raw,bool down) {
     auto key=key_name(raw);
     if (auto found=buttons.find(key);found!=buttons.end()) { if(down) report_.buttons|=found->second; else report_.buttons&=uint16_t(~found->second); }
     else if(auto direction=hats.find(key);direction!=hats.end()) {
-        if(down) directions_|=direction->second;else directions_&=~direction->second;
-        bool up=(directions_&1)&&!(directions_&2),bottom=(directions_&2)&&!(directions_&1),left=(directions_&4)&&!(directions_&8),right=(directions_&8)&&!(directions_&4);
-        report_.hat=up ? (left?7:right?1:0) : bottom ? (left?5:right?3:4) : left?6:right?2:8;
+        auto name=direction_name(key);
+        if(down) directions_.insert(name); else directions_.erase(name);
+        update_hat();
     } else throw Error("INVALID_ARGUMENT","不支持的按键: "+raw);
     send(); emit_state();
 }
@@ -63,7 +82,7 @@ void ControllerService::stick(const std::string& side,int x,int y) {
     else throw Error("INVALID_ARGUMENT","摇杆必须是 LS 或 RS");
     send(); emit_state();
 }
-void ControllerService::neutral() { report_={}; directions_=0; if(state_.value("status","")=="connected") send(); emit_state(); }
+void ControllerService::neutral() { report_={}; directions_.clear(); if(state_.value("status","")=="connected") send(); emit_state(); }
 void ControllerService::stop_actions() {
     cancelled_=true; wake_.notify_all();
     if(actions_.joinable()) actions_.join();
@@ -145,7 +164,7 @@ Json ControllerService::command(const std::string& method,const Json& args) {
                 while(Clock::now()<deadline) {uint8_t buffer[256];DWORD count=0;if(!ReadFile(serial_.get(),buffer,256,&count,nullptr)) break;for(DWORD i=0;i<count;++i) if(buffer[i]==0x80) received=true;if(received)break;}
                 if(!received) {serial_.reset();std::this_thread::sleep_for(100ms);continue;}
             }
-            port_=port; ++connects_; state_={{"status","connected"},{"name",port},{"baudrate",baud}};report_={};directions_=0;
+            port_=port; ++connects_; state_={{"status","connected"},{"name",port},{"baudrate",baud}};report_={};directions_.clear();
             send();emit_state();return state_;
         }
         state_={{"status","failed"},{"message","伊机控握手失败，请检查串口占用、固件和设备连接"}};emit_state();
