@@ -1,6 +1,6 @@
 import { createPortal } from 'react-dom';
 import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { RotateCcw, ScanText, SlidersHorizontal, Target, WandSparkles } from 'lucide-react';
+import { ScanText, Target, WandSparkles } from 'lucide-react';
 
 export type OcrRect = { x: number; y: number; width: number; height: number };
 
@@ -32,10 +32,6 @@ const cloneRows = () => initialRows.map(row => ({ ...row, rect: { ...row.rect } 
 export function OcrWorkspace({ overlayTarget, previewTarget }: { overlayTarget?: HTMLElement | null; previewTarget?: HTMLElement | null }) {
   const [rows, setRows] = useState<OcrRow[]>(cloneRows);
   const [selectedId, setSelectedId] = useState(initialRows[0].id);
-  const [language, setLanguage] = useState('简体中文');
-  const [threshold, setThreshold] = useState(80);
-  const [preprocess, setPreprocess] = useState('自动增强');
-  const [expectedText, setExpectedText] = useState('');
   const [warmed, setWarmed] = useState(false);
   const selectedRow = rows.find(row => row.id === selectedId) ?? rows[0];
 
@@ -59,11 +55,10 @@ export function OcrWorkspace({ overlayTarget, previewTarget }: { overlayTarget?:
   };
   const recognizeRow = (id: string) => {
     setSelectedId(id);
-    setRows(current => current.map(row => row.id === id ? { ...row, lastRecognition: expectedText.trim() || '等待视频帧' } : row));
+    setRows(current => current.map(row => row.id === id ? { ...row, lastRecognition: '等待视频帧' } : row));
   };
   const testAll = () => {
-    const result = expectedText.trim() || '等待视频帧';
-    setRows(current => current.map((row, index) => index < 8 ? { ...row, lastRecognition: result } : row));
+    setRows(current => current.map((row, index) => index < 8 ? { ...row, lastRecognition: '等待视频帧' } : row));
     setSelectedId(rows[0]?.id ?? initialRows[0].id);
   };
   const warmup = () => setWarmed(true);
@@ -80,16 +75,6 @@ export function OcrWorkspace({ overlayTarget, previewTarget }: { overlayTarget?:
         <div><ScanText size={17} /><div><h2>OCR 设置</h2><p>管理固定识别项目，在右侧视频中框选或预览对应区域。</p></div></div>
         <span className="ocr-source-badge">源画面 · {sourceSize.width} × {sourceSize.height}</span>
       </header>
-
-      <section className="ocr-settings-card ocr-parameter-bar" aria-label="OCR识别参数">
-        <header className="ocr-card-heading"><SlidersHorizontal size={15} /><h3>识别参数</h3><button className="text-button ocr-reset-all" type="button" onClick={resetAll}><RotateCcw size={12} />全部重置</button></header>
-        <div className="ocr-parameter-fields">
-          <label><span>识别语言</span><select value={language} onChange={event => setLanguage(event.target.value)}><option>简体中文</option><option>繁体中文</option><option>English</option><option>日本語</option></select></label>
-          <label><span>预处理</span><select value={preprocess} onChange={event => setPreprocess(event.target.value)}><option>自动增强</option><option>原始画面</option><option>灰度化</option><option>高对比度</option></select></label>
-          <label><span>最低置信度</span><div className="ocr-input-suffix"><input type="number" min={0} max={100} value={threshold} onChange={event => setThreshold(Math.max(0, Math.min(100, Math.round(Number(event.target.value) || 0))))} /><span>%</span></div></label>
-          <label className="ocr-expected-text"><span>期望文本</span><input value={expectedText} onChange={event => setExpectedText(event.target.value)} placeholder="可选，用于比对识别结果" /></label>
-        </div>
-      </section>
 
       <section className="ocr-settings-card ocr-region-card" aria-label="OCR识别区域">
         <header className="ocr-region-heading">
@@ -125,7 +110,7 @@ export function OcrWorkspace({ overlayTarget, previewTarget }: { overlayTarget?:
       </section>
     </div>
     {overlayTarget && createPortal(<OcrRoiOverlay rows={visibleRows} selectedId={selectedId} setRect={updateSelectedRect} />, overlayTarget)}
-    {previewTarget && createPortal(<OcrPreviewPanel row={selectedRow} threshold={threshold} />, previewTarget)}
+    {previewTarget && createPortal(<OcrPreviewPanel row={selectedRow} />, previewTarget)}
   </section>;
 }
 
@@ -162,11 +147,11 @@ function OcrRoiOverlay({ rows, selectedId, setRect }: { rows: OcrRow[]; selected
   </div>;
 }
 
-function OcrPreviewPanel({ row, threshold }: { row: OcrRow; threshold: number }) {
+function OcrPreviewPanel({ row }: { row: OcrRow }) {
   const waiting = row.lastRecognition === '未测试';
   return <section className="ocr-preview-panel" aria-label="OCR识别预览">
     <header className="ocr-preview-heading"><WandSparkles size={15} /><h2>识别预览 · {row.label}</h2><span>{waiting ? '待测试' : '已完成'}</span></header>
     <div className="ocr-preview-text">{waiting ? '尚未执行识别' : row.lastRecognition}</div>
-    <dl className="ocr-preview-meta"><div><dt>区域</dt><dd>{row.rect.width} × {row.rect.height}</dd></div><div><dt>阈值</dt><dd>{threshold}%</dd></div><div><dt>状态</dt><dd>{waiting ? '—' : '待确认'}</dd></div></dl>
+    <dl className="ocr-preview-meta"><div><dt>区域</dt><dd>{row.rect.width} × {row.rect.height}</dd></div><div><dt>状态</dt><dd>{waiting ? '—' : '待确认'}</dd></div></dl>
   </section>;
 }

@@ -180,7 +180,6 @@ describe('workspace interactions', () => {
     const frame = within(video).getByLabelText('视频画面');
     fireEvent.click(screen.getByRole('button', { name: 'OCR 设置' }));
     expect(screen.getByRole('heading', { name: 'OCR 设置', level: 2 })).toBeTruthy();
-    expect(screen.getByRole('region', { name: 'OCR识别参数' })).toBeTruthy();
     expect(screen.getByRole('region', { name: 'OCR识别区域' })).toBeTruthy();
     expect(screen.getByLabelText('OCR识别区域框选')).toBeTruthy();
     expect(within(video).getByLabelText('视频画面')).toBe(frame);
