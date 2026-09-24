@@ -17,6 +17,8 @@
     "test:controller-overlay": "npm run build && node tests/run-electron.cjs controller-overlay.cjs",
     "test:mapping": "npm run build && node tests/run-electron.cjs key-mapping.cjs",
     "test:script-editor": "npm run build && node tests/run-electron.cjs script-editor.cjs",
+    "test:qq": "vitest run tests/qq-notifications.test.js src/components/QQNotifications.test.tsx",
+    "test:qq:electron": "npm run build && node tests/run-electron.cjs qq-notifications.cjs",
     "test": "vitest run",
     "test:electron": "npm run build && node tests/run-electron.cjs",
     "start": "electron .",
@@ -31,7 +33,8 @@
     "electron": "latest",
     "lucide-react": "latest",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "ws": "^8.21.3"
   },
   "devDependencies": {
     "@testing-library/react": "^16.3.3",

@@ -46,6 +46,7 @@ export interface ControllerOverlayApi {
 }
 
 export interface DesktopApi {
+  notifications?: import('./notifications').QQApi;
   devices?: import('./devices').DevicesApi;
   overlay?: ControllerOverlayApi;
   getMetadata: () => Promise<{ name: string; version: string; platform: string }>;

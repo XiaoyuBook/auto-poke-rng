@@ -1,0 +1,116 @@
+const { app, BrowserWindow, ipcMain, safeStorage, nativeImage } = require('electron');
+const fs = require('node:fs');
+const path = require('node:path');
+const assert = require('node:assert/strict');
+const { QQClient } = require('../electron/qq-client.cjs');
+const { registerQQNotifications, makeTestImage } = require('../electron/qq-notifications.cjs');
+const { registerPanelWindows } = require('../electron/panel-windows.cjs');
+const { registerScriptFiles } = require('../electron/script-files.cjs');
+const { registerDevices } = require('../electron/devices.cjs');
+const { createQQFixture } = require('./helpers/qq-fixture.cjs');
+
+const root = path.resolve(__dirname, '..');
+const output = path.join(root, 'node_modules/.tmp/qq-notifications-review');
+fs.mkdirSync(output, { recursive: true });
+const profile = fs.mkdtempSync(path.join(output, 'profile-'));
+app.setPath('userData', profile);
+let service, fixture, devices;
+const timeout = setTimeout(() => { console.error('QQ Electron test timed out'); app.exit(1); }, 45000);
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+async function until(action, label) { for (let i = 0; i < 100; i++) { if (await action()) return; await delay(30); } throw new Error(label); }
+
+app.whenReady().then(async () => {
+  fixture = await createQQFixture();
+  const main = new BrowserWindow({ width: 1440, height: 920, show: false, webPreferences: {
+    preload: path.join(root, 'electron/preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false,
+  } });
+  const loadWindow = (window, query = {}) => window.loadFile(path.join(root, 'dist/index.html'), { query });
+  ipcMain.handle('app:metadata', () => ({ name: 'Auto Poke RNG', version: 'test', platform: 'win32' }));
+  registerPanelWindows({ getMainWindow: () => main, loadWindow });
+  registerScriptFiles({ getMainWindow: () => main, rootDirectory: path.join(profile, 'scripts') });
+  devices = registerDevices({ ipcMain, getWindows: () => BrowserWindow.getAllWindows(), loadWindow, rootDirectory: path.join(profile, 'scripts'), testMode: true });
+  service = registerQQNotifications({ ipcMain, getMainWindow: () => main, safeStorage, nativeImage, userData: profile, client: new QQClient(fixture.options) });
+  assert.deepEqual(nativeImage.createFromBuffer(makeTestImage(nativeImage)).getSize(), { width: 480, height: 270 }, 'test image is a real JPEG');
+  await loadWindow(main);
+  main.showInactive();
+  const js = code => main.webContents.executeJavaScript(code, true).catch(error => { console.error('Renderer check:', code); throw error; });
+  main.webContents.on('console-message', event => { if (event.level === 'error') console.error(event.message); });
+  const click = label => js(`(() => { const node = [...document.querySelectorAll('button')].find(button => button.getAttribute('aria-label') === ${JSON.stringify(label)} || button.textContent === ${JSON.stringify(label)}); if (!node || node.disabled) throw new Error('Missing or disabled button: ' + ${JSON.stringify(label)}); node.click(); })()`);
+  const input = (id, value) => js(`(() => { const node = document.getElementById(${JSON.stringify(id)}); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(node, ${JSON.stringify(value)}); node.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+  const shot = async (name, selector = '.qq-dialog') => {
+    await js('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
+    await delay(150);
+    const bounds = await js(`(() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return {x: Math.floor(r.x), y: Math.floor(r.y), width: Math.ceil(r.width), height: Math.ceil(r.height)}; })()`);
+    fs.writeFileSync(path.join(output, name + '.png'), (await main.webContents.capturePage(bounds)).toPNG());
+    const fits = await js(`(() => { const dialog = document.querySelector('.qq-dialog'); const footer = document.querySelector('.qq-footer').getBoundingClientRect(); return dialog.scrollWidth <= dialog.clientWidth + 1 && footer.bottom <= innerHeight && footer.top > 0; })()`);
+    assert.ok(fits, 'dialog has no horizontal overflow and footer is visible');
+  };
+  await until(() => js(`Boolean(document.querySelector(${JSON.stringify('[aria-label="QQ 通知：未配置"]')}))`), 'QQ bell');
+  await click('QQ 通知：未配置');
+  await until(() => js('Boolean(document.getElementById("qq-app-id"))'), 'QQ settings loaded');
+  await shot('setup-empty');
+  assert.equal(fixture.requests.length, 0, 'opening settings does not send network traffic');
+  await input('qq-app-id', 'TEST_APP'); await input('qq-secret', 'TEST_SECRET');
+  await js("document.querySelector('.qq-checkbox input').click()");
+  await click('保存设置');
+  await until(() => service.settings.secret === 'TEST_SECRET', 'settings saved');
+  const persisted = fs.readFileSync(path.join(profile, 'qq-notifications.json'), 'utf8');
+  assert.ok(!persisted.includes('TEST_SECRET') && persisted.includes('protectedSecret'), 'actual system encryption protects saved secret');
+  assert.ok(!(await js('window.desktop.notifications.getState().then(state => JSON.stringify(state))')).includes('TEST_SECRET'), 'preload never returns the secret');
+  await click('验证凭据'); await until(() => service.verified && !service.operation, 'credentials verified');
+  await click('绑定私聊'); await until(() => service.binding, 'binding code available');
+  await shot('binding');
+  assert.ok(await js(`(() => { const binding = document.querySelector('.qq-binding').getBoundingClientRect(); const content = document.querySelector('.qq-content').getBoundingClientRect(); return binding.top >= content.top && binding.bottom <= content.bottom + 1; })()`), 'new binding code scrolls into view');
+  fixture.bind('user', service.binding.code, 'USER');
+  await until(() => service.settings.userOpenId === 'USER' && !service.operation, 'recipient persisted');
+  await click('发送图文测试'); await until(() => service.testSent && !service.operation, 'text and image submitted');
+  const sends = fixture.requests.filter(request => request.path.endsWith('/messages'));
+  assert.deepEqual(sends.map(request => request.body.msg_type), [0, 7]);
+  await until(() => js("[...document.querySelectorAll('button')].some(button => button.textContent === '我已收到文字和图片' && !button.disabled)"), 'confirm button ready');
+  await click('我已收到文字和图片'); await until(() => service.testConfirmed, 'receipt confirmed');
+  await shot('setup-ready');
+  await js("document.querySelector('#qq-tab-records').click()"); await shot('records');
+  await js("document.querySelector('#qq-tab-guide').click()");
+  assert.equal(await js("document.querySelectorAll('.qq-guide-steps button').length"), 12, 'twelve illustrated guide steps');
+  for (let index = 0; index < 12; index++) {
+    await js(`document.querySelectorAll('.qq-guide-steps button')[${index}].click()`);
+    await until(() => js(`(() => { const image = document.querySelector('.qq-guide-crop img'); return image && image.alt.startsWith('第${index + 1}步：') && image.complete && image.naturalWidth > 0; })()`), 'bundled guide image ' + (index + 1));
+    assert.ok(await js("new URL(document.querySelector('.qq-guide-crop img').currentSrc).protocol === 'file:'"), 'tutorial images load from the built app, offline');
+    assert.ok(await js(`(() => { const image = document.querySelector('.qq-guide-crop').getBoundingClientRect(); const content = document.querySelector('.qq-content').getBoundingClientRect(); return image.height > 0 && image.top >= content.top && image.bottom <= content.bottom; })()`), 'current tutorial crop is fully visible without scrolling');
+    if (index === 0) await shot('guide-first-step');
+    if (index === 9) await shot('guide');
+  }
+  await click('查看第12步原图');
+  await until(() => js("Boolean(document.querySelector('.qq-image-dialog[open] img')?.complete)"), 'full image viewer');
+  assert.ok(await js(`(() => { const image = document.querySelector('.qq-image-stage img').getBoundingClientRect(); const stage = document.querySelector('.qq-image-stage').getBoundingClientRect(); return image.width > 0 && image.left >= stage.left && image.right <= stage.right && image.top >= stage.top && image.bottom <= stage.bottom; })()`), 'fit mode shows the entire original image');
+  await shot('guide-original', '.qq-image-dialog');
+  await click('原始尺寸');
+  assert.ok(await js("document.querySelector('.qq-image-stage img').getBoundingClientRect().width === document.querySelector('.qq-image-stage img').naturalWidth"), 'original-size mode uses source pixel dimensions');
+  await click('放大');
+  assert.equal(await js("document.querySelector('.qq-image-scale').textContent"), '125%');
+  await click('适应窗口');
+  main.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' });
+  main.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' });
+  await until(() => js("!document.querySelector('.qq-image-dialog') && Boolean(document.querySelector('.qq-dialog[open]'))"), 'Escape closes only the original image');
+  main.setSize(1100, 680); await delay(150);
+  await js("document.querySelectorAll('.qq-guide-steps button')[8].click()");
+  await until(() => js("document.querySelector('.qq-guide-crop img').complete"), 'compact guide image');
+  await shot('guide-compact');
+  assert.ok(await js(`(() => { const image = document.querySelector('.qq-guide-crop').getBoundingClientRect(); const content = document.querySelector('.qq-content').getBoundingClientRect(); return image.top >= content.top && image.bottom <= content.bottom; })()`), 'compact window keeps the current tutorial crop visible');
+  await js("document.querySelector('#qq-tab-setup').click()");
+  main.setSize(1100, 680); await delay(150); await shot('setup-compact');
+  await click('重新绑定'); await until(() => service.binding, 'second binding');
+  await click('关闭QQ 通知'); await until(() => !service.operation, 'closing cancels binding');
+  assert.equal(service.settings.userOpenId, 'USER', 'cancel preserves previous recipient');
+  await until(() => fixture.peers.at(-1).readyState === 3, 'binding gateway closed');
+  assert.equal(fixture.requests.filter(request => request.path.endsWith('/messages')).length, 2, 'UI navigation and closing do not send additional messages');
+  service.close(); await devices.close(); await fixture.close();
+  clearTimeout(timeout);
+  console.log('QQ Electron checks passed: encrypted persistence, IPC, binding, real local HTTP/WebSocket text + JPEG, records, guide, compact layout and close cancellation.');
+  console.log('Screenshots: ' + output);
+  app.exit(0);
+}).catch(async error => {
+  console.error(error); service?.close();
+  await devices?.close().catch(() => {}); await fixture?.close().catch(() => {});
+  clearTimeout(timeout); app.exit(1);
+});

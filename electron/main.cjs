@@ -1,12 +1,14 @@
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, safeStorage, nativeImage } = require('electron');
 const path = require('node:path');
 const { registerPanelWindows } = require('./panel-windows.cjs');
 const { registerScriptFiles } = require('./script-files.cjs');
 const { registerDevices } = require('./devices.cjs');
+const { registerQQNotifications } = require('./qq-notifications.cjs');
 
 let mainWindow = null;
 let panels;
 let devices;
+let notifications;
 let quitting = false;
 
 function loadWindow(window, query = {}) {
@@ -35,9 +37,9 @@ function createWindow() {
     },
   });
   mainWindow = window;
-  window.webContents.on('render-process-gone', () => { void devices?.stopInputs().catch(() => {}); });
+  window.webContents.on('render-process-gone', () => { void devices?.stopInputs().catch(() => {}); notifications?.cancel(); });
   void loadWindow(window);
-  window.on('closed', () => { mainWindow = null; panels.closeAll(); void devices?.controllerOverlay?.close(); });
+  window.on('closed', () => { notifications?.cancel(); mainWindow = null; panels.closeAll(); void devices?.controllerOverlay?.close(); });
 
   window.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
@@ -55,6 +57,7 @@ app.whenReady().then(() => {
   // launched with the test flag.
   const testDevices = !app.isPackaged || process.env.AUTO_POKE_TEST_DEVICES === '1';
   devices = registerDevices({ ipcMain, getWindows: () => BrowserWindow.getAllWindows(), loadWindow, testMode: testDevices });
+  notifications = registerQQNotifications({ ipcMain, getMainWindow: () => mainWindow, safeStorage, nativeImage, userData: app.getPath('userData') });
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -64,6 +67,7 @@ app.whenReady().then(() => {
 app.on('before-quit', event => {
   if (quitting || !devices) return;
   event.preventDefault(); quitting = true;
+  notifications?.close();
   void devices.close().finally(() => app.quit());
 });
 

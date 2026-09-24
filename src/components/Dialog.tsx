@@ -13,7 +13,7 @@ export function Dialog({ title, close, children, className = '' }: {
 
   return (
     <dialog ref={dialog} className={'dialog ' + className} aria-label={title}
-      onCancel={event => { event.preventDefault(); close(); }}
+      onCancel={event => { event.preventDefault(); event.stopPropagation(); close(); }}
       onClick={event => {
         if (event.target !== event.currentTarget) return;
         const bounds = event.currentTarget.getBoundingClientRect();

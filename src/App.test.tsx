@@ -167,7 +167,7 @@ describe('workspace interactions', () => {
     const nav = screen.getByRole('navigation', { name: '工作区' });
     expect(within(nav).getAllByRole('button').map(button => button.textContent)).toEqual(['首页', '脚本编辑']);
     const globalTools = screen.getByRole('group', { name: '全局工具' });
-    expect(within(globalTools).getAllByRole('button').map(button => button.getAttribute('aria-label'))).toEqual(['视频源：未尝试连接', '伊机控：未尝试连接', '通知：有未读通知']);
+    expect(within(globalTools).getAllByRole('button').map(button => button.getAttribute('aria-label'))).toEqual(['视频源：未尝试连接', '伊机控：未尝试连接', 'QQ 通知：未配置']);
     fireEvent.click(screen.getByRole('button', { name: '收起侧栏' }));
     expect(document.querySelector('.app-shell')?.getAttribute('data-collapsed')).toBe('true');
     fireEvent.click(screen.getByRole('button', { name: '展开侧栏' }));
@@ -240,17 +240,16 @@ describe('workspace interactions', () => {
     expect(logCenter.getByRole('heading', { name: '暂无日志' })).toBeTruthy();
   });
 
-  it('opens video without replacing the editor and clears the notification indicator', async () => {
+  it('opens video without replacing the editor and opens QQ settings without an invented unread indicator', async () => {
     await openApp();
     fireEvent.click(screen.getByRole('button', { name: '视频预览' }));
     expect(screen.getByRole('dialog', { name: '视频预览' })).toBeTruthy();
     expect(screen.getByRole('textbox', { name: '脚本内容' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '关闭视频预览' }));
-    fireEvent.click(screen.getByRole('button', { name: '通知：有未读通知' }));
-    expect(screen.getByRole('dialog', { name: '通知' })).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: '关闭通知' }));
-    expect(screen.queryByRole('button', { name: '通知：有未读通知' })).toBeNull();
-    expect(screen.getByRole('button', { name: '通知：无未读通知' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'QQ 通知：未配置' }));
+    expect(screen.getByRole('dialog', { name: 'QQ 通知' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '关闭QQ 通知' }));
+    expect(screen.getByRole('button', { name: 'QQ 通知：未配置' }).querySelector('.tool-status-dot')).toBeNull();
   });
 
   it('keeps edits and log filters while the floating panel expands, minimizes, and restores', async () => {

@@ -9,6 +9,8 @@
 | `npm run test:runtime` | OCR 适配器单测、CTest 核心测试、脚本/设备 Node 集成测试，以及全部设备审查回归 |
 | `npm run test:devices` | 构建界面后，在真实 Electron 中验证模拟设备接线 |
 | `npm run test:electron` | 桌面窗口、面板、脚本文件等集成验证 |
+| `npm run test:qq` | QQ 本地 HTTP／WebSocket 协议、密钥持久化、发送服务与配置组件测试 |
+| `npm run test:qq:electron` | 真实 Electron 下的 QQ 配置、系统加密、绑定、图文发送、窗口关闭与布局验证 |
 
 设备问题与用例编号、视频依赖策略和硬件覆盖边界见 [公共设备回归资产](../docs/DEVICE_REGRESSIONS.md)。DEV-001 至 DEV-006 已修复并纳入两个设备回归命令。
 
@@ -29,3 +31,7 @@ node --test --test-name-pattern=DEV-003 tests/device-regressions.cjs
 ```
 
 测试输入夹具位于 `tests/helpers`、`tests/fixtures` 和 `runtime/tests/test_frames.py`。它们可由版本控制复现，执行不依赖审查期间的 `.deps/module-review` 临时文件。设备用例退出时释放自身资源；测试结果、截图和构建目录仍按项目现有忽略规则处理。
+
+QQ 测试只访问本地模拟服务，不使用真实 QQ 凭据或向外部接收方发消息。Electron 测试使用隔离配置目录，验证实际系统加密和有效 JPEG 图片，截图保存在 `node_modules/.tmp/qq-notifications-review/`。回归包含旧码／错误事件拒绝、部分失败不重发、取消清理、保存失败保留旧配置、清除密钥同时清除客户端缓存，以及绑定码自动滚动到可见区域。真实 QQ 开放平台权限和实际收件情况需要使用自己的机器人手动验证。
+
+教程回归逐一检查 12 步图片在构建后的 Electron 应用中可离线加载，验证关键区域预览、完整原图、原始尺寸和缩放，并确认 Esc 仅关闭图片查看器、不会关闭教程或丢失接入草稿；包含 1100 × 680 窗口截图。

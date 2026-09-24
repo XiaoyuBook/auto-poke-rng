@@ -1,4 +1,5 @@
 import { Bell, Gamepad2, Tv } from 'lucide-react';
+import { qqStatusLabels, type QQStatus } from '../notifications';
 
 export type ConnectionStatus = 'idle' | 'connecting' | 'failed' | 'connected';
 export interface DeviceConnections {
@@ -13,11 +14,13 @@ const connectionLabels: Record<ConnectionStatus, string> = {
 
 interface Props {
   connections: DeviceConnections;
-  unread: boolean;
+  notificationStatus: QQStatus;
   open: (tool: 'video' | 'easycon' | 'notification') => void;
 }
 
-export function GlobalTools({ connections, unread, open }: Props) {
+export function GlobalTools({ connections, notificationStatus, open }: Props) {
+  const notificationLabel = 'QQ 通知：' + qqStatusLabels[notificationStatus];
+  const notificationDot = notificationStatus === 'ready' ? 'connected' : notificationStatus === 'busy' ? 'connecting' : notificationStatus === 'failed' ? 'failed' : '';
   return <div className="sidebar-actions" role="group" aria-label="全局工具">
     {([
       { tool: 'video', name: '视频源', icon: <Tv size={16} /> },
@@ -31,9 +34,9 @@ export function GlobalTools({ connections, unread, open }: Props) {
         {status !== 'idle' && <span className={'tool-status-dot ' + status} aria-hidden="true" />}
       </button>;
     })}
-    <button className="icon-button" type="button" title={unread ? '通知：有未读通知' : '通知：无未读通知'}
-      aria-label={unread ? '通知：有未读通知' : '通知：无未读通知'} onClick={() => open('notification')}>
-      <Bell size={16} />{unread && <span className="tool-status-dot unread" aria-hidden="true" />}
+    <button className="icon-button" type="button" title={notificationLabel}
+      aria-label={notificationLabel} onClick={() => open('notification')}>
+      <Bell size={16} />{notificationDot && <span className={'tool-status-dot ' + notificationDot} aria-hidden="true" />}
     </button>
   </div>;
 }

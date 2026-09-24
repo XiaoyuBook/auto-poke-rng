@@ -23,6 +23,7 @@ import { loadControllerMapping, type MappingAction } from './controllerMapping';
 import { useDevices } from './useDevices';
 import type { ScriptProgress } from './devices';
 import { useScriptValidation } from './useScriptValidation';
+import { useQQState } from './notifications';
 
 interface ScriptRun { folder: string; scriptName: string; path: string; text: string; started: number; progress?: ScriptProgress }
 
@@ -60,7 +61,7 @@ export default function App({ connections = initialConnections }: { connections?
   const [detaching, setDetaching] = useState(false);
   const { state: panelWindows, setLogSource, setVideoLabelsOpen, error: panelError } = usePanelWindows();
   const nativePanels = window.desktop?.panels;
-  const [unread, setUnread] = useState(true);
+  const { state: notificationState, error: notificationError } = useQQState();
   const [version, setVersion] = useState('0.1.0');
   const [toast, setToast] = useState('');
   const switcher = useRef<HTMLDivElement>(null);
@@ -154,7 +155,6 @@ export default function App({ connections = initialConnections }: { connections?
 
   const openModal = (next: Modal) => {
     setGameMenuOpen(false);
-    if (next === 'notification') setUnread(false);
     if (next === 'mapping' && overlayApi) {
       if (mappingOpening.current || modal === 'mapping') return;
       mappingOpening.current = true;
@@ -394,7 +394,7 @@ export default function App({ connections = initialConnections }: { connections?
               </div>
             )}
           </div>
-          <GlobalTools connections={actualConnections} unread={unread} open={openModal} />
+          <GlobalTools connections={actualConnections} notificationStatus={notificationError ? 'failed' : notificationState?.status || 'unconfigured'} open={openModal} />
         </div>
 
         <nav className="sidebar-nav" aria-label="工作区">

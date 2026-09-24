@@ -1,4 +1,4 @@
-import { Bell, Settings } from 'lucide-react';
+import { Settings } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { Modal } from '../workspace';
 import { Dialog } from './Dialog';
@@ -6,8 +6,10 @@ import { VideoSource } from './VideoSource';
 import { Controller } from './Controller';
 import { EasyConConnection } from './EasyConConnection';
 import { ScriptHelp } from './ScriptHelp';
+import { QQNotifications } from './QQNotifications';
 
 export function ToolsDialog({ modal, close, onInput }: { modal: Modal; close: () => void; onInput: (key: string) => void }) {
+  if (modal === 'notification') return <QQNotifications close={close} />;
   const titles: Record<Modal, string> = { video: '视频源', easycon: '伊机控连接', controller: '虚拟手柄', notification: '通知', mapping: '按键映射', help: '脚本编辑帮助', settings: '设置' };
   return (
     <Dialog title={titles[modal]} close={close} className={modal === 'help' ? 'script-help-dialog' : ''}>
@@ -15,7 +17,6 @@ export function ToolsDialog({ modal, close, onInput }: { modal: Modal; close: ()
         {modal === 'settings' && <OverlayScaleSetting />}
         {modal === 'video' && <VideoSource />}
         {modal === 'easycon' && <EasyConConnection />}
-        {modal === 'notification' && <div className="notice"><Bell size={18} /><div><strong>工作区已就绪</strong><p>可连接视频源和伊机控，执行脚本并查看实时画面。</p></div></div>}
         {modal === 'controller' && <Controller onInput={onInput} />}
         {modal === 'help' && <ScriptHelp />}
       </div>

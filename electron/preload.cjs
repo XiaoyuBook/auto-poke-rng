@@ -8,6 +8,17 @@ const subscribe = (channel, listener) => {
 
 contextBridge.exposeInMainWorld('desktop', {
   getMetadata: () => ipcRenderer.invoke('app:metadata'),
+  notifications: {
+    getState: () => ipcRenderer.invoke('qq:state'),
+    save: values => ipcRenderer.invoke('qq:save', values),
+    verify: () => ipcRenderer.invoke('qq:verify'),
+    bind: kind => ipcRenderer.invoke('qq:bind', kind),
+    unbind: kind => ipcRenderer.invoke('qq:unbind', kind),
+    sendTest: () => ipcRenderer.invoke('qq:test'),
+    confirmTest: () => ipcRenderer.invoke('qq:confirm'),
+    cancel: bindingOnly => ipcRenderer.invoke('qq:cancel', bindingOnly),
+    onState: listener => subscribe('qq:state', listener),
+  },
   devices: {
     getState: () => ipcRenderer.invoke('devices:state'),
     onState: listener => subscribe('devices:state', listener),
