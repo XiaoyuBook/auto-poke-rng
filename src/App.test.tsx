@@ -165,7 +165,7 @@ describe('workspace interactions', () => {
   it('keeps the original navigation and lets the sidebar be reopened', async () => {
     await openApp();
     const nav = screen.getByRole('navigation', { name: '工作区' });
-    expect(within(nav).getAllByRole('button').map(button => button.textContent)).toEqual(['首页', '脚本编辑', 'OCR 设置']);
+    expect(within(nav).getAllByRole('button').map(button => button.textContent)).toEqual(['首页', '脚本编辑', '定点数据', 'OCR 设置']);
     const globalTools = screen.getByRole('group', { name: '全局工具' });
     expect(within(globalTools).getAllByRole('button').map(button => button.getAttribute('aria-label'))).toEqual(['视频源：未尝试连接', '伊机控：未尝试连接', 'QQ 通知：未配置']);
     fireEvent.click(screen.getByRole('button', { name: '收起侧栏' }));
@@ -185,6 +185,25 @@ describe('workspace interactions', () => {
     expect(within(video).getByLabelText('视频画面')).toBe(frame);
     fireEvent.click(screen.getByRole('button', { name: '测试当前项' }));
     expect(within(screen.getByRole('region', { name: 'OCR识别预览' })).getByText('等待视频帧')).toBeTruthy();
+  });
+
+  it('opens static data search, keeps the persistent video, and applies a selected result', async () => {
+    await openApp();
+    const videoFrame = screen.getByRole('region', { name: '视频预览' }).querySelector('.preview-frame');
+    fireEvent.click(screen.getByRole('button', { name: '定点数据' }));
+    expect(screen.getByRole('heading', { name: '定点数据', level: 2 })).toBeTruthy();
+    expect(screen.getByRole('region', { name: '定点搜索条件' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: '定点搜索结果' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: '视频预览' }).querySelector('.preview-frame')).toBe(videoFrame);
+    fireEvent.change(screen.getByLabelText('初始 Seed'), { target: { value: 'DEADBEEF' } });
+    fireEvent.click(screen.getByRole('button', { name: '搜索定点结果' }));
+    const table = screen.getByRole('region', { name: '定点搜索结果' });
+    const resultRows = within(table).getAllByRole('row');
+    expect(resultRows.length).toBeGreaterThan(1);
+    fireEvent.click(resultRows[1]);
+    expect((screen.getByRole('button', { name: '应用为自动定点目标' }) as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: '应用为自动定点目标' }));
+    expect(screen.getByText(/已应用 Advance/)).toBeTruthy();
   });
 
   it('requires an EasyCon connection before opening the virtual controller', async () => {
