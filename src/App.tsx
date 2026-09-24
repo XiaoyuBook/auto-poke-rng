@@ -29,14 +29,14 @@ interface ScriptRun { folder: string; scriptName: string; path: string; text: st
 
 const videoWidthKey = 'auto-poke-rng:video-preview-width';
 const videoMinWidth = 260;
-function maxVideoWidth() { return Math.max(videoMinWidth, Math.min(520, Math.floor(window.innerWidth * 0.44))); }
+function maxVideoWidth() { return Math.max(videoMinWidth, Math.min(640, Math.floor(window.innerWidth * 0.48))); }
 function clampVideoWidth(width: number) { return Math.min(Math.max(videoMinWidth, Math.round(width)), maxVideoWidth()); }
 function readVideoWidth() {
   try {
     const saved = Number(localStorage.getItem(videoWidthKey));
     if (Number.isFinite(saved) && saved > 0) return clampVideoWidth(saved);
   } catch { /* Use the responsive default when local storage is unavailable. */ }
-  return clampVideoWidth(window.innerWidth * 0.26);
+  return clampVideoWidth(window.innerWidth * 0.30);
 }
 
 export default function App({ connections = initialConnections }: { connections?: DeviceConnections }) {
