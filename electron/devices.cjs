@@ -30,7 +30,7 @@ function registerDevices({ ipcMain, getWindows, loadWindow, rootDirectory = path
       if (message.state.status !== 'connected') clearInterval(controllerTimer);
     }
   });
-  const updateVideo = value => { state = { ...state, video: value }; broadcast(); };
+  const updateVideo = value => { state = { ...state, video: value }; broadcast(); runner.handleVideoState(value); };
   const requireWindow = event => {
     if (!getWindows().some(window => !window.isDestroyed() && window.webContents === event.sender)
       || event.senderFrame !== event.sender.mainFrame) throw new Error('Unknown device sender');

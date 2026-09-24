@@ -111,6 +111,29 @@ test('original interpreter runs loops, imports, UI aliases; keeps connection and
   } finally { await runner.stop(); await client.close(); fs.rmSync(root,{recursive:true,force:true}); }
 });
 
+test('video loss stops only scripts that depend on video', { timeout: 10000 }, async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'poke-video-policy-'));
+  const client = addSequenceApi(new RuntimeClient({ role: 'controller', testMode: true }));
+  const events = [];
+  const video = { status: 'connected', session: 'session-a' };
+  const runner = new ScriptRunner({ controller: client, rootDirectory: root, getVideo: () => video, emit: event => events.push(event) });
+  const until = async predicate => {
+    for (let n = 0; n < 100; n++) { if (predicate()) return; await delay(20); }
+    throw new Error('script event timeout');
+  };
+  try {
+    await client.call('controller.connect', { port: 'mock' });
+    const text = 'A DOWN\nWAIT 250\nA UP';
+    fs.writeFileSync(path.join(root, 'controller-only.rng'), text);
+    await runner.start({ text, path: 'controller-only.rng' });
+    await until(() => events.some(event => event.event === 'script.started'));
+    runner.handleVideoState({ status: 'idle' });
+    await runner.current.done;
+    assert.equal(events.at(-1).status, 'completed');
+    assert.deepEqual((await client.call('controller.debug')).report, neutral);
+  } finally { await runner.stop(); await client.close(); fs.rmSync(root, { recursive: true, force: true }); }
+});
+
 test('fast loops publish bounded latest positions and library wait exposes its source and caller', {timeout:10000}, async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'poke-trace-'));
   const client = addSequenceApi(new RuntimeClient({role:'controller',testMode:true}));

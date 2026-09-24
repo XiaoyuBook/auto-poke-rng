@@ -192,7 +192,11 @@ def run(config, program):
         # Compile + asset preflight before taking controller ownership or sending input.
         request("script.acquire", {})
         trace.begin(config["name"])
-        emit({"event": "script.started"})
+        emit({
+            "event": "script.started",
+            "requiresVideo": program.requires_image_search,
+            "videoSession": config.get("video", {}).get("session") if program.requires_image_search else None,
+        })
         reporter = threading.Thread(target=report_progress, daemon=True)
         reporter.start()
         program.run(gamepad=RemoteGamepad(), waiter=RemoteWaiter(), external_getters=getters,

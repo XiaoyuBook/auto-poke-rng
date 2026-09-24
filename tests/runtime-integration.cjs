@@ -9,6 +9,7 @@ const { ScriptRunner, addSequenceApi } = require('../electron/script-runner.cjs'
 const localPython = path.join(__dirname, '..', '.deps', 'script-python', 'Scripts', 'python.exe');
 const pythonExecutable = process.env.AUTO_POKE_PYTHON || (fs.existsSync(localPython) ? localPython : 'python');
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+const neutral = { buttons: 0, hat: 8, lx: 128, ly: 128, rx: 128, ry: 128 };
 async function connected(client, config = {}) {
   const ready = new Promise((resolve, reject) => {
     const timer = setTimeout(() => { client.off('event', listener); reject(new Error('Video never connected')); }, 5000);
@@ -69,6 +70,30 @@ target.mkdir()
     assert.ok(events.some(event => event.event === 'script.log' && event.message.trim() === '100'));
     assert.equal((await controller.call('controller.status')).status, 'connected');
     assert.equal((await client.call('video.status')).session, state.session);
+    events.length = 0;
+    const dependent = '$score = @目标\nWAIT 60000';
+    fs.writeFileSync(path.join(root, 'dependent.rng'), dependent);
+    await runner.start({ text: dependent, path: 'dependent.rng' });
+    while (!events.some(event => event.event === 'script.started' && event.requiresVideo)) await delay(20);
+    const stopped = runner.current.done;
+    runner.handleVideoState({ status: 'idle' });
+    await stopped;
+    const disconnected = events.find(event => event.event === 'script.done');
+    assert.equal(disconnected.status, 'failed');
+    assert.match(disconnected.message, /视频源已断开/);
+    assert.deepEqual((await controller.call('controller.status')).report, neutral);
+
+    events.length = 0;
+    await runner.start({ text: dependent, path: 'dependent.rng' });
+    while (!events.some(event => event.event === 'script.started' && event.requiresVideo)) await delay(20);
+    const sessionChanged = runner.current.done;
+    runner.handleVideoState({ status: 'connected', session: 'new-session' });
+    await sessionChanged;
+    const changed = events.find(event => event.event === 'script.done');
+    assert.equal(changed.status, 'failed');
+    assert.match(changed.message, /视频源会话已变化/);
+    assert.deepEqual((await controller.call('controller.status')).report, neutral);
+
     await delay(400);
     const slow = await request(state, '/frame?mode=next&after=' + sequence);
     assert.ok(Number(slow.headers.get('x-frame-skipped')) > 0); await slow.arrayBuffer();

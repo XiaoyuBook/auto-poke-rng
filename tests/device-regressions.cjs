@@ -79,5 +79,3 @@ test('[DEV-005] releasing a diagonal preserves a separately held cardinal direct
   await f.call('controller:key', { key: 'UP', down: false });
   assert.equal((await f.clients.controller.call('controller.status')).report.hat, 8);
 });
-
-test.todo('[DEV-007] define video-loss behavior for snapshot-only and continuously video-dependent tasks');

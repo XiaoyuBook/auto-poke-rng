@@ -4,7 +4,7 @@ const crypto = require('node:crypto');
 
 class ScriptRunner {
   constructor({ controller, rootDirectory, getVideo, emit }) {
-    Object.assign(this, { controller, rootDirectory, getVideo, emit });
+    Object.assign(this, { controller, rootDirectory, getVideo: getVideo || (() => ({ status: 'idle' })), emit });
     this.current = null;
     this.validationVersion = 0;
     this.cancelValidation = null;
@@ -74,7 +74,10 @@ class ScriptRunner {
     if (state.status !== 'connected') throw new Error('请先连接伊机控。');
     // Recheck after asynchronous preflight to reject simultaneous run requests.
     if (this.current) throw new Error('已有脚本正在运行。');
-    const run = { id: crypto.randomUUID(), owner: '', stopped: false, child: null, done: null, finished: false };
+    const run = {
+      id: crypto.randomUUID(), owner: '', stopped: false, child: null, done: null, finished: false,
+      videoDependent: false, videoSession: null,
+    };
     this.current = run;
     const child = spawn(this.pythonPath(), ['-u', path.join(__dirname, '..', 'runtime', 'python', 'script_host.py')], {
       windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, PYTHONUTF8: '1', PYTHONDONTWRITEBYTECODE: '1' },
@@ -142,7 +145,13 @@ class ScriptRunner {
               if (!run.finished && !child.stdin.destroyed) child.stdin.write(JSON.stringify({ id: message.id, result }) + '\n');
             } catch (error) { if (!run.finished && !child.stdin.destroyed) child.stdin.write(JSON.stringify({ id: message.id, error: error.message }) + '\n'); }
           })();
-        } else if (message.event === 'script.started') { clearTimeout(startupTimer); this.emit({ ...message, runId: run.id }); }
+        } else if (message.event === 'script.started') {
+          clearTimeout(startupTimer);
+          run.videoDependent = Boolean(message.requiresVideo);
+          run.videoSession = message.videoSession || null;
+          this.emit({ ...message, runId: run.id });
+          this.checkVideoDependency(run, this.getVideo?.());
+        }
         else if (message.event === 'script.done') void finish(run.stopped ? 'cancelled' : message.status, message.message, {
           phase: message.phase, source: message.source, line: message.line, column: message.column,
         });
@@ -168,6 +177,21 @@ class ScriptRunner {
       }
       await run.done;
     } finally { clearTimeout(timeout); }
+  }
+
+  checkVideoDependency(run, state) {
+    if (!run || run.finished || run.stopped || !run.videoDependent) return;
+    if (state?.status !== 'connected') {
+      void this.stop('视频源已断开，依赖视频的脚本已停止。');
+      return;
+    }
+    if (run.videoSession && state.session !== run.videoSession) {
+      void this.stop('视频源会话已变化，依赖视频的脚本已停止。请重新启动脚本。');
+    }
+  }
+
+  handleVideoState(state) {
+    this.checkVideoDependency(this.current, state);
   }
 }
 

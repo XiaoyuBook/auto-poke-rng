@@ -10,7 +10,7 @@
 | `npm run test:devices` | 构建界面后，在真实 Electron 中验证模拟设备接线 |
 | `npm run test:electron` | 桌面窗口、面板、脚本文件等集成验证 |
 
-设备问题与用例编号、已知失败、未定策略和硬件覆盖边界见 [公共设备回归资产](../docs/DEVICE_REGRESSIONS.md)。当前 DEV-001 至 DEV-005 尚未修复，两个包含它们的命令会返回失败；这不代表回归资产已全部通过。
+设备问题与用例编号、已知失败、视频依赖策略和硬件覆盖边界见 [公共设备回归资产](../docs/DEVICE_REGRESSIONS.md)。当前 DEV-001 至 DEV-005 尚未修复，两个包含它们的命令会返回失败；这不代表回归资产已全部通过。
 
 设备 Node 用例使用 `.cjs` 文件名和 `node:test`，由以上命令显式执行，不由 Vitest 的 `*.test.*` 发现规则收集。增加回归文件时，同时更新 `package.json` 中的独立回归命令和 `tools/test-runtime.ps1` 的文件清单。
 
