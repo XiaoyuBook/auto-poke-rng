@@ -22,7 +22,7 @@ async function fixture(t, options = {}) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'poke-repository-'));
   const rootDirectory = path.join(directory, 'scripts'), logs = [], requests = [], gate = createScriptGate();
   let remote = pack(), offline = false, busy = false;
-  const serviceOptions = { rootDirectory, userData: directory, appVersion: '0.1.0', gate, log: message => logs.push(message), isBusy: () => busy,
+  const serviceOptions = { rootDirectory, userData: directory, appVersion: '0.1.0', bundledCatalog: null, gate, log: message => logs.push(message), isBusy: () => busy,
     fetch: async url => { requests.push(url); if (offline) throw Error('offline'); return new Response(url.endsWith('catalog.json') ? JSON.stringify(remote.catalog) : remote.bytes); }, ...options };
   const service = createScriptRepository(serviceOptions);
   t.after(() => fs.rm(directory, { recursive: true, force: true }));
@@ -221,4 +221,41 @@ test('network failures have an actionable Chinese error and preserve cached pack
   const f = await fixture(t); await f.service.refresh(); f.offline();
   await assert.rejects(f.service.refresh(), /无法连接官方脚本仓库.*系统代理.*重试/);
   assert.equal((await f.service.state()).packages[0].id, 'demo');
+});
+
+test('bundled catalog makes first offline browsing possible without claiming a current index', async t => {
+  const bundledCatalog = require('../resources/script-catalog.json');
+  const f = await fixture(t, { bundledCatalog }); f.offline();
+  const initial = await f.service.state();
+  assert.equal(initial.cached, false); assert.equal(initial.catalogSource, 'bundled');
+  assert.equal(initial.packages[0].name, '珍钻复刻官方脚本包');
+  assert.equal(initial.packages[0].files.filter(file => file.path.endsWith('.txt')).length, 24);
+  await assert.rejects(f.service.refresh(), /无法连接/);
+  assert.deepEqual((await f.service.state()).packages, initial.packages);
+});
+
+test('Gitee channel persists, isolates its catalog, and never changes installed files', async t => {
+  const f = await fixture(t); await f.service.refresh(); await f.install(pack().bytes);
+  await f.write('测试.txt', 'personal');
+  const plan = await f.service.prepare('demo');
+  assert.equal((await f.service.setChannel('gitee')).cached, false);
+  await assert.rejects(f.service.apply({ token: plan.token, policy: 'replace' }), /过期/);
+  f.setRemote(pack('1.1.0')); await f.service.refresh();
+  assert.ok(f.requests.at(-1).startsWith('https://gitee.com/shekongsk/auto-poke-rng-scripts/raw/main/'));
+  const restarted = createScriptRepository(f.serviceOptions);
+  assert.equal((await restarted.state()).channel, 'gitee');
+  assert.equal((await restarted.state()).packages[0].version, '1.1.0');
+  assert.equal((await restarted.setChannel('github')).packages[0].version, '1.0.0');
+  assert.equal(await f.read('测试.txt'), 'personal');
+  await assert.rejects(restarted.setChannel('untrusted'), /渠道无效/);
+});
+
+test('details verify the archive without staging, installing, or invalidating an install preview', async t => {
+  const f = await fixture(t); await f.service.refresh();
+  const plan = await f.service.prepare('demo'), count = f.requests.length;
+  const details = await f.service.details('demo');
+  assert.equal(details.files.length, 2); assert.equal(f.requests.length, count);
+  await assert.rejects(f.read('测试.txt'), { code: 'ENOENT' });
+  await f.service.apply({ token: plan.token, policy: 'keep' });
+  assert.equal(await f.read('测试.txt'), 'A 1\n');
 });

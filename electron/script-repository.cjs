@@ -5,6 +5,10 @@ const { unzipSync } = require('fflate');
 const { createScriptGate } = require('./script-storage.cjs');
 
 const SOURCE = 'https://raw.githubusercontent.com/XiaoyuBook/auto-poke-rng-scripts/main/';
+const SOURCES = {
+  github: { name: 'GitHub', url: 'https://github.com/XiaoyuBook/auto-poke-rng-scripts' },
+  gitee: { name: 'Gitee', url: 'https://gitee.com/shekongsk/auto-poke-rng-scripts' },
+};
 const META = '.rng-package.json';
 const MAX_ARCHIVE = 20 * 1024 * 1024, MAX_FILES = 256, MAX_EXPANDED = 50 * 1024 * 1024;
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -19,6 +23,16 @@ function validatePackage(item) {
   if (!item || item.schemaVersion !== 1 || typeof item.id !== 'string' || !/^[a-z][a-z0-9-]{0,63}$/.test(item.id) || !version(item.version) || !version(item.minimumAppVersion)
     || !text(item.name, 100) || !text(item.description, 3000) || !text(item.game, 50) || !Array.isArray(item.authors) || !item.authors.length || item.authors.length > 20 || item.authors.some(author => !text(author, 100))
     || !safePath(item.installFolder) || item.installFolder.includes('/') || item.installFolder.startsWith('.') || (item.instructions != null && !text(item.instructions, 12000))) throw Error('脚本包描述无效。');
+  if (item.readme != null && !text(item.readme, 30000) || item.updatedAt != null && (typeof item.updatedAt !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(item.updatedAt))) throw Error('脚本包说明无效。');
+  if (item.files != null) {
+    if (!Array.isArray(item.files) || item.files.length > MAX_FILES) throw Error('脚本包文件清单无效。');
+    const seen = new Set();
+    for (const file of item.files) {
+      if (!file || !safePath(file.path) || !/\.(txt|rng|il|md)$/i.test(file.path) || !Number.isSafeInteger(file.bytes) || file.bytes < 0 || file.bytes > 12 * 1024 * 1024 || !digest(file.sha256)
+        || seen.has(file.path.toLowerCase()) || file.category != null && !text(file.category, 50)) throw Error('脚本包资源路径或文件清单无效。');
+      seen.add(file.path.toLowerCase());
+    }
+  }
   return item;
 }
 function validateCatalog(value) {
@@ -101,9 +115,15 @@ function installedInfo(files) {
   return info;
 }
 
-function createScriptRepository({ rootDirectory, userData, appVersion, gate = createScriptGate(), isBusy = () => false, fetch: download = globalThis.fetch, log = () => {}, rename = fs.rename }) {
+function createScriptRepository({ rootDirectory, userData, appVersion, bundledCatalog = require('../resources/script-catalog.json'), gate = createScriptGate(), isBusy = () => false, fetch: download = globalThis.fetch, log = () => {}, rename = fs.rename }) {
   const stateDirectory = path.join(userData, 'script-repository');
-  const cachePath = path.join(stateDirectory, 'catalog.json');
+  const settingsPath = path.join(stateDirectory, 'settings.json');
+  let channel = 'github', settingsLoaded, catalogSource = 'empty', downloadedArchive;
+  const cachePath = () => path.join(stateDirectory, channel === 'github' ? 'catalog.json' : 'catalog-gitee.json');
+  const loadSettings = () => settingsLoaded ||= (async () => {
+    try { const saved = JSON.parse(await fs.readFile(settingsPath, 'utf8')); if (Object.hasOwn(SOURCES, saved.channel)) channel = saved.channel; }
+    catch (error) { if (error.code !== 'ENOENT') log('仓库渠道设置无法读取，已使用默认渠道。', 'warning'); }
+  })();
   const journalPath = path.join(stateDirectory, 'install-pending.json');
   let catalog = null;
   let recovery;
@@ -129,8 +149,10 @@ function createScriptRepository({ rootDirectory, userData, appVersion, gate = cr
     recovery ||= recoverInstall(); await recovery;
   };
   async function fetchBytes(relative, maximum) {
+    await loadSettings();
     const resource = relative.split('/').map(encodeURIComponent).join('/');
-    const urls = [new URL(resource, SOURCE).href, `https://api.github.com/repos/XiaoyuBook/auto-poke-rng-scripts/contents/${resource}?ref=main`];
+    const urls = channel === 'gitee' ? [`https://gitee.com/shekongsk/auto-poke-rng-scripts/raw/main/${resource}`]
+      : [new URL(resource, SOURCE).href, `https://api.github.com/repos/XiaoyuBook/auto-poke-rng-scripts/contents/${resource}?ref=main`];
     let failure;
     for (const url of urls) {
       try {
@@ -149,9 +171,13 @@ function createScriptRepository({ rootDirectory, userData, appVersion, gate = cr
     throw Error('无法连接官方脚本仓库。请检查网络或系统代理后重试，也可以导入本地脚本包。', { cause: failure });
   }
   async function loadCatalog() {
+    await loadSettings();
     if (!catalog) {
-      try { catalog = validateCatalog(JSON.parse(await fs.readFile(cachePath, 'utf8'))); }
-      catch (error) { if (error.code !== 'ENOENT') throw Error('本地仓库索引无效，请检查更新。'); }
+      try { catalog = validateCatalog(JSON.parse(await fs.readFile(cachePath(), 'utf8'))); catalogSource = 'cache'; }
+      catch (error) {
+        if (error.code !== 'ENOENT') log('本地仓库目录无法读取，已回退到内置目录。', 'warning');
+        if (bundledCatalog) { catalog = validateCatalog(bundledCatalog); catalogSource = 'bundled'; }
+      }
     }
     return catalog || { schemaVersion: 1, packages: [] };
   }
@@ -164,16 +190,26 @@ function createScriptRepository({ rootDirectory, userData, appVersion, gate = cr
       const files = await readTree(path.join(rootDirectory, entry.name)), info = installedInfo(files);
       installed.push({ ...info.manifest, modified: Object.entries(info.hashes).some(([name,value]) => !files[name] || hash(files[name]) !== value) });
     }
-    return { packages: index.packages, installed, rootPath: rootDirectory, source: 'https://github.com/XiaoyuBook/auto-poke-rng-scripts', cached: !!catalog };
+    return { packages: index.packages, installed, rootPath: rootDirectory, source: SOURCES[channel].url, channel, sources: SOURCES, catalogSource, cached: ['cache', 'remote'].includes(catalogSource) };
   }
   async function refresh() {
     const next = validateCatalog(JSON.parse((await fetchBytes('catalog.json', 2 * 1024 * 1024)).toString('utf8')));
     await fs.mkdir(stateDirectory, { recursive: true });
     const temporary = path.join(stateDirectory, 'catalog-' + randomUUID() + '.tmp');
-    try { await fs.writeFile(temporary, JSON.stringify(next)); await fs.rename(temporary, cachePath); }
+    try { await fs.writeFile(temporary, JSON.stringify(next)); await fs.rename(temporary, cachePath()); }
     finally { await fs.rm(temporary, { force: true }); }
-    catalog = next;
+    catalog = next; catalogSource = 'remote';
     log('脚本仓库索引已更新。');
+    return state();
+  }
+  async function setChannel(value) {
+    if (!Object.hasOwn(SOURCES, value)) throw Error('仓库渠道无效。');
+    await loadSettings();
+    await fs.mkdir(stateDirectory, { recursive: true });
+    const temporary = path.join(stateDirectory, 'settings-' + randomUUID() + '.tmp');
+    try { await fs.writeFile(temporary, JSON.stringify({ channel: value })); await fs.rename(temporary, settingsPath); }
+    finally { await fs.rm(temporary, { force: true }); }
+    channel = value; catalog = null; catalogSource = 'empty'; downloadedArchive = undefined; plans.clear();
     return state();
   }
   async function planArchive(bytes, expected) {
@@ -202,13 +238,20 @@ function createScriptRepository({ rootDirectory, userData, appVersion, gate = cr
     plans.clear(); plans.set(token, { ...pack, before, target, changes, conflicts, expires: Date.now() + 5 * 60000 });
     return { token, package: manifest, installedVersion: old?.manifest.version || null, changes, conflicts };
   }
-  async function prepare(id) {
+  async function downloadPackage(id) {
     const index = await loadCatalog(), item = index.packages.find(pack => pack.id === id);
     if (!item) throw Error('请先检查仓库更新并选择脚本包。');
-    const bytes = await fetchBytes(item.archive, MAX_ARCHIVE);
+    const bytes = downloadedArchive?.sha256 === item.sha256 ? downloadedArchive.bytes : await fetchBytes(item.archive, MAX_ARCHIVE);
     if (bytes.length !== item.bytes || hash(bytes) !== item.sha256) throw Error('脚本包下载校验失败，未安装。');
-    return planArchive(bytes, item);
+    downloadedArchive = { sha256: item.sha256, bytes };
+    return { bytes, item };
   }
+  async function details(id) {
+    const { bytes, item } = await downloadPackage(id), { manifest } = unpackArchive(bytes);
+    if (manifest.id !== item.id || manifest.version !== item.version || manifest.installFolder !== item.installFolder) throw Error('脚本包与仓库索引不一致。');
+    return manifest;
+  }
+  async function prepare(id) { const { bytes, item } = await downloadPackage(id); return planArchive(bytes, item); }
   const apply = ({ token, policy }) => gate.run(async () => {
     if (isBusy()) throw Error('请先停止脚本和自动流程，再安装或更新脚本包。');
     const plan = plans.get(token);
@@ -251,7 +294,7 @@ function createScriptRepository({ rootDirectory, userData, appVersion, gate = cr
       }
     }
   });
-  return { state, refresh, prepare, planArchive, apply };
+  return { state, refresh, setChannel, details, prepare, planArchive, apply };
 }
 
 function registerScriptRepository({ ipcMain, getMainWindow, dialog, ...options }) {
@@ -259,6 +302,12 @@ function registerScriptRepository({ ipcMain, getMainWindow, dialog, ...options }
   const service = createScriptRepository({ ...options, fetch: options.fetch || ((...args) => require('electron').net.fetch(...args)) });
   const actions = {
     state: () => service.state(), refresh: () => service.refresh(), prepare: args => service.prepare(args?.id), apply: args => service.apply(args || {}),
+    channel: args => service.setChannel(args?.channel), details: args => service.details(args?.id),
+    'open-directory': async () => {
+      await service.state();
+      const error = await (options.openPath || require('electron').shell.openPath)(path.resolve(options.rootDirectory));
+      if (error) throw Error('无法打开脚本目录，请在文件管理器中查看。');
+    },
     import: async () => {
       const selected = await dialog.showOpenDialog(getMainWindow(), { title: '导入脚本包', filters: [{ name: '脚本包', extensions: ['zip'] }], properties: ['openFile'] });
       if (selected.canceled) return null;

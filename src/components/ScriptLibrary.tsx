@@ -2,8 +2,10 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ChevronRight, FileCode2, Folder, FolderOpen, Package, Plus, RefreshCw, Search, X } from 'lucide-react';
 import { ScriptRepositoryDialog } from './ScriptRepositoryDialog';
 import { isScriptDirty, parentFolder, type LibraryScript, type ScriptFolder } from '../scriptLibrary';
+import type { GameId } from '../workspace';
 
 interface Props {
+  game?: GameId;
   scripts: LibraryScript[];
   folders: ScriptFolder[];
   selectedPath?: string;
@@ -115,6 +117,6 @@ export function ScriptLibrary(props: Props) {
     </div>
     {props.warnings.length > 0 && <details className="library-warnings"><summary>{props.warnings.length} 项未能读取</summary>{props.warnings.map(warning => <p key={warning}>{warning}</p>)}</details>}
     <footer className="library-footer"><kbd>Ctrl S</kbd><span>保存当前文件</span></footer>
-    {repositoryOpen && <ScriptRepositoryDialog close={() => setRepositoryOpen(false)} onInstalled={props.refresh} hasUnsaved={props.scripts.some(isScriptDirty)} />}
+    {repositoryOpen && <ScriptRepositoryDialog currentGame={props.game} close={() => setRepositoryOpen(false)} onInstalled={props.refresh} hasUnsaved={props.scripts.some(isScriptDirty)} />}
   </aside>;
 }

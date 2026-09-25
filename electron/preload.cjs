@@ -11,6 +11,9 @@ contextBridge.exposeInMainWorld('desktop', {
   scriptRepository: {
     getState: () => ipcRenderer.invoke('script-repository:state'),
     refresh: () => ipcRenderer.invoke('script-repository:refresh'),
+    setChannel: channel => ipcRenderer.invoke('script-repository:channel', { channel }),
+    details: id => ipcRenderer.invoke('script-repository:details', { id }),
+    openDirectory: () => ipcRenderer.invoke('script-repository:open-directory'),
     prepare: id => ipcRenderer.invoke('script-repository:prepare', { id }),
     importZip: () => ipcRenderer.invoke('script-repository:import'),
     apply: request => ipcRenderer.invoke('script-repository:apply', request),

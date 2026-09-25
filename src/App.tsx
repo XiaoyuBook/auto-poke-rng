@@ -570,7 +570,7 @@ export default function App({ connections = initialConnections }: { connections?
               {page === '脚本编辑' && <ScriptWorkspace scriptId={library.active?.path || ''} scriptName={library.active?.name || ''} script={script}
                 onChange={body => library.update({ body })} onRename={name => library.update({ name })} onCursorChange={setCursor} saved={saved}
                 busy={library.busy} statusLabel={!library.active ? '' : library.active.missing ? '文件已移除 · 编辑保留' : library.active.diskChanged ? '外部已修改 · 编辑保留' : saved ? '已保存' : '未保存'} onSave={saveDraft}
-                library={<ScriptLibrary {...library} selectedPath={library.active?.path} />}
+                library={<ScriptLibrary {...library} game={game} selectedPath={library.active?.path} />}
                 logs={easyConLogs} clearLogs={() => setLogs(entries => entries.filter(log => !isEasyConLog(log)))} running={Boolean(run)} runningName={run?.scriptName}
                 runningLine={run && run.path === library.active?.path && run.text === script && run.progress?.source === run.path ? run.progress.line : undefined}
                 progress={run?.progress} validation={validation} recording={recording} elapsed={elapsed} toggleRunning={toggleRunning} toggleRecording={toggleRecording} openModal={openModal}
