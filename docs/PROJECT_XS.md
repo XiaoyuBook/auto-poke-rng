@@ -1,0 +1,76 @@
+# Project_Xs 眨眼捕获接入
+
+## 来源与范围
+
+直接引用 [Lincoln-LM/Project_Xs](https://github.com/Lincoln-LM/Project_Xs) 的原始算法，固定提交 `5439cec701e96280981a1fa6664cd8d0e885d514`。`third_party/Project_Xs/` 保存原始 `rngtool.py`、`calc.py`、`xorshift.py`、作为行为参考的 `player_blink_gui.py`、README 和 MIT LICENSE，均未修改。`manifest.json` 记录 SHA-256；`.gitattributes` 禁止对这些文件转换换行。引入时还逐字节核对了三个核心模块与上游 master 一致。auto-bdsp-rng 的适配器仅作为共享采集等接入方式的对照。
+
+```powershell
+node tools/vendor-project-xs.mjs          # 从原始仓库的固定提交更新副本
+node tools/vendor-project-xs.mjs --check  # 离线验证副本
+```
+
+功能和参数语义优先以原版 `player_blink_gui.py` 为准；auto-bdsp-rng 仅用于中文术语和既有工作流程对照。本页接入捕获、识别预览、状态恢复、重新定位、持续 advances 推进和手动 Timeline 倒计时。没有驱动原版 Tk 界面；自动 Timeline 目标触发、全局 PgUp 按键、最终 A 键调度和完整 TID 筛选流程尚未接入。小卡比兽模式恢复开场 RNG Seed，不直接计算 TID/SID。
+
+## 使用
+
+1. 切换到珍钻复刻并连接已有视频源，打开“眨眼捕获”。火叶和剑盾不显示这个页面或相关右键菜单。
+2. 在右上角视频右击“框选眨眼眼睛模板”，冻结一张当前源截图，框选睁开的眼睛并确认。取消／Esc 不修改配置。
+3. 右击“框选眨眼 ROI”，选择覆盖眼睛移动范围的搜索区域并确认。ROI 至少容纳完整模板。左侧同名按钮也进入这套视频框选流程。
+4. 用“识别预览”确认睁眼分数高于阈值，停止预览后直接点“捕捉 Seed”“校正”或“TID/SID 测种”。阈值是 OpenCV `TM_CCOEFF_NORMED` 的相关系数，不是百分比置信度。
+5. 捕获完成后持续推进，Seed 区保留本次捕获的基准值，推进区显示当前帧数和状态。玩家模式可点击“Timeline”，沿用原版倒计时后切换模型；“停止”、断源或切换游戏终止推进。1 PK NPC 校正成功后依原版直接进入 Timeline，宝可梦 NPC 按原版设为 1。
+6. 可复制两段 64 位 Seed、填入定点数据，或使用自动填入的四段 32 位状态再次校正。Seed 全程使用十六进制字符串。填入定点数据只填参数，不自动生成结果。
+
+配置名称、模板 PNG、像素 ROI、源分辨率、阈值、NPC 数、重新定位参数及所有高级时序字段保存在本地。保存同名配置会更新该配置，最多保留 20 份；旧配置自动补入时序默认值。“浏览”读取原版 JSON 的 `view/thresh/white_delay/advance_delay/advance_delay_2/npc/timeline_npc/pokemon_npc/reident_1_pk_npc`，以及配置目录或其上一级目录中的相对 PNG 模板。导入不会修改采集设备；没有连接视频、ROI 越界或存在原版 crop 裁剪时需重新框选。导入后点“保存配置”保存在本软件内，不覆盖原 JSON。分辨率变化后需要重新框选；换源时不把未完成的截图选择应用到新源。框选按源像素存储，支持黑边、不同宽高比、拖动缩放以及反向框选。
+
+| 模式 | 捕获数 | 原版入口 | 结果语义 |
+| --- | ---: | --- | --- |
+| 玩家 Seed 恢复 | 40 | `rngtool.recov` | 最后一次玩家眨眼 RNG 调用之前的状态 |
+| 普通重新定位 | 7 | `rngtool.reidentiy_by_intervals` | 匹配帧号和该次调用之前的状态 |
+| 单宝可梦干扰重新定位 | 20 | `rngtool.reidentiy_by_intervals_noisy` | 上游按干扰次数评分的候选状态和帧号 |
+| 小卡比兽 · TID/SID | 64 | `rngtool.recov_by_munchlax` | 丢弃第一个非完整间隔，并采用原版 `+0.048s` 校正的开场状态 |
+
+上游 README 将重新定位概括为 20 次，实际 GUI 普通分支使用 7 次，干扰分支使用 20 次；这里跟随实际代码。玩家识别保留间隔 `/1.017` 后取整、超过 `0.3s` 的双眨眼分类和 `0.7s` 状态复位；玩家闭眼分数门限为 `(0.01, threshold)`，宝可梦为 `(0.4, threshold)`。
+
+搜索起点包含、终点不包含，当前界面要求 `0 ≤ 起点 < 终点 ≤ 1,000,000`（原版 Spinbox 上限更大）。1 PK NPC 超过 100,000 时显示原版建议，不再硬性拦截；此时可能有不准确的匹配。该模式原函数把 `search_max` 当作起点后的长度，适配层把 UI 终点换成 `终点 - 起点`，避免非零起点时越界多搜。NPC 输入范围为 0–999；眼睛模板宽高为 2–512 像素，拒绝缺少图像细节的模板。
+
+### 时序参数与原版对应
+
+| 界面参数 | 原版字段 | 实际作用 |
+| --- | --- | --- |
+| 时间延迟 | `white_delay` | Timeline 转换调用后、初始化事件队列前等待的秒数 |
+| 帧数延迟 | `advance_delay` | 等待结束后一次性增加的 RNG 推进数 |
+| 帧数延迟 2 | `advance_delay_2` | Timeline 第 11 次事件前一次性追加 |
+| Timeline NPC 数 | `timeline_npc` | 每 1.017 秒的事件来源数为此值 +1；支持原版 -1 |
+| 宝可梦 NPC 数 | `pokemon_npc` | 采用原版 `rangefloat(3, 12) + 0.285` 的随机间隔事件来源数 |
+| 1 PK NPC 校正 | `reident_noisy_check_var` | 使用 20 次间隔抗干扰校正，并按原版切入单宝可梦 Timeline |
+| 关闭菜单 +1 | `menu_check_var` | 对应原版计数基准偏移与 Timeline 切换时附加 RNG 调用 |
+
+`blink_timing.py` 按原版 GUI 顺序执行，不把延迟字段用于眨眼识别。玩家恢复/校正后先以 `round(now - offset_time) × (npc + 1)` 补偿求解时间，随后按 1.018 秒持续推进。Seed 区输出这个补偿后的基准状态；原始恢复状态另保存在结果 `rawWords`。`matchedAdvance` 仍为搜索原始匹配帧号，`baselineAdvances` 是开始持续推进的计数基准。Timeline 保留原版切换、菜单和宝可梦队列初始化中未计入 advances 的 RNG 调用顺序，因此 advances 并非每次底层 `next()` 调用的总计。
+
+## 运行架构与修正
+
+`electron/blink-client.cjs` 只接受主窗口主 frame 请求，使用设备服务的可信 shared-memory descriptor 启动独立 `blink_host.py`。Python 进程读取 `runtime/clients/frames.py`，每个消费者拥有独立 cursor，不重开采集设备、不占伊机控，也不以渲染帧率测量眨眼间隔。计算采用原始 Python/NumPy 算法，图像匹配采用 OpenCV；不是另写的 C++ 求解器，工作不会在 React 渲染线程执行。
+
+使用采集源 QPC 时间戳与顺序帧，拒绝过期帧；捕获时相邻消费帧间隔超过 200ms 会停止并提示可能漏检。预览状态更新最多约 10Hz（眨眼分类变动立即更新）。切换 BDSP 内页面保留任务；换游戏、换视频源、视频中断、主窗口退出和显式停止终止任务，取消会等待进程退出后释放槽位。错误／取消不伪造 Seed，不影响定点搜索进程或设备连接。
+
+本项目适配层作以下明确修正，原始源码不变：
+
+- 共享帧协议为 BGR，模板和 ROI 使用一致的灰度转换；原版采集循环使用 `COLOR_RGB2GRAY`。
+- 连续帧像素完全相同时也推进最后一次眨眼的 0.7s 完成判定，避免结果一直等待。
+- 原版矩阵／`zip` 验证只涵盖前 39 次玩家眨眼；补验恢复状态的下一次随机值是否符合最后一次观测。回归测试已证明缺少该检查时错误的末次眨眼仍会返回 Seed。
+- 拒绝无效全零 RNG 状态；将所有双眨眼误判为单眨眼时，原版可返回这个不可能的状态。
+- 子进程失败重试时隔离旧进程迟到的 close／管道错误；离开 BDSP 后到达的运行状态也会取消。
+
+## 验证
+
+```powershell
+npm run test:blink
+npx vitest run src/components/BlinkWorkspace.test.tsx src/components/StaticDataWorkspace.test.tsx src/App.test.tsx
+npm run test:blink:electron
+```
+
+Python 测试从已知 Xorshift Seed 生成玩家／小卡比兽序列并还原状态，覆盖 NPC、非零搜索起点、干扰搜索参数、最后一次眨眼校验、无匹配、阈值边界和模板匹配。共享帧回放使用生成的睁闭眼图像及源时间戳，经过真实 OpenCV → 检测状态机 → 原版求解器，验证最终 Seed。时序测试通过 AST 提取并直接执行未修改原版 GUI 的 Timeline 代码块，逐个时间点对比混合 NPC 队列、两段延迟、菜单补偿的 advances 与完整 RNG 状态；另覆盖持续推进、倒计时和工作进程命令。
+
+主进程测试覆盖 IPC 来源、参数范围、取消重试、启动失败、旧事件隔离及断源。前端测试覆盖 BDSP 专属入口、右侧视频／日志保留、配置保存、运行状态、黑边坐标换算和 Seed 字符串传递。模式切换后进度显示所选模式的 40／7／20／64 次目标，避免沿用其他模式的进度和观测记录。
+
+Electron 测试启用已有“测试彩条（模拟）”，验证实际 C++ 共享帧 → Python/OpenCV → IPC → UI 的预览链路及视频菜单框选，并确认没有重开视频源。检查 1500、1280 和 1100 宽窗口布局：宽工作区并列显示参数栏和结果，窄工作区回到单列，展开高级参数不横向裁切，停止按钮始终可达；使用独立的前端结果样本检查窄窗口完整 Seed 和结果操作区，不把该样本当作捕获结果验证。截图在 `node_modules/.tmp/blink-review/`。这不是 Switch 实机眨眼录像验证；实机成功率仍需用实际场景、模板与采集卡验证。

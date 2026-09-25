@@ -73,6 +73,14 @@ contextBridge.exposeInMainWorld('desktop', {
     labelRead: (folder, name) => ipcRenderer.invoke('scripts:label-read', { folder, name }),
     labelSave: label => ipcRenderer.invoke('scripts:label-save', label),
   },
+  blink: {
+    getState: () => ipcRenderer.invoke('blink:state'),
+    start: config => ipcRenderer.invoke('blink:start', config),
+    stop: () => ipcRenderer.invoke('blink:stop'),
+    timeline: () => ipcRenderer.invoke('blink:timeline'),
+    importConfig: () => ipcRenderer.invoke('blink:import-config'),
+    onState: listener => subscribe('blink:state', listener),
+  },
   rng: {
     staticGenerate: request => ipcRenderer.invoke('rng:static-generate', request),
     cancel: () => ipcRenderer.invoke('rng:cancel'),

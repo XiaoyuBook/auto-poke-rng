@@ -10,6 +10,8 @@
 
 珍钻复刻的定点数据页已接入 PokeFinder 原生 BDSP 定点/游走生成器和个体值计算器，使用首页存档参数与上游模板生成真实结果，支持存档信息管理与表格属性列设置。源码固定版本、构建测试方式及接入范围见 [PokeFinder BDSP 接入说明](docs/POKEFINDER_BDSP.md)。
 
+珍钻复刻的“眨眼捕获”页已接入原版 Project_Xs 的玩家 Seed 恢复、普通／单宝可梦干扰校正和开场小卡比兽 Seed 恢复。右击固定视频预览可框选睁眼模板与 ROI，识别复用公共视频帧。支持原版配置导入、本地保存、识别预览、持续推进、手动 Timeline、两段帧数延迟及 NPC 时序参数，并可将捕获基准 Seed 填入定点数据。来源、参数语义及验证边界见 [Project_Xs 接入说明](docs/PROJECT_XS.md)。
+
 公共 OCR 已接入脚本运行时和 `.IL` 的 OCR 文本标签（兼容旧格式 `searchMethod:107/TESSER_DETECT`）：采用 PP-OCRv6 small，支持简中、繁中、英文和日文。首次安装 `setup:runtime` 会下载并校验模型；候选实测、模型哈希、复现方式和适用限制见 [OCR 选型报告](docs/OCR_SELECTION.md)。
 
 ## 开发环境

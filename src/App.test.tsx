@@ -169,7 +169,7 @@ describe('workspace interactions', () => {
     expect(within(nav).getAllByRole('button').map(button => button.textContent)).toEqual(['首页', '脚本编辑']);
     expect(screen.queryByRole('button', { name: '定点数据' })).toBeNull();
     changeGame('珍钻复刻');
-    expect(within(nav).getAllByRole('button').map(button => button.textContent)).toEqual(['首页', '脚本编辑', '定点数据', 'OCR 设置']);
+    expect(within(nav).getAllByRole('button').map(button => button.textContent)).toEqual(['首页', '脚本编辑', '定点数据', 'OCR 设置', '眨眼捕获']);
     fireEvent.click(screen.getByRole('button', { name: '首页' }));
     expect(screen.getByRole('region', { name: '存档信息' })).toBeTruthy();
     changeGame('火叶');
@@ -195,6 +195,43 @@ describe('workspace interactions', () => {
     expect(within(video).getByLabelText('视频画面')).toBe(frame);
     fireEvent.click(screen.getByRole('button', { name: '测试当前项' }));
     expect(within(screen.getByRole('region', { name: 'OCR识别预览' })).getByText('等待视频帧')).toBeTruthy();
+  });
+
+  it('limits blink capture and its video menu to BDSP, keeping the video and logs mounted', async () => {
+    await openApp();
+    const video = screen.getByRole('region', { name: '视频预览' });
+    const logs = document.querySelector('.persistent-logs');
+    expect(screen.queryByRole('button', { name: '眨眼捕获' })).toBeNull();
+    changeGame('珍钻复刻');
+    fireEvent.click(screen.getByRole('button', { name: '眨眼捕获' }));
+    expect(screen.getByRole('region', { name: '眨眼捕获工作区' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: '视频预览' })).toBe(video);
+    expect(document.querySelector('.persistent-logs')).toBe(logs);
+    expect((logs as HTMLElement).hidden).toBe(false);
+    fireEvent.contextMenu(video, { clientX: 300, clientY: 100 });
+    expect(screen.getByRole('menuitem', { name: '框选眨眼眼睛模板' })).toBeTruthy();
+    expect((screen.getByRole('menuitem', { name: '框选眨眼 ROI' }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.keyDown(window, { key: 'Escape' });
+    changeGame('火叶');
+    expect(screen.queryByRole('region', { name: '眨眼捕获工作区' })).toBeNull();
+    expect(screen.getByRole('heading', { name: '首页', level: 1 })).toBeTruthy();
+    fireEvent.contextMenu(video);
+    expect(screen.queryByRole('menuitem', { name: '框选眨眼 ROI' })).toBeNull();
+  });
+
+  it('applies recovered seed strings to static data without generating automatically', async () => {
+    let update!: (state: import('./blink').BlinkState) => void;
+    const result = { words: ['FFFFFFFF','FFFFFFFF','87654321','12345678'], pair: ['FFFFFFFFFFFFFFFF','8765432112345678'], mode: 'recover' as const, matchedAdvance: null, capturedAt: 10, blinks: [], intervals: [] };
+    const staticGenerate = vi.fn();
+    window.desktop!.rng = { staticGenerate, cancel: vi.fn(), calculateIvs: vi.fn() };
+    window.desktop!.blink = { getState: async () => ({ revision: 0, status: 'idle', captured: 0, target: 40, message: '' }), start: vi.fn(), stop: vi.fn(), timeline: vi.fn(), importConfig: vi.fn(), onState: listener => { update = listener; return () => {}; } };
+    await openApp(); changeGame('珍钻复刻');
+    fireEvent.click(screen.getByRole('button', { name: '眨眼捕获' }));
+    act(() => update({ revision: 1, runId: 'test', status: 'completed', captured: 40, target: 40, result, message: '已完成' }));
+    fireEvent.click(screen.getByRole('button', { name: '填入定点数据' }));
+    expect((screen.getByLabelText('Seed 0') as HTMLInputElement).value).toBe('FFFFFFFFFFFFFFFF');
+    expect((screen.getByLabelText('Seed 1') as HTMLInputElement).value).toBe('8765432112345678');
+    expect(staticGenerate).not.toHaveBeenCalled();
   });
 
   it('opens static data search, keeps the persistent video, and generates only after clicking generate', async () => {

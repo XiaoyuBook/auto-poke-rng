@@ -5,12 +5,14 @@ const { registerScriptFiles } = require('./script-files.cjs');
 const { registerDevices } = require('./devices.cjs');
 const { registerQQNotifications } = require('./qq-notifications.cjs');
 const { registerRng } = require('./rng-client.cjs');
+const { registerBlink } = require('./blink-client.cjs');
 
 let mainWindow = null;
 let panels;
 let devices;
 let notifications;
 let rng;
+let blink;
 let quitting = false;
 
 function loadWindow(window, query = {}) {
@@ -61,6 +63,7 @@ app.whenReady().then(() => {
   devices = registerDevices({ ipcMain, getWindows: () => BrowserWindow.getAllWindows(), loadWindow, testMode: testDevices });
   notifications = registerQQNotifications({ ipcMain, getMainWindow: () => mainWindow, safeStorage, nativeImage, userData: app.getPath('userData') });
   rng = registerRng({ ipcMain, getMainWindow: () => mainWindow });
+  blink = registerBlink({ ipcMain, getMainWindow: () => mainWindow, getVideo: () => devices.getState().video });
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -71,7 +74,7 @@ app.on('before-quit', event => {
   if (quitting || !devices) return;
   event.preventDefault(); quitting = true;
   notifications?.close();
-  void Promise.allSettled([devices.close(), rng?.close?.()]).finally(() => app.quit());
+  void Promise.allSettled([devices.close(), rng?.close?.(), blink?.close()]).finally(() => app.quit());
 });
 
 app.on('window-all-closed', () => {

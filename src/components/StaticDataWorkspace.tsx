@@ -23,11 +23,11 @@ function numeric(text: string, label: string, max: number) {
   return value;
 }
 
-export function StaticDataWorkspace({ profile, onLog }: { profile: BdspProfile; onLog?: (message: string) => void }) {
+export function StaticDataWorkspace({ profile, onLog, capturedSeed }: { profile: BdspProfile; onLog?: (message: string) => void; capturedSeed?: { id: string; pair: string[] } | null }) {
   const [category, setCategory] = useState<StaticCategoryKey>('starters');
   const [targetKey, setTargetKey] = useState('Turtwig');
-  const [seed0, setSeed0] = useState('');
-  const [seed1, setSeed1] = useState('');
+  const [seed0, setSeed0] = useState(capturedSeed?.pair[0] || '');
+  const [seed1, setSeed1] = useState(capturedSeed?.pair[1] || '');
   const [initialAdvance, setInitialAdvance] = useState('0');
   const [maxAdvances, setMaxAdvances] = useState('100000');
   const [offset, setOffset] = useState('0');

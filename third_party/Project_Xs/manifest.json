@@ -1,0 +1,12 @@
+{
+  "repository": "https://github.com/Lincoln-LM/Project_Xs",
+  "revision": "5439cec701e96280981a1fa6664cd8d0e885d514",
+  "hashes": {
+    "LICENSE": "4166be68c2685b156198179c04cd319a7da98158513b6177b3139af70aabc65d",
+    "README.md": "2018ac2a5b4c8080b4a51a16016c944816d7997e136cc632cec7321a00308dea",
+    "src/calc.py": "c2353fbaad95cc349ecfc17dac1375d359677da8a9ab01dfbb9b48f4c259572f",
+    "src/rngtool.py": "f8cbaa35129f260c63afa2b794d3207bfcc8ed8ad1128b0a1fe2627bf1cb6ef6",
+    "src/xorshift.py": "e7fca120e35fec14b727aa7b86fc89ab76721034ba7009965d6b49fb7d1e1f0b",
+    "src/player_blink_gui.py": "8f2bf4399485e5b2a492f96b8898572c3e2d5a9a4973b4cbd19a0c1847893cac"
+  }
+}

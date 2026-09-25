@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import {
-  Check, ChevronDown, CircleHelp, Dices, FileClock, Gamepad2, Home, Keyboard, Maximize2,
+  Check, ChevronDown, CircleHelp, Dices, Eye, FileClock, Gamepad2, Home, Keyboard, Maximize2,
   MonitorPlay, PanelLeftClose, PanelLeftOpen, ScanText, Search, Settings, TerminalSquare, Tv,
 } from 'lucide-react';
 import { CommandPalette, type CommandAction } from './components/CommandPalette';
@@ -21,6 +21,9 @@ import { ControllerOverlayApp } from './components/ControllerOverlayApp';
 import { KeyMappingDialog } from './components/KeyMappingDialog';
 import { OcrWorkspace } from './components/OcrWorkspace';
 import { StaticDataWorkspace } from './components/StaticDataWorkspace';
+import { BlinkWorkspace } from './components/BlinkWorkspace';
+import { BlinkVideoOverlay } from './components/BlinkVideoOverlay';
+import { useBlink, type BlinkResult } from './blink';
 import { BdspHomeWorkspace } from './components/BdspProfileCard';
 import { useBdspProfile } from './bdspProfile';
 import { loadControllerMapping, type MappingAction } from './controllerMapping';
@@ -86,6 +89,9 @@ export default function App({ connections = initialConnections }: { connections?
   const [labelReferenceHost, setLabelReferenceHost] = useState<HTMLDivElement | null>(null);
   const [ocrOverlayHost, setOcrOverlayHost] = useState<HTMLDivElement | null>(null);
   const [ocrPreviewHost, setOcrPreviewHost] = useState<HTMLDivElement | null>(null);
+  const blink = useBlink(devices.video, game === 'bdsp' && !panelQuery);
+  const [capturedSeed, setCapturedSeed] = useState<{ id: string; pair: string[] } | null>(null);
+  const blinkLogRevision = useRef('');
   const switcher = useRef<HTMLDivElement>(null);
   const gameButton = useRef<HTMLButtonElement>(null);
   const settingsButton = useRef<HTMLButtonElement>(null);
@@ -146,6 +152,18 @@ export default function App({ connections = initialConnections }: { connections?
   const addLog = useCallback((message: string, source: LogEntry['source'] = '系统', level: LogEntry['level'] = 'info') => {
     setLogs(entries => [...entries, createLog(message, source, level)].slice(-500));
   }, []);
+
+  useEffect(() => {
+    const key = `${blink.state.runId}:${blink.state.status}`;
+    if (key === blinkLogRevision.current || !blink.state.runId) return;
+    blinkLogRevision.current = key;
+    if (blink.state.status === 'completed' || blink.state.status === 'tracking') addLog('眨眼捕获完成 · Seed ' + blink.state.result?.pair.join(' / '), '系统', 'success');
+    else if (blink.state.status === 'error') addLog('眨眼捕获：' + blink.state.message, '系统', 'warning');
+    else if (['capturing', 'solving', 'stopped', 'countdown', 'timeline'].includes(blink.state.status)) addLog('眨眼捕获：' + blink.state.message);
+  }, [blink.state, addLog]);
+  useEffect(() => {
+    if (page !== '眨眼捕获' || inlineLabelsOpen) blink.cancelSelection();
+  }, [page, inlineLabelsOpen]);
 
   useEffect(() => window.desktop?.devices?.onEvent(event => {
     const activeRun = currentRun.current;
@@ -274,9 +292,14 @@ export default function App({ connections = initialConnections }: { connections?
   };
 
   const navigateToPage = (next: Page) => {
-    if ((next === '定点数据' || next === 'OCR 设置') && game !== 'bdsp') return;
+    if ((next === '定点数据' || next === 'OCR 设置' || next === '眨眼捕获') && game !== 'bdsp') return;
     setPage(next);
     if (inlineLabelsOpen) setVideoLabelsOpen(false);
+  };
+
+  const applyBlinkSeed = (result: BlinkResult) => {
+    setCapturedSeed({ id: crypto.randomUUID(), pair: [...result.pair] });
+    navigateToPage('定点数据');
   };
 
   const toggleVideoLabels = () => {
@@ -288,7 +311,7 @@ export default function App({ connections = initialConnections }: { connections?
     event.preventDefault();
     setVideoContextMenu({
       x: Math.min(event.clientX, Math.max(8, window.innerWidth - 180)),
-      y: Math.min(event.clientY, Math.max(8, window.innerHeight - 54)),
+      y: Math.min(event.clientY, Math.max(8, window.innerHeight - (game === 'bdsp' ? 128 : 54))),
     });
   };
 
@@ -454,6 +477,7 @@ export default function App({ connections = initialConnections }: { connections?
     ...(game === 'bdsp' ? [
       { label: '定点数据', keywords: 'static pokemon pokefinder encounter', icon: <Dices size={16} />, run: () => navigateToPage('定点数据') },
       { label: 'OCR 设置', keywords: 'ocr recognition', icon: <ScanText size={16} />, run: () => navigateToPage('OCR 设置') },
+      { label: '眨眼捕获', keywords: 'blink seed project xs', icon: <Eye size={16} />, run: () => navigateToPage('眨眼捕获') },
     ] : []),
     { label: '视频预览', keywords: 'video preview', icon: <MonitorPlay size={16} />, run: () => showPanel('video') },
     { label: '日志中心', keywords: 'logs history', icon: <FileClock size={16} />, run: () => showPanel('logs') },
@@ -488,7 +512,7 @@ export default function App({ connections = initialConnections }: { connections?
                   <button key={item.id} role="menuitemradio" aria-checked={item.id === game} className={'game-option ' + (item.id === game ? 'selected' : '')}
                     onClick={() => {
                       setGame(item.id); setGameMenuOpen(false); gameButton.current?.focus();
-                      if (item.id !== 'bdsp' && (page === '定点数据' || page === 'OCR 设置')) setPage('首页');
+                      if (item.id !== 'bdsp' && (page === '定点数据' || page === 'OCR 设置' || page === '眨眼捕获')) setPage('首页');
                       if (item.id !== game) addLog('已切换查看：' + item.label + '。');
                     }}>
                     <span className="game-mark" style={{ background: item.color }} />
@@ -507,6 +531,7 @@ export default function App({ connections = initialConnections }: { connections?
           <NavItem label="脚本编辑" icon={<TerminalSquare size={16} />} active={page === '脚本编辑'} onClick={() => navigateToPage('脚本编辑')} />
           {game === 'bdsp' && <NavItem label="定点数据" icon={<Dices size={16} />} active={page === '定点数据'} onClick={() => navigateToPage('定点数据')} />}
           {game === 'bdsp' && <NavItem label="OCR 设置" icon={<ScanText size={16} />} active={page === 'OCR 设置'} onClick={() => navigateToPage('OCR 设置')} />}
+          {game === 'bdsp' && <NavItem label="眨眼捕获" icon={<Eye size={16} />} active={page === '眨眼捕获'} onClick={() => navigateToPage('眨眼捕获')} />}
         </nav>
         <footer className="sidebar-footer">
           <span className="brand-mark" aria-hidden="true" />
@@ -525,7 +550,7 @@ export default function App({ connections = initialConnections }: { connections?
           <h1>{page}</h1>
           <div className="topbar-actions">
             <button className="search-trigger" title="快速查找 (Ctrl+K)" aria-label="快速查找" onClick={() => setPaletteOpen(true)}><Search size={15} /><kbd>Ctrl K</kbd></button>
-            <span className="run-state"><span className={'status-dot ' + (run || recording ? 'success' : '')} />{run ? run.folder + (window.desktop?.devices ? ' · 运行中' : ' · 演示运行中') : recording ? '录制预览中' : '待命'}</span>
+            <span className="run-state"><span className={'status-dot ' + (run || recording || blink.busy ? 'success' : '')} />{run ? run.folder + (window.desktop?.devices ? ' · 运行中' : ' · 演示运行中') : recording ? '录制预览中' : blink.busy ? ['tracking', 'countdown', 'timeline'].includes(blink.state.status) ? blink.state.message : blink.state.mode === 'preview' ? '眨眼识别预览' : '眨眼捕获中' : '待命'}</span>
           </div>
         </header>
 
@@ -542,7 +567,8 @@ export default function App({ connections = initialConnections }: { connections?
                 virtualControllerOpen={virtualControllerOpen} toggleVirtualController={() => void toggleVirtualController()}
                 labelButton={<VideoLabelsButton variant="tool" expanded={panelWindows.videoLabelsOpen} toggle={toggleVideoLabels} />} />}
               {page === 'OCR 设置' && <OcrWorkspace overlayTarget={ocrOverlayHost} previewTarget={ocrPreviewHost} />}
-              {page === '定点数据' && <StaticDataWorkspace profile={bdspProfile} onLog={message => addLog(message, '系统', 'success')} />}
+              {page === '定点数据' && <StaticDataWorkspace profile={bdspProfile} capturedSeed={capturedSeed} onLog={message => addLog(message, '系统', 'success')} />}
+              {page === '眨眼捕获' && <BlinkWorkspace blink={blink} video={devices.video} onApply={applyBlinkSeed} />}
               {page === '首页' && (game === 'bdsp' ? <BdspHomeWorkspace profile={bdspProfile} onChange={setBdspProfile} onOpenScript={() => navigateToPage('脚本编辑')} /> : <div className="empty-state home-empty"><Home size={28} /><h2>开始你的工作</h2><p>当前游戏为{activeGame.label}，打开脚本编辑开始配置操作。</p><button className="button" onClick={() => navigateToPage('脚本编辑')}><TerminalSquare size={15} />打开脚本编辑</button></div>)}
             </div>
             <section className="workspace-labels" aria-label="标签工作区" hidden={!inlineLabelsOpen}>
@@ -557,7 +583,8 @@ export default function App({ connections = initialConnections }: { connections?
           <aside className="workspace-right-rail" aria-label="固定工作区侧栏">
             <section ref={videoRegion} className="persistent-video" aria-label="视频预览" tabIndex={-1} onContextMenu={openVideoContextMenu}>
               <VideoPreview previewOnly />
-              <div ref={setOcrOverlayHost} className="video-roi-host" aria-hidden={page !== 'OCR 设置' || undefined} hidden={page !== 'OCR 设置'} />
+              <div ref={setOcrOverlayHost} className="video-roi-host" aria-hidden={!(page === 'OCR 设置' || page === '眨眼捕获') || inlineLabelsOpen || undefined} hidden={!(page === 'OCR 设置' || page === '眨眼捕获') || inlineLabelsOpen} />
+              {page === '眨眼捕获' && !inlineLabelsOpen && <BlinkVideoOverlay blink={blink} video={devices.video} target={ocrOverlayHost} />}
               <button className="video-resize-handle" type="button" aria-label="调整视频预览大小" title="拖动调整视频大小，保持 16:9"
                 onPointerDown={startVideoResize} onPointerMove={resizeVideo} onPointerUp={finishVideoResize} onPointerCancel={finishVideoResize}
                 onLostPointerCapture={() => { videoResize.current = null; }} onKeyDown={nudgeVideoSize}><Maximize2 size={13} aria-hidden="true" /></button>
@@ -593,6 +620,10 @@ export default function App({ connections = initialConnections }: { connections?
       {paletteOpen && <CommandPalette actions={actions} close={() => setPaletteOpen(false)} />}
       {videoContextMenu && <div className="video-context-menu" role="menu" style={{ left: videoContextMenu.x, top: videoContextMenu.y }} onPointerDown={event => event.stopPropagation()}>
         <button type="button" role="menuitem" aria-label="弹出视频窗口" onClick={() => void openVideoWindow()}>弹出视频窗口</button>
+        {game === 'bdsp' && <>
+          <button type="button" role="menuitem" disabled={blink.busy || blink.selecting || devices.video.status !== 'connected'} onClick={() => { setVideoContextMenu(null); navigateToPage('眨眼捕获'); void blink.beginSelection('eye'); }}>框选眨眼眼睛模板</button>
+          <button type="button" role="menuitem" disabled={blink.busy || blink.selecting || devices.video.status !== 'connected'} onClick={() => { setVideoContextMenu(null); navigateToPage('眨眼捕获'); void blink.beginSelection('roi'); }}>框选眨眼 ROI</button>
+        </>}
       </div>}
       {(toast || panelError) && <div className="toast" role="status"><Check size={15} />{toast || panelError}</div>}
     </div>
