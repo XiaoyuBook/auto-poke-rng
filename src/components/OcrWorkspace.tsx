@@ -137,13 +137,10 @@ function OcrRoiOverlay({ rows, selectedId, setRect }: { rows: OcrRow[]; selected
     drag.current = null;
     if (svg.current?.hasPointerCapture(event.pointerId)) svg.current.releasePointerCapture(event.pointerId);
   };
-  const active = rows.find(row => row.id === selectedId);
   return <div className="video-roi-overlay" aria-label="反查识别区域框选">
     <svg ref={svg} viewBox={`0 0 ${sourceSize.width} ${sourceSize.height}`} preserveAspectRatio="none" onPointerDown={begin} onPointerMove={update} onPointerUp={end} onPointerCancel={end}>
-      <rect className="ocr-roi-mask" x="0" y="0" width={sourceSize.width} height={sourceSize.height} />
       {rows.map(row => <rect key={row.id} className={row.id === selectedId ? 'ocr-roi-selection is-active' : 'ocr-roi-selection'} x={row.rect.x} y={row.rect.y} width={row.rect.width} height={row.rect.height} />)}
     </svg>
-    {active && <span className="ocr-roi-badge"><Target size={12} />{active.label} · {active.rect.width} × {active.rect.height}</span>}
   </div>;
 }
 

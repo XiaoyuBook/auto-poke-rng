@@ -145,10 +145,8 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .video-roi-host { position: absolute; z-index: 3; inset: 0; overflow: hidden; border-radius: 6px; container-type: inline-size; }
 .video-roi-host[hidden], .persistent-ocr-preview[hidden], .persistent-logs[hidden] { display: none; }
 .video-roi-overlay { position: absolute; inset: 0; color: var(--accent); }
-.video-roi-overlay svg { display: block; width: 100%; height: 100%; cursor: crosshair; touch-action: none; }
-.ocr-roi-mask { fill: #11161666; pointer-events: none; }
+.video-roi-overlay > svg { display: block; width: 100%; height: 100%; cursor: crosshair; touch-action: none; }
 .ocr-roi-selection { fill: #8996d01c; stroke: #b3bdf4; stroke-width: 4; vector-effect: non-scaling-stroke; stroke-dasharray: 10 7; pointer-events: none; }
-.ocr-roi-badge { position: absolute; left: 10px; top: 10px; display: inline-flex; align-items: center; gap: 5px; padding: 4px 7px; border: 1px solid #8996d077; border-radius: 4px; background: #171a1add; color: #c3caf1; font-size: 10px; pointer-events: none; }
 .persistent-ocr-preview { display: flex; flex: 1; min-width: 0; min-height: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: #171a1a; }
 .ocr-preview-panel { display: flex; flex-direction: column; width: 100%; min-height: 0; padding: 12px; color: var(--secondary); }
 .ocr-preview-heading { display: flex; align-items: center; gap: 8px; min-height: 28px; color: var(--muted); }

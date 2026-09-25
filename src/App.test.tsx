@@ -191,7 +191,14 @@ describe('workspace interactions', () => {
     fireEvent.click(screen.getByRole('button', { name: '闪光反查区域' }));
     expect(screen.getByRole('heading', { name: '闪光反查区域', level: 2 })).toBeTruthy();
     expect(screen.getByRole('region', { name: '反查识别区域' })).toBeTruthy();
-    expect(screen.getByLabelText('反查识别区域框选')).toBeTruthy();
+    const overlay = screen.getByLabelText('反查识别区域框选');
+    expect(overlay.querySelector('.ocr-roi-selection')).toBeNull();
+    expect(overlay.querySelector('.ocr-roi-badge, .ocr-roi-mask')).toBeNull();
+    const natureRow = screen.getByRole('row', { name: /性格/ });
+    fireEvent.click(within(natureRow).getByRole('button', { name: '显示' }));
+    expect(overlay.querySelector('.ocr-roi-selection')?.getAttribute('x')).toBe('112');
+    fireEvent.click(within(natureRow).getByRole('button', { name: '隐藏' }));
+    expect(overlay.querySelector('.ocr-roi-selection')).toBeNull();
     expect(within(video).getByLabelText('视频画面')).toBe(frame);
     fireEvent.click(screen.getByRole('button', { name: '测试当前项' }));
     expect(within(screen.getByRole('region', { name: '反查识别预览' })).getByText('等待视频帧')).toBeTruthy();
