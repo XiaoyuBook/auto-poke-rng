@@ -263,21 +263,23 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .static-results-heading { min-height: 44px; padding: 0 12px; border-bottom: 1px solid var(--line-soft); }
 .static-results-actions { display: flex; align-items: center; gap: 2px; }
 .static-results-actions .icon-button { width: 27px; height: 27px; }
-.static-table-wrap { min-height: 0; flex: 1; overflow: auto; background: #151717; }
-.static-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-.static-table th { position: sticky; top: 0; z-index: 1; height: 32px; padding: 0 8px; border-bottom: 1px solid var(--line); background: #1d2020; color: var(--muted); font-size: 10px; font-weight: 500; text-align: left; white-space: nowrap; }
-.static-table td { height: 37px; padding: 0 8px; border-bottom: 1px solid var(--line-soft); color: var(--secondary); font-size: 10px; vertical-align: middle; }
+.static-table-wrap { min-height: 0; flex: 1; overflow: auto; overflow-anchor: none; background: #151717; }
+.static-table { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; outline: none; }
+.static-table:focus-visible { box-shadow: inset 0 0 0 1px var(--accent); }
+.static-table th { position: sticky; top: 0; z-index: 1; height: var(--static-header-height); padding: 0 8px; border-bottom: 1px solid var(--line); background: #1d2020; color: var(--muted); font-size: 10px; font-weight: 500; text-align: left; white-space: nowrap; }
+.static-table td { height: var(--static-row-height); padding: 0 8px; border-bottom: 1px solid var(--line-soft); color: var(--secondary); font-size: 10px; vertical-align: middle; white-space: nowrap; }
 .static-table tbody tr { cursor: pointer; transition: background-color 120ms ease; }
 .static-table tbody tr:hover, .static-table tbody tr.is-selected { background: #202424; }
 .static-table tbody tr.is-selected td:first-child { box-shadow: inset 2px 0 var(--accent); color: var(--text); }
+.static-table tbody tr td.is-current { box-shadow: inset 0 0 0 1px #65708f; background: #2a2f3b; color: var(--text); }
+.static-table:focus tbody tr td.is-current { box-shadow: inset 0 0 0 2px var(--accent); }
+.static-table tbody tr.static-table-spacer { background: transparent; cursor: default; }
+.static-table .static-table-spacer td { padding: 0; border: 0; font-size: 0; line-height: 0; }
 .static-table tbody tr:last-child td { border-bottom: 0; }
 .static-table .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .static-ivs, .static-stats { color: #aeb9ef !important; white-space: nowrap; }
 .static-shiny { display: inline-flex; align-items: center; gap: 4px; color: #d8c37d; white-space: nowrap; }
 .static-muted { color: var(--muted); }
-.static-results-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 49px; padding: 8px 12px; border-top: 1px solid var(--line-soft); color: var(--muted); font-size: 10px; }
-.static-results-footer > div { display: flex; gap: 7px; }
-.static-results-footer .button { min-height: 28px; padding-inline: 9px; font-size: 10px; }
 .static-profile-card { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-height: 58px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 7px; background: #171a1a; }
 .static-profile-card > label:not(.static-check) { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 11px; }
 .static-profile-card > label:not(.static-check) input, .static-profile-card select { width: 86px; height: 30px; padding: 4px 8px; border: 1px solid #3b4242; border-radius: 5px; background: #1a1e1e; color: var(--secondary); font-size: 11px; }
@@ -334,7 +336,6 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .static-results-actions .button:last-child { margin-left: auto; }
 .static-results-actions .button.primary { background: #84b39a; border-color: #84b39a; color: #14201b; }
 .static-results-actions .button.primary:hover:not(:disabled) { background: #9bc8ad; border-color: #9bc8ad; }
-.static-table td { height: 36px; padding: 0 8px; font-size: 10px; white-space: nowrap; }
 .static-table .static-empty { height: 120px; padding: 0; color: var(--muted); text-align: center; }
 .static-empty-content { position: sticky; left: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; width: min(100%, calc(100cqw - 2px)); height: 120px; }
 .static-empty-content svg { color: #90a0ae; }

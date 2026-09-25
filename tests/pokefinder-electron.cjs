@@ -16,8 +16,8 @@ let rng, devices, notifications;
 const timeout = setTimeout(() => { console.error('PokeFinder Electron test timed out'); app.exit(1); }, 45000);
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const js = (window, code) => window.webContents.executeJavaScript(code, true);
-async function until(window, code, label) {
-  for (let i = 0; i < 150; i++) { if (await js(window, code)) return; await delay(30); }
+async function until(window, code, label, attempts = 150) {
+  for (let i = 0; i < attempts; i++) { if (await js(window, code)) return; await delay(30); }
   throw Error(label);
 }
 app.whenReady().then(async () => {
@@ -135,6 +135,48 @@ app.whenReady().then(async () => {
   fs.writeFileSync(path.join(output, 'iv-calculator-1280.png'), (await main.webContents.capturePage()).toPNG());
   await clickText('关闭');
   assert.equal(await js(main, `document.querySelector('.persistent-video') === window.previewBefore && document.querySelector('.persistent-logs') === window.logsBefore`), true);
+  // Exercise virtualization against actual native data, including rows well
+  // beyond the former 200-result page and the end of a multi-million-pixel table.
+  main.setSize(1600, 1000); main.focus(); await delay(100);
+  await setInput('最大帧数', '99999');
+  await clickText('生成');
+  await until(main, `document.querySelector('.static-results-meta > span')?.textContent==='100000 条结果'`, '100,000 native rows rendered', 750);
+  assert.equal(await js(main, `Boolean(Array.from(document.querySelectorAll('button')).find(x=>x.textContent==='下一页'))`), false);
+  assert.ok(await js(main, `document.querySelectorAll('.static-table [data-row-index]').length<70`));
+  const key = async keyCode => {
+    main.webContents.sendInputEvent({ type: 'keyDown', keyCode });
+    main.webContents.sendInputEvent({ type: 'keyUp', keyCode });
+    await js(main, `new Promise(resolve=>requestAnimationFrame(resolve))`);
+  };
+  await js(main, `document.querySelector('.static-table [data-row-index="0"] [data-column="height"]').click()`);
+  for (const character of '255') await key(character);
+  await until(main, `document.querySelector('.static-table td.is-current')?.textContent==='255'`, 'typed height locates a real result');
+  assert.equal(await js(main, `document.querySelector('.static-table td.is-current').dataset.column`), 'height');
+  assert.ok(await js(main, `Number(document.querySelector('.static-table tr.is-selected').dataset.rowIndex)>200`));
+  assert.equal(await js(main, `(() => {
+    const viewport=document.querySelector('.static-table-wrap');const r=viewport.getBoundingClientRect();
+    const cell=document.querySelector('.static-table td.is-current').getBoundingClientRect();
+    return cell.left>=r.left && cell.right<=r.left+viewport.clientWidth+1 && cell.top>=r.top+31 && cell.bottom<=r.top+viewport.clientHeight+1;
+  })()`), true, 'lookup reveals the selected cell vertically and horizontally under the sticky header');
+  await delay(150);
+  fs.writeFileSync(path.join(output, 'virtual-table-height-lookup.png'), (await main.webContents.capturePage()).toPNG());
+  await key('End');
+  await until(main, `document.querySelector('.static-table tr.is-selected')?.dataset.rowIndex==='99999'`, 'keyboard reaches final row');
+  assert.equal(await js(main, `document.querySelector('.static-table tr.is-selected [data-column="advances"]').textContent`), '99999');
+  assert.ok(await js(main, `Math.abs(document.querySelector('.static-table-wrap').scrollHeight-(100000*36+32))<3`), 'spacer height stays accurate across 100,000 rows');
+  await js(main, `document.querySelector('.static-table-wrap').scrollTop=50000*36`);
+  await until(main, `Boolean(document.querySelector('.static-table [data-row-index="50000"]'))`, 'scrollbar reaches the middle without paging');
+  assert.ok(await js(main, `document.querySelectorAll('.static-table [data-row-index]').length<70`));
+  await key('Home');
+  await until(main, `document.querySelector('.static-table tr.is-selected')?.dataset.rowIndex==='0'`, 'keyboard reaches first row after scrolling away from selection');
+  await js(main, `document.querySelector('.static-table [data-row-index="0"] [data-column="ec"]').click()`);
+  for (const character of direct[0].ec.toLowerCase()) await key(character);
+  await until(main, `document.querySelector('.static-table td.is-current')?.textContent===${JSON.stringify(direct[0].ec)}`, 'hex prefix lookup ignores case');
+  await setInput('最大帧数', '0'); await clickText('生成');
+  await until(main, `document.querySelector('.static-results-meta > span')?.textContent==='1 条结果'`, 'fresh result replaces large list');
+  assert.equal(await js(main, `document.querySelector('.static-table-wrap').scrollTop`), 0);
+  assert.equal(await js(main, `document.querySelectorAll('.static-table [data-row-index]').length`), 1);
+  assert.equal(await js(main, `Boolean(document.querySelector('.static-table td.is-current'))`), false);
   const cancelledRequest = { ...request, maxAdvances: 1000000000, filter: { natures: Array(25).fill(false) } };
   await js(main, `window.cancelResult = window.desktop.rng.staticGenerate(${JSON.stringify(cancelledRequest)}).then(()=>'',error=>error.message); void 0`);
   await js(main, `window.desktop.rng.cancel()`);

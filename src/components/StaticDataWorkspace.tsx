@@ -1,21 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Copy, Database, Download, Dices, Filter, RefreshCw, Sparkles } from 'lucide-react';
-import { CATEGORY_OPTIONS, NATURES_ZH, CHARACTERISTICS_ZH, ABILITIES_ZH, getCategoryLabel, getStaticTargets, targetAbilityLabel, targetShinyLabel, type StaticCategoryKey } from '../staticData';
+import { CATEGORY_OPTIONS, NATURES_ZH, getCategoryLabel, getStaticTargets, targetAbilityLabel, targetShinyLabel, type StaticCategoryKey } from '../staticData';
 import type { NativeStaticResult, StaticGenerationRequest } from '../desktop';
 import type { BdspProfile } from '../bdspProfile';
 import { LeadSelector } from './LeadSelector';
 import { STATIC_COLUMNS, useStaticColumns } from '../staticTable';
 import { StaticTableSettings } from './StaticTableSettings';
 import { IvCalculatorDialog } from './IvCalculatorDialog';
+import { StaticResultsTable } from './StaticResultsTable';
+import { staticResultCells as cells } from '../staticResults';
 
 const statLabels = ['HP', '攻击', '防御', '特攻', '特防', '速度'];
 const columns = STATIC_COLUMNS.map(column => column.label);
-const PAGE_SIZE = 200;
-function cells(row: NativeStaticResult, showStats: boolean) {
-  return [row.advances, row.ec, row.pid, ['否', 'Star', 'Square'][row.shiny], NATURES_ZH[row.nature],
-    row.ability === 2 ? '隐藏' : String(row.ability), ['雄', '雌', '-'][row.gender],
-    ...(showStats ? row.stats : row.ivs), row.height, row.weight, CHARACTERISTICS_ZH[row.characteristic]];
-}
 function csvDownload(rows: NativeStaticResult[], species: string, showStats: boolean) {
   const csv = [columns, ...rows.map(row => cells(row, showStats))].map(line => line.map(value => `"${String(value).replaceAll('"', '""')}"`).join(',')).join('\r\n');
   const url = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' }));
@@ -52,20 +48,18 @@ export function StaticDataWorkspace({ profile, onLog }: { profile: BdspProfile; 
   const [resultSpecies, setResultSpecies] = useState('');
   const [generating, setGenerating] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-  const [page, setPage] = useState(0);
+  const [lookupMessage, setLookupMessage] = useState('');
   const [message, setMessage] = useState('尚未生成结果');
   const [error, setError] = useState(false);
   const [tableSettingsOpen, setTableSettingsOpen] = useState(false);
   const [calculatorOpen, setCalculatorOpen] = useState(false);
   const { hidden, setHidden, visible } = useStaticColumns();
   const seedRef = useRef<HTMLInputElement>(null);
-  const tableRef = useRef<HTMLDivElement>(null);
   const running = useRef(false);
   const mounted = useRef(true);
   const targetOptions = useMemo(() => getStaticTargets(category, profile.version), [category, profile.version]);
   const target = targetOptions.find(item => item.speciesKey === targetKey) ?? targetOptions[0];
-  const selected = results.find(row => row.advances === selectedIndex);
-  const pageCount = Math.ceil(results.length / PAGE_SIZE);
+  const selected = selectedIndex === null ? undefined : results[selectedIndex];
   useEffect(() => {
     mounted.current = true;
     return () => { mounted.current = false; if (running.current) void window.desktop?.rng?.cancel().catch(() => {}); };
@@ -73,7 +67,7 @@ export function StaticDataWorkspace({ profile, onLog }: { profile: BdspProfile; 
   const updateRange = (setter: typeof setIvMin, values: number[], index: number, value: string) => setter(values.map((item, itemIndex) => itemIndex === index ? Math.max(0, Math.min(31, Number.parseInt(value, 10) || 0)) : item));
   const generate = async () => {
     if (!target || running.current) return;
-    setError(false); setResults([]); setSelectedIndex(null); setPage(0);
+    setError(false); setResults([]); setSelectedIndex(null);
     try {
       const engine = window.desktop?.rng;
       if (!engine) throw new Error('请在桌面应用中使用 PokeFinder 原生计算引擎。');
@@ -106,7 +100,6 @@ export function StaticDataWorkspace({ profile, onLog }: { profile: BdspProfile; 
       setMessage(selection ? '已复制选中行' : `已复制 ${rows.length} 条结果`); setError(false);
     } catch { setMessage('复制失败，请重试或导出 CSV。'); setError(true); }
   };
-  const changePage = (next: number) => { setPage(next); if (tableRef.current) tableRef.current.scrollTop = 0; };
 
   return <section className="static-workspace" aria-label="定点数据工作区">
     <div className="static-settings-content">
@@ -157,16 +150,10 @@ export function StaticDataWorkspace({ profile, onLog }: { profile: BdspProfile; 
       </section>
       <section className="static-results-card" aria-label="定点搜索结果">
         <header className="static-results-toolbar"><div className="static-results-actions"><button className="button primary" type="button" onClick={() => void generate()} disabled={generating}><RefreshCw size={13} />{generating ? '生成中' : '生成'}</button>{generating && <button className="button" type="button" onClick={() => void window.desktop?.rng?.cancel().catch(reason => { setError(true); setMessage(String(reason)); })}>取消搜索</button>}<button className="button" type="button" disabled={!results.length} onClick={() => void copy(results)}><Copy size={13} />复制</button><button className="button" type="button" disabled={!results.length} onClick={() => csvDownload(results, resultSpecies, showStats)}><Download size={13} />导出 CSV</button><button className="button" type="button" disabled={!selected} onClick={() => selected && void copy([selected], true)}>复制选中行</button><button className="button" type="button" onClick={() => setTableSettingsOpen(true)}>表格设置</button></div></header>
-        <div className="static-results-meta"><span>{results.length} 条结果</span><span className="static-search-status" role={error ? 'alert' : 'status'}>{message}</span><label className="static-check stats-toggle"><input type="checkbox" checked={showStats} onChange={event => setShowStats(event.target.checked)} />显示能力值</label></div>
-        <div ref={tableRef} className="static-table-wrap"><table className="static-table" style={{ minWidth: visible.reduce((sum, column) => sum + column.width, 0) }}>
-          <colgroup>{visible.map(column => <col key={column.id} style={{ width: column.width }} />)}</colgroup>
-          <thead><tr>{visible.map(column => <th key={column.id}>{column.label}</th>)}</tr></thead>
-          <tbody>{results.length ? results.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map(row => {
-            const values = cells(row, showStats);
-            return <tr key={row.advances} aria-selected={row.advances === selectedIndex} className={row.advances === selectedIndex ? 'is-selected' : undefined} onClick={() => setSelectedIndex(row.advances)}>{visible.map(({ id, index }) => <td key={id} title={index === 5 ? ABILITIES_ZH[row.abilityIndex - 1] : undefined} className={index < 3 || index > 6 && index < 15 ? 'mono' : undefined}>{values[index]}</td>)}</tr>;
-          }) : <tr><td className="static-empty" colSpan={visible.length}><div className="static-empty-content"><Sparkles size={20} /><strong>{generating ? '搜索中…' : '设置 Seed 和筛选条件后点击生成'}</strong><button className="button" type="button" onClick={() => seedRef.current?.focus()}>设置 Seed 与参数</button></div></td></tr>}</tbody>
-        </table></div>
-        {pageCount > 1 && <footer className="static-results-footer"><span>第 {page + 1} / {pageCount} 页 · 每页 {PAGE_SIZE} 条 · 复制与导出包含全部结果</span><div><button className="button" disabled={page === 0} onClick={() => changePage(page - 1)}>上一页</button><button className="button" disabled={page + 1 >= pageCount} onClick={() => changePage(page + 1)}>下一页</button></div></footer>}
+        <div className="static-results-meta"><span>{results.length} 条结果</span><span className="static-search-status" role={error ? 'alert' : 'status'}>{lookupMessage || message}</span><label className="static-check stats-toggle"><input type="checkbox" checked={showStats} onChange={event => setShowStats(event.target.checked)} />显示能力值</label></div>
+        <StaticResultsTable rows={results} columns={visible} showStats={showStats} selectedIndex={selectedIndex} onSelect={setSelectedIndex} onSearchStatus={setLookupMessage}>
+          <div className="static-empty-content"><Sparkles size={20} /><strong>{generating ? '搜索中…' : '设置 Seed 和筛选条件后点击生成'}</strong><button className="button" type="button" onClick={() => seedRef.current?.focus()}>设置 Seed 与参数</button></div>
+        </StaticResultsTable>
       </section>
     </div>
     {tableSettingsOpen && <StaticTableSettings hidden={hidden} onChange={setHidden} close={() => setTableSettingsOpen(false)} />}

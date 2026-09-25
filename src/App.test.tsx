@@ -23,6 +23,7 @@ async function openApp() {
 }
 
 beforeEach(() => {
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
   localStorage.clear();
   disk = {
     rootPath: 'D:/project/auto-poke-rng/scripts', warnings: [],
@@ -154,7 +155,7 @@ describe('project script folders', () => {
     expect(localStorage.getItem('auto-poke-rng:script-library')).toBe('{"version":1,"scripts":[]}');
   });
 });
-afterEach(() => { cleanup(); delete window.desktop; vi.useRealTimers(); vi.restoreAllMocks(); });
+afterEach(() => { cleanup(); delete window.desktop; vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 function changeGame(label: string) {
   fireEvent.click(screen.getByRole('button', { name: /切换游戏/ }));
@@ -221,7 +222,7 @@ describe('workspace interactions', () => {
     const table = screen.getByRole('region', { name: '定点搜索结果' });
     const resultRows = within(table).getAllByRole('row');
     expect(resultRows.length).toBeGreaterThan(1);
-    fireEvent.click(resultRows[1]);
+    fireEvent.click(within(resultRows[1]).getAllByRole('gridcell')[0]);
     expect((screen.getByRole('button', { name: '复制选中行' }) as HTMLButtonElement).disabled).toBe(false);
     fireEvent.click(screen.getByRole('button', { name: '复制选中行' }));
     expect((screen.getByRole('button', { name: '复制选中行' }) as HTMLButtonElement).disabled).toBe(false);

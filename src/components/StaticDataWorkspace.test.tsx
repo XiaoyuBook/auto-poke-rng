@@ -9,13 +9,14 @@ const row: NativeStaticResult = { advances: 0, ec: '220345D0', pid: '2203506A', 
 const generate = vi.fn();
 const cancel = vi.fn(async () => {});
 beforeEach(() => {
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
   localStorage.clear();
   HTMLDialogElement.prototype.showModal = function () { this.open = true; };
   HTMLDialogElement.prototype.close = function () { this.open = false; };
   generate.mockReset().mockResolvedValue([row]); cancel.mockClear();
   window.desktop = { rng: { staticGenerate: generate, cancel } } as unknown as DesktopApi;
 });
-afterEach(() => { cleanup(); delete window.desktop; vi.restoreAllMocks(); });
+afterEach(() => { cleanup(); delete window.desktop; vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 function open() {
   const app = render(<StaticDataWorkspace profile={{ ...defaultBdspProfile, version: 'SP', tid: 42, sid: 31 }} />);
   fireEvent.change(screen.getByLabelText('Seed 0'), { target: { value: 'FFFFFFFFFFFFFFFF' } });
@@ -32,9 +33,9 @@ it('preserves 64-bit seeds, zero bounds and real profile; renders native stats a
   expect(generate).toHaveBeenCalledWith(expect.objectContaining({ seed0: 'FFFFFFFFFFFFFFFF', seed1: '0123456789ABCDEF', maxAdvances: 0, profile: expect.objectContaining({ version: 'SP', tid: 42, sid: 31 }), filter: expect.objectContaining({ heightMax: 0, weightMax: 0 }) }));
   const result = screen.getAllByRole('row')[1];
   expect(within(result).getByText('好奇心强')).toBeTruthy();
-  expect(within(result).getAllByRole('cell').slice(7, 13).map(cell => Number(cell.textContent))).toEqual(row.ivs);
+  expect(within(result).getAllByRole('gridcell').slice(7, 13).map(cell => Number(cell.textContent))).toEqual(row.ivs);
   fireEvent.click(screen.getByLabelText('显示能力值'));
-  expect(within(result).getAllByRole('cell').slice(7, 13).map(cell => Number(cell.textContent))).toEqual(row.stats);
+  expect(within(result).getAllByRole('gridcell').slice(7, 13).map(cell => Number(cell.textContent))).toEqual(row.stats);
 });
 it('uses the original lead menu hierarchy with all 25 natures and both Cute Charm genders', async () => {
   open();
@@ -80,14 +81,17 @@ it('rejects invalid inputs before invoking the engine', () => {
   expect(screen.getByRole('alert').textContent).toMatch(/下限/);
   expect(generate).not.toHaveBeenCalled();
 });
-it('pages the display while copying all native results, including those beyond the first page', async () => {
+it('scrolls continuously with bounded rendered rows while copying the complete result set', async () => {
   const clipboard = vi.fn(async (_text: string) => {});
   Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: clipboard } });
   generate.mockResolvedValue(Array.from({ length: 402 }, (_, advances) => ({ ...row, advances })));
   open(); start(); await screen.findByText('402 条结果');
-  expect(screen.getAllByRole('row')).toHaveLength(201);
-  fireEvent.click(screen.getByRole('button', { name: '下一页' }));
-  expect(screen.getAllByRole('row')[1].textContent?.startsWith('200')).toBe(true);
+  expect(screen.getAllByRole('row').length).toBeLessThan(40);
+  expect(screen.queryByRole('button', { name: '下一页' })).toBeNull();
+  const viewport = document.querySelector('.static-table-wrap')!;
+  fireEvent.scroll(viewport, { target: { scrollTop: 200 * 36 } });
+  expect(document.querySelector('[data-row-index="200"]')).toBeTruthy();
+  expect(screen.getByRole('grid').getAttribute('aria-rowcount')).toBe('403');
   fireEvent.click(screen.getByRole('button', { name: '复制' }));
   await screen.findByText('已复制 402 条结果');
   expect(clipboard.mock.calls[0][0].split('\n')).toHaveLength(403);
@@ -114,14 +118,14 @@ it('has no filter presets; hidden columns keep their cell alignment and full cli
   for (const label of ['EC', '性格', 'HP']) fireEvent.click(dialog.getByLabelText(label));
   fireEvent.click(dialog.getByRole('button', { name: '完成' }));
   expect(screen.getAllByRole('columnheader').map(cell => cell.textContent)).toEqual(['帧数','PID','异色','特性','性别','攻击','防御','特攻','特防','速度','身高','体重','个性']);
-  expect(within(screen.getAllByRole('row')[1]).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['0','2203506A','否','0','雄','23','15','30','19','26','124','99','好奇心强']);
+  expect(within(screen.getAllByRole('row')[1]).getAllByRole('gridcell').map(cell => cell.textContent)).toEqual(['0','2203506A','否','0','雄','23','15','30','19','26','124','99','好奇心强']);
   fireEvent.click(screen.getByRole('button', { name: '复制' }));
   await screen.findByText('已复制 1 条结果');
   expect(clipboard.mock.calls[0][0].split('\n').map(line => line.split('\t').length)).toEqual([16,16]);
   expect(clipboard.mock.calls[0][0]).toContain('220345D0');
   app.unmount(); open();
   expect(screen.queryByRole('columnheader', { name: 'EC' })).toBeNull();
-  expect(screen.getByRole('cell').getAttribute('colspan')).toBe('13');
+  expect(screen.getByRole('gridcell').getAttribute('colspan')).toBe('13');
   fireEvent.click(screen.getByRole('button', { name: '表格设置' }));
   fireEvent.click(screen.getByRole('button', { name: '显示全部列' }));
   fireEvent.click(screen.getByRole('button', { name: '完成' }));
