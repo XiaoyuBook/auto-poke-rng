@@ -146,7 +146,7 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .video-roi-host[hidden], .persistent-ocr-preview[hidden], .persistent-logs[hidden] { display: none; }
 .video-roi-overlay { position: absolute; inset: 0; color: var(--accent); }
 .video-roi-overlay > svg { display: block; width: 100%; height: 100%; cursor: crosshair; touch-action: none; }
-.ocr-roi-selection { fill: #8996d01c; stroke: #b3bdf4; stroke-width: 4; vector-effect: non-scaling-stroke; stroke-dasharray: 10 7; pointer-events: none; }
+.ocr-roi-selection { fill: #a8d7bd0a; stroke: #a9b7ae; stroke-width: 1.5; vector-effect: non-scaling-stroke; pointer-events: none; }
 .persistent-ocr-preview { display: flex; flex: 1; min-width: 0; min-height: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: #171a1a; }
 .ocr-preview-panel { display: flex; flex-direction: column; width: 100%; min-height: 0; padding: 12px; color: var(--secondary); }
 .ocr-preview-heading { display: flex; align-items: center; gap: 8px; min-height: 28px; color: var(--muted); }
@@ -218,8 +218,8 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .ocr-region-footer .button { min-height: 28px; padding-inline: 9px; font-size: 10px; }
 .ocr-region-footer .button.primary { background: #cbd0d0; border-color: #cbd0d0; }
 .ocr-preview-heading h2 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ocr-roi-selection { opacity: .45; }
-.ocr-roi-selection.is-active { opacity: 1; }
+.ocr-roi-selection { opacity: .65; }
+.ocr-roi-selection.is-active { fill: #a8d7bd18; stroke: #a8d7bd; stroke-width: 2; opacity: 1; }
 .static-workspace { display: flex; flex-direction: column; height: 100%; min-height: 0; color: var(--secondary); container: bdsp-static / inline-size; }
 .static-settings-content { display: flex; flex-direction: column; min-height: 0; height: 100%; gap: 10px; overflow: hidden; }
 .static-workspace-heading { display: flex; flex-shrink: 0; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 2px 0 3px; }
