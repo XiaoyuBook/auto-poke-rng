@@ -1100,14 +1100,6 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .blink-unit-input:has(> span) input { padding-right: 42px; }
 .blink-workspace .blink-check { display: flex; flex-direction: row; align-items: center; gap: 7px; min-height: 26px; }
 .blink-check input { accent-color: var(--accent); margin: 0; }
-.blink-disclosure { min-width: 0; font-size: 11px; }
-.blink-disclosure > summary { display: flex; align-items: center; gap: 5px; color: var(--secondary); cursor: pointer; list-style: none; min-height: 26px; }
-.blink-disclosure > summary::-webkit-details-marker { display: none; }
-.blink-disclosure > summary > span { color: var(--muted); font-size: 10px; margin-left: auto; }
-.blink-disclosure > summary > svg { transition: transform .15s; flex-shrink: 0; }
-.blink-disclosure[open] > summary > svg { transform: rotate(90deg); }
-.blink-disclosure[open] > summary { margin-bottom: 8px; }
-.blink-advanced { border-top: 1px solid var(--line); padding-top: 8px; }
 .blink-footer { flex-shrink: 0; padding: 10px 0; border-top: 1px solid var(--line); }
 .blink-run-actions { display: flex; align-items: center; gap: 8px; }
 .blink-run-actions > span { margin-left: auto; color: var(--muted); font: 10px var(--mono); }

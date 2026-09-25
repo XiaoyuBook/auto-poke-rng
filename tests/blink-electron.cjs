@@ -95,7 +95,6 @@ app.whenReady().then(async () => {
   assert.deepEqual(await compactLayout(), { logsBelowVideo: true, seedInVideo: true, badgesSeparate: true, actionsOnTwoRows: true, configOnOneRow: true, configFits: true, configWrapped: false }, 'logs stay below the video while frame and Seed fit in its top-left corner');
   fs.writeFileSync(path.join(output, 'blink-preview-1500.png'), (await main.webContents.capturePage()).toPNG());
   await click('停止'); await until(`window.desktop.blink.getState().then(x=>x.status==='stopped')`, 'stop preview');
-  await js(`document.querySelector('.blink-advanced').open=true`);
   await js(`document.querySelector('.blink-scroll').scrollTop=240`);
   await delay(100);
   fs.writeFileSync(path.join(output, 'blink-advanced-1500.png'), (await main.webContents.capturePage()).toPNG());
@@ -105,7 +104,6 @@ app.whenReady().then(async () => {
   assert.equal((await compactLayout()).configOnOneRow, true, 'configuration selector stays inline at medium widths');
   assert.equal(await js(`(() => {const s=document.querySelector('.blink-scroll');return s.scrollWidth<=s.clientWidth+1;})()`), true, 'advanced fields do not clip horizontally');
   fs.writeFileSync(path.join(output, 'blink-advanced-1280.png'), (await main.webContents.capturePage()).toPNG());
-  await js(`document.querySelector('.blink-advanced').open=false`);
   await click('TID/SID 测种');
   await until(`window.desktop.blink.getState().then(x=>x.status==='capturing')`, 'TID/SID capture starts');
   assert.equal(await js(`document.querySelector('.blink-footer').textContent.includes('0 / 64')`), true, 'active capture count remains visible below the form');

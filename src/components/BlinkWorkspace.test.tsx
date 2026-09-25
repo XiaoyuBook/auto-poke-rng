@@ -103,7 +103,8 @@ it('shows capture progress in the footer for the selected mode', async () => {
 it('persists every original timing parameter and sends them to capture and Timeline', async () => {
   const api = setup(); render(<api.Harness />); await act(async () => {});
   fireEvent.click(screen.getByRole('button', { name: '准备配置' }));
-  expect(screen.getByLabelText('眨眼NPC数').closest('details')?.querySelector('summary')?.textContent).toContain('高级时序8 项参数');
+  expect(screen.getByRole('region', { name: '高级时序' }).querySelector('h3')?.textContent).toContain('高级时序8 项参数');
+  expect(screen.getByLabelText('眨眼NPC数').closest('details')).toBeNull();
   for (const [label, value] of [['眨眼NPC数', '3'], ['眨眼时间延迟', '.8'], ['眨眼帧数延迟', '13'], ['眨眼帧数延迟2', '27'], ['Timeline NPC 数', '-1'], ['宝可梦 NPC 数', '2']]) {
     fireEvent.change(screen.getByLabelText(label), { target: { value } });
   }
