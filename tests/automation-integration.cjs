@@ -168,6 +168,31 @@ test('O07: reverse searches the entire legendary group and preserves equal-Adv s
   const rows=await f.callbacks().request('search',{seed:{pair:['1','2']},reverse:{target:{raw_target_advances:150},nature:'认真'}});
   assert.equal(rows.length,2);assert.deepEqual(rows.map(row=>row.reverseSpecies),['Latias','Latios']);
 });
+test('reverse preserves the forward lead for ordinary and sync candidates in every sync mode',async t=>{
+  const {RuntimeClient}=require('../electron/runtime-client.cjs');
+  const {natures}=require('../src/generated/bdsp-data.json');
+  const client=new RuntimeClient({role:'rng'});
+  t.after(()=>client.close());
+  for(const mode of [0,1,2])for(const configuredLead of [13,255])for(const source of (mode===0?['no_sync']:['no_sync','sync'])){
+    await t.test(`mode=${mode}, configured lead=${configuredLead}, source=${source}`,async t=>{
+      const f=fixture(t),calls=[];
+      Object.assign(f.input.config.parameters,{sync_mode:mode,sync_nature:natures[7],lead:configuredLead,max_advances:20,reverse_lookup_window:10});
+      f.input.config.parameters.filters[0].shiny=255;
+      f.rng.generate=async input=>{calls.push(input);return client.call('static.generate',input);};
+      await f.invoke('start',f.input);
+      const request=f.callbacks().request,seed={pair:['1234567887654321','8765432112345678']};
+      const forwardLead=source==='sync'?7:mode>0?255:configuredLead;
+      const rows=await request('search',{seed,...(mode>0?{lead:forwardLead}:{})});
+      const candidate=rows.find(row=>row.nature!==13)||rows[0];
+      assert.ok(candidate,'forward search produces a real native candidate');
+      const reverse=await request('search',{seed,reverse:{target:{raw_target_advances:candidate.advances,sync_source:source,sync_nature:source==='sync'?7:null},nature:natures[candidate.nature]}});
+      assert.equal(calls[0].lead,forwardLead);
+      assert.equal(calls[1].lead,forwardLead,'reverse must use the lead that generated the candidate');
+      assert.deepEqual(reverse.find(row=>row.advances===candidate.advances),{...candidate,reverseSpecies:'Turtwig'});
+    });
+  }
+});
+
 test('O11: calibration never presses keys or applies a threshold without user choice',async t=>{
   const f=fixture(t);const calibration=f.invoke('calibrate',{target:'Turtwig'});
   await new Promise(resolve=>setImmediate(resolve));

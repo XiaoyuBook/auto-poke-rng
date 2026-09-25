@@ -186,7 +186,9 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
           const p=run.input.config.parameters;
           let initial=p.initial_advances,max=p.max_advances,lead=params.lead??p.lead,filters=p.filters;
           if(params.reverse){const center=params.reverse.target.raw_target_advances;initial=Math.max(0,center-p.reverse_lookup_window);max=center+p.reverse_lookup_window-initial;
-            lead=params.reverse.target.sync_source==='sync'?params.reverse.target.sync_nature:p.lead;
+            // With a sync strategy, the core generates ordinary candidates with Lead.NONE.
+            // Without that strategy, its ordinary search uses the configured lead.
+            lead=params.reverse.target.sync_source==='sync'?params.reverse.target.sync_nature:p.sync_mode>0?255:p.lead;
             const nature=data.natures.indexOf(params.reverse.nature);filters=[{...defaultFilter(),shiny:255,natures:data.natures.map((_,i)=>nature<0||i===nature)}];}
           const rows=new Map();
           const targets=params.reverse?(reverseGroups.find(group=>group.includes(p.target))||[p.target]):[p.target];
