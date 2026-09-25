@@ -245,7 +245,7 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
   handle('log',row=>store.log(row.message,row.source,row.level));
   handle('ocr',async args=>{
     if(active||auxiliary)throw Error('已有流程正在使用 OCR');
-    const run={id:randomUUID(),stopped:false,scripts:{turn:{path:'BDSP/OCR翻页.rng'}}};auxiliary=run;
+    const run={id:randomUUID(),stopped:false,scripts:{turn:{path:'BDSP/OCR翻页.txt'}}};auxiliary=run;
     const rows=structuredClone(store.data.config.ocr);
     try{
       if(args.operation==='warmup'){await devices.ocr.start();checkStopped(run);return {text:'OCR 已预热'};}

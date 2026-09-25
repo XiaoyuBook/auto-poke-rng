@@ -12,10 +12,11 @@ const validLabelName = name => typeof name === 'string' && name.length > 0 && na
   && !/[<>:"/\\|?*\x00-\x1f]/.test(name) && !/[. ]$/.test(name)
   && !/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(name);
 
-function createScriptStore(rootDirectory) {
+function createScriptStore(rootDirectory, { serialize: sharedSerialize } = {}) {
   const rootPath = path.resolve(rootDirectory);
   let writes = Promise.resolve();
   const serialize = action => {
+    if (sharedSerialize) return sharedSerialize(action);
     const next = writes.then(action);
     writes = next.catch(() => {});
     return next;
@@ -28,7 +29,7 @@ function createScriptStore(rootDirectory) {
     }
     await fs.mkdir(rootPath, { recursive: true });
     const rootInfo = await fs.lstat(rootPath);
-    if (rootInfo.isSymbolicLink() || !rootInfo.isDirectory()) throw new Error('scripts 必须是项目内的普通文件夹。');
+    if (rootInfo.isSymbolicLink() || !rootInfo.isDirectory()) throw new Error('scripts 必须是普通文件夹。');
     const parts = relative ? relative.split('/') : [];
     let current = rootPath;
     for (let index = 0; index < parts.length; index++) {
@@ -43,7 +44,7 @@ function createScriptStore(rootDirectory) {
       const needsDirectory = index < parts.length - 1 || directory;
       if (needsDirectory ? !info.isDirectory() : !info.isFile()) throw new Error('脚本路径类型无效。');
     }
-    if (!directory && (!relative || path.extname(relative).toLowerCase() !== '.rng')) throw new Error('请选择 .rng 脚本文件。');
+    if (!directory && (!relative || !['.txt', '.rng'].includes(path.extname(relative).toLowerCase()))) throw new Error('请选择 .txt 脚本文件。');
     return current;
   }
 
@@ -68,7 +69,7 @@ function createScriptStore(rootDirectory) {
           if (entry.isDirectory()) {
             folders.push({ path: relative, name: entry.name });
             await visit(relative);
-          } else if (entry.isFile() && path.extname(entry.name).toLowerCase() === '.rng') files.push(await read(relative));
+          } else if (entry.isFile() && ['.txt', '.rng'].includes(path.extname(entry.name).toLowerCase())) files.push(await read(relative));
         } catch (error) { warnings.push(relative + '：' + error.message); }
       }
     }
@@ -80,7 +81,7 @@ function createScriptStore(rootDirectory) {
     const directory = await resolveEntry(folder, { directory: true });
     const body = '# 在此编写脚本\n';
     for (let index = 1; index < 10000; index++) {
-      const name = '未命名脚本' + (index === 1 ? '' : ' ' + index) + '.rng';
+      const name = '未命名脚本' + (index === 1 ? '' : ' ' + index) + '.txt';
       try {
         await fs.writeFile(path.join(directory, name), body, { encoding: 'utf8', flag: 'wx' });
         return read(folder ? folder + '/' + name : name);
@@ -122,7 +123,7 @@ function createScriptStore(rootDirectory) {
     const directory = path.join(scriptDirectory, 'ImgLabel');
     try {
       const info = await fs.lstat(directory);
-      if (info.isSymbolicLink() || !info.isDirectory()) throw new Error('ImgLabel 必须是项目内的普通文件夹。');
+      if (info.isSymbolicLink() || !info.isDirectory()) throw new Error('ImgLabel 必须是普通文件夹。');
     } catch (error) {
       if (error.code === 'ENOENT' && allowMissing) return directory;
       throw error;
@@ -218,9 +219,9 @@ function createScriptStore(rootDirectory) {
   return { list, read, create, save, labelsList, labelRead, labelSave };
 }
 
-function registerScriptFiles({ getMainWindow, rootDirectory, getLabelWindows = () => [] }) {
+function registerScriptFiles({ getMainWindow, rootDirectory, getLabelWindows = () => [], serialize }) {
   const { ipcMain } = require('electron');
-  const store = createScriptStore(rootDirectory);
+  const store = createScriptStore(rootDirectory, { serialize });
   const handlers = { list: 'list', create: 'create', save: 'save', labelsList: 'labels-list', labelRead: 'label-read', labelSave: 'label-save' };
   const labelOperations = new Set(['labelsList', 'labelRead', 'labelSave']);
   for (const [operation, channel] of Object.entries(handlers)) {

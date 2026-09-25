@@ -57,7 +57,10 @@ test('C04: cancellation during script preflight cannot launch a late controller 
 
 test('C02: every imported BDSP script compiles with this project’s existing engine',async()=>{
   const runner=new ScriptRunner({rootDirectory:path.resolve('scripts')});
-  for(const file of fs.readdirSync('scripts/BDSP').filter(file=>file.endsWith('.rng'))){
+  const files=fs.readdirSync('scripts/BDSP').filter(file=>file.endsWith('.txt'));
+  assert.equal(files.length,24);
+  assert.equal((await runner.resolveScript('BDSP/OCR翻页.rng')).absolute,path.resolve('scripts/BDSP/OCR翻页.txt'));
+  for(const file of files){
     const result=await runner.validate({text:fs.readFileSync(path.join('scripts/BDSP',file),'utf8'),path:'BDSP/'+file});
     assert.equal(result.valid,true,`${file}: ${result.diagnostic?.message}`);
   }

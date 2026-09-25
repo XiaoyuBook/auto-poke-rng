@@ -57,7 +57,7 @@ export function ScriptWorkspace(props: Props) {
         <div className="editor-file">
           <FileCode2 size={16} />
           {props.scriptId ? <><input className="script-title-input" aria-label="脚本名称" title={'scripts/' + props.scriptId + '（修改名称后保存）'} maxLength={80} value={props.scriptName} onChange={event => props.onRename(event.target.value)} placeholder="未命名脚本" />
-          <span className="file-extension">.rng</span></> : <span className="file-extension">未打开脚本</span>}
+          <span className="file-extension">{props.scriptId.slice(props.scriptId.lastIndexOf('.'))}</span></> : <span className="file-extension">未打开脚本</span>}
         </div>
         <div className="editor-actions">
           <span className="saved-state">{props.statusLabel}</span>

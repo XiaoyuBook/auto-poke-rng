@@ -10,12 +10,21 @@ class ScriptRunner {
     this.cancelValidation = null;
   }
   async resolveScript(relative) {
-    if (typeof relative !== 'string' || !relative || relative.includes('\\') || relative.includes(':') || relative.split('/').some(part => !part || part === '..' || part === '.') || !/\.rng$/i.test(relative)) throw new Error('脚本路径无效。');
-    const root = path.resolve(this.rootDirectory), absolute = path.resolve(root, relative);
+    if (typeof relative !== 'string' || !relative || relative.includes('\\') || relative.includes(':') || relative.split('/').some(part => !part || part === '..' || part === '.') || !/\.(txt|rng)$/i.test(relative)) throw new Error('脚本路径无效。');
+    const root = path.resolve(this.rootDirectory);
+    let resolved = relative, absolute = path.resolve(root, resolved);
     if (!absolute.startsWith(root + path.sep)) throw new Error('脚本必须位于脚本目录内。');
     const fs = require('node:fs/promises');
+    if (/\.(rng|txt)$/i.test(relative)) {
+      try { await fs.lstat(absolute); }
+      catch (error) {
+        if (error.code !== 'ENOENT') throw error;
+        resolved = relative.replace(/\.(rng|txt)$/i, (_, extension) => extension.toLowerCase() === 'rng' ? '.txt' : '.rng');
+        absolute = path.resolve(root, resolved);
+      }
+    }
     let currentPath = root;
-    for (const part of ['', ...relative.split('/')]) {
+    for (const part of ['', ...resolved.split('/')]) {
       currentPath = part ? path.join(currentPath, part) : currentPath;
       if ((await fs.lstat(currentPath)).isSymbolicLink()) throw new Error('脚本目录不允许链接。');
     }

@@ -19,6 +19,15 @@ afterEach(async () => { await fs.rm(fixture, { recursive: true, force: true }); 
 const save = (file, changes) => store.save({ ...file, expectedRevision: file.revision, ...changes });
 
 describe('project script files', () => {
+  it('creates txt scripts and preserves both txt and legacy rng extensions when editing', async () => {
+    await put('BDSP/原版.TXT', 'A 1\n');
+    await put('BDSP/旧脚本.rng', 'B 1\n');
+    const created = await store.create({ folder: 'BDSP' });
+    expect(created.path).toBe('BDSP/未命名脚本.txt');
+    expect((await store.list()).files).toHaveLength(3);
+    expect((await save(await store.read('BDSP/原版.TXT'), { name: '修改名称' })).path).toBe('BDSP/修改名称.TXT');
+    expect((await save(await store.read('BDSP/旧脚本.rng'), { name: '旧版兼容' })).path).toBe('BDSP/旧版兼容.rng');
+  });
   it('discovers actual folders recursively, root scripts, and empty folders, ignoring other file types', async () => {
     await put('火红/确认.rng', '# 火红');
     await put('珍钻复刻/菜单/确认.rng', '# 珍钻');
