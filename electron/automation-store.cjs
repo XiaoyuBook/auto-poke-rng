@@ -15,7 +15,7 @@ const defaults = () => ({
     fixed_delay: 100, max_wait_frames: 300, reseed_threshold_frames: 900000, reidentify_max_attempts: 2,
     reidentify_failure_policy: 'next_round', reidentify_seed_max_attempts: 1, reseeding_threshold: 500000,
     auto_reverse: false, escape_continue: false, reverse_lookup_window: 500, shiny_threshold_seconds: 4,
-    sync_mode: 0, sync_nature: '', loop_mode: 'single', loop_count: 1, start: 'script' },
+    sync_mode: 0, sync_nature: '', exit_blink_name: '', loop_mode: 'single', loop_count: 1, start: 'script' },
     scripts: { seed: '', advance: '', hit: '', exit: '', reverse: '', escape: '', record: '' } },
   tid: { parameters: { frame_threshold: 300, delay: 0, target_display_tids: [], loop_mode: 'single', loop_count: 1, start: 'script' }, scripts: { seed: '', name: '' } },
   ocr: regions.map(([id,label,x,y,width,height]) => ({ id, label, rect: { x,y,width,height } })),
@@ -109,7 +109,8 @@ class AutomationStore extends EventEmitter {
     if (event === 'seed_captured') { round.seed = args[0]; round.currentAdvances = args[1]; }
     if (event === 'candidates_found' || event === 'candidates_refiltered') { round.candidates = clone(args[0]); round.selected = args[1]; round.sources = args[2]; }
     if (event === 'cycle_no_candidate') round.outcome = '无候选';
-    if (event === 'cycle_result') { round.outcome = args[0] ? '出闪' : '未出闪'; round.interval = args[1]; round.trigger = args[2]; round.usedDelay = args[3]; }
+    if (event === 'cycle_result') { round.outcome = args[0] ? '出闪' : args[1] == null ? '判闪未知' : '未出闪'; round.interval = args[1]; round.trigger = args[2]; round.usedDelay = args[3]; }
+    if (event === 'cycle_restart') { round.outcome = '继续重试'; round.message = args[0]; }
     if (event === 'reverse_result') { round.reverse = clone(args[0]); round.actualDelays = clone(args[1]); }
     this.emit('change');
   }

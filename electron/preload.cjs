@@ -19,6 +19,8 @@ contextBridge.exposeInMainWorld('desktop', {
     defaultOcr: () => ipcRenderer.invoke('automation:ocr-defaults'),
     ocr: input => ipcRenderer.invoke('automation:ocr', input),
     delay: input => ipcRenderer.invoke('automation:delay', input),
+    delayEstimate: profile => ipcRenderer.invoke('automation:delay-estimate', { profile }),
+    calibrate: target => ipcRenderer.invoke('automation:calibrate', { target }),
     tidPreview: input => ipcRenderer.invoke('automation:tid-preview', input),
     setLogging: value => ipcRenderer.invoke('automation:logging', value),
     clearLogs: () => ipcRenderer.invoke('automation:clear-logs'),

@@ -65,7 +65,7 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
     const listener=message=>{if(!id)early.push(message);else dispatch(message);};
     devices.events.on('script',listener);
     try{
-      ({runId:id}=await devices.runner.start({text,path:selected.path}));
+      ({runId:id}=await devices.runner.start({text,path:selected.path,shouldStop:()=>run.stopped||closed||(active!==run&&auxiliary!==run)}));
       for(const message of early)dispatch(message);
       if(run.stopped){await devices.runner.stop();throw Error('自动流程已停止');}
       await complete;checkStopped(run);
@@ -91,6 +91,7 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
     await add('视频源',()=>{if(devices.getState().video.status!=='connected')throw Error('请先连接视频源');});
     await add('伊机控',()=>{if(devices.getState().controller.status!=='connected')throw Error('请先连接伊机控');if(devices.runner.current)throw Error('已有手动脚本正在运行');});
     await add('眼睛模板与校正配置',()=>{validateBlink({...input.blink,mode:kind==='tid'?'munchlax':config?.parameters?.start==='reidentify'?'reidentify':'recover'},devices.getState().video);if(input.exitBlink)validateBlink({...input.exitBlink,mode:'recover'},devices.getState().video);
+      if(config?.parameters?.exit_blink_name&&!input.exitBlink)throw Error('所选过场测种配置已不可用，请重新选择');
       if(['starting','preview','capturing','solving','tracking','countdown','timeline','stopping'].includes(blink.getState().status))throw Error('请先停止手动眨眼捕获/推进');});
     await add('脚本配置与语法',async()=>{
       if(!config?.scripts||!config.parameters)throw Error('脚本选择无效');
@@ -115,8 +116,9 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
     const run=active||auxiliary;if(!run)return;
     if(run.stopped)return run.done;
     run.stopped=true;run.failure=failure;run.stopReason=message;
-    update({status:'stopping',message});
-    await Promise.allSettled([run.worker?.stop(),run.stop?.(),devices.runner.stop(),rng.cancel(),devices.controller.child&&devices.controller.call('controller.stop')]);
+    if(run.calibration){await run.worker?.stop(message);return run.done;}
+    if(active===run){store.history(run.id,'stop',[message,state.progress]);update({status:'stopping',message});}
+    await Promise.allSettled([run.worker?.stop(message),run.stop?.(message),devices.runner.stop(),rng.cancel(),devices.controller.child&&devices.controller.call('controller.stop')]);
     if(run.done)await run.done;
   };
   const emergencyStop=()=>{void stop('伊机控停止操作');};
@@ -125,7 +127,7 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
     if(active||auxiliary||rng.isBusy())throw Error('已有任务正在运行');
     input=structuredClone(input);
     const run={id:randomUUID(),kind:input.kind,round:0,stopped:false,scripts:{},worker:null};active=run;
-    update({status:'starting',kind:input.kind,runId:run.id,progress:null,capture:null,message:'检查运行条件…'});
+    update({status:'starting',kind:input.kind,runId:run.id,progress:null,capture:null,seed:null,roundDelay:null,message:'检查运行条件…'});
     try{
       await devices.claimAutomation(run.id);
       checkStopped(run);
@@ -169,6 +171,7 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
       run.worker=workerFactory({kind:input.kind,parameters:input.config.parameters,scripts:result.scripts,
         species:result.target?.speciesId,blink:input.blink,exitBlink:input.exitBlink,video:{sharedMemory:devices.getState().video.sharedMemory},scriptRoot:devices.runner.rootDirectory},
         {request,event:message=>{
+          if(active===run&&message.event==='log'){store.log(message.message,source,'info',context());return;}
           if(run.stopped||active!==run)return;
           if(message.event==='progress'){
             const progress=message.progress;run.round=progress.loop_index||run.round;
@@ -197,7 +200,7 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
         update({status,message,capture:null,progress:state.progress?{...state.progress,wait_target_wall:null}:null});
       })();
       return snapshot();
-    }catch(error){devices.releaseAutomation(run.id);if(active===run)active=null;update({status:run.stopped?'stopped':'failed',message:error.message});throw error;}
+    }catch(error){const status=run.stopped?'stopped':'failed';store.finishRun(run.id,status,error.message);devices.releaseAutomation(run.id);if(active===run)active=null;update({status,message:error.message});throw error;}
   };
   handle('state',snapshot,false);
   handle('check',async input=>{if(active||auxiliary)throw Error('已有流程正在运行');const {ready,checks:items}=await checks(input);return {ready,checks:items};});
@@ -231,6 +234,28 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
   handle('delay-estimate',async({profile})=>{
     const worker=workerFactory({command:'delay-estimate',profile});const result=await worker.done;
     if(result.status!=='completed')throw Error(result.message);return result.result;
+  });
+  handle('calibrate',async({target})=>{
+    if(active||auxiliary)throw Error('已有流程正在使用 OCR');
+    const species=data.targets.find(item=>item.speciesKey===target)?.speciesId;
+    const video=devices.getState().video;
+    if(!species||video.status!=='connected'||!video.sharedMemory)throw Error('请选择宝可梦并连接视频源');
+    const run={calibration:true,stopped:false};auxiliary=run;
+    const rows=structuredClone(store.data.config.ocr);
+    update({status:'starting',kind:'static',runId:null,progress:null,capture:null,message:'准备判闪校准…'});
+    try{
+      await devices.ocr.start();checkStopped(run);
+      run.worker=workerFactory({command:'calibrate',species,video:{sharedMemory:video.sharedMemory}},
+        {request:async(method,params)=>{checkStopped(run);if(method!=='ocr')throw Error('校准仅允许 OCR');return ocrRequest(params,rows);}});
+      update({status:'running',message:'判闪校准中，请手动触发一次普通遭遇'});
+      run.done=run.worker.done;
+      const result=await run.done;
+      if(result.status!=='completed')throw Error(result.message||'校准已停止');
+      store.log(`判闪校准：间隔 ${result.result.interval}s，建议阈值 ${result.result.suggested}s`,'OCR');
+      update({status:'completed',message:'判闪校准完成，请确认建议阈值'});
+      return result.result;
+    }catch(error){update({status:run.stopped?'stopped':'failed',message:error.message});throw error;}
+    finally{if(auxiliary===run)auxiliary=null;}
   });
   handle('tid-preview',async args=>{
     if(active||auxiliary)throw Error('已有流程正在运行');

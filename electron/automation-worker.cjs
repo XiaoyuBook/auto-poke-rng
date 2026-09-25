@@ -33,13 +33,13 @@ function startWorker(config, { event = () => {}, request = async () => { throw E
           catch(error){send({id:message.id,error:error.message});}})();
       }else if(message.event==='done')finish({status:stopped?'stopped':message.status,message:message.message,result});
       else if(message.event==='result'){result=message.result;finish({status:'completed',result});}
-      else if(!stopped)event(message);
+      else if(!stopped||message.event==='log')event(message);
     }
   });
   send(config);
-  return {done,send,stop:async()=>{
+  return {done,send,stop:async(reason='用户停止')=>{
     if(completed)return done;
-    stopped=true;send({command:'stop'});
+    stopped=true;send({command:'stop',reason});
     const timer=setTimeout(()=>child.kill(),2000);
     try{return await done;}finally{clearTimeout(timer);}
   }};

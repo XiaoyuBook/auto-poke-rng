@@ -45,7 +45,7 @@ function createWindow() {
   mainWindow = window;
   window.webContents.on('render-process-gone', () => { void automation?.stop('主窗口已退出', true); void devices?.stopInputs().catch(() => {}); notifications?.cancel(); });
   void loadWindow(window);
-  window.on('closed', () => { notifications?.cancel(); mainWindow = null; panels.closeAll(); void devices?.controllerOverlay?.close(); });
+  window.on('closed', () => { void automation?.stop('主窗口已关闭'); notifications?.cancel(); mainWindow = null; panels.closeAll(); void devices?.controllerOverlay?.close(); });
 
   window.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);

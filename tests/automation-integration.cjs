@@ -11,12 +11,12 @@ const deferred=()=>{let resolve;const promise=new Promise(done=>{resolve=done;})
 function fixture(t){
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'automation-contract-'));
   const script=path.join(directory,'source.rng');fs.writeFileSync(script,'_目标帧数 = 300\nA 10\n');
-  const trace=[],handlers=new Map(),events=new EventEmitter();
+  const trace=[],ocrRequests=[],handlers=new Map(),events=new EventEmitter();
   const window={isDestroyed:()=>false,webContents:{isDestroyed:()=>false,send:()=>{},mainFrame:{}}};
   const state={video:{status:'connected',width:1920,height:1080,sharedMemory:{},session:'one'},controller:{status:'connected'}};
   let resolveDone,callbacks,workerConfig;
   const devices={events,getState:()=>state,claimAutomation:async()=>trace.push('claim'),releaseAutomation:()=>trace.push('release'),
-    ocr:{start:async()=>trace.push('warmup'),read:async(_image,_lang,options)=>{trace.push('ocr:'+options.field);return {text:options.field};}},
+    ocr:{start:async()=>trace.push('warmup'),read:async(_image,_lang,options)=>{trace.push('ocr:'+options.field);ocrRequests.push(options);return {text:options.field};}},
     controller:{sequence:async()=>trace.push('key')},runner:{rootDirectory:directory,current:null,
       resolveScript:async()=>({absolute:script}),validate:async()=>({valid:true}),stop:async()=>trace.push('stop-script'),
       start:async options=>{trace.push(options.text);queueMicrotask(()=>events.emit('script',{event:'script.done',runId:'s',status:'completed'}));return {runId:'s'};}}};
@@ -29,7 +29,7 @@ function fixture(t){
     sourceWidth:1920,sourceHeight:1080,roi:{x:0,y:0,width:100,height:100},threshold:.9,npc:0,seed:['1','2','3','4'],noisy:false,searchMin:0,searchMax:1000000}};
   input.config.scripts={...input.config.scripts,seed:'source.rng',advance:'source.rng',hit:'source.rng'};
   t.after(async()=>{await automation.close();fs.rmSync(directory,{recursive:true,force:true});});
-  return {automation,input,invoke,trace,devices,state,rng,done:value=>resolveDone(value),callbacks:()=>callbacks,workerConfig:()=>workerConfig};
+  return {automation,input,invoke,trace,ocrRequests,devices,state,rng,done:value=>resolveDone(value),callbacks:()=>callbacks,workerConfig:()=>workerConfig};
 }
 
 test('C02: preparation compiles but does not save, press, warm up, or claim devices',async t=>{
@@ -46,6 +46,10 @@ test('C01/D04: run snapshots parameters and OCR; newly recorded samples retain t
   assert.equal((await request('delay_profile',{})).config.baseline_delay,1442);
   assert.equal(f.workerConfig().parameters.target,'Turtwig');
   assert.equal(f.workerConfig().parameters.fixed_delay,1442);
+  const changed=defaults().ocr;changed[0].rect.x=900;
+  await f.invoke('ocr-save',changed);
+  await request('ocr',{imageBase64:'image',operation:'text',field:'nature'});
+  assert.equal(f.ocrRequests.at(-1).regions.nature[0],112,'active OCR uses its startup snapshot');
 });
 test('C04: stopping forbids all late script/search calls and releases the resource lock',async t=>{
   const f=fixture(t);await f.invoke('start',f.input);const request=f.callbacks().request;
@@ -77,4 +81,12 @@ test('O07: reverse searches the entire legendary group and preserves equal-Adv s
   const f=fixture(t);f.input.config.parameters.target='Latias';await f.invoke('start',f.input);
   const rows=await f.callbacks().request('search',{seed:{pair:['1','2']},reverse:{target:{raw_target_advances:150},nature:'认真'}});
   assert.equal(rows.length,2);assert.deepEqual(rows.map(row=>row.reverseSpecies),['Latias','Latios']);
+});
+test('O11: calibration never presses keys or applies a threshold without user choice',async t=>{
+  const f=fixture(t);const calibration=f.invoke('calibrate',{target:'Turtwig'});
+  await new Promise(resolve=>setImmediate(resolve));
+  f.done({status:'completed',result:{interval:2.5,suggested:3}});
+  assert.deepEqual(await calibration,{interval:2.5,suggested:3});
+  assert.equal(f.automation.getState().config.static.parameters.shiny_threshold_seconds,4);
+  assert.deepEqual(f.trace,['warmup']);
 });

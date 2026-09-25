@@ -66,11 +66,13 @@ class ScriptRunner {
     child.stdin.end(JSON.stringify({ command: 'validate', text, name: relative, scriptDir: path.dirname(absolute), rootDirectory: root }) + '\n');
     return result;
   }
-  async start({ text, path: relative }) {
+  async start({ text, path: relative, shouldStop = () => false }) {
     if (this.current) throw new Error('已有脚本正在运行。');
     if (typeof text !== 'string' || Buffer.byteLength(text, 'utf8') > 1024 * 1024 || !text.trim()) throw new Error('脚本内容无效。');
     const { root, absolute } = await this.resolveScript(relative);
+    if (shouldStop()) throw new Error('脚本已停止。');
     const state = await this.controller.call('controller.status');
+    if (shouldStop()) throw new Error('脚本已停止。');
     if (state.status !== 'connected') throw new Error('请先连接伊机控。');
     // Recheck after asynchronous preflight to reject simultaneous run requests.
     if (this.current) throw new Error('已有脚本正在运行。');

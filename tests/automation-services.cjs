@@ -70,3 +70,11 @@ test('L01/L02: rounds retain different outcomes and immutable candidate snapshot
   assert.equal(rounds[0].outcome, '未出闪'); assert.equal(rounds[1].outcome, '无候选');
   assert.equal(rounds[0].usedDelay, 1400);
 });
+
+test('L01: unknown OCR and restarted rounds are not labelled definite misses or running forever', t => {
+  const {store}=fixture(t);store.beginRun('r','static');store.history('r','cycle_start',[1]);
+  store.history('r','cycle_result',[false,null,1,100]);
+  store.history('r','cycle_start',[2]);store.history('r','cycle_restart',['校正失败']);
+  assert.equal(store.runs[0].rounds[0].outcome,'判闪未知');
+  assert.equal(store.runs[0].rounds[1].outcome,'继续重试');
+});

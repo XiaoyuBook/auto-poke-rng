@@ -52,6 +52,14 @@ def reidentify_windows(noisy, hint, max_advances, *, exit_scene=False):
     return list(dict.fromkeys(windows + fallbacks))
 
 
+def discard_warmup(detector, started, timestamp):
+    # Keep the pending single/double sample until the detector has returned to
+    # IDLE; clearing it while SINGLE would make a second blink index an empty list.
+    if len(detector.intervals) == 1 and detector.offset - started < 1 and timestamp - detector.offset > .7:
+        detector.intervals.clear()
+        detector.blinks.clear()
+
+
 def serialize(value):
     if isinstance(value, SeedState32):
         return {'words': [f'{word:08X}' for word in value.words], 'pair': list(value.to_seed_pair64().format_seeds())}
@@ -81,7 +89,10 @@ class Session:
         if message.get('command') == 'stop':
             self.cancel.set()
             if self.runner:
-                self.runner._stop_requested = True
+                if self.config.get('kind') == 'tid':
+                    self.runner.stop(message.get('reason') or '用户停止')
+                else:
+                    self.runner.stop()
         elif message.get('event') == 'battle':
             self.battle.set()
         elif 'id' in message:
@@ -179,8 +190,7 @@ class Session:
                 detector.feed(score,timestamp,gray_before is None or not np.array_equal(gray,gray_before))
                 gray_before = gray
                 # Match the old capture warm-up rule: discard an early first blink.
-                if len(detector.intervals) == 1 and detector.offset - started < 1:
-                    detector.intervals.clear(); detector.blinks.clear()
+                discard_warmup(detector, started, timestamp)
                 done = len(detector.intervals)
                 if time.monotonic() - last_progress >= .1:
                     self.emit(event='capture', captured=done,target=count,score=score,location=location)
@@ -210,7 +220,7 @@ class Session:
         state = SeedState32(*rng.get_state())
         now = time.monotonic()
         if tid:
-            seed = AutoTidSeedResult(state,0,0,' '.join(state.to_seed_pair64().format_seeds()),now,time.time())
+            seed = AutoTidSeedResult(state,0,max(0,config.get('pokemonNpc',0)),' '.join(state.to_seed_pair64().format_seeds()),now,time.time())
         elif previous:
             timeline = bool(config['noisy'])
             seed = replace(previous,current_advances=(result['matchedAdvance'] or 0)+elapsed,npc=config['npc'],measured_at=now,
@@ -314,11 +324,26 @@ class Session:
         self.emit(event='delay',value=result)
         return result
 
+    def calibrate(self):
+        from auto_bdsp_rng.automation.auto_rng.dialog_timing import measure_keyword_interval, suggested_shiny_threshold
+        starter = self.config['species'] in (387, 390, 393)
+        timing = measure_keyword_interval(self.frame, lambda image: self.ocr(image, field='shiny_dialog')['text'],
+            first_keyword=('去吧','上吧') if starter else '出现了！',
+            second_keyword=('战斗','戰鬥') if starter else ('去吧','上吧'),
+            second_capture_frame=self.frame if starter else None,
+            second_read_text=(lambda image: self.ocr(image, field='starter_battle')['text']) if starter else None,
+            should_stop=self.cancel.is_set, sleep=self.sleep, timeout_seconds=45)
+        self.emit(event='result', result={'interval': timing.interval_seconds, 'suggested': suggested_shiny_threshold(timing.interval_seconds)})
+
     def progress(self,value):
         self.emit(event='progress',progress=serialize(value),clock=time.monotonic(),wall=time.time())
 
     def run(self):
         c = self.config
+        if c.get('command') == 'calibrate':
+            self.emit(event='ready')
+            self.calibrate()
+            return
         if c.get('command') == 'delay-estimate':
             value = calculate_delay(DelayStrategyConfig(**c['profile']['config']),[DelaySampleRound(**sample) for sample in c['profile']['samples']])
             self.emit(event='result',result=value); return

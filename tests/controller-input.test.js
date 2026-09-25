@@ -164,3 +164,16 @@ it('publishes WASD, diagonal/opposing sticks and button highlights before serial
   await input.setActive(false);
   expect(input.getState().inputReport).toBeNull();
 });
+
+it('keeps the automation lock across idle controller reports and rejects keyboard activation', async () => {
+  const { input, controller, children, connection } = fixture();
+  input.automationLocked = true;
+  connection('connected');
+  await input.setActive(true);
+  expect(input.locked).toBe(true);
+  expect(input.getState().active).toBe(false);
+  expect(children).toHaveLength(0);
+  expect(controller.call).not.toHaveBeenCalled();
+  input.automationLocked = false;
+  expect(input.locked).toBe(false);
+});
