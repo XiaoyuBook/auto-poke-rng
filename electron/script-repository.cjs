@@ -151,12 +151,24 @@ function createScriptRepository({ rootDirectory, userData, appVersion, bundledCa
   async function fetchBytes(relative, maximum) {
     await loadSettings();
     const resource = relative.split('/').map(encodeURIComponent).join('/');
-    const urls = channel === 'gitee' ? [`https://gitee.com/shekongsk/auto-poke-rng-scripts/raw/main/${resource}`]
+    const useGitee = channel === 'gitee';
+    const urls = useGitee ? [`https://gitee.com/shekongsk/auto-poke-rng-scripts/raw/main/${resource}`]
       : [new URL(resource, SOURCE).href, `https://api.github.com/repos/XiaoyuBook/auto-poke-rng-scripts/contents/${resource}?ref=main`];
     let failure;
     for (const url of urls) {
       try {
-        const response = await download(url, { signal: AbortSignal.timeout(12000), redirect: 'error', headers: { Accept: 'application/vnd.github.raw+json' } });
+        const options = { signal: AbortSignal.timeout(12000), redirect: useGitee ? 'manual' : 'error', headers: { Accept: 'application/vnd.github.raw+json' }, maximumBytes: maximum };
+        let response = await download(url, options);
+        if (useGitee && [301, 302, 303, 307, 308].includes(response.status)) {
+          const location = response.headers.get('location');
+          await response.body?.cancel();
+          const destination = location && new URL(location, url);
+          // Gitee serves public files through a signed URL on its raw CDN.
+          // Permit one hop to the same resource, retaining the original timeout.
+          if (!destination || destination.origin !== 'https://raw.giteeusercontent.com' || destination.username || destination.password
+            || destination.hash || destination.pathname !== new URL(url).pathname) throw Error('Gitee 下载跳转地址无效。');
+          response = await download(destination.href, options);
+        }
         if (!response.ok) { await response.body?.cancel(); throw Error(`HTTP ${response.status}`); }
         if (Number(response.headers.get('content-length')) > maximum) { await response.body?.cancel(); throw new RangeError('仓库下载大小超限。'); }
         const chunks = []; let size = 0;
@@ -299,7 +311,7 @@ function createScriptRepository({ rootDirectory, userData, appVersion, bundledCa
 
 function registerScriptRepository({ ipcMain, getMainWindow, dialog, ...options }) {
   // Chromium networking follows the desktop session's system proxy settings.
-  const service = createScriptRepository({ ...options, fetch: options.fetch || ((...args) => require('electron').net.fetch(...args)) });
+  const service = createScriptRepository({ ...options, fetch: options.fetch || require('./script-repository-network.cjs').fetchRepositoryResource });
   const actions = {
     state: () => service.state(), refresh: () => service.refresh(), prepare: args => service.prepare(args?.id), apply: args => service.apply(args || {}),
     channel: args => service.setChannel(args?.channel), details: args => service.details(args?.id),

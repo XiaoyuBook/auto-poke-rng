@@ -250,6 +250,53 @@ test('Gitee channel persists, isolates its catalog, and never changes installed 
   await assert.rejects(restarted.setChannel('untrusted'), /渠道无效/);
 });
 
+test('Gitee public downloads follow the official raw CDN redirect and verify the archive', async t => {
+  const input = pack(), requests = [];
+  const f = await fixture(t, { fetch: async (url, options) => {
+    requests.push({ url, options });
+    const destination = new URL(url);
+    if (destination.hostname === 'gitee.com') {
+      destination.hostname = 'raw.giteeusercontent.com';
+      destination.search = '?metadata=public-download&signature=test';
+      return new Response(null, { status: 302, headers: { location: destination.href } });
+    }
+    assert.equal(destination.hostname, 'raw.giteeusercontent.com');
+    return new Response(destination.pathname.endsWith('catalog.json') ? JSON.stringify(input.catalog) : input.bytes);
+  } });
+  await f.service.setChannel('gitee');
+  await f.service.refresh();
+  const plan = await f.service.prepare('demo');
+  await f.service.apply({ token: plan.token, policy: 'keep' });
+  assert.equal(await f.read('测试.txt'), 'A 1\n');
+  assert.equal(requests.length, 4);
+  assert.ok(requests.every(request => request.options.redirect === 'manual'));
+  assert.equal(requests[0].options.signal, requests[1].options.signal);
+  assert.equal(requests[2].options.signal, requests[3].options.signal);
+});
+
+test('Gitee redirects cannot leave the exact HTTPS repository resource or loop', async t => {
+  const raw = 'https://raw.giteeusercontent.com/shekongsk/auto-poke-rng-scripts/raw/main/catalog.json';
+  for (const location of [undefined, raw.replace('https:', 'http:'), raw.replace('.com/', '.com.evil.example/'), raw.replace('/shekongsk/', '/another-owner/'), raw.replace('catalog.json', 'other.json'), raw.replace('https://', 'https://user:pass@'), raw + '#fragment', raw.replace('.com/', '.com:8443/')]) {
+    const requests = [];
+    const f = await fixture(t, { fetch: async url => {
+      requests.push(url);
+      return new Response(null, { status: 302, headers: location ? { location } : {} });
+    } });
+    await f.service.setChannel('gitee');
+    await assert.rejects(f.service.refresh(), /无法连接官方脚本仓库/);
+    assert.equal(requests.length, 1);
+    assert.deepEqual((await f.service.state()).packages, []);
+  }
+  let requests = 0;
+  const f = await fixture(t, { fetch: async () => {
+    requests++;
+    return new Response(null, { status: 302, headers: { location: raw } });
+  } });
+  await f.service.setChannel('gitee');
+  await assert.rejects(f.service.refresh(), /无法连接官方脚本仓库/);
+  assert.equal(requests, 2);
+});
+
 test('details verify the archive without staging, installing, or invalidating an install preview', async t => {
   const f = await fixture(t); await f.service.refresh();
   const plan = await f.service.prepare('demo'), count = f.requests.length;

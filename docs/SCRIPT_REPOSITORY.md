@@ -32,7 +32,7 @@
 
 仓库设置可选择 GitHub 或 Gitee（`https://gitee.com/shekongsk/auto-poke-rng-scripts`），选择会持久化，两个渠道的目录缓存分别保存。公开下载不需要用户输入令牌。切换渠道不修改已安装文件，尚未确认的安装预览会失效。
 
-桌面下载使用 Electron 的网络会话，遵循系统代理设置。GitHub 原始文件地址不可达时尝试同一仓库的官方接口，继续执行大小与哈希校验。失败时可切换 Gitee，或导入已下载的压缩包。网络通道回归：`node tests/run-electron.cjs script-repository-network-electron.cjs`。
+桌面下载使用 Electron 的网络会话，遵循系统代理设置。GitHub 原始文件地址不可达时尝试同一仓库的官方接口；Gitee 允许一次跳转到官方 `raw.giteeusercontent.com` 的同路径 HTTPS 资源，跳转前后共用下载超时，继续执行大小与哈希校验。失败时可切换渠道，或导入已下载的压缩包。网络通道回归：`node tests/run-electron.cjs script-repository-network-electron.cjs`。
 
 ## 验证
 
