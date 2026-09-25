@@ -50,6 +50,8 @@ it('shows current frame and complete seeds only on the blink video overlay', () 
   expect(screen.getByLabelText('当前帧数').textContent).toBe('125');
   expect(screen.getByLabelText('捕获 Seed 0').textContent).toBe('FFFFFFFFFFFFFFFF');
   expect(screen.getByLabelText('捕获 Seed 1').textContent).toBe('8765432112345678');
+  expect(screen.queryByRole('button', { name: '停止推进' })).toBeNull();
+  expect(screen.queryByRole('status', { name: '眨眼推进状态' })).toBeNull();
   expect(badge.querySelector('button')).toBeNull();
   app.rerender(<BlinkVideoOverlay blink={blink} target={target} video={{ ...video, status: 'idle' }} />);
   expect(screen.getByRole('region', { name: '眨眼帧数与 Seed' })).toBeTruthy();

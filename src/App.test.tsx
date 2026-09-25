@@ -236,6 +236,10 @@ describe('workspace interactions', () => {
     expect(within(video).getByLabelText('捕获 Seed 0').textContent).toBe('FFFFFFFFFFFFFFFF');
     expect(within(video).getByLabelText('捕获 Seed 1').textContent).toBe('8765432112345678');
     expect(screen.queryByRole('button', { name: '填入定点数据' })).toBeNull();
+    act(() => update({ revision: 2, runId: 'test', mode: 'recover', status: 'tracking', captured: 40, target: 40, result,
+      tracking: { advances: 189, phase: 'tracking', nextIn: .5, countdown: null, words: result.words, pair: result.pair }, message: '正在持续推进' }));
+    expect(document.querySelector('.run-state')?.textContent).toBe('当前帧数 189');
+    expect(screen.queryByText('正在持续推进')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '定点数据' }));
     expect(within(video).queryByRole('region', { name: '眨眼帧数与 Seed' })).toBeNull();
     expect((screen.getByLabelText('Seed 0') as HTMLInputElement).value).toBe('');

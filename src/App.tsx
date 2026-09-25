@@ -545,7 +545,7 @@ export default function App({ connections = initialConnections }: { connections?
           <h1>{page}</h1>
           <div className="topbar-actions">
             <button className="search-trigger" title="快速查找 (Ctrl+K)" aria-label="快速查找" onClick={() => setPaletteOpen(true)}><Search size={15} /><kbd>Ctrl K</kbd></button>
-            <span className="run-state"><span className={'status-dot ' + (run || recording || blink.busy ? 'success' : '')} />{run ? run.folder + (window.desktop?.devices ? ' · 运行中' : ' · 演示运行中') : recording ? '录制预览中' : blink.busy ? ['tracking', 'countdown', 'timeline'].includes(blink.state.status) ? blink.state.message : blink.state.mode === 'preview' ? '眨眼识别预览' : '眨眼捕获中' : '待命'}</span>
+            <span className="run-state"><span className={'status-dot ' + (run || recording || blink.busy ? 'success' : '')} />{run ? run.folder + (window.desktop?.devices ? ' · 运行中' : ' · 演示运行中') : recording ? '录制预览中' : blink.busy ? ['tracking', 'countdown', 'timeline'].includes(blink.state.status) ? `当前帧数 ${(blink.state.tracking?.advances ?? blink.state.result?.baselineAdvances)?.toLocaleString() ?? '—'}` : blink.state.mode === 'preview' ? '眨眼识别预览' : '眨眼捕获中' : '待命'}</span>
           </div>
         </header>
 

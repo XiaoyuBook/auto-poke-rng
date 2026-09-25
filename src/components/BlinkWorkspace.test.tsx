@@ -164,13 +164,12 @@ it('persists every original timing parameter and sends them to capture and Timel
   expect(screen.getByLabelText('当前帧数').textContent).toBe('25');
   expect((screen.getByRole('button', { name: '捕捉 Seed' }) as HTMLButtonElement).disabled).toBe(false);
   expect((screen.getByRole('button', { name: 'TID/SID 测种' }) as HTMLButtonElement).disabled).toBe(false);
-  expect(screen.getByRole('button', { name: '停止推进' })).toBeTruthy();
+  expect(screen.queryByRole('button', { name: '停止推进' })).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Timeline' }));
   expect(api.timeline).toHaveBeenCalledOnce();
   api.update({ revision: 4, mode: 'munchlax', status: 'tracking', captured: 64, target: 64, message: '正在推进' });
   expect((screen.getByRole('button', { name: 'Timeline' }) as HTMLButtonElement).disabled).toBe(true);
-  fireEvent.click(screen.getByRole('button', { name: '停止推进' }));
-  expect(api.stop).toHaveBeenCalledOnce();
+  expect(api.stop).not.toHaveBeenCalled();
 });
 it('restores capture buttons after recovery and stops old tracking before calibration', async () => {
   const api = setup(); render(<api.Harness overlay />); await act(async () => {});
@@ -181,7 +180,7 @@ it('restores capture buttons after recovery and stops old tracking before calibr
     tracking: { advances: 25, phase: 'tracking', nextIn: .5, countdown: null, words: ['12345678', '87654321', '87654321', '12345678'], pair: ['1234567887654321', '8765432112345678'] } });
   await act(async () => {});
   expect(screen.queryByRole('status', { name: '眨眼捕捉进度' })).toBeNull();
-  expect(screen.getByRole('status', { name: '眨眼推进状态' }).textContent).toContain('持续推进中');
+  expect(screen.queryByRole('status', { name: '眨眼推进状态' })).toBeNull();
   expect(screen.getByRole('button', { name: '捕捉 Seed' })).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: '校正' }));
   await waitFor(() => expect(api.start).toHaveBeenCalledWith(expect.objectContaining({ mode: 'reidentify' })));
