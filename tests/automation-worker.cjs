@@ -4,6 +4,21 @@ const {startWorker}=require('../electron/automation-worker.cjs');
 const {defaults}=require('../electron/automation-store.cjs');
 const {validateParameters}=require('../electron/automation.cjs');
 
+test('calibration loads native libraries with stdin open and reports unavailable video',async()=>{
+  const worker=startWorker({command:'calibrate',species:492,video:{sharedMemory:{version:0}}});
+  let timer;
+  try {
+    const result=await Promise.race([worker.done,new Promise((_,reject)=>{
+      timer=setTimeout(()=>reject(Error('calibration stalled during native initialization')),10000);
+    })]);
+    assert.equal(result.status,'failed');
+    assert.match(result.message,/Unsupported frame protocol/);
+  } finally {
+    clearTimeout(timer);
+    await worker.stop();
+  }
+});
+
 test('T02: real JSONL worker generates inclusive ID range and fixed elapsed timings',async()=>{
   const worker=startWorker({command:'tid-preview',seed:['40000000','00000000','40000000','00000000'],frame_threshold:4});
   const result=await worker.done;

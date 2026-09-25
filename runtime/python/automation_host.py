@@ -407,8 +407,14 @@ def main():
             except (ValueError,TypeError):
                 session.cancel.set()
         session.receive({'command':'stop'})
-    threading.Thread(target=receive,daemon=True).start()
     try:
+        if config.get('command') not in ('tid-preview', 'delay-estimate'):
+            # Native initialization may flush C stdio on Windows. Complete it
+            # before the reader holds stdin's CRT lock waiting for a command.
+            import numpy  # noqa: F401
+            import cv2  # noqa: F401
+            import blink_core  # noqa: F401
+        threading.Thread(target=receive,daemon=True).start()
         session.run()
     except Cancelled as error:
         emit(event='done',status='stopped',message=str(error))
