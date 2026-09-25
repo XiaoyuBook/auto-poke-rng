@@ -24,6 +24,7 @@ function fixture(overrides={}){
   const scripts={labelsList:vi.fn(async()=>({labels:[label]})),labelRead:vi.fn(async()=>label),labelSave:vi.fn(async data=>({...data,path:label.path}))};
   const listeners=new Set();
   const video={getSnapshot:vi.fn(async()=>frame),onSnapshot:vi.fn(fn=>{listeners.add(fn);return()=>listeners.delete(fn);}),
+    matchLabel:vi.fn(async()=>({score:100,scriptValue:100,matched:true,unit:'percent',x:1,y:1,width:2,height:2})),
     snapshot:vi.fn(async()=>{const live={...frame,url:'data:image/png;base64,FRAMEB',sequence:2};listeners.forEach(fn=>fn(live));return live;}),
     captureFrame:vi.fn(async()=>({...frame,url:'data:image/png;base64,FRAMEB',sequence:2}))};
   window.desktop={scripts,devices:{video}};
@@ -74,4 +75,23 @@ test('searching a live frame leaves the static reference and its next saved crop
   expect(screen.getByAltText('截图静态帧').getAttribute('src')).toBe(frame.url);
   expect(video.captureFrame).toHaveBeenCalledOnce();expect(video.snapshot).not.toHaveBeenCalled();
   expect((await save(scripts)).imageBase64).toBe(btoa('crop:'+frame.url));
+});
+
+test.each([5,3,2])('editor uses runtime matching and script threshold semantics for method %s',async method=>{
+  const {video}=fixture({searchMethod:method});render(<VideoPreview labelsOpen />);await load();
+  video.matchLabel.mockResolvedValue({score:94.1,scriptValue:95,matched:true,unit:method===2?'score':'percent',x:1,y:1,width:2,height:2});
+  fireEvent.click(screen.getByRole('button',{name:'搜索测试'}));
+  await waitFor(()=>expect(video.matchLabel).toHaveBeenCalledWith('FRAMEB',expect.objectContaining({searchMethod:method,imageBase64:'ORIGINAL',threshold:95})));
+  await screen.findByText('脚本值 95 · 通过');
+  const notice=screen.getByRole('status').textContent;
+  expect(notice).toContain(method===2?'94.1 分':'94.1%');
+});
+
+test('new color labels use normalized correlation while legacy raw thresholds remain editable',async()=>{
+  const {scripts}=fixture({searchMethod:2,threshold:2000});render(<VideoPreview labelsOpen />);await load();
+  fireEvent.change(screen.getByLabelText('最低匹配度'),{target:{value:'3000'}});
+  expect((await save(scripts)).threshold).toBe(3000);
+  fireEvent.change(screen.getByLabelText('搜索方法'),{target:{value:'3'}});
+  scripts.labelSave.mockClear();
+  expect((await save(scripts)).searchMethod).toBe(3);
 });

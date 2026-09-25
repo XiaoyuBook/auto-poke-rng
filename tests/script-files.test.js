@@ -115,6 +115,17 @@ describe('project script files', () => {
     await expect(store.labelSave({ ...valid, searchMethod: 999 })).rejects.toThrow('搜索方法');
   });
 
+  it('round trips raw score thresholds and all runtime-supported legacy methods', async () => {
+    await put('BDSP/test.rng');
+    for (const method of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14]) {
+      const threshold = method === 0 ? -3000 : [2, 4].includes(method) ? 3000 : 95;
+      const request = {folder:'BDSP',name:'legacy',searchMethod:method,threshold,
+        range:validRect(),target:validRect(),imageBase64:'YWJj'};
+      await store.labelSave(request);
+      expect(await store.labelRead({folder:'BDSP',name:'legacy'})).toMatchObject({searchMethod:method,threshold,imageBase64:'YWJj'});
+    }
+  });
+
   it('stores OCR labels as expected text instead of image base64', async () => {
     await put('火红/确认.rng');
     const saved = await store.labelSave({

@@ -6,6 +6,21 @@ const { createDeviceFixture, until } = require('./helpers/device-fixture.cjs');
 const neutral = { buttons: 0, hat: 8, lx: 128, ly: 128, rx: 128, ry: 128 };
 const options = { timeout: 15000, skip: process.platform !== 'win32' };
 
+test('image label IPC uses the script matcher and preserves raw legacy scores', options, async t => {
+  const f = createDeviceFixture(t);
+  const imageBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAMAAAADCAIAAADZSiLoAAAAG0lEQVQIHWNkYmRgBgNGbi5OZjBgFBEWYgYDAAdxAJTQaRgKAAAAAElFTkSuQmCC';
+  const rect = {x:0,y:0,width:3,height:3};
+  for (const method of [5, 3, 2]) {
+    const result = await f.call('video:match-label', { imageBase64, label: {searchMethod:method,threshold:95,range:rect,target:rect,imageBase64} });
+    assert.equal(result.matched, true);
+    assert.equal(result.scriptValue, Math.ceil(result.score));
+    assert.equal(result.unit, method === 2 ? 'score' : 'percent');
+    if (method === 2) assert.ok(result.score > 100);
+    else assert.ok(Math.abs(result.score - 100) < 0.001);
+  }
+  await assert.rejects(f.call('video:match-label', {imageBase64:'bad!'}), /无效/);
+});
+
 test('live test captures do not publish or replace the reference snapshot', options, async t => {
   const f = createDeviceFixture(t);
   await f.connectVideo();

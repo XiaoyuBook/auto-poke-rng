@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPoi
 import { createPortal } from 'react-dom';
 import { Camera, CircleHelp, Focus, Image, ImagePlus, MonitorPlay, Play, Save, ScanSearch, Search, Tag, Tags, X } from 'lucide-react';
 import { useDevices } from '../useDevices';
-import type { Snapshot } from '../devices';
+import type { LabelMatchResult, Snapshot } from '../devices';
 import type { LabelRecord, LabelRect } from '../scriptLibrary';
 
 function LiveVideo() {
@@ -29,7 +29,9 @@ export function VideoPreview({ labelsOpen = false, labelFolder = '', previewOnly
 }
 
 type SelectionKind = 'range' | 'target';
-type MatchResult = { score: number; maxScore: number; elapsedMs: number; liveUrl: string; targetUrl: string; x: number; y: number; recognizedText?: string };
+type MatchResult = LabelMatchResult & { maxScore: number; elapsedMs: number; liveUrl: string; targetUrl: string };
+const isRawMethod = (method: number) => [0, 2, 4].includes(method);
+const scoreText = (score: number, unit: 'score' | 'percent') => score.toFixed(1) + (unit === 'percent' ? '%' : ' 分');
 const blankRect = (): LabelRect => ({ x: 0, y: 0, width: 0, height: 0 });
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 const rectFromPoints = (start: { x: number; y: number }, end: { x: number; y: number }): LabelRect => ({
@@ -65,38 +67,6 @@ async function cropImage(url: string, rect: LabelRect): Promise<string> {
   const context = canvas.getContext('2d'); if (!context) throw new Error('当前环境不支持图像处理。');
   context.drawImage(image, rect.x, rect.y, rect.width, rect.height, 0, 0, rect.width, rect.height);
   return canvas.toDataURL('image/png');
-}
-
-async function matchImage(liveUrl: string, templateUrl: string, range: LabelRect, target: LabelRect): Promise<{ score: number; x: number; y: number }> {
-  const [live, template] = await Promise.all([loadImage(liveUrl), loadImage(templateUrl)]);
-  const liveCanvas = document.createElement('canvas'); liveCanvas.width = live.naturalWidth; liveCanvas.height = live.naturalHeight;
-  const templateCanvas = document.createElement('canvas'); templateCanvas.width = target.width; templateCanvas.height = target.height;
-  const liveContext = liveCanvas.getContext('2d'); const templateContext = templateCanvas.getContext('2d');
-  if (!liveContext || !templateContext) throw new Error('当前环境不支持图像处理。');
-  liveContext.drawImage(live, 0, 0); templateContext.drawImage(template, 0, 0);
-  const source = liveContext.getImageData(0, 0, liveCanvas.width, liveCanvas.height).data;
-  const wanted = templateContext.getImageData(0, 0, target.width, target.height).data;
-  const right = Math.min(range.x + range.width - target.width, live.naturalWidth - target.width);
-  const bottom = Math.min(range.y + range.height - target.height, live.naturalHeight - target.height);
-  if (right < range.x || bottom < range.y) throw new Error('搜索目标必须位于搜索范围内。');
-  const area = (right - range.x + 1) * (bottom - range.y + 1);
-  const positionStep = Math.max(1, Math.ceil(Math.sqrt(area / 120000)));
-  const pixelStep = Math.max(1, Math.ceil(Math.sqrt((target.width * target.height) / 12000)));
-  let best = { score: -1, x: range.x, y: range.y };
-  for (let y = range.y; y <= bottom; y += positionStep) for (let x = range.x; x <= right; x += positionStep) {
-    let error = 0; let count = 0;
-    for (let ty = 0; ty < target.height; ty += pixelStep) for (let tx = 0; tx < target.width; tx += pixelStep) {
-      const sourceIndex = ((y + ty) * live.naturalWidth + x + tx) * 4;
-      const wantedIndex = (ty * target.width + tx) * 4;
-      error += Math.abs(source[sourceIndex] - wanted[wantedIndex]);
-      error += Math.abs(source[sourceIndex + 1] - wanted[wantedIndex + 1]);
-      error += Math.abs(source[sourceIndex + 2] - wanted[wantedIndex + 2]);
-      count += 3;
-    }
-    const score = Math.max(0, 100 * (1 - error / (count * 255)));
-    if (score > best.score) best = { score, x, y };
-  }
-  return best;
 }
 
 function ImageLabelWorkspace({ active, labelFolder, cornerLayout, referenceTarget, onCloseLabels }: { active: boolean; labelFolder: string; cornerLayout: boolean; referenceTarget?: HTMLElement | null; onCloseLabels?: () => void }) {
@@ -198,20 +168,22 @@ function ImageLabelWorkspace({ active, labelFolder, cornerLayout, referenceTarge
     const videoApi = window.desktop?.devices?.video;
     if (!videoApi) throw new Error('请使用桌面应用连接视频源。');
     const started = performance.now(); const live = await videoApi.captureFrame();
-    let result: { score: number; x: number; y: number; recognizedText?: string };
+    let result: LabelMatchResult;
     if (searchMethod === 107) {
       const liveTargetUrl = await cropImage(live.url, target);
       const encoded = liveTargetUrl.split(',')[1] || '';
       const recognized = await videoApi.ocr(encoded);
       const text = recognized.text.trim();
-      result = { score: stringSimilarity(text, expectedText.trim()) * recognized.confidence * 100, x: target.x, y: target.y, recognizedText: text };
+      const score = stringSimilarity(text, expectedText.trim()) * recognized.confidence * 100;
+      const scriptValue = Math.ceil(score);
+      result = { score, scriptValue, matched: scriptValue >= threshold, unit: 'percent', ...target, recognizedText: text };
     } else {
-      result = await matchImage(live.url, targetUrl, range, target);
+      result = await videoApi.matchLabel(live.url.split(',')[1], { searchMethod, threshold, range, target, imageBase64: targetUrl.split(',')[1] });
     }
-    const liveTargetUrl = await cropImage(live.url, { x: result.x, y: result.y, width: target.width, height: target.height });
-    setMatch(current => ({ ...result, maxScore: Math.max(current?.maxScore || 0, result.score), elapsedMs: Math.round(performance.now() - started), liveUrl: liveTargetUrl, targetUrl }));
-    setNotice(`识别完成：${result.score.toFixed(1)}%${result.recognizedText === undefined ? '' : ` · “${result.recognizedText}”`} · ${Math.round(performance.now() - started)} ms`);
-  }, [expectedText, range, searchMethod, snapshot, target, templateBase64]);
+    const liveTargetUrl = await cropImage(live.url, result);
+    setMatch(current => ({ ...result, maxScore: Math.max(current?.maxScore ?? result.score, result.score), elapsedMs: Math.round(performance.now() - started), liveUrl: liveTargetUrl, targetUrl }));
+    setNotice(`识别完成：${scoreText(result.score, result.unit)}${result.recognizedText === undefined ? '' : ` · “${result.recognizedText}”`} · ${Math.round(performance.now() - started)} ms`);
+  }, [expectedText, range, searchMethod, snapshot, target, templateBase64, threshold]);
   const startDynamic = () => {
     if (dynamicTesting) { if (dynamicTimer.current !== null) window.clearInterval(dynamicTimer.current); dynamicTimer.current = null; setDynamicTesting(false); setNotice('动态测试已停止。'); return; }
     void performSearch().then(() => {
@@ -272,16 +244,17 @@ function ImageLabelWorkspace({ active, labelFolder, cornerLayout, referenceTarge
           <div className="label-parameter-body">
             <div className="label-form-fields">
               <label><span>标签名称</span><input type="text" placeholder="输入标签名称" aria-label="标签名称" value={name} onChange={event => setName(event.target.value)} /></label>
-              <label><span>搜索方法</span><select aria-label="搜索方法" value={searchMethod} onChange={event => setSearchMethod(Number(event.target.value))}><option value={5}>模板匹配</option><option value={2}>颜色匹配</option><option value={107}>OCR 文本匹配</option>{![5, 2, 107].includes(searchMethod) && <option value={searchMethod}>原有方法 {searchMethod}</option>}</select></label>
+              <label><span>搜索方法</span><select aria-label="搜索方法" value={searchMethod} onChange={event => { const method = Number(event.target.value); setSearchMethod(method); setMatch(null); if (!isRawMethod(method)) setThreshold(value => clamp(value, 0, 100)); }}><option value={5}>模板匹配</option><option value={3}>颜色匹配（归一化）</option><option value={107}>OCR 文本匹配</option>{![5, 3, 107].includes(searchMethod) && <option value={searchMethod}>原有方法 {searchMethod}{isRawMethod(searchMethod) ? '（数值分数）' : ''}</option>}</select></label>
               {searchMethod === 107 && <label><span>期望文本</span><input type="text" placeholder="输入识别文本" aria-label="OCR 期望文本" value={expectedText} onChange={event => setExpectedText(event.target.value)} /></label>}
-              <label><span>最低匹配度</span><div className="label-threshold"><input type="number" aria-label="最低匹配度" min={0} max={100} value={threshold} onChange={event => setThreshold(clamp(Math.round(Number(event.target.value) || 0), 0, 100))} /><span>%</span></div></label>
+              <label><span>最低匹配度</span><div className="label-threshold"><input type="number" aria-label="最低匹配度" min={isRawMethod(searchMethod) ? undefined : 0} max={isRawMethod(searchMethod) ? undefined : 100} value={threshold} onChange={event => { const value = Math.round(Number(event.target.value) || 0); setThreshold(isRawMethod(searchMethod) ? value : clamp(value, 0, 100)); }} /><span>{isRawMethod(searchMethod) ? '分' : '%'}</span></div></label>
             </div>
             <section className="label-match-preview" aria-label="动态测试对照">
               <div className="label-match-comparison">
                 <figure><figcaption>实时区域</figcaption>{match ? <img src={match.liveUrl} alt="实时匹配画面" /> : <div className="label-region-placeholder"><MonitorPlay size={20} /><span>等待实时画面</span></div>}</figure>
                 <figure><figcaption>标签截图</figcaption>{match ? <img src={match.targetUrl} alt="标签截图" /> : <div className="label-region-placeholder"><Focus size={20} /><span>等待标签截图</span></div>}</figure>
               </div>
-              <dl><div><dt>匹配度</dt><dd>{match ? match.score.toFixed(1) + '%' : '—'}</dd></div><div><dt>耗时</dt><dd>{match ? match.elapsedMs : '—'} <small>ms</small></dd></div><div><dt>最大匹配度</dt><dd>{match ? match.maxScore.toFixed(1) + '%' : '—'}</dd></div></dl>
+              <dl><div><dt>匹配度</dt><dd>{match ? scoreText(match.score, match.unit) : '—'}</dd></div><div><dt>耗时</dt><dd>{match ? match.elapsedMs : '—'} <small>ms</small></dd></div><div><dt>最大匹配度</dt><dd>{match ? scoreText(match.maxScore, match.unit) : '—'}</dd></div></dl>
+              {match && <p>脚本值 {match.scriptValue} · {match.matched ? '通过' : '未通过'}</p>}
             </section>
           </div>
           <div className="label-coordinates">

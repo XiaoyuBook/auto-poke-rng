@@ -193,7 +193,9 @@ function createScriptStore(rootDirectory) {
       || target.x + target.width > range.x + range.width || target.y + target.height > range.y + range.height) {
       throw new Error('图像标签的范围和目标坐标无效。');
     }
-    if (![0, 1, 2, 3, 4, 5, 9, 107].includes(method)) throw new Error('图像标签搜索方法无效。');
+    if (![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 107].includes(method)) throw new Error('图像标签搜索方法无效。');
+    const scoreThreshold = Number(threshold);
+    if (!Number.isFinite(scoreThreshold)) throw new Error('图像标签阈值无效。');
     const directory = await resolveLabelDirectory(folder, { allowMissing: true });
     await fs.mkdir(directory, { recursive: true });
     const rootInfo = await fs.lstat(path.dirname(directory));
@@ -201,7 +203,7 @@ function createScriptStore(rootDirectory) {
     const absolute = path.join(directory, trimmedName + '.IL');
     const relative = labelPath(folder, trimmedName);
     const data = {
-      searchMethod: method, threshold: Math.max(0, Math.min(100, Number(threshold) || 0)), ImgBase64: method === 107 ? imageBase64.trim() : imageBase64,
+      searchMethod: method, threshold: [0, 2, 4].includes(method) ? scoreThreshold : Math.max(0, Math.min(100, scoreThreshold)), ImgBase64: method === 107 ? imageBase64.trim() : imageBase64,
       RangeX: range.x, RangeY: range.y, RangeWidth: range.width, RangeHeight: range.height,
       TargetX: target.x, TargetY: target.y, TargetWidth: target.width, TargetHeight: target.height,
     };

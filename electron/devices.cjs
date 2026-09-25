@@ -1,5 +1,6 @@
 const { RuntimeClient } = require('./runtime-client.cjs');
 const { OcrClient } = require('./ocr-client.cjs');
+const { ImageLabelMatcher } = require('./image-label-matcher.cjs');
 const { ScriptRunner, addSequenceApi } = require('./script-runner.cjs');
 const { registerControllerOverlay } = require('./controller-overlay.cjs');
 const path = require('node:path');
@@ -8,6 +9,7 @@ const { EventEmitter } = require('node:events');
 function registerDevices({ ipcMain, getWindows, loadWindow, rootDirectory = path.join(__dirname, '..', 'scripts'), testMode = false }) {
   const video = new RuntimeClient({ role: 'video', testMode });
   const ocr = new OcrClient();
+  const matcher = new ImageLabelMatcher();
   const events = new EventEmitter();
   let automationOwner = null, executionStarting = false;
   const requireIdle = () => { if (automationOwner) throw Error('自动流程正在使用设备，请先停止自动流程。'); };
@@ -132,6 +134,7 @@ function registerDevices({ ipcMain, getWindows, loadWindow, rootDirectory = path
   });
   handle('video:get-snapshot', () => snapshot);
   handle('video:ocr', args => ocr.read(args?.imageBase64, args?.language || ''));
+  handle('video:match-label', args => matcher.match(args));
   const captureFrame = async () => {
     const source = state.video;
     if (source.status !== 'connected') throw new Error('请先连接视频源。');
@@ -161,7 +164,7 @@ function registerDevices({ ipcMain, getWindows, loadWindow, rootDirectory = path
     releaseAutomation: owner => { if (automationOwner === owner) { automationOwner = null; controllerOverlay.input.automationLocked = false; } },
     stopInputs: async () => { await runner.stop(); await controllerOverlay.suspend(); if (controller.child) await controller.call('controller.stop'); },
     controllerOverlay,
-    close: async () => { closing = true; clearVideoTimers(); clearInterval(controllerTimer); ++runner.validationVersion; runner.cancelValidation?.(); await runner.stop().catch(() => {}); await controllerOverlay.close(); await Promise.allSettled([video.close(), controller.close(), ocr.close()]); },
+    close: async () => { closing = true; matcher.close(); clearVideoTimers(); clearInterval(controllerTimer); ++runner.validationVersion; runner.cancelValidation?.(); await runner.stop().catch(() => {}); await controllerOverlay.close(); await Promise.allSettled([video.close(), controller.close(), ocr.close()]); },
     getState: () => state,
   };
 }

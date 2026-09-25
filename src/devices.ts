@@ -8,6 +8,10 @@ export interface VideoState extends DeviceState {
 }
 export interface DevicesState { video: VideoState; controller: DeviceState }
 export interface Snapshot { url: string; session: string; sequence: string; width: number; height: number }
+export interface LabelMatchResult {
+  score: number; scriptValue: number; matched: boolean; unit: 'score' | 'percent';
+  x: number; y: number; width: number; height: number; recognizedText?: string;
+}
 export interface ScriptDiagnostic { message: string; source?: string; line?: number; column?: number }
 export interface ScriptProgress { source: string; line: number; column: number; action: string; text: string; caller?: { source: string; line: number } | null; loops?: { source: string; line: number; column: number; iteration: number; total?: number | null }[] }
 export interface ScriptEvent extends Partial<ScriptProgress> { event: string; runId: string; status?: string; message?: string; phase?: string }
@@ -36,6 +40,7 @@ export interface DevicesApi {
     disconnect: () => Promise<void>;
     snapshot: () => Promise<Snapshot>;
     captureFrame: () => Promise<Snapshot>;
+    matchLabel: (imageBase64: string, label: Pick<import('./scriptLibrary').LabelSaveRequest, 'searchMethod' | 'threshold' | 'range' | 'target' | 'imageBase64'>) => Promise<LabelMatchResult>;
     getSnapshot: () => Promise<Snapshot | null>;
     ocr: (imageBase64: string, language?: string) => Promise<{ text: string; confidence: number }>;
     onSnapshot: (listener: (snapshot: Snapshot) => void) => () => void;
