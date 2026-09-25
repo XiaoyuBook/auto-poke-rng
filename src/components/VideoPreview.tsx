@@ -24,7 +24,7 @@ export function VideoPreview({ labelsOpen = false, labelFolder = '', previewOnly
     {!labelsOnly && !labelsOpen && <div className="preview-stage">
       <div className="preview-frame"><LiveVideo /></div>
     </div>}
-    {!previewOnly && <div className="image-label-content" hidden={!labelsOpen}><ImageLabelWorkspace active={labelsOpen} labelFolder={labelFolder} cornerLayout={labelsOnly} referenceTarget={referenceTarget} onCloseLabels={onCloseLabels} /></div>}
+    {!previewOnly && <div className="image-label-content" hidden={!labelsOpen}><ImageLabelWorkspace key={labelFolder} active={labelsOpen} labelFolder={labelFolder} cornerLayout={labelsOnly} referenceTarget={referenceTarget} onCloseLabels={onCloseLabels} /></div>}
   </section>;
 }
 
@@ -102,6 +102,11 @@ function ImageLabelWorkspace({ active, labelFolder, cornerLayout, referenceTarge
   const svgRef = useRef<SVGSVGElement | null>(null);
   const drag = useRef<{ kind: SelectionKind; start: { x: number; y: number } } | null>(null);
   const dynamicTimer = useRef<number | null>(null);
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
   const reloadLabels = useCallback(async () => {
     const list = window.desktop?.scripts?.labelsList;
@@ -187,7 +192,7 @@ function ImageLabelWorkspace({ active, labelFolder, cornerLayout, referenceTarge
   const startDynamic = () => {
     if (dynamicTesting) { if (dynamicTimer.current !== null) window.clearInterval(dynamicTimer.current); dynamicTimer.current = null; setDynamicTesting(false); setNotice('动态测试已停止。'); return; }
     void performSearch().then(() => {
-      if (!active) return;
+      if (!active || !mounted.current) return;
       setDynamicTesting(true); setNotice('动态测试运行中…');
       dynamicTimer.current = window.setInterval(() => { void performSearch().catch(error => setNotice(error instanceof Error ? error.message : String(error))); }, 1000);
     }).catch(error => setNotice(error instanceof Error ? error.message : String(error)));

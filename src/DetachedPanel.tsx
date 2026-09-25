@@ -8,6 +8,16 @@ import { VideoPreview, VideoLabelsButton } from './components/VideoPreview';
 export function DetachedPanel({ tool }: { tool: PanelTool }) {
   const { state, setLogSource, setVideoLabelsOpen, error, setError } = usePanelWindows();
   const [platform, setPlatform] = useState('win32');
+  const [labelFolder, setLabelFolder] = useState(() => localStorage.getItem('auto-poke-rng:label-folder') || '');
+  useEffect(() => {
+    const syncFolder = () => setLabelFolder(localStorage.getItem('auto-poke-rng:label-folder') || '');
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === null || event.key === 'auto-poke-rng:label-folder') syncFolder();
+    };
+    window.addEventListener('storage', onStorage);
+    syncFolder();
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
   const api = window.desktop?.panels;
   const title = tool === 'video' ? '视频预览' : '日志中心';
   useEffect(() => {
@@ -34,7 +44,7 @@ export function DetachedPanel({ tool }: { tool: PanelTool }) {
     </header>
     <div className="floating-panel-body">
       {error && <p className="panel-error" role="alert">{error}</p>}
-      {tool === 'video' ? <VideoPreview labelsOpen={state.videoLabelsOpen} /> : <LogsPanel logs={state.logs} source={state.logSource} setSource={setLogSource} clear={() => perform(api?.clearLogs())} />}
+      {tool === 'video' ? <VideoPreview labelsOpen={state.videoLabelsOpen} labelFolder={labelFolder} /> : <LogsPanel logs={state.logs} source={state.logSource} setSource={setLogSource} clear={() => perform(api?.clearLogs())} />}
     </div>
   </main>;
 }

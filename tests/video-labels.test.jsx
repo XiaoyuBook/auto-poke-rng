@@ -3,8 +3,10 @@ import React from 'react';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { VideoPreview } from '../src/components/VideoPreview';
+import { DetachedPanel } from '../src/DetachedPanel';
 
 vi.mock('../src/useDevices',()=>({useDevices:()=>({video:{status:'idle'}})}));
+vi.mock('../src/usePanelWindows',()=>({usePanelWindows:()=>({state:{videoLabelsOpen:true},setError:()=>{}})}));
 beforeEach(()=>{
   vi.stubGlobal('Image',class {
     naturalWidth=8; naturalHeight=8;
@@ -15,7 +17,7 @@ beforeEach(()=>{
   });
   vi.spyOn(HTMLCanvasElement.prototype,'toDataURL').mockImplementation(function(){return `data:image/png;base64,${btoa('crop:'+this.source)}`;});
 });
-afterEach(()=>{cleanup();vi.restoreAllMocks();vi.unstubAllGlobals();delete window.desktop;});
+afterEach(()=>{cleanup();vi.restoreAllMocks();vi.unstubAllGlobals();delete window.desktop;localStorage.clear();});
 
 function fixture(overrides={}){
   const frame={url:'data:image/png;base64,FRAMEA',width:8,height:8,sequence:1};
@@ -27,7 +29,7 @@ function fixture(overrides={}){
     matchLabel:vi.fn(async()=>({score:100,scriptValue:100,matched:true,unit:'percent',x:1,y:1,width:2,height:2})),
     snapshot:vi.fn(async()=>{const live={...frame,url:'data:image/png;base64,FRAMEB',sequence:2};listeners.forEach(fn=>fn(live));return live;}),
     captureFrame:vi.fn(async()=>({...frame,url:'data:image/png;base64,FRAMEB',sequence:2}))};
-  window.desktop={scripts,devices:{video}};
+  window.desktop={scripts,devices:{video},getMetadata:async()=>({platform:'win32'})};
   return {scripts,video,frame,label,listeners};
 }
 async function load(){
@@ -94,4 +96,48 @@ test('new color labels use normalized correlation while legacy raw thresholds re
   fireEvent.change(screen.getByLabelText('搜索方法'),{target:{value:'3'}});
   scripts.labelSave.mockClear();
   expect((await save(scripts)).searchMethod).toBe(3);
+});
+
+test('detached labels read, save, switch, and reopen in the active script folder',async()=>{
+  const {scripts}=fixture();localStorage.setItem('auto-poke-rng:label-folder','BDSP');
+  const view=render(<DetachedPanel tool="video" />);await load();
+  expect(scripts.labelsList).toHaveBeenCalledWith('BDSP');
+  expect(scripts.labelRead).toHaveBeenCalledWith('BDSP','已有标签');
+  expect((await save(scripts)).folder).toBe('BDSP');
+  await act(async()=>{
+    localStorage.setItem('auto-poke-rng:label-folder','FRLG');
+    window.dispatchEvent(new StorageEvent('storage',{key:'auto-poke-rng:label-folder',newValue:'FRLG'}));
+  });
+  await waitFor(()=>expect(scripts.labelsList).toHaveBeenCalledWith('FRLG'));
+  expect(screen.getByLabelText('标签名称').value).toBe('');
+  await load();scripts.labelSave.mockClear();
+  expect(scripts.labelRead).toHaveBeenCalledWith('FRLG','已有标签');
+  expect((await save(scripts)).folder).toBe('FRLG');
+  view.unmount();scripts.labelsList.mockClear();render(<DetachedPanel tool="video" />);
+  await waitFor(()=>expect(scripts.labelsList).toHaveBeenCalledWith('FRLG'));
+});
+
+test('a late label read from the previous folder cannot become the new folder draft',async()=>{
+  const {scripts,label}=fixture();let completeRead;
+  scripts.labelRead.mockReturnValue(new Promise(resolve=>{completeRead=resolve;}));
+  const view=render(<VideoPreview labelsOpen labelFolder="BDSP" />);
+  fireEvent.click(await screen.findByRole('button',{name:'已有标签'}));
+  view.rerender(<VideoPreview labelsOpen labelFolder="FRLG" />);
+  await act(async()=>completeRead(label));
+  expect(screen.getByLabelText('标签名称').value).toBe('');
+  fireEvent.click(screen.getByRole('button',{name:'保存标签'}));
+  await screen.findByText('请先截图并填写标签名称。');
+  expect(scripts.labelSave).not.toHaveBeenCalled();
+});
+
+test('switching folders while dynamic testing starts does not leave an old timer running',async()=>{
+  const {video}=fixture();let completeMatch;
+  video.matchLabel.mockReturnValue(new Promise(resolve=>{completeMatch=resolve;}));
+  const view=render(<VideoPreview labelsOpen labelFolder="BDSP" />);await load();
+  fireEvent.click(screen.getByRole('button',{name:'动态测试'}));
+  await waitFor(()=>expect(video.matchLabel).toHaveBeenCalled());
+  view.rerender(<VideoPreview labelsOpen labelFolder="FRLG" />);
+  const interval=vi.spyOn(window,'setInterval');
+  await act(async()=>completeMatch({score:100,scriptValue:100,matched:true,unit:'percent',x:1,y:1,width:2,height:2}));
+  expect(interval).not.toHaveBeenCalled();
 });
