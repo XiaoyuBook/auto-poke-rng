@@ -51,7 +51,7 @@ test('offline startup retains the cached catalog and existing scripts', async t 
   const f = await fixture(t); await f.service.refresh(); await f.install(pack().bytes); f.offline();
   const restarted = createScriptRepository(f.serviceOptions);
   assert.equal((await restarted.state()).packages.length, 1);
-  await assert.rejects(restarted.refresh(), /offline/);
+  await assert.rejects(restarted.refresh(), /无法连接官方脚本仓库/);
   assert.equal((await restarted.state()).installed.length, 1);
   assert.equal(await f.read('测试.txt'), 'A 1\n');
 });
@@ -199,4 +199,26 @@ test('case aliases in ancestor directories are rejected before installation', as
   const f = await fixture(t); await f.write('User/local.txt', 'personal');
   await assert.rejects(f.service.planArchive(pack('1.0.0', { 'user/new.txt': 'A 1' }).bytes), /大小写/);
   assert.equal(await f.read('User/local.txt'), 'personal');
+});
+
+test('blocked raw downloads fall back to the official GitHub API for index and archive', async t => {
+  const input = pack(), requests = [];
+  const f = await fixture(t, { fetch: async (url, options) => {
+    requests.push(url);
+    if (url.startsWith('https://raw.githubusercontent.com/')) throw new TypeError('fetch failed');
+    assert.ok(url.startsWith('https://api.github.com/repos/XiaoyuBook/auto-poke-rng-scripts/contents/'));
+    assert.equal(options.headers.Accept, 'application/vnd.github.raw+json');
+    return new Response(url.includes('catalog.json') ? JSON.stringify(input.catalog) : input.bytes);
+  } });
+  await f.service.refresh();
+  const plan = await f.service.prepare('demo');
+  await f.service.apply({ token: plan.token, policy: 'keep' });
+  assert.equal(await f.read('测试.txt'), 'A 1\n');
+  assert.equal(requests.length, 4);
+});
+
+test('network failures have an actionable Chinese error and preserve cached packages', async t => {
+  const f = await fixture(t); await f.service.refresh(); f.offline();
+  await assert.rejects(f.service.refresh(), /无法连接官方脚本仓库.*系统代理.*重试/);
+  assert.equal((await f.service.state()).packages[0].id, 'demo');
 });

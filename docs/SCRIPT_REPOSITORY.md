@@ -26,6 +26,8 @@
 
 下载限定官方源；校验大小、哈希、路径、扩展名和最低版本。拒绝穿越目录、符号链接、大小写冲突、未声明文件和超量解压。第一版手动检查并确认更新，未实现后台自动更新、卸载、多源和分享链接。
 
+桌面下载使用 Electron 的网络会话，遵循系统代理设置。原始文件地址不可达时尝试同一仓库的 GitHub 官方接口，继续执行大小与哈希校验。两条通道均失败时显示中文重试提示，保留已有缓存和本地脚本。网络通道回归：`node tests/run-electron.cjs script-repository-network-electron.cjs`。
+
 ## 验证
 
 `npm run test:scripts:repository` 覆盖完整包安装、真实 `.txt` 编译、旧后缀兼容、离线缓存、三方冲突、备份与回滚、中断恢复、迁移失败、IPC 隔离、包校验与界面确认流程。Electron 集成测试：`npm run build` 后执行 `node tests/run-electron.cjs script-repository-electron.cjs`。

@@ -129,13 +129,24 @@ function createScriptRepository({ rootDirectory, userData, appVersion, gate = cr
     recovery ||= recoverInstall(); await recovery;
   };
   async function fetchBytes(relative, maximum) {
-    const url = new URL(relative.split('/').map(encodeURIComponent).join('/'), SOURCE);
-    const response = await download(url.href, { signal: AbortSignal.timeout(30000), redirect: 'error' });
-    if (!response.ok) throw Error(`仓库下载失败（HTTP ${response.status}）。`);
-    if (Number(response.headers.get('content-length')) > maximum) throw Error('仓库下载大小超限。');
-    const chunks = []; let size = 0;
-    for await (const chunk of response.body) { size += chunk.length; if (size > maximum) throw Error('仓库下载大小超限。'); chunks.push(Buffer.from(chunk)); }
-    return Buffer.concat(chunks);
+    const resource = relative.split('/').map(encodeURIComponent).join('/');
+    const urls = [new URL(resource, SOURCE).href, `https://api.github.com/repos/XiaoyuBook/auto-poke-rng-scripts/contents/${resource}?ref=main`];
+    let failure;
+    for (const url of urls) {
+      try {
+        const response = await download(url, { signal: AbortSignal.timeout(12000), redirect: 'error', headers: { Accept: 'application/vnd.github.raw+json' } });
+        if (!response.ok) { await response.body?.cancel(); throw Error(`HTTP ${response.status}`); }
+        if (Number(response.headers.get('content-length')) > maximum) { await response.body?.cancel(); throw new RangeError('仓库下载大小超限。'); }
+        const chunks = []; let size = 0;
+        for await (const chunk of response.body) { size += chunk.length; if (size > maximum) throw new RangeError('仓库下载大小超限。'); chunks.push(Buffer.from(chunk)); }
+        return Buffer.concat(chunks);
+      } catch (error) {
+        if (error instanceof RangeError) throw error;
+        failure = error;
+      }
+    }
+    log('脚本仓库连接失败：' + failure?.message, 'warning');
+    throw Error('无法连接官方脚本仓库。请检查网络或系统代理后重试，也可以导入本地脚本包。', { cause: failure });
   }
   async function loadCatalog() {
     if (!catalog) {
@@ -244,7 +255,8 @@ function createScriptRepository({ rootDirectory, userData, appVersion, gate = cr
 }
 
 function registerScriptRepository({ ipcMain, getMainWindow, dialog, ...options }) {
-  const service = createScriptRepository(options);
+  // Chromium networking follows the desktop session's system proxy settings.
+  const service = createScriptRepository({ ...options, fetch: options.fetch || ((...args) => require('electron').net.fetch(...args)) });
   const actions = {
     state: () => service.state(), refresh: () => service.refresh(), prepare: args => service.prepare(args?.id), apply: args => service.apply(args || {}),
     import: async () => {
