@@ -66,6 +66,7 @@ function validateConfig(input, video) {
 function registerBlink({ ipcMain, getMainWindow, getVideo, spawnProcess = spawn, chooseConfig }) {
   let state = { revision: 0, status: 'idle', captured: 0, target: 40, message: '在右侧视频中框选睁眼模板与 ROI。' };
   let job = null;
+  let observer = null;
   const publish = update => {
     state = { ...state, ...update, revision: state.revision + 1 };
     const window = getMainWindow();
@@ -84,11 +85,74 @@ function registerBlink({ ipcMain, getMainWindow, getVideo, spawnProcess = spawn,
     if (!failed && state.status === 'stopping') publish({ status: 'stopped', message });
     return state;
   };
+  const stopObserver = () => {
+    const active = observer;
+    if (!active) return Promise.resolve();
+    observer = null;
+    active.child.kill();
+    return active.done;
+  };
   const requireWindow = event => {
     if (event.sender !== getMainWindow()?.webContents || event.senderFrame !== event.sender.mainFrame) throw Error('Unknown blink sender');
   };
   ipcMain.handle('blink:state', event => { requireWindow(event); return state; });
   ipcMain.handle('blink:stop', event => { requireWindow(event); return stop(); });
+  ipcMain.handle('blink:observe', (event, input) => {
+    requireWindow(event);
+    void stopObserver();
+    if (!input || (job && !['tracking', 'countdown', 'timeline'].includes(state.status))) return;
+    const video = getVideo();
+    const config = validateConfig({ ...input, mode: 'preview' }, video);
+    const root = path.join(__dirname, '..');
+    const bundled = path.join(root, '.deps/script-python', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
+    const python = process.env.AUTO_POKE_PYTHON || (fs.existsSync(bundled) ? bundled : 'python');
+    const child = spawnProcess(python, ['-u', path.join(root, 'runtime/python/blink_host.py')], {
+      windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, PYTHONUTF8: '1', PYTHONDONTWRITEBYTECODE: '1' },
+    });
+    let finish;
+    const active = { child, done: new Promise(resolve => { finish = resolve; }) };
+    observer = active;
+    let buffer = '', diagnostic = '', closed = false;
+    const destroyed = () => { if (observer === active) void stopObserver(); };
+    event.sender.once('destroyed', destroyed);
+    event.sender.once('render-process-gone', destroyed);
+    const send = payload => {
+      if (observer === active && !event.sender.isDestroyed()) event.sender.send('blink:observation', payload);
+    };
+    const health = setInterval(() => {
+      const current = getVideo();
+      if (current.status !== 'connected' || current.session !== video.session) void stopObserver();
+    }, 200);
+    const cleanup = () => {
+      if (closed) return;
+      closed = true;
+      clearInterval(health);
+      event.sender.removeListener('destroyed', destroyed);
+      event.sender.removeListener('render-process-gone', destroyed);
+      if (observer === active) observer = null;
+      finish();
+    };
+    child.once('error', error => { send({ error: `无法启动实时眼睛识别：${error.message}` }); cleanup(); });
+    child.once('close', () => { if (observer === active) send({ error: `实时眼睛识别已停止。${diagnostic.slice(-300)}` }); cleanup(); });
+    child.stderr.setEncoding('utf8');
+    child.stderr.on('data', data => { diagnostic = (diagnostic + data).slice(-1000); });
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', data => {
+      if (observer !== active) return;
+      buffer += data;
+      if (buffer.length > 128 * 1024) { send({ error: '实时眼睛识别响应过大。' }); void stopObserver(); return; }
+      let newline;
+      while ((newline = buffer.indexOf('\n')) >= 0) {
+        const line = buffer.slice(0, newline); buffer = buffer.slice(newline + 1);
+        let value;
+        try { value = JSON.parse(line); } catch { send({ error: '实时眼睛识别响应无效。' }); void stopObserver(); return; }
+        if (value.event === 'progress') send({ score: value.score, location: value.location });
+        else if (value.event === 'error') { send({ error: value.message || '实时眼睛识别失败。' }); void stopObserver(); return; }
+      }
+    });
+    child.stdin.on('error', error => { send({ error: `实时眼睛识别通信失败：${error.message}` }); void stopObserver(); });
+    child.stdin.write(JSON.stringify(config) + '\n');
+  });
   ipcMain.handle('blink:import-config', async event => {
     requireWindow(event);
     if (busy(state)) throw Error('请先停止当前眨眼任务。');
@@ -107,6 +171,7 @@ function registerBlink({ ipcMain, getMainWindow, getVideo, spawnProcess = spawn,
     if (job || busy(state)) throw Error('已有眨眼任务在运行，请先停止。');
     const video = getVideo();
     const config = validateConfig(input, video);
+    void stopObserver();
     const root = path.join(__dirname, '..');
     const bundled = path.join(root, '.deps/script-python', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
     const python = process.env.AUTO_POKE_PYTHON || (fs.existsSync(bundled) ? bundled : 'python');
@@ -177,6 +242,6 @@ function registerBlink({ ipcMain, getMainWindow, getVideo, spawnProcess = spawn,
     child.stdin.write(JSON.stringify(config) + '\n');
     return state;
   });
-  return { close: () => stop(), getState: () => state };
+  return { close: () => Promise.all([stop(), stopObserver()]), getState: () => state };
 }
 module.exports = { registerBlink, validateConfig, timingConfig, readBlinkConfig };

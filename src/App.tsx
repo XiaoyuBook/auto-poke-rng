@@ -23,7 +23,7 @@ import { OcrWorkspace } from './components/OcrWorkspace';
 import { StaticDataWorkspace } from './components/StaticDataWorkspace';
 import { BlinkWorkspace } from './components/BlinkWorkspace';
 import { BlinkVideoOverlay } from './components/BlinkVideoOverlay';
-import { useBlink, type BlinkResult } from './blink';
+import { useBlink } from './blink';
 import { BdspHomeWorkspace } from './components/BdspProfileCard';
 import { useBdspProfile } from './bdspProfile';
 import { loadControllerMapping, type MappingAction } from './controllerMapping';
@@ -89,8 +89,9 @@ export default function App({ connections = initialConnections }: { connections?
   const [labelReferenceHost, setLabelReferenceHost] = useState<HTMLDivElement | null>(null);
   const [ocrOverlayHost, setOcrOverlayHost] = useState<HTMLDivElement | null>(null);
   const [ocrPreviewHost, setOcrPreviewHost] = useState<HTMLDivElement | null>(null);
-  const blink = useBlink(devices.video, game === 'bdsp' && !panelQuery);
-  const [capturedSeed, setCapturedSeed] = useState<{ id: string; pair: string[] } | null>(null);
+  const videoDetached = panelWindows.detached.includes('video');
+  const inlineLabelsOpen = panelWindows.videoLabelsOpen && !videoDetached;
+  const blink = useBlink(devices.video, game === 'bdsp' && !panelQuery, page === '眨眼捕获' && !inlineLabelsOpen);
   const blinkLogRevision = useRef('');
   const switcher = useRef<HTMLDivElement>(null);
   const gameButton = useRef<HTMLButtonElement>(null);
@@ -103,8 +104,6 @@ export default function App({ connections = initialConnections }: { connections?
   const script = library.active?.body || '';
   const validation = useScriptValidation(library.active?.path || '', script);
   const saved = library.saved;
-  const videoDetached = panelWindows.detached.includes('video');
-  const inlineLabelsOpen = panelWindows.videoLabelsOpen && !videoDetached;
   const overlayApi = window.desktop?.overlay;
   const scriptRef = useRef(script);
   const recordingRef = useRef(false);
@@ -297,11 +296,6 @@ export default function App({ connections = initialConnections }: { connections?
     if (inlineLabelsOpen) setVideoLabelsOpen(false);
   };
 
-  const applyBlinkSeed = (result: BlinkResult) => {
-    setCapturedSeed({ id: crypto.randomUUID(), pair: [...result.pair] });
-    navigateToPage('定点数据');
-  };
-
   const toggleVideoLabels = () => {
     setVideoLabelsOpen(!panelWindows.videoLabelsOpen);
     if (videoDetached) void openVideoWindow();
@@ -309,6 +303,7 @@ export default function App({ connections = initialConnections }: { connections?
 
   const openVideoContextMenu = (event: ReactMouseEvent<HTMLElement>) => {
     event.preventDefault();
+    if (blink.selection || blink.selecting || blink.suppressVideoContextMenu()) return;
     setVideoContextMenu({
       x: Math.min(event.clientX, Math.max(8, window.innerWidth - 180)),
       y: Math.min(event.clientY, Math.max(8, window.innerHeight - (game === 'bdsp' ? 128 : 54))),
@@ -567,8 +562,8 @@ export default function App({ connections = initialConnections }: { connections?
                 virtualControllerOpen={virtualControllerOpen} toggleVirtualController={() => void toggleVirtualController()}
                 labelButton={<VideoLabelsButton variant="tool" expanded={panelWindows.videoLabelsOpen} toggle={toggleVideoLabels} />} />}
               {page === 'OCR 设置' && <OcrWorkspace overlayTarget={ocrOverlayHost} previewTarget={ocrPreviewHost} />}
-              {page === '定点数据' && <StaticDataWorkspace profile={bdspProfile} capturedSeed={capturedSeed} onLog={message => addLog(message, '系统', 'success')} />}
-              {page === '眨眼捕获' && <BlinkWorkspace blink={blink} video={devices.video} onApply={applyBlinkSeed} />}
+              {page === '定点数据' && <StaticDataWorkspace profile={bdspProfile} onLog={message => addLog(message, '系统', 'success')} />}
+              {page === '眨眼捕获' && <BlinkWorkspace blink={blink} video={devices.video} />}
               {page === '首页' && (game === 'bdsp' ? <BdspHomeWorkspace profile={bdspProfile} onChange={setBdspProfile} onOpenScript={() => navigateToPage('脚本编辑')} /> : <div className="empty-state home-empty"><Home size={28} /><h2>开始你的工作</h2><p>当前游戏为{activeGame.label}，打开脚本编辑开始配置操作。</p><button className="button" onClick={() => navigateToPage('脚本编辑')}><TerminalSquare size={15} />打开脚本编辑</button></div>)}
             </div>
             <section className="workspace-labels" aria-label="标签工作区" hidden={!inlineLabelsOpen}>

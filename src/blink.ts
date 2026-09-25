@@ -17,14 +17,17 @@ export type BlinkState = {
   blinks?: number[]; intervals?: number[]; result?: BlinkResult | null;
   tracking?: BlinkTracking | null;
 };
+export type BlinkObservation = { score?: number; location?: BlinkRect; error?: string };
 export type BlinkRequest = Omit<BlinkConfig, 'mode'> & { mode: BlinkMode | 'preview' };
 export interface BlinkApi {
   getState: () => Promise<BlinkState>;
   start: (config: BlinkRequest) => Promise<BlinkState>;
   stop: () => Promise<BlinkState>;
   timeline: () => Promise<BlinkState>;
+  observe: (config: BlinkRequest | null) => Promise<void>;
   importConfig: () => Promise<Partial<BlinkConfig> | null>;
   onState: (listener: (state: BlinkState) => void) => () => void;
+  onObservation: (listener: (observation: BlinkObservation) => void) => () => void;
 }
 export type BlinkSelection = { kind: 'eye' | 'roi'; frame: Snapshot };
 export const blinkBusy = (state: BlinkState) => ['starting', 'preview', 'capturing', 'solving', 'tracking', 'countdown', 'timeline', 'stopping'].includes(state.status);
@@ -64,17 +67,20 @@ async function cropEye(frame: Snapshot, rect: BlinkRect) {
   return canvas.toDataURL('image/png');
 }
 
-export function useBlink(video: VideoState, enabled: boolean) {
+export function useBlink(video: VideoState, enabled: boolean, viewActive = false) {
   const [configs, setConfigs] = useState(loadConfigs);
   const [config, setConfig] = useState<BlinkConfig>(() => configs[0] || newBlinkConfig());
   const [state, setState] = useState<BlinkState>({ revision: 0, status: 'idle', captured: 0, target: 40, message: '等待捕获' });
+  const [observation, setObservation] = useState<BlinkObservation | null>(null);
   const [selection, setSelection] = useState<BlinkSelection | null>(null);
   const [selecting, setSelecting] = useState(false);
   const [notice, setNotice] = useState('');
   const selectionVersion = useRef(0);
+  const suppressContextMenuUntil = useRef(0);
   const currentVideo = useRef(video); currentVideo.current = video;
   const active = useRef(enabled); active.current = enabled;
   const busy = blinkBusy(state);
+  const matchingInJob = ['starting', 'preview', 'capturing', 'solving', 'stopping'].includes(state.status);
   const api = window.desktop?.blink;
   const lastResult = useRef<BlinkResult | null>(null);
   useEffect(() => {
@@ -95,6 +101,19 @@ export function useBlink(video: VideoState, enabled: boolean) {
     void api.getState().then(update).catch(() => {});
     return () => { alive = false; unsubscribe(); };
   }, [api]);
+  useEffect(() => api?.onObservation(value => setObservation(value)), [api]);
+  useEffect(() => {
+    if (!api || !viewActive || !enabled || matchingInJob || selection || selecting || video.status !== 'connected'
+        || !config.eye || !config.roi || config.sourceWidth !== video.width || config.sourceHeight !== video.height) {
+      setObservation(null);
+      return;
+    }
+    setObservation(null);
+    let active = true;
+    void api.observe({ ...config, mode: 'preview' }).catch(error => { if (active) setObservation({ error: errorMessage(error) }); });
+    return () => { active = false; void api.observe(null).catch(() => {}); };
+  }, [api, viewActive, enabled, matchingInJob, selection, selecting, video.status, video.session, video.width, video.height,
+    config.eye, config.roi, config.sourceWidth, config.sourceHeight, config.threshold]);
   useEffect(() => {
     ++selectionVersion.current; setSelection(null); setSelecting(false);
   }, [enabled, video.session, video.status]);
@@ -118,6 +137,7 @@ export function useBlink(video: VideoState, enabled: boolean) {
   };
   const finishSelection = async (rect: BlinkRect) => {
     if (!selection) return;
+    suppressContextMenuUntil.current = performance.now() + 500;
     const version = selectionVersion.current;
     const { frame, kind } = selection;
     if (rect.width < 2 || rect.height < 2) { setNotice('请选择至少 2 × 2 像素的区域。'); return; }
@@ -161,6 +181,7 @@ export function useBlink(video: VideoState, enabled: boolean) {
     try { localStorage.setItem(storageKey, JSON.stringify(next)); setConfigs(next); setConfig({ ...config, name }); setNotice('配置已保存'); }
     catch { setNotice('配置保存失败，本地存储空间不足。'); }
   };
-  return { configs, config, setConfig, state, busy, selection, selecting, notice, setNotice, beginSelection, cancelSelection, finishSelection, run, stop, save, timeline, importConfig };
+  return { configs, config, setConfig, state, observation, busy, selection, selecting, notice, setNotice, beginSelection, cancelSelection, finishSelection,
+    suppressVideoContextMenu: () => performance.now() < suppressContextMenuUntil.current, run, stop, save, timeline, importConfig };
 }
 export type BlinkController = ReturnType<typeof useBlink>;

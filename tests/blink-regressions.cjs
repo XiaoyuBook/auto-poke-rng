@@ -11,7 +11,7 @@ const videoState = () => ({ status: 'connected', session: 'one', width: 1920, he
 const config = () => ({ mode: 'recover', eye: 'data:image/png;base64,AAAA', roi: { x: 100, y: 100, width: 50, height: 50 }, sourceWidth: 1920, sourceHeight: 1080, threshold: .9, npc: 0,
   noisy: false, seed: ['12345678', '87654321', '87654321', '12345678'], searchMin: 0, searchMax: 1000000 });
 function setup() {
-  const handlers = {}, sender = new EventEmitter(); sender.mainFrame = {}; sender.isDestroyed = () => false; sender.send = () => {};
+  const handlers = {}, sender = new EventEmitter(), messages = []; sender.mainFrame = {}; sender.isDestroyed = () => false; sender.send = (...args) => messages.push(args);
   const window = { webContents: sender, isDestroyed: () => false };
   let video = videoState();
   const children = [];
@@ -24,8 +24,30 @@ function setup() {
       children.push(child); return child;
     } });
   const event = { sender, senderFrame: sender.mainFrame };
-  return { service, handlers, sender, children, setVideo: value => { video = value; }, call: (method, args) => handlers[`blink:${method}`](event, args) };
+  return { service, handlers, sender, messages, children, setVideo: value => { video = value; }, call: (method, args) => handlers[`blink:${method}`](event, args) };
 }
+
+test('live eye observation reports matches and yields to capture without changing capture state', async () => {
+  const api = setup();
+  try {
+    api.call('observe', config());
+    assert.equal(api.children.length, 1);
+    assert.equal(JSON.parse(api.children[0].stdin.read().toString()).mode, 'preview');
+    api.children[0].reply({ event: 'progress', score: .95, location: { x: 110, y: 115, width: 20, height: 10 } });
+    assert.deepEqual(api.messages.at(-1), ['blink:observation', { score: .95, location: { x: 110, y: 115, width: 20, height: 10 } }]);
+    assert.equal(api.service.getState().status, 'idle');
+    await api.call('start', config());
+    assert.equal(api.children[0].killed, true);
+    assert.equal(api.children.length, 2);
+    assert.equal(api.service.getState().status, 'starting');
+    api.call('observe', config());
+    assert.equal(api.children.length, 2, 'capture owns matching while active');
+    api.children[1].reply({ event: 'result', result: { pair: ['1234'], words: [] } });
+    api.call('observe', config());
+    assert.equal(api.children.length, 3, 'live matching resumes during RNG tracking');
+    await api.call('stop');
+  } finally { await api.service.close(); }
+});
 
 test('Project_Xs deterministic original algorithm and frame regression suite', { timeout: 30000 }, () => {
   const root = path.resolve(__dirname, '..');
@@ -121,7 +143,7 @@ test('window close, source change, malformed protocol and spawn failure release 
 });
 test('other windows and subframes cannot start, stop or read capture state', async () => {
   const api = setup();
-  for (const method of ['state', 'start', 'stop', 'timeline', 'import-config']) {
+  for (const method of ['state', 'start', 'stop', 'timeline', 'observe', 'import-config']) {
     await assert.rejects(async () => api.handlers[`blink:${method}`]({ sender: {}, senderFrame: {} }, config()), /Unknown blink sender/);
     await assert.rejects(async () => api.handlers[`blink:${method}`]({ sender: api.sender, senderFrame: {} }, config()), /Unknown blink sender/);
   }

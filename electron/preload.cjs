@@ -78,8 +78,10 @@ contextBridge.exposeInMainWorld('desktop', {
     start: config => ipcRenderer.invoke('blink:start', config),
     stop: () => ipcRenderer.invoke('blink:stop'),
     timeline: () => ipcRenderer.invoke('blink:timeline'),
+    observe: config => ipcRenderer.invoke('blink:observe', config),
     importConfig: () => ipcRenderer.invoke('blink:import-config'),
     onState: listener => subscribe('blink:state', listener),
+    onObservation: listener => subscribe('blink:observation', listener),
   },
   rng: {
     staticGenerate: request => ipcRenderer.invoke('rng:static-generate', request),
