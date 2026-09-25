@@ -170,6 +170,7 @@ class ScriptRunner {
         });
         else if (message.event === 'script.log') this.emit({ ...message, runId: run.id });
         else if (message.event === 'script.progress') this.emit({ ...message, runId: run.id });
+        else if (message.event === 'script.image-result') this.emit({ ...message, runId: run.id });
       }
     });
     child.stdin.write(JSON.stringify({ text, name: relative, scriptDir: path.dirname(absolute), rootDirectory: root, video: this.getVideo() }) + '\n');

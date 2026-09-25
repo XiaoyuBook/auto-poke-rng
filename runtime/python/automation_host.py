@@ -82,6 +82,7 @@ class Session:
         self.config, self.emit = config, emit
         self.cancel = threading.Event()
         self.battle = threading.Event()
+        self.battle_script_id = None
         self.pending, self.counter = {}, 0
         self.lock = threading.Lock()
         self.runner = None
@@ -95,7 +96,8 @@ class Session:
                 else:
                     self.runner.stop()
         elif message.get('event') == 'battle':
-            self.battle.set()
+            if self.battle_script_id is not None and message.get('scriptId') == self.battle_script_id:
+                self.battle.set()
         elif 'id' in message:
             with self.lock:
                 pending = self.pending.get(message['id'])
@@ -245,12 +247,19 @@ class Session:
             should_stop=self.cancel.is_set,sleep=self.sleep)
 
     def shiny(self,text,name,threshold):
+        script_id = uuid4().hex
+        self.battle_script_id = script_id
+        self.battle.clear()
+        try:
+            return self.monitor_shiny(text,name,threshold,script_id)
+        finally:
+            self.battle_script_id = None
+
+    def monitor_shiny(self,text,name,threshold,script_id):
         from auto_bdsp_rng.automation.auto_rng.dialog_timing import measure_keyword_interval, DialogKeywordTimeoutError
         starter = self.config['species'] in (387,390,393)
         roamer = self.config['species'] in (481,488)
         errors, done = [],threading.Event()
-        script_id = uuid4().hex
-        self.battle.clear()
         def script():
             try:
                 self.run_script(text,name,script_id=script_id)

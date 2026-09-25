@@ -12,7 +12,7 @@ const deferred=()=>{let resolve;const promise=new Promise(done=>{resolve=done;})
 function fixture(t){
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'automation-contract-'));
   const script=path.join(directory,'source.rng');fs.writeFileSync(script,'_目标帧数 = 300\nA 10\n');
-  const trace=[],ocrRequests=[],handlers=new Map(),events=new EventEmitter();
+  const trace=[],ocrRequests=[],workerMessages=[],handlers=new Map(),events=new EventEmitter();
   const window={isDestroyed:()=>false,webContents:{isDestroyed:()=>false,send:()=>{},mainFrame:{}}};
   const state={video:{status:'connected',width:1920,height:1080,sharedMemory:{},session:'one'},controller:{status:'connected'}};
   let resolveDone,callbacks,workerConfig;
@@ -22,7 +22,7 @@ function fixture(t){
       resolveScript:async()=>({absolute:script}),validate:async()=>({valid:true}),stop:async()=>trace.push('stop-script'),
       start:async options=>{trace.push(options.text);queueMicrotask(()=>events.emit('script',{event:'script.done',runId:'s',status:'completed'}));return {runId:'s'};}}};
   const rng={isBusy:()=>false,cancel:async()=>trace.push('cancel-search'),generate:async input=>{trace.push(input);return [{advances:151,pid:'00000001',ec:'00000002',stats:[1,2,3,4,5,6]}];}};
-  const workerFactory=(config,handlers)=>{workerConfig=config;callbacks=handlers;return {done:new Promise(resolve=>{resolveDone=resolve;}),send:()=>{},stop:async()=>resolveDone({status:'stopped'})};};
+  const workerFactory=(config,handlers)=>{workerConfig=config;callbacks=handlers;return {done:new Promise(resolve=>{resolveDone=resolve;}),send:message=>workerMessages.push(message),stop:async()=>resolveDone({status:'stopped'})};};
   const automation=registerAutomation({ipcMain:{handle:(name,fn)=>handlers.set(name,fn)},getMainWindow:()=>window,getWindows:()=>[window],devices,rng,
     blink:{getState:()=>({status:'idle'})},userData:directory,workerFactory,captureImage:async()=>{trace.push('frame');return 'image';}});
   const invoke=(name,input,event={sender:window.webContents,senderFrame:window.webContents.mainFrame})=>handlers.get('automation:'+name)(event,input);
@@ -30,7 +30,7 @@ function fixture(t){
     sourceWidth:1920,sourceHeight:1080,roi:{x:0,y:0,width:100,height:100},threshold:.9,npc:0,seed:['1','2','3','4'],noisy:false,searchMin:0,searchMax:1000000}};
   input.config.scripts={...input.config.scripts,seed:'source.rng',advance:'source.rng',hit:'source.rng'};
   t.after(async()=>{await automation.close();fs.rmSync(directory,{recursive:true,force:true});});
-  return {automation,input,invoke,trace,ocrRequests,devices,state,rng,done:value=>resolveDone(value),callbacks:()=>callbacks,workerConfig:()=>workerConfig};
+  return {automation,input,invoke,trace,ocrRequests,workerMessages,devices,state,rng,done:value=>resolveDone(value),callbacks:()=>callbacks,workerConfig:()=>workerConfig};
 }
 
 test('C02: preparation compiles but does not save, press, warm up, or claim devices',async t=>{
@@ -106,6 +106,43 @@ test('hit cancellation releases real mock-controller input before the workflow c
   assert.equal(state.report.buttons,0);assert.equal(state.owned,false);
   assert.equal(f.automation.getState().logs.some(row=>row.message==='unexpected-tail'),false);
   await request('script',{text:'B 1',name:'source.rng'});
+});
+
+test('roamer battle detection uses structured watch results from the current hit script',async t=>{
+  const f=fixture(t);f.input.config.parameters.target='Cresselia';await f.invoke('start',f.input);
+  const started=deferred();f.devices.runner.start=async()=>{started.resolve();return {runId:'hit'};};
+  f.devices.runner.stop=async()=>f.devices.events.emit('script',{event:'script.done',runId:'hit',status:'cancelled'});
+  const script=f.callbacks().request('script',{text:'$2 = @宝可表',name:'source.rng',scriptId:'hit-watch'});void script.catch(()=>{});
+  await started.promise;
+  await new Promise(setImmediate);
+  const emit=message=>f.devices.events.emit('script',{runId:'hit',event:'script.image-result',...message});
+  emit({event:'script.log',message:'已检测到进入战斗'});
+  emit({runId:'old-hit',labelName:'宝可表',scriptValue:50});
+  emit({labelName:'其他标签',scriptValue:50});
+  emit({labelName:'宝可表',scriptValue:95});
+  assert.deepEqual(f.workerMessages,[]);
+  emit({labelName:'宝可表',score:93.2,scriptValue:94});
+  assert.deepEqual(f.workerMessages,[{event:'battle',scriptId:'hit-watch'}]);
+  f.devices.events.emit('script',{event:'script.done',runId:'hit',status:'completed'});await script;
+  emit({labelName:'宝可表',scriptValue:0});
+  assert.equal(f.workerMessages.length,1,'finished scripts no longer observe battle');
+});
+
+test('a real image-label script detects roamer battle without PRINT wording',{skip:process.platform!=='win32',timeout:15000},async t=>{
+  const hardware=createDeviceFixture(t);await hardware.connectController();await hardware.connectVideo();
+  const f=fixture(t);f.input.config.parameters.target='Cresselia';
+  f.input.blink.sourceWidth=320;f.input.blink.sourceHeight=240;
+  hardware.devices.runner.rootDirectory=f.devices.runner.rootDirectory;
+  f.devices.runner=hardware.devices.runner;f.devices.controller=hardware.devices.controller;
+  f.devices.getState=()=>hardware.devices.getState();
+  hardware.devices.events.on('script',message=>f.devices.events.emit('script',message));
+  const directory=path.join(f.devices.runner.rootDirectory,'ImgLabel');fs.mkdirSync(directory);
+  fs.writeFileSync(path.join(directory,'宝可表.IL'),JSON.stringify({searchMethod:0,
+    ImgBase64:'iVBORw0KGgoAAAANSUhEUgAAAAMAAAADCAIAAADZSiLoAAAAG0lEQVQIHWNkYmRgBgNGbi5OZjBgFBEWYgYDAAdxAJTQaRgKAAAAAElFTkSuQmCC',
+    RangeX:0,RangeY:0,RangeWidth:3,RangeHeight:3,TargetX:0,TargetY:0,TargetWidth:3,TargetHeight:3}));
+  await f.invoke('start',f.input);
+  await f.callbacks().request('script',{text:'$2 = @宝可表',name:'source.rng',scriptId:'native-watch'});
+  assert.deepEqual(f.workerMessages,[{event:'battle',scriptId:'native-watch'}]);
 });
 test('C04: device loss terminates the whole workflow as a failure',async t=>{
   const f=fixture(t);await f.invoke('start',f.input);f.state.video.session='reconnected';

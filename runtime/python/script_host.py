@@ -226,7 +226,12 @@ def run(config, program):
                 extern_functions["OCR"] = ocr_region
 
             if labels is not None:
-                getters = labels.external_getters(read_frame, ocr_reader=ocr_reader)
+                getters = labels.external_getters(read_frame, ocr_reader=ocr_reader,
+                    result_callback=lambda match: emit({
+                        'event': 'script.image-result', 'labelName': match.label_name,
+                        'score': match.score, 'scriptValue': match.script_value,
+                        'location': match.location, 'rangeRect': match.range_rect, 'matchRect': match.match_rect,
+                    }))
             # Fail before controller.acquire when a required video source has
             # not published a usable frame yet.
             read_frame()

@@ -12,6 +12,16 @@ from auto_bdsp_rng.automation.auto_rng import dialog_timing
 
 
 class ShinyContracts(unittest.TestCase):
+    def test_only_the_monitored_script_can_signal_battle(self):
+        session = host.Session({}, lambda **_: None)
+        session.receive({'event': 'battle'})
+        self.assertFalse(session.battle.is_set())
+        session.battle_script_id = 'current-hit'
+        session.receive({'event': 'battle', 'scriptId': 'old-hit'})
+        self.assertFalse(session.battle.is_set())
+        session.receive({'event': 'battle', 'scriptId': 'current-hit'})
+        self.assertTrue(session.battle.is_set())
+
     def monitor(self, outcome):
         trace, ids = [], []
         started, released, stopped = threading.Event(), threading.Event(), threading.Event()
