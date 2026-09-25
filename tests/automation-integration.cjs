@@ -6,6 +6,7 @@ const path=require('node:path');
 const {EventEmitter}=require('node:events');
 const {registerAutomation}=require('../electron/automation.cjs');
 const {defaults}=require('../electron/automation-store.cjs');
+const {createDeviceFixture,until}=require('./helpers/device-fixture.cjs');
 
 const deferred=()=>{let resolve;const promise=new Promise(done=>{resolve=done;});return {promise,resolve};};
 function fixture(t){
@@ -57,6 +58,54 @@ test('C04: stopping forbids all late script/search calls and releases the resour
   await assert.rejects(request('script',{text:'A 100',name:'source.rng'}),/停止/);
   await assert.rejects(request('search',{}),/停止/);
   assert.equal(f.automation.getState().state.status,'stopped');assert.equal(f.trace.at(-1),'release');
+});
+
+test('definite non-shiny stops only its hit script and waits for controller cleanup',async t=>{
+  const f=fixture(t);await f.invoke('start',f.input);
+  const status=f.automation.getState().state.status;
+  const release=deferred(),started=deferred();let released=false;
+  f.devices.runner.start=async()=>{started.resolve();return {runId:'hit'};};
+  f.devices.runner.stop=async()=>{await release.promise;released=true;f.devices.events.emit('script',{event:'script.done',runId:'hit',status:'cancelled'});};
+  t.after(()=>release.resolve());
+  const request=f.callbacks().request;
+  const script=request('script',{text:'A 1',name:'source.rng',scriptId:'hit-1'});
+  void script.catch(()=>{});
+  await started.promise;
+  let stopped=false;
+  const stopping=request('stop_script',{scriptId:'hit-1'}).then(()=>{stopped=true;});
+  void stopping.catch(()=>{});
+  await new Promise(setImmediate);assert.equal(stopped,false);assert.equal(released,false);
+  release.resolve();await stopping;await script;
+  assert.equal(released,true);assert.equal(f.automation.getState().state.status,status);
+  f.devices.runner.start=async()=>{queueMicrotask(()=>f.devices.events.emit('script',{event:'script.done',runId:'next',status:'completed'}));return {runId:'next'};};
+  await request('script',{text:'B 1',name:'source.rng'});
+});
+
+test('a stop arriving before the hit script request prevents its launch',async t=>{
+  const f=fixture(t);await f.invoke('start',f.input);const request=f.callbacks().request;
+  const status=f.automation.getState().state.status;
+  await request('stop_script',{scriptId:'early-hit'});
+  await request('script',{text:'late-key',name:'source.rng',scriptId:'early-hit'});
+  assert.equal(f.trace.includes('late-key'),false);
+  assert.equal(f.automation.getState().state.status,status);
+});
+
+test('hit cancellation releases real mock-controller input before the workflow continues',{skip:process.platform!=='win32',timeout:15000},async t=>{
+  const hardware=createDeviceFixture(t);await hardware.connectController();
+  const f=fixture(t);
+  hardware.devices.runner.rootDirectory=f.devices.runner.rootDirectory;
+  f.devices.runner=hardware.devices.runner;
+  f.devices.controller=hardware.devices.controller;
+  hardware.devices.events.on('script',message=>f.devices.events.emit('script',message));
+  await f.invoke('start',f.input);const request=f.callbacks().request;
+  const script=request('script',{text:'A DOWN\nWAIT 60000\nPRINT "unexpected-tail"\nB 1',name:'source.rng',scriptId:'native-hit'});
+  void script.catch(()=>{});
+  await until(async()=>((await hardware.clients.controller.call('controller.status')).report.buttons&4)!==0,'hit script holds A');
+  await request('stop_script',{scriptId:'native-hit'});await script;
+  const state=await hardware.clients.controller.call('controller.status');
+  assert.equal(state.report.buttons,0);assert.equal(state.owned,false);
+  assert.equal(f.automation.getState().logs.some(row=>row.message==='unexpected-tail'),false);
+  await request('script',{text:'B 1',name:'source.rng'});
 });
 test('C04: device loss terminates the whole workflow as a failure',async t=>{
   const f=fixture(t);await f.invoke('start',f.input);f.state.video.session='reconnected';

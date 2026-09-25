@@ -12,6 +12,7 @@ from pathlib import Path
 import sys
 import threading
 import time
+from uuid import uuid4
 from types import SimpleNamespace
 
 from auto_bdsp_rng.automation.auto_rng.models import AutoRngConfig, AutoRngPhase, AutoRngSeedResult, ShinyCheckResult
@@ -150,8 +151,8 @@ class Session:
             raise RuntimeError('OCR 图像编码失败')
         return self.request('ocr', imageBase64=base64.b64encode(encoded).decode('ascii'), operation=operation, **options)
 
-    def run_script(self, text, name):
-        return self.request('script', text=text, name=name)
+    def run_script(self, text, name, script_id=None):
+        return self.request('script', text=text, name=name, scriptId=script_id)
 
     def capture(self, previous=None, *, exit_scene=False, tid=False):
         import numpy as np
@@ -248,10 +249,11 @@ class Session:
         starter = self.config['species'] in (387,390,393)
         roamer = self.config['species'] in (481,488)
         errors, done = [],threading.Event()
+        script_id = uuid4().hex
         self.battle.clear()
         def script():
             try:
-                self.run_script(text,name)
+                self.run_script(text,name,script_id=script_id)
             except BaseException as error:
                 errors.append(error)
             finally:
@@ -288,6 +290,13 @@ class Session:
         except DialogKeywordTimeoutError:
             result = ShinyCheckResult(False)
             self.log('判闪关键词超时，结果未知')
+        if result.interval_seconds is not None and not result.is_shiny:
+            # A definite miss cancels only this hit script; OCR timeout remains
+            # unknown and follows the original wait-for-script behavior.
+            self.request('stop_script', scriptId=script_id)
+            thread.join(timeout=5)
+            if thread.is_alive():
+                raise RuntimeError('撞闪脚本停止超时，自动流程停止')
         while not done.wait(.05):
             check_script()
         check_script()

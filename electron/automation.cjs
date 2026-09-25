@@ -45,9 +45,10 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
   };
   const handle=(name,action,main=true)=>ipcMain.handle('automation:'+name,async(event,args)=>{requireWindow(event,main);if(closed)throw Error('程序正在关闭');return action(args);});
   const checkStopped=run=>{if(closed||run.stopped||(active!==run&&auxiliary!==run))throw Error('自动流程已停止');};
-  const runScript=async(run,text,name)=>{
+  const executeScript=async(run,text,name,script)=>{
     await run.keepalive;
     checkStopped(run);
+    if(script.stopped)return;
     const selected=run.scripts[name]||Object.values(run.scripts)[0];
     if(!selected)throw Error('未配置脚本目录');
     let resolve,reject,id;const early=[];
@@ -60,16 +61,41 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
         store.log(message.message,'脚本','info',{runId:run.id,round:run.round});
         if(/已检测到进入战斗/.test(message.message))run.worker?.send({event:'battle'});
       }
-      if(message.event==='script.done')message.status==='completed'?resolve():reject(Error(message.message||'脚本已停止'));
+      if(message.event==='script.done')message.status==='completed'||(script.stopped&&message.status==='cancelled')?resolve():reject(Error(message.message||'脚本已停止'));
     };
     const listener=message=>{if(!id)early.push(message);else dispatch(message);};
     devices.events.on('script',listener);
     try{
-      ({runId:id}=await devices.runner.start({text,path:selected.path,shouldStop:()=>run.stopped||closed||(active!==run&&auxiliary!==run)}));
+      ({runId:id}=await devices.runner.start({text,path:selected.path,shouldStop:()=>script.stopped||run.stopped||closed||(active!==run&&auxiliary!==run)}));
       for(const message of early)dispatch(message);
       if(run.stopped){await devices.runner.stop();throw Error('自动流程已停止');}
+      if(script.stopped)await devices.runner.stop();
       await complete;checkStopped(run);
+    }catch(error){
+      if(script.stopped&&error.message==='脚本已停止。'){checkStopped(run);return;}
+      throw error;
     }finally{devices.events.off('script',listener);}
+  };
+  const runScript=(run,text,name,scriptId)=>{
+    checkStopped(run);
+    if(run.currentScript)throw Error('已有自动脚本正在运行');
+    const script={scriptId,stopped:run.cancelledScripts?.delete(scriptId)||false,done:null};
+    run.currentScript=script;
+    script.done=executeScript(run,text,name,script).finally(()=>{run.lastScriptId=script.scriptId;if(run.currentScript===script)run.currentScript=null;});
+    return script.done;
+  };
+  const stopScript=async(run,scriptId)=>{
+    if(typeof scriptId!=='string'||!scriptId)throw Error('停止脚本标识无效');
+    const script=run.currentScript;
+    if(!script||script.scriptId!==scriptId){
+      if(run.lastScriptId===scriptId)return;
+      // OCR can finish before the hit thread's script request reaches Electron.
+      (run.cancelledScripts||=new Set()).add(scriptId);return;
+    }
+    script.stopped=true;
+    await devices.runner.stop();
+    await script.done; // script.done is emitted only after controller release.
+    checkStopped(run);
   };
   const image=captureImage||(async()=>{
     const source=devices.getState().video;
@@ -145,7 +171,8 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
       const context=()=>({runId:run.id,round:run.round});
       const request=async(method,params)=>{
         checkStopped(run);
-        if(method==='script')return runScript(run,params.text,params.name);
+        if(method==='script')return runScript(run,params.text,params.name,params.scriptId);
+        if(method==='stop_script')return stopScript(run,params.scriptId);
         if(method==='ocr')return ocrRequest(params,run.ocr);
         if(method==='delay_profile'){
           const profile=store.data.profiles[run.target.speciesId];
