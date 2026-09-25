@@ -24,7 +24,8 @@ function fixture(overrides={}){
   const scripts={labelsList:vi.fn(async()=>({labels:[label]})),labelRead:vi.fn(async()=>label),labelSave:vi.fn(async data=>({...data,path:label.path}))};
   const listeners=new Set();
   const video={getSnapshot:vi.fn(async()=>frame),onSnapshot:vi.fn(fn=>{listeners.add(fn);return()=>listeners.delete(fn);}),
-    snapshot:vi.fn(async()=>{const live={...frame,url:'data:image/png;base64,FRAMEB',sequence:2};listeners.forEach(fn=>fn(live));return live;})};
+    snapshot:vi.fn(async()=>{const live={...frame,url:'data:image/png;base64,FRAMEB',sequence:2};listeners.forEach(fn=>fn(live));return live;}),
+    captureFrame:vi.fn(async()=>({...frame,url:'data:image/png;base64,FRAMEB',sequence:2}))};
   window.desktop={scripts,devices:{video}};
   return {scripts,video,frame,label,listeners};
 }
@@ -63,4 +64,14 @@ test('a new reference snapshot does not replace the loaded template',async()=>{
   fireEvent.click(screen.getByRole('button',{name:'截图',exact:true}));
   await waitFor(()=>expect(screen.getByAltText('截图静态帧').getAttribute('src')).toContain('FRAMEB'));
   expect((await save(scripts)).imageBase64).toBe('ORIGINAL');
+});
+
+test('searching a live frame leaves the static reference and its next saved crop unchanged',async()=>{
+  const {scripts,frame,video}=fixture();render(<VideoPreview labelsOpen labelFolder="BDSP" />);await load();
+  fireEvent.change(screen.getByLabelText('目标位置 X'),{target:{value:'2'}});
+  fireEvent.click(screen.getByRole('button',{name:'搜索测试'}));
+  await screen.findByAltText('实时匹配画面');
+  expect(screen.getByAltText('截图静态帧').getAttribute('src')).toBe(frame.url);
+  expect(video.captureFrame).toHaveBeenCalledOnce();expect(video.snapshot).not.toHaveBeenCalled();
+  expect((await save(scripts)).imageBase64).toBe(btoa('crop:'+frame.url));
 });

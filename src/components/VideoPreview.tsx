@@ -197,7 +197,7 @@ function ImageLabelWorkspace({ active, labelFolder, cornerLayout, referenceTarge
     const targetUrl = searchMethod !== 107 && templateBase64 ? `data:image/png;base64,${templateBase64}` : await cropImage(snapshot.url, target);
     const videoApi = window.desktop?.devices?.video;
     if (!videoApi) throw new Error('请使用桌面应用连接视频源。');
-    const started = performance.now(); const live = await videoApi.snapshot();
+    const started = performance.now(); const live = await videoApi.captureFrame();
     let result: { score: number; x: number; y: number; recognizedText?: string };
     if (searchMethod === 107) {
       const liveTargetUrl = await cropImage(live.url, target);

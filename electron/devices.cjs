@@ -132,7 +132,7 @@ function registerDevices({ ipcMain, getWindows, loadWindow, rootDirectory = path
   });
   handle('video:get-snapshot', () => snapshot);
   handle('video:ocr', args => ocr.read(args?.imageBase64, args?.language || ''));
-  handle('video:snapshot', async () => {
+  const captureFrame = async () => {
     const source = state.video;
     if (source.status !== 'connected') throw new Error('请先连接视频源。');
     const response = await fetch(`${source.baseUrl}/snapshot.png?session=${encodeURIComponent(source.session)}`, {
@@ -140,8 +140,12 @@ function registerDevices({ ipcMain, getWindows, loadWindow, rootDirectory = path
     });
     if (response.status !== 200) throw new Error('截图失败，视频源可能已断开。');
     const bytes = Buffer.from(await response.arrayBuffer());
-    snapshot = { url: 'data:image/png;base64,' + bytes.toString('base64'), session: response.headers.get('x-frame-session'),
+    return { url: 'data:image/png;base64,' + bytes.toString('base64'), session: response.headers.get('x-frame-session'),
       sequence: response.headers.get('x-frame-sequence'), width: Number(response.headers.get('x-frame-width')), height: Number(response.headers.get('x-frame-height')) };
+  };
+  handle('video:capture-frame', captureFrame);
+  handle('video:snapshot', async () => {
+    snapshot = await captureFrame();
     for (const window of getWindows()) if (!window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send('video:snapshot-updated', snapshot);
     return snapshot;
   });

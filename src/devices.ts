@@ -35,6 +35,7 @@ export interface DevicesApi {
     connect: (config: { deviceId: string; backend: string; width: number; height: number; fps: number }) => Promise<void>;
     disconnect: () => Promise<void>;
     snapshot: () => Promise<Snapshot>;
+    captureFrame: () => Promise<Snapshot>;
     getSnapshot: () => Promise<Snapshot | null>;
     ocr: (imageBase64: string, language?: string) => Promise<{ text: string; confidence: number }>;
     onSnapshot: (listener: (snapshot: Snapshot) => void) => () => void;

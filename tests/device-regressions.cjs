@@ -6,6 +6,22 @@ const { createDeviceFixture, until } = require('./helpers/device-fixture.cjs');
 const neutral = { buttons: 0, hat: 8, lx: 128, ly: 128, rx: 128, ry: 128 };
 const options = { timeout: 15000, skip: process.platform !== 'win32' };
 
+test('live test captures do not publish or replace the reference snapshot', options, async t => {
+  const f = createDeviceFixture(t);
+  await f.connectVideo();
+  const reference = await f.call('video:snapshot');
+  const published = () => f.events.filter(event => event.channel === 'video:snapshot-updated');
+  assert.equal(published().length, 1);
+  const live = await f.call('video:capture-frame');
+  assert.equal(live.session, reference.session);
+  assert.match(live.url, /^data:image\/png;base64,/);
+  assert.equal(published().length, 1);
+  assert.deepEqual(await f.call('video:get-snapshot'), reference);
+  const updated = await f.call('video:snapshot');
+  assert.equal(published().length, 2);
+  assert.deepEqual(await f.call('video:get-snapshot'), updated);
+});
+
 test('[DEV-001] a manual held key is released across a public short-press handoff', options, async t => {
   const f = createDeviceFixture(t);
   await f.connectController();
