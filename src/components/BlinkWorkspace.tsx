@@ -20,7 +20,6 @@ export function BlinkWorkspace({ blink, video }: { blink: BlinkController; video
   const ready = Boolean(config.eye && rect && video.status === 'connected' && config.sourceWidth === video.width && config.sourceHeight === video.height);
   const locked = busy || Boolean(blink.selection) || blink.selecting;
   const unavailable = !ready || locked || !window.desktop?.blink;
-  const tracking = state.tracking;
   const hasSeed = config.seed.length === 4 && config.seed.every(word => /^[\da-f]{1,8}$/i.test(word)) && config.seed.some(word => !/^0+$/.test(word));
   const actionButton = (mode: BlinkMode, label: string, primary = false) => {
     const active = busy && state.mode === mode;
@@ -34,13 +33,8 @@ export function BlinkWorkspace({ blink, video }: { blink: BlinkController; video
         void blink.run(mode);
       }}>{active ? <><Square size={13} />停止</> : <>{mode === 'recover' && <Play size={14} />}{label}</>}</button>;
   };
-  const progress = busy && tracking ? `当前 ${tracking.advances.toLocaleString()} 帧` : busy && state.mode !== 'preview' ? `${state.captured} / ${state.target}` : '';
-  const observationError = !blink.notice && !busy && ready && ['idle', 'stopped'].includes(state.status) ? blink.observation?.error : null;
-  const status = blink.notice || (video.status !== 'connected' && !busy ? '请先连接视频源，再在右侧画面框选。'
-    : state.status === 'error' ? state.message
-    : state.status === 'stopped' && ready ? observationError || '眨眼任务已停止，实时眼睛识别继续。'
-    : state.status === 'idle' && ready ? observationError || '实时眼睛识别中'
-    : state.message);
+  const message = blink.notice || (state.status === 'error' ? state.message : !busy && ready ? blink.observation?.error : '');
+  const messageError = !blink.notice && (state.status === 'error' || Boolean(blink.observation?.error));
   return <section className="blink-workspace" aria-label="眨眼捕获工作区">
     <header className="blink-heading"><Eye size={18} /><h2>眨眼捕获</h2><span>Project_Xs</span></header>
     <div className="blink-scroll">
@@ -58,17 +52,17 @@ export function BlinkWorkspace({ blink, video }: { blink: BlinkController; video
             <button className="button" type="button" aria-label="保存配置" disabled={locked} onClick={blink.save}><Save size={13} />保存</button>
           </div>
           <div className="blink-capture-actions">{actionButton('recover', '捕捉 Seed', true)}{actionButton('munchlax', 'TID/SID 测种', true)}{actionButton('reidentify', '校正')}<button className="button" title="捕获或校正成功后可切换 Timeline" disabled={state.status !== 'tracking' || state.mode === 'munchlax'} onClick={() => void blink.timeline()}><Clock3 size={14} />Timeline</button></div>
+          {message && <p className="blink-action-message" role={messageError ? 'alert' : 'status'}>{message}</p>}
         </section>
         <section className="blink-section" aria-label="识别参数"><h3>识别参数</h3>
           <div className="blink-region-actions"><button className="button" title="点击后在右上角视频中右键拖动框选" disabled={locked || video.status !== 'connected'} onClick={() => void blink.beginSelection('roi')}>框选眼睛区域</button><button className="button" title="点击后在右上角视频中右键拖动框选" disabled={locked || video.status !== 'connected'} onClick={() => void blink.beginSelection('eye')}>截取眼睛</button></div>
         </section>
         <section className="blink-section blink-advanced" aria-label="高级时序"><h3>高级时序<span>8 项参数</span></h3><div className="blink-form-fields">
-          <label className="blink-check"><input type="checkbox" checked={config.noisy} disabled={locked} onChange={event => update({ noisy: event.target.checked, ...(event.target.checked ? { pokemonNpc: 1 } : {}) })} />1 PK NPC 校正</label>
           {timingFields.map(([key, label, aria, min, max, step, help]) => <label key={key} title={help}>{label}<span className="blink-unit-input"><input aria-label={aria} type="number" min={min} max={max} step={step} value={config[key]} disabled={locked} onChange={event => update({ [key]: Number(event.target.value) })} />{key === 'timeDelay' && <span>秒</span>}</span></label>)}
+          <label className="blink-check"><input type="checkbox" checked={config.noisy} disabled={locked} onChange={event => update({ noisy: event.target.checked, ...(event.target.checked ? { pokemonNpc: 1 } : {}) })} />1 PK NPC 校正</label>
           <label className="blink-check" title="对应 Project_Xs 的 +1 on menu close"><input type="checkbox" checked={config.menuClose} disabled={locked} onChange={event => update({ menuClose: event.target.checked })} />关闭菜单 +1</label>
         </div></section>
       </div>
     </div>
-    <footer className="blink-footer"><p role={state.status === 'error' || observationError ? 'alert' : 'status'}>{status}</p>{progress && <span className="blink-progress">{progress}</span>}</footer>
   </section>;
 }

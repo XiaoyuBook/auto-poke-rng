@@ -1100,10 +1100,8 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .blink-unit-input:has(> span) input { padding-right: 42px; }
 .blink-workspace .blink-check { display: flex; flex-direction: row; align-items: center; gap: 7px; min-height: 26px; }
 .blink-check input { accent-color: var(--accent); margin: 0; }
-.blink-footer { display: flex; align-items: center; gap: 8px; flex-shrink: 0; min-height: 35px; padding: 10px 0; border-top: 1px solid var(--line); }
-.blink-footer p { flex: 1; min-width: 0; margin: 0; font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
-.blink-progress { margin-left: auto; flex-shrink: 0; color: var(--muted); font: 10px var(--mono); }
-.blink-footer p[role=alert] { color: var(--red); }
+.blink-action-message { margin: 8px 0 0; color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+.blink-action-message[role=alert] { color: var(--red); }
 @container (max-width: 340px) {
   .blink-form-fields > label { grid-template-columns: 104px minmax(0, 1fr); gap: 7px; }
   .blink-config-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -1122,12 +1120,15 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .blink-video-seed-row { display: grid; grid-template-columns: 46px minmax(0, 1fr); align-items: baseline; gap: 5px; white-space: nowrap; }
 .blink-video-seed-row > span { color: #adb9b1; }
 .blink-video-seed-row code { color: #a6d8b8; font: 11px var(--mono); user-select: text; cursor: text; }
-.blink-video-status { position: absolute; z-index: 1; top: 6px; right: 6px; display: flex; align-items: center; gap: 8px; padding: 4px 6px; border: 1px solid #59645c99; border-radius: 4px; background: #141a18e8; color: #cbd5cf; font-size: 10px; white-space: nowrap; pointer-events: auto; }
-.blink-video-status > span, .blink-video-status label { display: inline-flex; align-items: center; gap: 4px; }
+.blink-video-status { position: absolute; z-index: 1; top: 6px; right: 6px; display: grid; gap: 4px; padding: 4px 6px; border: 1px solid #59645c99; border-radius: 4px; background: #141a18e8; color: #cbd5cf; font-size: 10px; white-space: nowrap; pointer-events: auto; }
+.blink-video-status-row, .blink-video-status-row > span, .blink-video-status label { display: inline-flex; align-items: center; gap: 4px; }
+.blink-video-status-row { justify-content: space-between; gap: 8px; }
 .blink-video-status output { color: #a6d8b8; font: 11px var(--mono); }
 .blink-video-status.is-blinking output { color: #f4d083; }
 .blink-video-status input { box-sizing: border-box; width: 54px; height: 22px; padding: 2px 4px; border: 1px solid #58685f; border-radius: 3px; background: #1a2320; color: var(--text); font: 11px var(--mono); }
 .blink-video-status input:disabled { opacity: .6; }
+.blink-video-progress { display: flex; justify-content: space-between; gap: 12px; padding-top: 4px; border-top: 1px solid #59645c99; }
+.blink-video-progress strong { color: #a6d8b8; font: 11px var(--mono); }
 @container (max-width: 360px) {
   .blink-video-seeds { top: 40px; }
 }

@@ -27,6 +27,7 @@ export function BlinkVideoOverlay({ blink, target, video }: { blink: BlinkContro
   const location = matchingInJob ? blink.state.location : blink.observation?.location;
   const score = matchingInJob ? blink.state.score : blink.observation?.score;
   const blinking = score != null && score > (blink.config.mode === 'munchlax' ? .4 : .01) && score < blink.config.threshold;
+  const capturing = ['starting', 'capturing', 'solving', 'stopping'].includes(blink.state.status) && blink.state.mode !== 'preview';
   const point = (event: PointerEvent<SVGSVGElement>, clamp = false) => containedPoint(event.clientX, event.clientY, event.currentTarget.getBoundingClientRect(), width, height, clamp);
   const update = (event: PointerEvent<SVGSVGElement>) => {
     const end = point(event, true);
@@ -51,9 +52,10 @@ export function BlinkVideoOverlay({ blink, target, video }: { blink: BlinkContro
       {[0, 1].map(index => <div className="blink-video-seed-row" key={index}><span>Seed{index}</span><code aria-label={`捕获 Seed ${index}`}>{seed?.[index] || '—'}</code></div>)}
     </div>}
     {showMatchStatus && <div className={'blink-video-status' + (blinking ? ' is-blinking' : '')} onContextMenu={event => event.stopPropagation()}>
-      <span>匹配 <output aria-label="实时匹配分数" title={blink.observation?.error || '实时模板匹配分数'}>{score == null ? blink.observation?.error ? '异常' : '—' : score.toFixed(4)}</output></span>
-      <label>阈值 <input aria-label="眨眼匹配阈值" type="number" min="0.02" max="0.9999" step="0.01" value={blink.config.threshold}
-        disabled={blink.busy || blink.selecting} onChange={event => { const threshold = Number(event.target.value); blink.setConfig(current => ({ ...current, threshold })); }} /></label>
+      <div className="blink-video-status-row"><span>匹配 <output aria-label="实时匹配分数" title={blink.observation?.error || '实时模板匹配分数'}>{score == null ? blink.observation?.error ? '异常' : '—' : score.toFixed(4)}</output></span>
+        <label>阈值 <input aria-label="眨眼匹配阈值" type="number" min="0.02" max="0.9999" step="0.01" value={blink.config.threshold}
+          disabled={blink.busy || blink.selecting} onChange={event => { const threshold = Number(event.target.value); blink.setConfig(current => ({ ...current, threshold })); }} /></label></div>
+      {capturing && <div className="blink-video-progress" role="status" aria-label="眨眼捕捉进度"><span>捕捉进度</span><strong>{blink.state.captured} / {blink.state.target}</strong></div>}
     </div>}
     {connected && selection && <div className="blink-selection-tools"><span>右键拖动{selection.kind === 'eye' ? '框选睁开的眼睛' : '框选眼睛搜索范围'}{draft ? ` · ${draft.width} × ${draft.height}` : ''}</span><button disabled={saving} onClick={blink.cancelSelection}>取消</button></div>}
   </div>, target);

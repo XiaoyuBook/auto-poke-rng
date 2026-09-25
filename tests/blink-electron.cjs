@@ -56,7 +56,7 @@ app.whenReady().then(async () => {
   await select('截取眼睛');
   fs.writeFileSync(path.join(output, 'eye-selection.png'), (await main.webContents.capturePage()).toPNG());
   await drag(25, 334, 84, 28);
-  await until(`document.querySelector('.blink-footer')?.textContent.includes('已截取睁眼模板') && !document.querySelector('.blink-frozen')`, 'cropped template applied');
+  await until(`document.querySelector('.blink-action-message')?.textContent.includes('已截取睁眼模板') && !document.querySelector('.blink-frozen')`, 'cropped template applied');
   await select('框选眼睛区域');
   await drag(18, 320, 128, 60);
   await until(`!document.querySelector('.blink-frozen')`, 'roi selected');
@@ -104,7 +104,8 @@ app.whenReady().then(async () => {
   await click('TID/SID 测种');
   await until(`window.desktop.blink.getState().then(x=>x.status==='capturing')`, 'TID/SID capture starts');
   assert.equal(await js(`(() => { const buttons=[...document.querySelectorAll('.blink-capture-actions button')]; return buttons[1].textContent==='停止' && !buttons[1].disabled && buttons[0].disabled && buttons[2].disabled; })()`), true, 'active capture button becomes stop while the other modes are disabled');
-  assert.equal(await js(`document.querySelector('.blink-footer').textContent.includes('0 / 64')`), true, 'active capture count remains visible below the form');
+  assert.equal(await js(`(() => { const row=document.querySelector('.blink-video-status-row').getBoundingClientRect(), progress=document.querySelector('.blink-video-progress'); return progress.textContent.includes('0 / 64') && progress.getBoundingClientRect().top>=row.bottom; })()`), true, 'capture count appears below the video threshold');
+  assert.equal(await js(`document.querySelector('.blink-footer')===null`), true, 'the old status footer is removed');
   await click('停止'); await until(`window.desktop.blink.getState().then(x=>x.status==='stopped')`, 'stop TID/SID capture');
   await click('捕捉 Seed');
   await until(`window.desktop.blink.getState().then(x=>x.status==='capturing')`, 'capture starts');
@@ -116,7 +117,7 @@ app.whenReady().then(async () => {
   assert.equal(await js(`(() => {const s=document.querySelector('.blink-scroll');return s.scrollWidth<=s.clientWidth+1;})()`), true, 'narrow workspace must not clip controls horizontally');
   assert.equal((await compactLayout()).configFits, true, 'configuration input and buttons fit in a small window');
   assert.equal((await compactLayout()).configWrapped, true, 'configuration actions wrap beneath the name in a small window');
-  assert.equal(await js(`(() => {const r=document.querySelector('.blink-footer').getBoundingClientRect();return r.bottom<innerHeight && r.top>50;})()`), true, 'status remains reachable in a small window');
+  assert.equal(await js(`(() => {const r=document.querySelector('.blink-capture-actions button').getBoundingClientRect();return r.top>=0 && r.bottom<innerHeight && document.querySelector('.blink-video-progress')?.textContent.includes('/ 40');})()`), true, 'active stop and video progress remain reachable in a small window');
   fs.writeFileSync(path.join(output, 'blink-compact-1100.png'), (await main.webContents.capturePage()).toPNG());
   await js(`window.desktop.devices.video.disconnect()`);
   await until(`window.desktop.blink.getState().then(x=>x.status==='error')`, 'disconnect stops worker');
