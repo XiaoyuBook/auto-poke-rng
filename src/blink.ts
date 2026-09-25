@@ -47,6 +47,28 @@ function loadConfigs(): BlinkConfig[] {
 }
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : String(error);
 
+export function eyeTemplateSize(config: Pick<BlinkConfig, 'eye' | 'eyeRect'>) {
+  if (!config.eye) return null;
+  if (config.eyeRect) return { width: config.eyeRect.width, height: config.eyeRect.height };
+  // Imported configurations have no eyeRect; PNG stores its dimensions in IHDR.
+  if (!config.eye.startsWith('data:image/png;base64,')) return null;
+  try {
+    const header = atob(config.eye.slice('data:image/png;base64,'.length, 'data:image/png;base64,'.length + 32));
+    const signature = [137, 80, 78, 71, 13, 10, 26, 10];
+    if (header.length < 24 || !signature.every((byte, index) => header.charCodeAt(index) === byte)
+        || header.slice(12, 16) !== 'IHDR') return null;
+    const dimension = (offset: number) => ((header.charCodeAt(offset) * 0x1000000)
+      + (header.charCodeAt(offset + 1) << 16) + (header.charCodeAt(offset + 2) << 8) + header.charCodeAt(offset + 3));
+    const width = dimension(16), height = dimension(20);
+    return width > 0 && height > 0 ? { width, height } : null;
+  } catch { return null; }
+}
+
+export function roiFitsEye(config: Pick<BlinkConfig, 'eye' | 'eyeRect' | 'roi'>) {
+  const size = eyeTemplateSize(config);
+  return !config.roi || !size || (config.roi.width >= size.width && config.roi.height >= size.height);
+}
+
 export function containedPoint(clientX: number, clientY: number, bounds: { left: number; top: number; width: number; height: number }, width: number, height: number, clamp = false) {
   const scale = Math.min(bounds.width / width, bounds.height / height);
   if (!Number.isFinite(scale) || scale <= 0) return null;
@@ -106,7 +128,7 @@ export function useBlink(video: VideoState, enabled: boolean, viewActive = false
   useEffect(() => api?.onObservation(value => setObservation(value)), [api]);
   useEffect(() => {
     if (!api || !viewActive || !enabled || matchingInJob || selection || selecting || video.status !== 'connected'
-        || !config.eye || !config.roi || config.sourceWidth !== video.width || config.sourceHeight !== video.height) {
+        || !config.eye || !config.roi || !roiFitsEye(config) || config.sourceWidth !== video.width || config.sourceHeight !== video.height) {
       setObservation(null);
       return;
     }
@@ -115,7 +137,7 @@ export function useBlink(video: VideoState, enabled: boolean, viewActive = false
     void api.observe({ ...config, mode: 'preview' }).catch(error => { if (active) setObservation({ error: errorMessage(error) }); });
     return () => { active = false; void api.observe(null).catch(() => {}); };
   }, [api, viewActive, enabled, matchingInJob, selection, selecting, video.status, video.session, video.width, video.height,
-    config.eye, config.roi, config.sourceWidth, config.sourceHeight, config.threshold]);
+    config.eye, config.eyeRect, config.roi, config.sourceWidth, config.sourceHeight, config.threshold]);
   useEffect(() => {
     ++selectionVersion.current; setSelection(null); setSelecting(false);
   }, [enabled, video.session, video.status]);
@@ -143,6 +165,18 @@ export function useBlink(video: VideoState, enabled: boolean, viewActive = false
     const version = selectionVersion.current;
     const { frame, kind } = selection;
     if (rect.width < 2 || rect.height < 2) { setNotice('请选择至少 2 × 2 像素的区域。'); return; }
+    const sameSource = config.sourceWidth === frame.width && config.sourceHeight === frame.height;
+    if (sameSource && kind === 'roi') {
+      const eye = eyeTemplateSize(config);
+      if (eye && (rect.width < eye.width || rect.height < eye.height)) {
+        setNotice(`ROI 至少需要 ${eye.width} × ${eye.height} 像素，请框选更大的范围或重新截取更小的眼睛。`);
+        return;
+      }
+    }
+    if (sameSource && kind === 'eye' && config.roi && (rect.width > config.roi.width || rect.height > config.roi.height)) {
+      setNotice(`眼睛模板不能大于当前 ROI（${config.roi.width} × ${config.roi.height}），请缩小眼睛框或先扩大 ROI。`);
+      return;
+    }
     try {
       const eye = kind === 'eye' ? await cropEye(frame, rect) : null;
       if (version !== selectionVersion.current || frame.session !== currentVideo.current.session) return;
@@ -158,6 +192,7 @@ export function useBlink(video: VideoState, enabled: boolean, viewActive = false
   };
   const run = async (mode: BlinkMode = config.mode) => {
     if (!api || launching.current || selection || selecting || (busy && state.status !== 'tracking')) return;
+    if (!roiFitsEye(config)) { setNotice('ROI 小于眼睛模板，请重新框选更大的 ROI 或截取更小的眼睛。'); return; }
     launching.current = true;
     setNotice('');
     const parameters = { ...config, mode, ...fixedSearchRange, ...(mode === 'reidentify' && config.noisy ? { pokemonNpc: 1 } : {}) };

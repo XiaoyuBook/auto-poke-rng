@@ -13,19 +13,21 @@ const video: VideoState = { status: 'connected', session: 'one', width: 1920, he
 function setup() {
   let listener: (state: BlinkState) => void = () => {};
   let observationListener: (value: BlinkObservation) => void = () => {};
+  let currentBlink: ReturnType<typeof useBlink>;
   const start = vi.fn(async () => ({ revision: 1, status: 'starting', captured: 0, target: 40, message: '开始' } as BlinkState));
   const stop = vi.fn(async () => ({ revision: 2, status: 'stopped', captured: 0, target: 40, message: '停止' } as BlinkState));
   const getState = vi.fn(async () => ({ revision: 0, status: 'idle', captured: 0, target: 40, message: '待命' } as BlinkState));
   const timeline = vi.fn(async () => ({ revision: 5, status: 'countdown', captured: 40, target: 40, message: '倒计时' } as BlinkState));
   const importConfig = vi.fn(async () => null);
   const observe = vi.fn(async () => {});
-  window.desktop = { blink: { start, stop, getState, timeline, importConfig, observe, onObservation: (callback: (value: BlinkObservation) => void) => { observationListener = callback; return () => {}; }, onState: (callback: (state: BlinkState) => void) => { listener = callback; return () => {}; } } } as unknown as DesktopApi;
+  window.desktop = { devices: { video: { snapshot: vi.fn(async () => ({ url: 'data:image/png;base64,AAAA', session: 'one', sequence: '1', width: 1920, height: 1080 })) } }, blink: { start, stop, getState, timeline, importConfig, observe, onObservation: (callback: (value: BlinkObservation) => void) => { observationListener = callback; return () => {}; }, onState: (callback: (state: BlinkState) => void) => { listener = callback; return () => {}; } } } as unknown as DesktopApi;
   function Harness({ enabled = true, active = false, overlay = false }: { enabled?: boolean; active?: boolean; overlay?: boolean }) {
     const blink = useBlink(video, enabled, active);
+    currentBlink = blink;
     const [target, setTarget] = useState<HTMLDivElement | null>(null);
     return <><button onClick={() => blink.setConfig({ ...newBlinkConfig(), eye: 'data:image/png;base64,AAAA', roi: { x: 0, y: 0, width: 50, height: 50 }, sourceWidth: 1920, sourceHeight: 1080 })}>准备配置</button><BlinkWorkspace blink={blink} video={video} />{overlay && <><div ref={setTarget} /><BlinkVideoOverlay blink={blink} video={video} target={target} /></>}</>;
   }
-  return { Harness, start, stop, timeline, observe, update: (state: BlinkState) => act(() => listener(state)), observeFrame: (value: BlinkObservation) => act(() => observationListener(value)) };
+  return { Harness, start, stop, timeline, observe, getBlink: () => currentBlink, update: (state: BlinkState) => act(() => listener(state)), observeFrame: (value: BlinkObservation) => act(() => observationListener(value)) };
 }
 
 it('maps native pixels through letterboxing and resizing, rejecting selections in black bars', () => {
@@ -35,6 +37,30 @@ it('maps native pixels through letterboxing and resizing, rejecting selections i
   expect(containedPoint(420, 200, bounds, 640, 480)).toEqual({ x: 320, y: 240 });
   expect(containedPoint(900, -20, bounds, 640, 480, true)).toEqual({ x: 640, y: 0 });
   expect(containedPoint(260, 110, { ...bounds, width: 320, height: 180 }, 1920, 1080)).toEqual({ x: 960, y: 540 });
+});
+it('keeps selection open when the new ROI or eye is larger than its counterpart', async () => {
+  const api = setup(); render(<api.Harness />); await act(async () => {});
+  act(() => api.getBlink().setConfig({ ...newBlinkConfig(), eye: 'data:image/png;base64,AAAA', eyeRect: { x: 0, y: 0, width: 80, height: 40 }, roi: { x: 0, y: 0, width: 120, height: 60 }, sourceWidth: 1920, sourceHeight: 1080 }));
+  await act(async () => api.getBlink().beginSelection('roi'));
+  await act(async () => api.getBlink().finishSelection({ x: 0, y: 0, width: 60, height: 50 }));
+  expect(api.getBlink().selection?.kind).toBe('roi');
+  expect(api.getBlink().config.roi?.width).toBe(120);
+  expect(screen.getByRole('status').textContent).toContain('至少需要 80 × 40');
+  act(() => api.getBlink().cancelSelection());
+  await act(async () => api.getBlink().beginSelection('eye'));
+  await act(async () => api.getBlink().finishSelection({ x: 0, y: 0, width: 130, height: 40 }));
+  expect(api.getBlink().selection?.kind).toBe('eye');
+  expect(api.getBlink().config.eyeRect?.width).toBe(80);
+  expect(screen.getByRole('status').textContent).toContain('眼睛模板不能大于当前 ROI');
+});
+it('blocks a saved oversized PNG template before preview or capture', async () => {
+  const bytes = [137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 80, 0, 0, 0, 40];
+  const eye = `data:image/png;base64,${btoa(String.fromCharCode(...bytes))}`;
+  const api = setup(); render(<api.Harness active overlay />); await act(async () => {});
+  act(() => api.getBlink().setConfig({ ...newBlinkConfig(), eye, roi: { x: 0, y: 0, width: 60, height: 50 }, sourceWidth: 1920, sourceHeight: 1080 }));
+  expect((screen.getByRole('button', { name: '捕捉 Seed' }) as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.getByRole('alert').textContent).toContain('ROI 小于眼睛模板');
+  expect(api.observe).not.toHaveBeenCalledWith(expect.objectContaining({ eye }));
 });
 it('starts live matching on the blink page without occupying capture', async () => {
   const api = setup(); render(<api.Harness active />);

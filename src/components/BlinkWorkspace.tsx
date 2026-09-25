@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Eye, Play, Square, Save, Clock3, FolderOpen, ChevronDown, Plus } from 'lucide-react';
-import { newBlinkConfig, type BlinkController, type BlinkMode } from '../blink';
+import { newBlinkConfig, roiFitsEye, type BlinkController, type BlinkMode } from '../blink';
 import type { VideoState } from '../devices';
 
 const timingFields = [
@@ -17,7 +17,8 @@ export function BlinkWorkspace({ blink, video }: { blink: BlinkController; video
   const { config, setConfig, state, busy } = blink;
   const update = (values: Partial<typeof config>) => setConfig(current => ({ ...current, ...values }));
   const rect = config.roi;
-  const ready = Boolean(config.eye && rect && video.status === 'connected' && config.sourceWidth === video.width && config.sourceHeight === video.height);
+  const sizeMismatch = !roiFitsEye(config);
+  const ready = Boolean(config.eye && rect && !sizeMismatch && video.status === 'connected' && config.sourceWidth === video.width && config.sourceHeight === video.height);
   const locked = busy || Boolean(blink.selection) || blink.selecting;
   const unavailable = !ready || Boolean(blink.selection) || blink.selecting || (busy && state.status !== 'tracking') || !window.desktop?.blink;
   const capturing = ['starting', 'capturing', 'solving'].includes(state.status) || (state.status === 'stopping' && !state.tracking);
@@ -34,8 +35,8 @@ export function BlinkWorkspace({ blink, video }: { blink: BlinkController; video
         void blink.run(mode);
       }}>{active ? <><Square size={13} />停止</> : <>{mode === 'recover' && <Play size={14} />}{label}</>}</button>;
   };
-  const message = blink.notice || (state.status === 'error' ? state.message : !busy && ready ? blink.observation?.error : '');
-  const messageError = !blink.notice && (state.status === 'error' || Boolean(blink.observation?.error));
+  const message = blink.notice || (sizeMismatch ? 'ROI 小于眼睛模板，请扩大 ROI 或重新截取更小的眼睛。' : state.status === 'error' ? state.message : !busy && ready ? blink.observation?.error : '');
+  const messageError = !blink.notice && (sizeMismatch || state.status === 'error' || Boolean(blink.observation?.error));
   return <section className="blink-workspace" aria-label="眨眼捕获工作区">
     <header className="blink-heading"><Eye size={18} /><h2>眨眼捕获</h2><span>Project_Xs</span></header>
     <div className="blink-scroll">

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { containedPoint, type BlinkController, type BlinkRect } from '../blink';
+import { containedPoint, roiFitsEye, type BlinkController, type BlinkRect } from '../blink';
 import type { VideoState } from '../devices';
 
 export function BlinkVideoOverlay({ blink, target, video }: { blink: BlinkController; target: HTMLElement | null; video: VideoState }) {
@@ -20,7 +20,7 @@ export function BlinkVideoOverlay({ blink, target, video }: { blink: BlinkContro
   const width = selection?.frame.width || video.width || 1920;
   const height = selection?.frame.height || video.height || 1080;
   const configured = blink.config.sourceWidth === width && blink.config.sourceHeight === height;
-  const showMatchStatus = connected && configured && Boolean(blink.config.eye && blink.config.roi) && !selection;
+  const showMatchStatus = connected && configured && Boolean(blink.config.eye && blink.config.roi) && roiFitsEye(blink.config) && !selection;
   const seed = blink.state.result?.pair;
   const currentFrame = blink.state.tracking?.advances ?? blink.state.result?.baselineAdvances;
   const matchingInJob = ['preview', 'capturing'].includes(blink.state.status);
