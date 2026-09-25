@@ -8,6 +8,22 @@ const subscribe = (channel, listener) => {
 
 contextBridge.exposeInMainWorld('desktop', {
   getMetadata: () => ipcRenderer.invoke('app:metadata'),
+  automation: {
+    getState: () => ipcRenderer.invoke('automation:state'),
+    onState: listener => subscribe('automation:state', listener),
+    check: input => ipcRenderer.invoke('automation:check', input),
+    start: input => ipcRenderer.invoke('automation:start', input),
+    stop: () => ipcRenderer.invoke('automation:stop'),
+    save: input => ipcRenderer.invoke('automation:save', input),
+    saveOcr: rows => ipcRenderer.invoke('automation:ocr-save', rows),
+    defaultOcr: () => ipcRenderer.invoke('automation:ocr-defaults'),
+    ocr: input => ipcRenderer.invoke('automation:ocr', input),
+    delay: input => ipcRenderer.invoke('automation:delay', input),
+    tidPreview: input => ipcRenderer.invoke('automation:tid-preview', input),
+    setLogging: value => ipcRenderer.invoke('automation:logging', value),
+    clearLogs: () => ipcRenderer.invoke('automation:clear-logs'),
+    log: row => ipcRenderer.invoke('automation:log', row),
+  },
   notifications: {
     getState: () => ipcRenderer.invoke('qq:state'),
     save: values => ipcRenderer.invoke('qq:save', values),

@@ -16,6 +16,7 @@ import cv2
 import numpy as np
 
 from easycon.native.ocr import RapidOcrReader
+from automation_ocr import inspect_image
 
 
 def emit(payload: dict[str, object]) -> None:
@@ -48,8 +49,8 @@ def main() -> int:
             image = cv2.imdecode(np.frombuffer(payload, dtype=np.uint8), cv2.IMREAD_COLOR)
             if image is None or image.size == 0:
                 raise ValueError("OCR 图像无效")
-            text, confidence = reader.read(image, language=params.get("language"))
-            emit({"id": request_id, "ok": True, "result": {"text": text, "confidence": confidence}})
+            result = inspect_image(image, params, reader)
+            emit({"id": request_id, "ok": True, "result": result})
         except Exception as error:
             if isinstance(request_id, int):
                 emit({"id": request_id, "ok": False, "error": {"message": str(error)}})

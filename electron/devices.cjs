@@ -3,10 +3,14 @@ const { OcrClient } = require('./ocr-client.cjs');
 const { ScriptRunner, addSequenceApi } = require('./script-runner.cjs');
 const { registerControllerOverlay } = require('./controller-overlay.cjs');
 const path = require('node:path');
+const { EventEmitter } = require('node:events');
 
 function registerDevices({ ipcMain, getWindows, loadWindow, rootDirectory = path.join(__dirname, '..', 'scripts'), testMode = false }) {
   const video = new RuntimeClient({ role: 'video', testMode });
   const ocr = new OcrClient();
+  const events = new EventEmitter();
+  let automationOwner = null, executionStarting = false;
+  const requireIdle = () => { if (automationOwner) throw Error('自动流程正在使用设备，请先停止自动流程。'); };
   const controller = addSequenceApi(new RuntimeClient({ role: 'controller', testMode }));
   const openWindow = loadWindow || ((window, query) => window.loadFile(path.join(__dirname, '..', 'dist', 'index.html'), { query }));
   const controllerOverlay = registerControllerOverlay({ controller, getMainWindow: () => getWindows().find(window => !window.isDestroyed()), getWindows, loadWindow: openWindow });
@@ -17,6 +21,7 @@ function registerDevices({ ipcMain, getWindows, loadWindow, rootDirectory = path
     for (const window of getWindows()) if (!window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send('devices:state', state);
   };
   const scriptEvent = message => {
+    events.emit('script', message);
     for (const window of getWindows()) if (!window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send('devices:event', message);
   };
   const runner = new ScriptRunner({ controller, rootDirectory, getVideo: () => state.video, emit: scriptEvent });
@@ -73,15 +78,19 @@ function registerDevices({ ipcMain, getWindows, loadWindow, rootDirectory = path
     await runner.stop(); clearInterval(controllerTimer);
     if (controller.child) await controller.call('controller.disconnect');
   });
-  handle('controller:key', args => controller.call('controller.key', args));
-  handle('controller:stick', args => controller.call('controller.stick', args));
+  handle('controller:key', args => { requireIdle(); return controller.call('controller.key', args); });
+  handle('controller:stick', args => { requireIdle(); return controller.call('controller.stick', args); });
   handle('controller:press', args => {
+    requireIdle();
     if (!args || typeof args.key !== 'string') throw new Error('按键无效。');
     return controller.sequence({ actions: [{ kind: 'button', key: args.key, down: true }, { kind: 'wait', duration_ms: 80 }, { kind: 'button', key: args.key, down: false }] });
   });
-  handle('controller:reset', () => controller.call('controller.reset'));
-  handle('controller:stop', async () => { await runner.stop(); if (controller.child) await controller.call('controller.stop'); });
-  handle('execution:start', args => runner.start(args));
+  handle('controller:reset', () => { requireIdle(); return controller.call('controller.reset'); });
+  handle('controller:stop', async () => { events.emit('stop-automation'); await runner.stop(); if (controller.child) await controller.call('controller.stop'); });
+  handle('execution:start', async args => {
+    requireIdle(); executionStarting = true;
+    try { return await runner.start(args); } finally { executionStarting = false; }
+  });
   handle('execution:validate', args => runner.validate(args));
   handle('execution:stop', () => runner.stop());
   handle('video:list', args => video.call('video.list', args, 15000));
@@ -137,6 +146,15 @@ function registerDevices({ ipcMain, getWindows, loadWindow, rootDirectory = path
     return snapshot;
   });
   return {
+    events, runner, ocr, controller,
+    isAutomationBusy: () => !!automationOwner,
+    claimAutomation: async owner => {
+      if (automationOwner || runner.current || executionStarting) throw Error('已有流程或脚本正在运行。');
+      automationOwner = owner; controllerOverlay.input.automationLocked = true;
+      try { await controllerOverlay.suspend(); }
+      catch (error) { automationOwner = null; controllerOverlay.input.automationLocked = false; throw error; }
+    },
+    releaseAutomation: owner => { if (automationOwner === owner) { automationOwner = null; controllerOverlay.input.automationLocked = false; } },
     stopInputs: async () => { await runner.stop(); await controllerOverlay.suspend(); if (controller.child) await controller.call('controller.stop'); },
     controllerOverlay,
     close: async () => { closing = true; clearVideoTimers(); clearInterval(controllerTimer); ++runner.validationVersion; runner.cancelValidation?.(); await runner.stop().catch(() => {}); await controllerOverlay.close(); await Promise.allSettled([video.close(), controller.close(), ocr.close()]); },

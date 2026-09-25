@@ -6,6 +6,7 @@ const { registerDevices } = require('./devices.cjs');
 const { registerQQNotifications } = require('./qq-notifications.cjs');
 const { registerRng } = require('./rng-client.cjs');
 const { registerBlink } = require('./blink-client.cjs');
+const { registerAutomation } = require('./automation.cjs');
 
 let mainWindow = null;
 let panels;
@@ -13,6 +14,7 @@ let devices;
 let notifications;
 let rng;
 let blink;
+let automation;
 let quitting = false;
 
 function loadWindow(window, query = {}) {
@@ -41,7 +43,7 @@ function createWindow() {
     },
   });
   mainWindow = window;
-  window.webContents.on('render-process-gone', () => { void devices?.stopInputs().catch(() => {}); notifications?.cancel(); });
+  window.webContents.on('render-process-gone', () => { void automation?.stop('主窗口已退出', true); void devices?.stopInputs().catch(() => {}); notifications?.cancel(); });
   void loadWindow(window);
   window.on('closed', () => { notifications?.cancel(); mainWindow = null; panels.closeAll(); void devices?.controllerOverlay?.close(); });
 
@@ -62,8 +64,9 @@ app.whenReady().then(() => {
   const testDevices = !app.isPackaged || process.env.AUTO_POKE_TEST_DEVICES === '1';
   devices = registerDevices({ ipcMain, getWindows: () => BrowserWindow.getAllWindows(), loadWindow, testMode: testDevices });
   notifications = registerQQNotifications({ ipcMain, getMainWindow: () => mainWindow, safeStorage, nativeImage, userData: app.getPath('userData') });
-  rng = registerRng({ ipcMain, getMainWindow: () => mainWindow });
-  blink = registerBlink({ ipcMain, getMainWindow: () => mainWindow, getVideo: () => devices.getState().video });
+  rng = registerRng({ ipcMain, getMainWindow: () => mainWindow, isAutomationBusy: () => devices.isAutomationBusy() });
+  blink = registerBlink({ ipcMain, getMainWindow: () => mainWindow, getVideo: () => devices.getState().video, isAutomationBusy: () => devices.isAutomationBusy() });
+  automation = registerAutomation({ ipcMain, getMainWindow: () => mainWindow, getWindows: () => BrowserWindow.getAllWindows(), devices, rng, blink, userData: app.getPath('userData') });
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -74,7 +77,7 @@ app.on('before-quit', event => {
   if (quitting || !devices) return;
   event.preventDefault(); quitting = true;
   notifications?.close();
-  void Promise.allSettled([devices.close(), rng?.close?.(), blink?.close()]).finally(() => app.quit());
+  void automation?.close().catch(() => {}).then(() => Promise.allSettled([devices.close(), rng?.close?.(), blink?.close()])).finally(() => app.quit());
 });
 
 app.on('window-all-closed', () => {

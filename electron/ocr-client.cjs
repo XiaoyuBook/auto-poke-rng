@@ -77,7 +77,7 @@ class OcrClient {
     try { await this.starting; } finally { this.starting = null; }
   }
 
-  async read(imageBase64, language = '') {
+  async read(imageBase64, language = '', options = {}) {
     if (typeof imageBase64 !== 'string' || !/^[A-Za-z0-9+/]+={0,2}$/.test(imageBase64) || Buffer.byteLength(imageBase64, 'base64') > MAX_IMAGE_BYTES) {
       throw new Error('OCR 图像无效或过大。');
     }
@@ -91,7 +91,7 @@ class OcrClient {
         this.pending.delete(id); reject(new Error('OCR 识别超时。')); this.close();
       }, 30000);
       this.pending.set(id, { resolve, reject, timer });
-      child.stdin.write(JSON.stringify({ version: 1, id, params: { imageBase64, language } }) + '\n');
+      child.stdin.write(JSON.stringify({ version: 1, id, params: { ...options, imageBase64, language } }) + '\n');
     });
   }
 

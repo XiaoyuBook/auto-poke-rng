@@ -63,7 +63,7 @@ function validateConfig(input, video) {
     video: { sharedMemory: video.sharedMemory } };
 }
 
-function registerBlink({ ipcMain, getMainWindow, getVideo, spawnProcess = spawn, chooseConfig }) {
+function registerBlink({ ipcMain, getMainWindow, getVideo, spawnProcess = spawn, chooseConfig, isAutomationBusy = () => false }) {
   let state = { revision: 0, status: 'idle', captured: 0, target: 40, message: '在右侧视频中框选睁眼模板与 ROI。' };
   let job = null;
   let observer = null;
@@ -100,6 +100,7 @@ function registerBlink({ ipcMain, getMainWindow, getVideo, spawnProcess = spawn,
   ipcMain.handle('blink:observe', (event, input) => {
     requireWindow(event);
     void stopObserver();
+    if (isAutomationBusy()) return;
     if (!input || (job && !['tracking', 'countdown', 'timeline'].includes(state.status))) return;
     const video = getVideo();
     const config = validateConfig({ ...input, mode: 'preview' }, video);
@@ -168,6 +169,7 @@ function registerBlink({ ipcMain, getMainWindow, getVideo, spawnProcess = spawn,
   });
   ipcMain.handle('blink:start', async (event, input) => {
     requireWindow(event);
+    if (isAutomationBusy()) throw Error('请先停止自动流程再手动捕获。');
     if (job || busy(state)) throw Error('已有眨眼任务在运行，请先停止。');
     const video = getVideo();
     const config = validateConfig(input, video);

@@ -34,6 +34,8 @@ function stickValue(directions) {
 }
 
 class ControllerInputManager extends EventEmitter {
+  get locked() { return Boolean(this.deviceLocked || this.automationLocked); }
+  set locked(value) { this.deviceLocked = Boolean(value); }
   constructor({ controller, broadcast, spawnKeyboard = spawn }) {
     super();
     this.controller = controller;
@@ -53,6 +55,7 @@ class ControllerInputManager extends EventEmitter {
     this.pending = Promise.resolve();
     this.connected = false;
     this.locked = false;
+    this.automationLocked = false;
     this.controllerOwned = false;
     this.deferredReset = false;
     controller.on('event', message => {

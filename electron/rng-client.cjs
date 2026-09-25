@@ -3,7 +3,7 @@ const { RuntimeClient } = require('./runtime-client.cjs');
 const BATCH_SIZE = 4096;
 const MAX_RESULTS = 250000;
 
-function registerRng({ ipcMain, getMainWindow, client = new RuntimeClient({ role: 'rng' }), calculator = new RuntimeClient({ role: 'rng' }) }) {
+function registerRng({ ipcMain, getMainWindow, client = new RuntimeClient({ role: 'rng' }), calculator = new RuntimeClient({ role: 'rng' }), isAutomationBusy = () => false }) {
   let active = null;
   const requireWindow = event => {
     if (!event.sender || event.sender !== getMainWindow()?.webContents || event.senderFrame !== event.sender.mainFrame) throw new Error('Unknown RNG sender');
@@ -15,8 +15,7 @@ function registerRng({ ipcMain, getMainWindow, client = new RuntimeClient({ role
     client.terminate();
     await job.promise.catch(() => {});
   };
-  ipcMain.handle('rng:static-generate', async (event, request) => {
-    requireWindow(event);
+  const generate = async (request, sender = getMainWindow()?.webContents) => {
     if (!request || typeof request !== 'object') throw new Error('定点搜索参数无效。');
     if (active) throw new Error('已有定点搜索正在进行，请先取消。');
     for (const [key, limit] of [['initialAdvances', 10000000], ['maxAdvances', 1000000000], ['offset', 1000000]]) {
@@ -25,8 +24,8 @@ function registerRng({ ipcMain, getMainWindow, client = new RuntimeClient({ role
     const job = { cancelled: false, promise: null };
     active = job;
     const destroyed = () => { void cancel(); };
-    event.sender.once('destroyed', destroyed);
-    event.sender.once('render-process-gone', destroyed);
+    sender?.once('destroyed', destroyed);
+    sender?.once('render-process-gone', destroyed);
     job.promise = (async () => {
       const rows = [];
       // PokeFinder's maximum is an inclusive distance from the initial advance.
@@ -47,19 +46,23 @@ function registerRng({ ipcMain, getMainWindow, client = new RuntimeClient({ role
       // Child termination is asynchronous. Do not release the search slot until
       // exit has cleared RuntimeClient.child, or an immediate retry sees a killed child.
       if (job.cancelled || client.child?.killed) await client.close();
-      event.sender.removeListener('destroyed', destroyed);
-      event.sender.removeListener('render-process-gone', destroyed);
+      sender?.removeListener('destroyed', destroyed);
+      sender?.removeListener('render-process-gone', destroyed);
       if (active === job) active = null;
     });
     return job.promise;
+  };
+  ipcMain.handle('rng:static-generate', async (event, request) => {
+    requireWindow(event); if (isAutomationBusy()) throw Error('请先停止自动流程再进行手动搜索。');
+    return generate(request, event.sender);
   });
-  ipcMain.handle('rng:cancel', async event => { requireWindow(event); await cancel(); });
+  ipcMain.handle('rng:cancel', async event => { requireWindow(event); if (isAutomationBusy()) throw Error('请使用自动流程的停止按钮。'); await cancel(); });
   ipcMain.handle('rng:iv-calculate', async (event, request) => {
     requireWindow(event);
     if (!request || typeof request !== 'object') throw new Error('个体值计算参数无效。');
     return calculator.call('iv.calculate', request);
   });
-  return { close: async () => { await cancel(); await Promise.all([client.close(), calculator.close()]); } };
+  return { generate, cancel, isBusy: () => !!active, close: async () => { await cancel(); await Promise.all([client.close(), calculator.close()]); } };
 }
 
 module.exports = { registerRng, BATCH_SIZE, MAX_RESULTS };
