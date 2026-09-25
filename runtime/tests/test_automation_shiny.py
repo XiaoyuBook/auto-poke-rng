@@ -60,6 +60,51 @@ class ShinyContracts(unittest.TestCase):
         self.assertFalse(stopped)
         self.assertEqual(trace, ['tail-key', 'released'])
 
+    def roamer_monitor(self, *, overrun=False, cancelled=False):
+        clock = [0.0]
+        finish_script = threading.Event()
+        session = host.Session({'species': 481}, lambda **_: None)
+        class Battle:
+            calls = 0
+            def clear(self): pass
+            def wait(self, *_):
+                self.calls += 1
+                if self.calls == 1:
+                    clock[0] = 301.0
+                    if cancelled:
+                        session.cancel.set()
+                    return False
+                return True
+        session.battle = Battle()
+        session.run_script = lambda *_args, **_kwargs: finish_script.wait(2)
+        session.ocr = lambda *_args, **_kwargs: {'text': '出现了！'}
+        def measure(capture, read, **kwargs):
+            self.assertEqual(session.battle.calls, 2)
+            self.assertEqual(kwargs['hard_timeout_seconds'], 300)
+            if overrun:
+                clock[0] += 301
+            self.assertEqual(read(None), '出现了！')
+            finish_script.set()
+            self.assertTrue(kwargs['script_done'].wait(2))
+            return SimpleNamespace(interval_seconds=5)
+        try:
+            with patch.object(host.time, 'monotonic', side_effect=lambda: clock[0]), \
+                 patch.object(dialog_timing, 'measure_keyword_interval', side_effect=measure):
+                return session.shiny('WAIT 60000', 'roamer.rng', 4)
+        finally:
+            finish_script.set()
+
+    def test_roamer_tracking_can_exceed_300_seconds_before_monitoring_starts(self):
+        self.assertTrue(self.roamer_monitor().is_shiny)
+
+    def test_roamer_monitor_still_times_out_300_seconds_after_battle(self):
+        with self.assertRaisesRegex(RuntimeError, '300秒'):
+            self.roamer_monitor(overrun=True)
+
+    def test_roamer_long_tracking_can_still_be_cancelled(self):
+        with self.assertRaises(host.Cancelled):
+            self.roamer_monitor(cancelled=True)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -259,19 +259,20 @@ class Session:
             finally:
                 done.set()
         thread = threading.Thread(target=script,daemon=True)
-        started = time.monotonic()
+        started = None if roamer else time.monotonic()
         thread.start()
         def check_script():
             self.check()
             if errors:
                 raise errors[0]
-            if time.monotonic()-started > 300:
+            if started is not None and time.monotonic()-started > 300:
                 raise RuntimeError('撞闪脚本超过300秒，自动流程停止')
         if roamer:
             while not self.battle.wait(.05):
                 check_script()
                 if done.is_set():
                     return ShinyCheckResult(False)
+            started = time.monotonic()
         # OCR requests return text, while capture callbacks keep the monitor's
         # observation timestamp before inference, matching the reference.
         def read_dialog(image):
