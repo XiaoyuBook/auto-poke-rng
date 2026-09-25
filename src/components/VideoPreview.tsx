@@ -122,7 +122,8 @@ function ImageLabelWorkspace({ active, labelFolder, cornerLayout, referenceTarge
   const [target, setTarget] = useState<LabelRect>(blankRect);
   const [name, setName] = useState('');
   const [expectedText, setExpectedText] = useState('');
-  const [searchMethod, setSearchMethod] = useState('template');
+  const [searchMethod, setSearchMethod] = useState(5);
+  const [templateBase64, setTemplateBase64] = useState<string | null>(null);
   const [threshold, setThreshold] = useState(95);
   const [labels, setLabels] = useState<LabelRecord[]>([]);
   const [filter, setFilter] = useState('');
@@ -159,7 +160,8 @@ function ImageLabelWorkspace({ active, labelFolder, cornerLayout, referenceTarge
   const updateSelection = (event: ReactPointerEvent<SVGSVGElement>) => {
     if (!drag.current) return;
     const next = rectFromPoints(drag.current.start, sourcePoint(event));
-    if (drag.current.kind === 'range') setRange(next); else setTarget(next);
+    if (drag.current.kind === 'range') setRange(next);
+    else { setTarget(next); setTemplateBase64(null); }
   };
   const beginSelection = (event: ReactPointerEvent<SVGSVGElement>) => {
     if (!mode || !snapshot) return;
@@ -172,6 +174,7 @@ function ImageLabelWorkspace({ active, labelFolder, cornerLayout, referenceTarge
   };
   const changeRect = (kind: SelectionKind, field: keyof LabelRect, value: string) => {
     const number = Math.max(0, Number(value) || 0);
+    if (kind === 'target') setTemplateBase64(null);
     (kind === 'range' ? setRange : setTarget)(current => ({ ...current, [field]: Math.round(number) }));
   };
   const loadLabel = async (item: LabelRecord) => {
@@ -179,8 +182,9 @@ function ImageLabelWorkspace({ active, labelFolder, cornerLayout, referenceTarge
     if (!read) return;
     try {
       const full = await read(labelFolder, item.name);
-      setName(full.name); setRange(full.range); setTarget(full.target); setThreshold(full.threshold || 95);
-      setSearchMethod(full.searchMethod === 107 ? 'ocr' : full.searchMethod === 2 ? 'color' : 'template');
+      setName(full.name); setRange(full.range); setTarget(full.target); setThreshold(full.threshold ?? 95);
+      setSearchMethod(full.searchMethod);
+      setTemplateBase64(full.searchMethod === 107 ? null : full.imageBase64 || null);
       setExpectedText(full.searchMethod === 107 ? full.imageBase64 || '' : ''); setNotice(`已加载标签“${full.name}”。`);
     } catch (error) { setNotice(error instanceof Error ? error.message : String(error)); }
   };
@@ -189,13 +193,13 @@ function ImageLabelWorkspace({ active, labelFolder, cornerLayout, referenceTarge
     if (range.width <= 0 || range.height <= 0 || target.width <= 0 || target.height <= 0) throw new Error('请先圈选搜索范围和搜索目标。');
     if (!rectInside(range, snapshot.width, snapshot.height) || !rectInside(target, snapshot.width, snapshot.height)) throw new Error('圈选区域必须位于截图范围内。');
     if (target.x < range.x || target.y < range.y || target.x + target.width > range.x + range.width || target.y + target.height > range.y + range.height) throw new Error('搜索目标必须位于搜索范围内。');
-    if (searchMethod === 'ocr' && !expectedText.trim()) throw new Error('请填写 OCR 期望文本。');
-    const targetUrl = await cropImage(snapshot.url, target);
+    if (searchMethod === 107 && !expectedText.trim()) throw new Error('请填写 OCR 期望文本。');
+    const targetUrl = searchMethod !== 107 && templateBase64 ? `data:image/png;base64,${templateBase64}` : await cropImage(snapshot.url, target);
     const videoApi = window.desktop?.devices?.video;
     if (!videoApi) throw new Error('请使用桌面应用连接视频源。');
     const started = performance.now(); const live = await videoApi.snapshot();
     let result: { score: number; x: number; y: number; recognizedText?: string };
-    if (searchMethod === 'ocr') {
+    if (searchMethod === 107) {
       const liveTargetUrl = await cropImage(live.url, target);
       const encoded = liveTargetUrl.split(',')[1] || '';
       const recognized = await videoApi.ocr(encoded);
@@ -207,7 +211,7 @@ function ImageLabelWorkspace({ active, labelFolder, cornerLayout, referenceTarge
     const liveTargetUrl = await cropImage(live.url, { x: result.x, y: result.y, width: target.width, height: target.height });
     setMatch(current => ({ ...result, maxScore: Math.max(current?.maxScore || 0, result.score), elapsedMs: Math.round(performance.now() - started), liveUrl: liveTargetUrl, targetUrl }));
     setNotice(`识别完成：${result.score.toFixed(1)}%${result.recognizedText === undefined ? '' : ` · “${result.recognizedText}”`} · ${Math.round(performance.now() - started)} ms`);
-  }, [expectedText, range, searchMethod, snapshot, target]);
+  }, [expectedText, range, searchMethod, snapshot, target, templateBase64]);
   const startDynamic = () => {
     if (dynamicTesting) { if (dynamicTimer.current !== null) window.clearInterval(dynamicTimer.current); dynamicTimer.current = null; setDynamicTesting(false); setNotice('动态测试已停止。'); return; }
     void performSearch().then(() => {
@@ -223,9 +227,10 @@ function ImageLabelWorkspace({ active, labelFolder, cornerLayout, referenceTarge
     if (range.width <= 0 || range.height <= 0 || target.width <= 0 || target.height <= 0) throw new Error('请先圈选搜索范围和搜索目标。');
     if (!rectInside(range, snapshot.width, snapshot.height) || !rectInside(target, snapshot.width, snapshot.height)) throw new Error('圈选区域必须位于截图范围内。');
     if (target.x < range.x || target.y < range.y || target.x + target.width > range.x + range.width || target.y + target.height > range.y + range.height) throw new Error('搜索目标必须位于搜索范围内。');
-    if (searchMethod === 'ocr' && !expectedText.trim()) throw new Error('请填写 OCR 期望文本。');
-    const imageBase64 = searchMethod === 'ocr' ? expectedText.trim() : (await cropImage(snapshot.url, target)).split(',')[1];
-    const item = await save({ folder: labelFolder, name: name.trim(), searchMethod: searchMethod === 'ocr' ? 107 : searchMethod === 'color' ? 2 : 5, threshold, range, target, imageBase64 });
+    if (searchMethod === 107 && !expectedText.trim()) throw new Error('请填写 OCR 期望文本。');
+    const imageBase64 = searchMethod === 107 ? expectedText.trim() : templateBase64 ?? (await cropImage(snapshot.url, target)).split(',')[1];
+    const item = await save({ folder: labelFolder, name: name.trim(), searchMethod, threshold, range, target, imageBase64 });
+    if (searchMethod !== 107) setTemplateBase64(imageBase64);
     setLabels(current => [...current.filter(label => label.name !== item.name), { ...item, imageBase64: undefined }].sort((a, b) => a.name.localeCompare(b.name, 'zh-CN')));
     setNotice(`已保存标签“${item.name}”。`);
   };
@@ -267,8 +272,8 @@ function ImageLabelWorkspace({ active, labelFolder, cornerLayout, referenceTarge
           <div className="label-parameter-body">
             <div className="label-form-fields">
               <label><span>标签名称</span><input type="text" placeholder="输入标签名称" aria-label="标签名称" value={name} onChange={event => setName(event.target.value)} /></label>
-              <label><span>搜索方法</span><select aria-label="搜索方法" value={searchMethod} onChange={event => setSearchMethod(event.target.value)}><option value="template">模板匹配</option><option value="color">颜色匹配</option><option value="ocr">OCR 文本匹配</option></select></label>
-              {searchMethod === 'ocr' && <label><span>期望文本</span><input type="text" placeholder="输入识别文本" aria-label="OCR 期望文本" value={expectedText} onChange={event => setExpectedText(event.target.value)} /></label>}
+              <label><span>搜索方法</span><select aria-label="搜索方法" value={searchMethod} onChange={event => setSearchMethod(Number(event.target.value))}><option value={5}>模板匹配</option><option value={2}>颜色匹配</option><option value={107}>OCR 文本匹配</option>{![5, 2, 107].includes(searchMethod) && <option value={searchMethod}>原有方法 {searchMethod}</option>}</select></label>
+              {searchMethod === 107 && <label><span>期望文本</span><input type="text" placeholder="输入识别文本" aria-label="OCR 期望文本" value={expectedText} onChange={event => setExpectedText(event.target.value)} /></label>}
               <label><span>最低匹配度</span><div className="label-threshold"><input type="number" aria-label="最低匹配度" min={0} max={100} value={threshold} onChange={event => setThreshold(clamp(Math.round(Number(event.target.value) || 0), 0, 100))} /><span>%</span></div></label>
             </div>
             <section className="label-match-preview" aria-label="动态测试对照">
