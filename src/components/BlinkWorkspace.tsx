@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Eye, Scan, Play, Square, Save, Clock3, FolderOpen, ChevronDown, Plus } from 'lucide-react';
-import { newBlinkConfig, type BlinkController } from '../blink';
+import { Eye, Play, Square, Save, Clock3, FolderOpen, ChevronDown, Plus } from 'lucide-react';
+import { newBlinkConfig, type BlinkController, type BlinkMode } from '../blink';
 import type { VideoState } from '../devices';
 
 const timingFields = [
@@ -20,11 +20,27 @@ export function BlinkWorkspace({ blink, video }: { blink: BlinkController; video
   const ready = Boolean(config.eye && rect && video.status === 'connected' && config.sourceWidth === video.width && config.sourceHeight === video.height);
   const locked = busy || Boolean(blink.selection) || blink.selecting;
   const unavailable = !ready || locked || !window.desktop?.blink;
-  const count = config.mode === 'munchlax' ? 64 : config.mode === 'reidentify' ? config.noisy ? 20 : 7 : 40;
-  const matchingCapture = state.mode === config.mode && state.target === count;
-  const captured = matchingCapture ? state.captured : 0;
   const tracking = state.tracking;
   const hasSeed = config.seed.length === 4 && config.seed.every(word => /^[\da-f]{1,8}$/i.test(word)) && config.seed.some(word => !/^0+$/.test(word));
+  const actionButton = (mode: BlinkMode, label: string, primary = false) => {
+    const active = busy && state.mode === mode;
+    return <button className={'button' + (active ? ' danger' : primary ? ' primary' : '')} type="button"
+      aria-label={active ? `停止${label}` : label}
+      title={mode === 'reidentify' && !active && !hasSeed ? '先捕捉 Seed 或选择已有配置，再进行校正' : undefined}
+      disabled={active ? state.status === 'stopping' : unavailable}
+      onClick={() => {
+        if (active) { void blink.stop(); return; }
+        if (mode === 'reidentify' && !hasSeed) { blink.setNotice('请先捕捉 Seed 或选择已有配置，再进行校正。'); return; }
+        void blink.run(mode);
+      }}>{active ? <><Square size={13} />停止</> : <>{mode === 'recover' && <Play size={14} />}{label}</>}</button>;
+  };
+  const progress = busy && tracking ? `当前 ${tracking.advances.toLocaleString()} 帧` : busy && state.mode !== 'preview' ? `${state.captured} / ${state.target}` : '';
+  const observationError = !blink.notice && !busy && ready && ['idle', 'stopped'].includes(state.status) ? blink.observation?.error : null;
+  const status = blink.notice || (video.status !== 'connected' && !busy ? '请先连接视频源，再在右侧画面框选。'
+    : state.status === 'error' ? state.message
+    : state.status === 'stopped' && ready ? observationError || '眨眼任务已停止，实时眼睛识别继续。'
+    : state.status === 'idle' && ready ? observationError || '实时眼睛识别中'
+    : state.message);
   return <section className="blink-workspace" aria-label="眨眼捕获工作区">
     <header className="blink-heading"><Eye size={18} /><h2>眨眼捕获</h2><span>Project_Xs</span></header>
     <div className="blink-scroll">
@@ -41,7 +57,7 @@ export function BlinkWorkspace({ blink, video }: { blink: BlinkController; video
             <button className="button" type="button" aria-label="新增配置" disabled={locked} onClick={() => { setConfig({ ...newBlinkConfig(), name: '' }); setConfigsOpen(false); blink.setNotice('已新增空白配置，请输入名称后保存。'); }}><Plus size={13} />新增</button>
             <button className="button" type="button" aria-label="保存配置" disabled={locked} onClick={blink.save}><Save size={13} />保存</button>
           </div>
-          <div className="blink-capture-actions"><button className="button primary" disabled={unavailable} onClick={() => void blink.run('recover')}><Play size={14} />捕捉 Seed</button><button className="button primary" disabled={unavailable} onClick={() => void blink.run('munchlax')}>TID/SID 测种</button><button className="button" title={!hasSeed ? '先捕捉 Seed 或选择已有配置，再进行校正' : undefined} disabled={unavailable} onClick={() => { if (!hasSeed) { blink.setNotice('请先捕捉 Seed 或选择已有配置，再进行校正。'); return; } void blink.run('reidentify'); }}>校正</button><button className="button" title="捕获或校正成功后可切换 Timeline" disabled={state.status !== 'tracking' || state.mode === 'munchlax'} onClick={() => void blink.timeline()}><Clock3 size={14} />Timeline</button></div>
+          <div className="blink-capture-actions">{actionButton('recover', '捕捉 Seed', true)}{actionButton('munchlax', 'TID/SID 测种', true)}{actionButton('reidentify', '校正')}<button className="button" title="捕获或校正成功后可切换 Timeline" disabled={state.status !== 'tracking' || state.mode === 'munchlax'} onClick={() => void blink.timeline()}><Clock3 size={14} />Timeline</button></div>
         </section>
         <section className="blink-section" aria-label="识别参数"><h3>识别参数</h3>
           <div className="blink-region-actions"><button className="button" title="点击后在右上角视频中右键拖动框选" disabled={locked || video.status !== 'connected'} onClick={() => void blink.beginSelection('roi')}>框选眼睛区域</button><button className="button" title="点击后在右上角视频中右键拖动框选" disabled={locked || video.status !== 'connected'} onClick={() => void blink.beginSelection('eye')}>截取眼睛</button></div>
@@ -53,6 +69,6 @@ export function BlinkWorkspace({ blink, video }: { blink: BlinkController; video
         </div></section>
       </div>
     </div>
-    <footer className="blink-footer"><div className="blink-run-actions"><button className="button" disabled={unavailable} onClick={() => void blink.run('preview')}><Scan size={14} />识别预览</button><button className="button" disabled={!busy || state.status === 'stopping'} onClick={() => void blink.stop()}><Square size={13} />停止</button><span>{busy && tracking ? `当前 ${tracking.advances.toLocaleString()} 帧` : busy && state.mode !== 'preview' ? `${captured} / ${count}` : config.sourceWidth ? `${config.sourceWidth} × ${config.sourceHeight}` : ''}</span></div><p role={state.status === 'error' ? 'alert' : 'status'}>{blink.notice || (video.status !== 'connected' && !busy ? '请先连接视频源，再在右侧画面框选。' : state.message)}</p></footer>
+    <footer className="blink-footer"><p role={state.status === 'error' || observationError ? 'alert' : 'status'}>{status}</p>{progress && <span className="blink-progress">{progress}</span>}</footer>
   </section>;
 }

@@ -61,6 +61,7 @@ app.whenReady().then(async () => {
   await drag(18, 320, 128, 60);
   await until(`!document.querySelector('.blink-frozen')`, 'roi selected');
   await until(`Boolean(document.querySelector('.blink-roi') && document.querySelector('.blink-match'))`, 'live ROI and matched eye boxes');
+  await until(`Number(document.querySelector('[aria-label="实时匹配分数"]')?.textContent) > .99`, 'live matching score');
   assert.equal(await js(`Boolean(document.querySelector('.blink-video-status [aria-label="眨眼匹配阈值"]')) && !document.querySelector('.blink-eye-strip')`), true, 'threshold and score stay in the video corner');
   assert.equal(blink.getState().status, 'idle', 'live overlay does not occupy the capture job');
   await click('保存');
@@ -68,10 +69,7 @@ app.whenReady().then(async () => {
   assert.equal(saved.sourceWidth, 640); assert.equal(saved.sourceHeight, 480);
   assert.ok(Math.abs(saved.roi.x - 18) <= 2 && Math.abs(saved.roi.width - 128) <= 3, 'letterboxed display uses native pixel coordinates');
   assert.equal(await js(`window.originalPreview===document.querySelector('.live-video') && window.originalLogs===document.querySelector('.persistent-logs')`), true);
-  await click('识别预览');
-  await until(`window.desktop.blink.getState().then(x=>x.status==='error'||(x.status==='preview'&&x.score!=null))`, 'worker real image matching');
-  const preview = blink.getState(); assert.equal(preview.status, 'preview', preview.message); assert.ok(preview.score > .99, String(preview.score));
-  assert.equal(devices.getState().video.session, source, 'worker does not reopen hardware');
+  assert.equal(devices.getState().video.session, source, 'live observer does not reopen hardware');
   const compactLayout = async () => js(`(() => {
     const video=document.querySelector('.persistent-video').getBoundingClientRect();
     const seed=document.querySelector('.blink-video-seeds').getBoundingClientRect();
@@ -94,7 +92,6 @@ app.whenReady().then(async () => {
   })()`);
   assert.deepEqual(await compactLayout(), { logsBelowVideo: true, seedInVideo: true, badgesSeparate: true, actionsOnTwoRows: true, configOnOneRow: true, configFits: true, configWrapped: false }, 'logs stay below the video while frame and Seed fit in its top-left corner');
   fs.writeFileSync(path.join(output, 'blink-preview-1500.png'), (await main.webContents.capturePage()).toPNG());
-  await click('停止'); await until(`window.desktop.blink.getState().then(x=>x.status==='stopped')`, 'stop preview');
   await js(`document.querySelector('.blink-scroll').scrollTop=240`);
   await delay(100);
   fs.writeFileSync(path.join(output, 'blink-advanced-1500.png'), (await main.webContents.capturePage()).toPNG());
@@ -106,10 +103,12 @@ app.whenReady().then(async () => {
   fs.writeFileSync(path.join(output, 'blink-advanced-1280.png'), (await main.webContents.capturePage()).toPNG());
   await click('TID/SID 测种');
   await until(`window.desktop.blink.getState().then(x=>x.status==='capturing')`, 'TID/SID capture starts');
+  assert.equal(await js(`(() => { const buttons=[...document.querySelectorAll('.blink-capture-actions button')]; return buttons[1].textContent==='停止' && !buttons[1].disabled && buttons[0].disabled && buttons[2].disabled; })()`), true, 'active capture button becomes stop while the other modes are disabled');
   assert.equal(await js(`document.querySelector('.blink-footer').textContent.includes('0 / 64')`), true, 'active capture count remains visible below the form');
   await click('停止'); await until(`window.desktop.blink.getState().then(x=>x.status==='stopped')`, 'stop TID/SID capture');
   await click('捕捉 Seed');
   await until(`window.desktop.blink.getState().then(x=>x.status==='capturing')`, 'capture starts');
+  assert.equal(await js(`(() => { const buttons=[...document.querySelectorAll('.blink-capture-actions button')]; return buttons[0].textContent==='停止' && !buttons[0].disabled && buttons[1].disabled && buttons[2].disabled; })()`), true, 'Seed capture keeps its own stop button');
   await click('首页');
   assert.equal(blink.getState().status, 'capturing', 'BDSP page changes preserve the job');
   await click('眨眼捕获');
@@ -117,7 +116,7 @@ app.whenReady().then(async () => {
   assert.equal(await js(`(() => {const s=document.querySelector('.blink-scroll');return s.scrollWidth<=s.clientWidth+1;})()`), true, 'narrow workspace must not clip controls horizontally');
   assert.equal((await compactLayout()).configFits, true, 'configuration input and buttons fit in a small window');
   assert.equal((await compactLayout()).configWrapped, true, 'configuration actions wrap beneath the name in a small window');
-  assert.equal(await js(`(() => {const r=document.querySelector('.blink-footer').getBoundingClientRect();return r.bottom<innerHeight && r.top>50;})()`), true, 'stop and status remain reachable in a small window');
+  assert.equal(await js(`(() => {const r=document.querySelector('.blink-footer').getBoundingClientRect();return r.bottom<innerHeight && r.top>50;})()`), true, 'status remains reachable in a small window');
   fs.writeFileSync(path.join(output, 'blink-compact-1100.png'), (await main.webContents.capturePage()).toPNG());
   await js(`window.desktop.devices.video.disconnect()`);
   await until(`window.desktop.blink.getState().then(x=>x.status==='error')`, 'disconnect stops worker');

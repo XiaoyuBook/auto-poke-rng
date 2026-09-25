@@ -155,11 +155,11 @@ export function useBlink(video: VideoState, enabled: boolean, viewActive = false
       setNotice(kind === 'eye' ? '已截取睁眼模板' : '已设置识别 ROI');
     } catch (error) { setNotice(errorMessage(error)); }
   };
-  const run = async (mode: BlinkMode | 'preview' = config.mode) => {
+  const run = async (mode: BlinkMode = config.mode) => {
     if (!api || busy || selection || selecting) return;
     setNotice('');
     const parameters = { ...config, mode, ...fixedSearchRange, ...(mode === 'reidentify' && config.noisy ? { pokemonNpc: 1 } : {}) };
-    if (mode !== 'preview') setConfig(current => ({ ...current, ...parameters, mode }));
+    setConfig(current => ({ ...current, ...parameters, mode }));
     try { await api.start(parameters); }
     catch (error) { setNotice(errorMessage(error)); }
   };
@@ -172,7 +172,7 @@ export function useBlink(video: VideoState, enabled: boolean, viewActive = false
       const imported = await api.importConfig();
       if (!imported || version !== selectionVersion.current || !active.current) return;
       setConfig({ ...newBlinkConfig(), ...imported, ...fixedSearchRange });
-      setNotice(imported.eye && imported.roi ? '已导入原版配置，请用识别预览核对当前画面后保存。' : '参数已导入，请在当前视频重新框选模板与 ROI 后保存。');
+      setNotice(imported.eye && imported.roi ? '已导入原版配置，请在右上角视频核对实时识别结果后保存。' : '参数已导入，请在当前视频重新框选模板与 ROI 后保存。');
     } catch (error) { setNotice(errorMessage(error)); }
   };
   const save = () => {

@@ -1100,10 +1100,9 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .blink-unit-input:has(> span) input { padding-right: 42px; }
 .blink-workspace .blink-check { display: flex; flex-direction: row; align-items: center; gap: 7px; min-height: 26px; }
 .blink-check input { accent-color: var(--accent); margin: 0; }
-.blink-footer { flex-shrink: 0; padding: 10px 0; border-top: 1px solid var(--line); }
-.blink-run-actions { display: flex; align-items: center; gap: 8px; }
-.blink-run-actions > span { margin-left: auto; color: var(--muted); font: 10px var(--mono); }
-.blink-footer p { margin: 7px 0 0; font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
+.blink-footer { display: flex; align-items: center; gap: 8px; flex-shrink: 0; min-height: 35px; padding: 10px 0; border-top: 1px solid var(--line); }
+.blink-footer p { flex: 1; min-width: 0; margin: 0; font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
+.blink-progress { margin-left: auto; flex-shrink: 0; color: var(--muted); font: 10px var(--mono); }
 .blink-footer p[role=alert] { color: var(--red); }
 @container (max-width: 340px) {
   .blink-form-fields > label { grid-template-columns: 104px minmax(0, 1fr); gap: 7px; }
