@@ -69,22 +69,34 @@ class ScriptRunner {
   async start({ text, path: relative, shouldStop = () => false }) {
     if (this.current) throw new Error('已有脚本正在运行。');
     if (typeof text !== 'string' || Buffer.byteLength(text, 'utf8') > 1024 * 1024 || !text.trim()) throw new Error('脚本内容无效。');
-    const { root, absolute } = await this.resolveScript(relative);
-    if (shouldStop()) throw new Error('脚本已停止。');
-    const state = await this.controller.call('controller.status');
-    if (shouldStop()) throw new Error('脚本已停止。');
-    if (state.status !== 'connected') throw new Error('请先连接伊机控。');
-    // Recheck after asynchronous preflight to reject simultaneous run requests.
-    if (this.current) throw new Error('已有脚本正在运行。');
     const run = {
       id: crypto.randomUUID(), owner: '', stopped: false, child: null, done: null, finished: false,
       videoDependent: false, videoSession: null,
     };
+    run.done = new Promise(resolve => { run.resolveDone = resolve; });
+    // Reserve the run before preflight yields so stop() also cancels manual starts.
     this.current = run;
-    const child = spawn(this.pythonPath(), ['-u', path.join(__dirname, '..', 'runtime', 'python', 'script_host.py')], {
-      windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, PYTHONUTF8: '1', PYTHONDONTWRITEBYTECODE: '1' },
-    });
-    run.child = child;
+    const checkStopped = () => {
+      if (run.stopped || this.current !== run || shouldStop()) throw new Error('脚本已停止。');
+    };
+    let root, absolute, child;
+    try {
+      checkStopped();
+      ({ root, absolute } = await this.resolveScript(relative));
+      checkStopped();
+      const state = await this.controller.call('controller.status');
+      checkStopped();
+      if (state.status !== 'connected') throw new Error('请先连接伊机控。');
+      child = spawn(this.pythonPath(), ['-u', path.join(__dirname, '..', 'runtime', 'python', 'script_host.py')], {
+        windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, PYTHONUTF8: '1', PYTHONDONTWRITEBYTECODE: '1' },
+      });
+      run.child = child;
+    } catch (error) {
+      run.finished = true;
+      if (this.current === run) this.current = null;
+      run.resolveDone();
+      throw error;
+    }
     let buffer = '', diagnostic = '';
     const finish = async (status, message = '', details = {}) => {
       if (run.finished) return;
@@ -106,7 +118,6 @@ class ScriptRunner {
       this.emit({ event: 'script.done', ...details, runId: run.id, status, message });
       run.resolveDone?.();
     };
-    run.done = new Promise(resolve => { run.resolveDone = resolve; });
     const onOffline = error => { void this.stop(`伊机控进程已退出，无法确认按键释放：${error.message}`); };
     const onControllerEvent = event => {
       if (event.event === 'controller.state' && ['failed', 'idle'].includes(event.state.status)) {
@@ -170,6 +181,12 @@ class ScriptRunner {
     if (failureReason) run.failureReason = failureReason;
     if (run.stopped || run.finished) return run.done;
     run.stopped = true;
+    if (!run.child) {
+      run.finished = true;
+      if (this.current === run) this.current = null;
+      run.resolveDone();
+      return;
+    }
     if (!run.child.stdin.destroyed) run.child.stdin.write(JSON.stringify({ command: 'stop' }) + '\n');
     const timeout = setTimeout(() => run.child.kill(), 2000);
     try {
