@@ -192,7 +192,8 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
             const nature=data.natures.indexOf(params.reverse.nature);filters=[{...defaultFilter(),shiny:255,natures:data.natures.map((_,i)=>nature<0||i===nature)}];}
           const rows=new Map();
           const targets=params.reverse?(reverseGroups.find(group=>group.includes(p.target))||[p.target]):[p.target];
-          for(const target of targets)for(const filter of filters){checkStopped(run);const values=await rng.generate({seed0:params.seed.pair[0],seed1:params.seed.pair[1],target,profile:run.input.profile,lead,
+          const generate=params.reverse?rng.generateReverse:rng.generate;
+          for(const target of targets)for(const filter of filters){checkStopped(run);const values=await generate({seed0:params.seed.pair[0],seed1:params.seed.pair[1],target,profile:run.input.profile,lead,
             initialAdvances:initial,maxAdvances:max,offset:p.offset,filter:{...filter,natures:params.nature==null?filter.natures:data.natures.map((_,i)=>i===params.nature)}});
             checkStopped(run);
             for(const row of values)rows.set(`${target}:${row.advances}`,params.reverse?{...row,reverseSpecies:target}:row);}

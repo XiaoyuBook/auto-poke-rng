@@ -44,7 +44,8 @@ std::array<u8, 6> ivs(const Json& filter, const char* key, u8 fallback) {
 Json generate(const Json& args) {
     const auto seed0 = seed(args, "seed0"), seed1 = seed(args, "seed1");
     if (seed0 == 0 && seed1 == 0) throw Error("INVALID_ARGUMENT", "Seed 0 与 Seed 1 不能同时为 0");
-    const u32 initial = integer(args, "initialAdvances", 0, 0, 1010000000);
+    // Manual start + maximum forward distance + the internal reverse window.
+    const u32 initial = integer(args, "initialAdvances", 0, 0, 1010010000);
     // Bounded batches prevent an unfiltered billion-frame request exhausting memory.
     const u32 maximum = integer(args, "maxAdvances", 0, 0, 4095);
     const u32 offset = integer(args, "offset", 0, 0, 1000000);

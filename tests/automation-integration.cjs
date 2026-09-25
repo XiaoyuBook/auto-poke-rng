@@ -22,6 +22,7 @@ function fixture(t){
       resolveScript:async()=>({absolute:script}),validate:async()=>({valid:true}),stop:async()=>trace.push('stop-script'),
       start:async options=>{trace.push(options.text);queueMicrotask(()=>events.emit('script',{event:'script.done',runId:'s',status:'completed'}));return {runId:'s'};}}};
   const rng={isBusy:()=>false,cancel:async()=>trace.push('cancel-search'),generate:async input=>{trace.push(input);return [{advances:151,pid:'00000001',ec:'00000002',stats:[1,2,3,4,5,6]}];}};
+  rng.generateReverse=input=>rng.generate(input);
   const workerFactory=(config,handlers)=>{workerConfig=config;callbacks=handlers;return {done:new Promise(resolve=>{resolveDone=resolve;}),send:message=>workerMessages.push(message),stop:async()=>resolveDone({status:'stopped'})};};
   const automation=registerAutomation({ipcMain:{handle:(name,fn)=>handlers.set(name,fn)},getMainWindow:()=>window,getWindows:()=>[window],devices,rng,
     blink:{getState:()=>({status:'idle'})},userData:directory,workerFactory,captureImage:async()=>{trace.push('frame');return 'image';}});
@@ -191,6 +192,17 @@ test('reverse preserves the forward lead for ordinary and sync candidates in eve
       assert.deepEqual(reverse.find(row=>row.advances===candidate.advances),{...candidate,reverseSpecies:'Turtwig'});
     });
   }
+});
+
+test('high-advance reverse searches use the internal RNG entry point',async t=>{
+  const f=fixture(t),calls=[];
+  f.rng.generate=async()=>assert.fail('reverse must not use the manual initial-advance limit');
+  f.rng.generateReverse=async input=>{calls.push(input);return [];};
+  await f.invoke('start',f.input);
+  await f.callbacks().request('search',{seed:{pair:['1','2']},reverse:{target:{raw_target_advances:20000000,sync_source:'no_sync'},nature:'认真'}});
+  assert.equal(calls.length,1);
+  assert.equal(calls[0].initialAdvances,19999500);
+  assert.equal(calls[0].maxAdvances,1000);
 });
 
 test('O11: calibration never presses keys or applies a threshold without user choice',async t=>{

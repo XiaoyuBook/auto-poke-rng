@@ -39,6 +39,50 @@ test('result guard fails visibly without returning an incomplete success', async
   const api = setup({ call: async () => Array(4096).fill({}), close: async () => {} });
   await assert.rejects(api.generate(request({ maxAdvances: MAX_RESULTS + 4096 })), /结果超过 250,000/);
 });
+
+test('internal reverse searches reach high absolute advances and the forward range boundary', async () => {
+  const client = new RuntimeClient({ role: 'rng' });
+  const api = setup(client);
+  try {
+    for (const [center, window] of [[20000000, 500], [1010000000, 10000]]) {
+      const input = request({ initialAdvances: center - window, maxAdvances: window * 2, offset: 17 });
+      const rows = await api.service.generateReverse(input);
+      assert.equal(rows.length, window * 2 + 1);
+      assert.equal(rows[0].advances, center - window);
+      assert.equal(rows.at(-1).advances, center + window);
+      const direct = await client.call('static.generate', { ...input, initialAdvances: center, maxAdvances: 0 });
+      assert.deepEqual(rows[window], direct[0]);
+      const tail = await client.call('static.generate', { ...input, initialAdvances: center + window, maxAdvances: 0 });
+      assert.deepEqual(rows.at(-1), tail[0]);
+    }
+  } finally { await api.service.close(); }
+});
+
+test('reverse range limits stay internal and reject oversized windows or absolute endpoints', async () => {
+  const calls = [];
+  const api = setup({ call: async (_, args) => { calls.push(args); return []; }, close: async () => {} });
+  await assert.rejects(api.generate(request({ initialAdvances: 19999500, maxAdvances: 1000, reverse: true })), /必须在/);
+  for (const overrides of [
+    { initialAdvances: -1 }, { initialAdvances: 1010010001 }, { initialAdvances: 0.5 },
+    { maxAdvances: 20001 }, { maxAdvances: -1 }, { offset: 1000001 },
+    { initialAdvances: 1010010000, maxAdvances: 1 },
+  ]) await assert.rejects(api.service.generateReverse(request(overrides)), /必须在|绝对推进/);
+  assert.deepEqual(calls, []);
+  await api.service.generateReverse(request({ initialAdvances: 1010010000 }));
+  assert.equal(calls[0].initialAdvances, 1010010000);
+  assert.equal(api.sender.listenerCount('destroyed'), 0);
+});
+
+test('an internal reverse search uses the shared cancellation and search slot', async () => {
+  let rejectPending;
+  const client = { call: () => new Promise((_, reject) => { rejectPending = reject; }), terminate: () => rejectPending(new Error('exit')), close: async () => {} };
+  const api = setup(client);
+  const failed = assert.rejects(api.service.generateReverse(request({ initialAdvances: 20000000, maxAdvances: 1000 })), /已取消搜索/);
+  await assert.rejects(api.generate(request()), /已有定点搜索/);
+  await api.service.cancel(); await failed;
+  client.call = async () => [];
+  assert.deepEqual(await api.generate(request()), []);
+});
 test('cancelling kills only the RNG client, rejects the search, and allows a subsequent search', async () => {
   let rejectPending;
   let terminations = 0;

@@ -2,6 +2,10 @@ const { RuntimeClient } = require('./runtime-client.cjs');
 
 const BATCH_SIZE = 4096;
 const MAX_RESULTS = 250000;
+const MAX_INITIAL_ADVANCES = 10000000;
+const MAX_SEARCH_ADVANCES = 1000000000;
+const MAX_REVERSE_WINDOW = 10000;
+const MAX_ABSOLUTE_ADVANCES = MAX_INITIAL_ADVANCES + MAX_SEARCH_ADVANCES + MAX_REVERSE_WINDOW;
 
 function registerRng({ ipcMain, getMainWindow, client = new RuntimeClient({ role: 'rng' }), calculator = new RuntimeClient({ role: 'rng' }), isAutomationBusy = () => false }) {
   let active = null;
@@ -15,12 +19,13 @@ function registerRng({ ipcMain, getMainWindow, client = new RuntimeClient({ role
     client.terminate();
     await job.promise.catch(() => {});
   };
-  const generate = async (request, sender = getMainWindow()?.webContents) => {
+  const generateSearch = async (request, sender, reverse) => {
     if (!request || typeof request !== 'object') throw new Error('定点搜索参数无效。');
     if (active) throw new Error('已有定点搜索正在进行，请先取消。');
-    for (const [key, limit] of [['initialAdvances', 10000000], ['maxAdvances', 1000000000], ['offset', 1000000]]) {
+    for (const [key, limit] of [['initialAdvances', reverse ? MAX_ABSOLUTE_ADVANCES : MAX_INITIAL_ADVANCES], ['maxAdvances', reverse ? MAX_REVERSE_WINDOW * 2 : MAX_SEARCH_ADVANCES], ['offset', 1000000]]) {
       if (!Number.isInteger(request[key]) || request[key] < 0 || request[key] > limit) throw new Error(`${key} 必须在 0–${limit} 之间。`);
     }
+    if (reverse && request.initialAdvances + request.maxAdvances > MAX_ABSOLUTE_ADVANCES) throw new Error('反查绝对推进超出可搜索范围。');
     const job = { cancelled: false, promise: null };
     active = job;
     const destroyed = () => { void cancel(); };
@@ -52,6 +57,10 @@ function registerRng({ ipcMain, getMainWindow, client = new RuntimeClient({ role
     });
     return job.promise;
   };
+  const generate = (request, sender = getMainWindow()?.webContents) => generateSearch(request, sender, false);
+  // Only the main-process automation adapter can request a bounded absolute window.
+  // Renderer payloads cannot opt out of the manual search limits.
+  const generateReverse = request => generateSearch(request, getMainWindow()?.webContents, true);
   ipcMain.handle('rng:static-generate', async (event, request) => {
     requireWindow(event); if (isAutomationBusy()) throw Error('请先停止自动流程再进行手动搜索。');
     return generate(request, event.sender);
@@ -62,7 +71,7 @@ function registerRng({ ipcMain, getMainWindow, client = new RuntimeClient({ role
     if (!request || typeof request !== 'object') throw new Error('个体值计算参数无效。');
     return calculator.call('iv.calculate', request);
   });
-  return { generate, cancel, isBusy: () => !!active, close: async () => { await cancel(); await Promise.all([client.close(), calculator.close()]); } };
+  return { generate, generateReverse, cancel, isBusy: () => !!active, close: async () => { await cancel(); await Promise.all([client.close(), calculator.close()]); } };
 }
 
 module.exports = { registerRng, BATCH_SIZE, MAX_RESULTS };
