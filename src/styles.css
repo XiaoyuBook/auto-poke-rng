@@ -715,6 +715,37 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .dialog-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px 10px 20px; border-bottom: 1px solid #333737; }
 .dialog-header h2 { font-size: 13px; font-weight: 600; }
 .dialog-body { padding: 22px; }
+.script-repository-dialog { width: min(980px, calc(100vw - 48px)); height: min(700px, calc(100dvh - 64px)); }
+.script-repository-dialog[open] { display: flex; flex-direction: column; }
+.repository-toolbar { display: flex; align-items: center; gap: 8px; padding: 16px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
+.repository-search { display: flex; flex: 1; align-items: center; gap: 8px; min-width: 120px; }
+.repository-search input { width: 100%; }
+.repository-toolbar input, .repository-toolbar select { border: 1px solid #414545; border-radius: 5px; color: var(--text); background: #191d1b; padding: 7px 9px; font: inherit; }
+.repository-body { display: grid; grid-template-columns: 260px minmax(0, 1fr); flex: 1; min-height: 0; }
+.repository-list { overflow: auto; padding: 12px; border-right: 1px solid #333737; }
+.repository-list > button { display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 14px 10px; text-align: left; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--text); }
+.repository-list > button.selected { background: #abc7b714; border-color: #abc7b747; }
+.repository-list strong, .repository-list small { display: block; margin-bottom: 6px; }
+.repository-list small { color: var(--secondary); }
+.repository-detail { overflow: auto; padding: 24px; font-size: 13px; line-height: 1.8; }
+.repository-detail h3 { font-size: 20px; margin: 8px 0; }
+.repository-detail h4 { font-size: 13px; margin-bottom: 8px; }
+.repository-detail p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.repository-detail dl { display: grid; grid-template-columns: 110px 1fr; margin: 22px 0; gap: 8px; }
+.repository-detail dd { margin: 0; overflow-wrap: anywhere; }
+.repository-detail dt { color: var(--secondary); }
+.repository-game { padding: 4px 8px; background: #abc7b71a; color: var(--green); border-radius: 4px; }
+.repository-instructions { margin-top: 22px; padding: 14px; background: #ffffff04; border: 1px solid #333737; border-radius: 6px; }
+.repository-changes { padding: 0; max-height: 210px; overflow: auto; list-style: none; }
+.repository-changes li { display: flex; flex-wrap: wrap; gap: 10px; border-bottom: 1px solid #ffffff08; padding: 4px 0; overflow-wrap: anywhere; }
+.repository-changes li span { color: var(--secondary); }
+.repository-changes li strong { color: #d9b478; font-weight: 400; }
+.repository-policy { display: grid; gap: 8px; border: 1px solid #4d4b40; padding: 12px; border-radius: 5px; }
+.repository-policy input { accent-color: var(--green); }
+.repository-actions { display: flex; gap: 8px; }
+.repository-message { margin: 0; padding: 10px 16px; font-size: 12px; background: #abc7b710; overflow-wrap: anywhere; }
+.repository-message.error { color: #e7a297; }
+.repository-footer { display: flex; justify-content: space-between; gap: 12px; padding: 12px 16px; font-size: 11px; color: var(--secondary); border-top: 1px solid #333737; }
 .bdsp-profile-dialog[open], .static-columns-dialog[open], .iv-calculator-dialog[open] { display: flex; flex-direction: column; }
 .bdsp-profile-dialog .dialog-header, .static-columns-dialog .dialog-header, .iv-calculator-dialog .dialog-header { flex-shrink: 0; }
 .bdsp-tool-body { min-height: 0; overflow-y: auto; padding: 18px 20px; font-size: 12px; }

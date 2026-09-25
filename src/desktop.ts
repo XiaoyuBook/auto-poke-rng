@@ -68,6 +68,7 @@ export interface ControllerOverlayApi {
 }
 
 export interface DesktopApi {
+  scriptRepository?: import('./scriptRepository').ScriptRepositoryApi;
   automation?: import('./automation').AutomationApi;
   blink?: import('./blink').BlinkApi;
   notifications?: import('./notifications').QQApi;

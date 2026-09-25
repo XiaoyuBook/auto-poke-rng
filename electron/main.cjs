@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, safeStorage, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, safeStorage, nativeImage, dialog } = require('electron');
 const path = require('node:path');
 const { registerPanelWindows } = require('./panel-windows.cjs');
 const { registerScriptFiles } = require('./script-files.cjs');
@@ -7,6 +7,9 @@ const { registerQQNotifications } = require('./qq-notifications.cjs');
 const { registerRng } = require('./rng-client.cjs');
 const { registerBlink } = require('./blink-client.cjs');
 const { registerAutomation } = require('./automation.cjs');
+const { createScriptGate, initializeUserScripts } = require('./script-storage.cjs');
+const { registerScriptRepository } = require('./script-repository.cjs');
+const scriptGate = createScriptGate();
 
 let mainWindow = null;
 let panels;
@@ -53,31 +56,34 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  const rootDirectory = await initializeUserScripts(app.getPath('userData'), path.join(app.getAppPath(), 'scripts'));
   ipcMain.handle('app:metadata', () => ({ name: 'Auto Poke RNG', version: app.getVersion(), platform: process.platform }));
   panels = registerPanelWindows({ getMainWindow: () => mainWindow, loadWindow });
-  registerScriptFiles({ getMainWindow: () => mainWindow, getLabelWindows: () => [panels.getVideoWindow()], rootDirectory: path.join(app.getAppPath(), 'scripts') });
+  registerScriptFiles({ getMainWindow: () => mainWindow, getLabelWindows: () => [panels.getVideoWindow()], rootDirectory, serialize: scriptGate.run });
   // The unpackaged GUI is the local development entry point. Keep mock
   // hardware available there even when a shell drops environment variables;
   // packaged production builds remain real-device only unless explicitly
   // launched with the test flag.
   const testDevices = !app.isPackaged || process.env.AUTO_POKE_TEST_DEVICES === '1';
-  devices = registerDevices({ ipcMain, getWindows: () => BrowserWindow.getAllWindows(), loadWindow, testMode: testDevices });
+  devices = registerDevices({ ipcMain, getWindows: () => BrowserWindow.getAllWindows(), loadWindow, rootDirectory, testMode: testDevices, isScriptLibraryBusy: () => scriptGate.busy });
   notifications = registerQQNotifications({ ipcMain, getMainWindow: () => mainWindow, safeStorage, nativeImage, userData: app.getPath('userData') });
   rng = registerRng({ ipcMain, getMainWindow: () => mainWindow, isAutomationBusy: () => devices.isAutomationBusy() });
   blink = registerBlink({ ipcMain, getMainWindow: () => mainWindow, getVideo: () => devices.getState().video, isAutomationBusy: () => devices.isAutomationBusy() });
   automation = registerAutomation({ ipcMain, getMainWindow: () => mainWindow, getWindows: () => BrowserWindow.getAllWindows(), devices, rng, blink, userData: app.getPath('userData') });
+  registerScriptRepository({ ipcMain, getMainWindow: () => mainWindow, dialog, rootDirectory, userData: app.getPath('userData'), appVersion: app.getVersion(), gate: scriptGate,
+    isBusy: () => !!devices.runner.current || automation.isBusy(), log: (message, level = 'info') => automation.store.log(message, '系统', level) });
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
-});
+}).catch(error => { dialog.showErrorBox('脚本库初始化失败', error.message); app.quit(); });
 
 app.on('before-quit', event => {
   if (quitting || !devices) return;
   event.preventDefault(); quitting = true;
   notifications?.close();
-  void automation?.close().catch(() => {}).then(() => Promise.allSettled([devices.close(), rng?.close?.(), blink?.close()])).finally(() => app.quit());
+  void automation?.close().catch(() => {}).then(() => Promise.allSettled([devices.close(), rng?.close?.(), blink?.close(), scriptGate.drain()])).finally(() => app.quit());
 });
 
 app.on('window-all-closed', () => {

@@ -6,7 +6,7 @@ const { registerControllerOverlay } = require('./controller-overlay.cjs');
 const path = require('node:path');
 const { EventEmitter } = require('node:events');
 
-function registerDevices({ ipcMain, getWindows, loadWindow, rootDirectory = path.join(__dirname, '..', 'scripts'), testMode = false }) {
+function registerDevices({ ipcMain, getWindows, loadWindow, rootDirectory = path.join(__dirname, '..', 'scripts'), testMode = false, isScriptLibraryBusy = () => false }) {
   const video = new RuntimeClient({ role: 'video', testMode });
   const ocr = new OcrClient();
   const matcher = new ImageLabelMatcher();
@@ -90,6 +90,7 @@ function registerDevices({ ipcMain, getWindows, loadWindow, rootDirectory = path
   handle('controller:reset', () => { requireIdle(); return controller.call('controller.reset'); });
   handle('controller:stop', async () => { events.emit('stop-automation'); await runner.stop(); if (controller.child) await controller.call('controller.stop'); });
   handle('execution:start', async args => {
+    if (isScriptLibraryBusy()) throw Error('脚本库正在更新，请稍后运行。');
     requireIdle(); executionStarting = true;
     try { return await runner.start(args); } finally { executionStarting = false; }
   });
@@ -156,6 +157,7 @@ function registerDevices({ ipcMain, getWindows, loadWindow, rootDirectory = path
     events, runner, ocr, controller,
     isAutomationBusy: () => !!automationOwner,
     claimAutomation: async owner => {
+      if (isScriptLibraryBusy()) throw Error('脚本库正在更新，请稍后运行。');
       if (automationOwner || runner.current || executionStarting) throw Error('已有流程或脚本正在运行。');
       automationOwner = owner; controllerOverlay.input.automationLocked = true;
       try { await controllerOverlay.suspend(); }

@@ -8,6 +8,13 @@ const subscribe = (channel, listener) => {
 
 contextBridge.exposeInMainWorld('desktop', {
   getMetadata: () => ipcRenderer.invoke('app:metadata'),
+  scriptRepository: {
+    getState: () => ipcRenderer.invoke('script-repository:state'),
+    refresh: () => ipcRenderer.invoke('script-repository:refresh'),
+    prepare: id => ipcRenderer.invoke('script-repository:prepare', { id }),
+    importZip: () => ipcRenderer.invoke('script-repository:import'),
+    apply: request => ipcRenderer.invoke('script-repository:apply', request),
+  },
   automation: {
     getState: () => ipcRenderer.invoke('automation:state'),
     onState: listener => subscribe('automation:state', listener),

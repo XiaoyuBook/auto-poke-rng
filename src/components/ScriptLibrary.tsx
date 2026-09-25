@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ChevronRight, FileCode2, Folder, FolderOpen, Plus, RefreshCw, Search, X } from 'lucide-react';
+import { ChevronRight, FileCode2, Folder, FolderOpen, Package, Plus, RefreshCw, Search, X } from 'lucide-react';
+import { ScriptRepositoryDialog } from './ScriptRepositoryDialog';
 import { isScriptDirty, parentFolder, type LibraryScript, type ScriptFolder } from '../scriptLibrary';
 
 interface Props {
@@ -21,6 +22,7 @@ export function ScriptLibrary(props: Props) {
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [creating, setCreating] = useState(false);
+  const [repositoryOpen, setRepositoryOpen] = useState(false);
   const createMenu = useRef<HTMLDivElement>(null);
   const activeButton = useRef<HTMLButtonElement>(null);
   const query = search.trim().toLocaleLowerCase();
@@ -88,6 +90,7 @@ export function ScriptLibrary(props: Props) {
   return <aside className="script-library" aria-label="脚本库">
     <header className="library-header">
       <h2>脚本库</h2>
+      <button className="icon-button" title="脚本仓库" aria-label="打开脚本仓库" onClick={() => setRepositoryOpen(true)}><Package size={15} /></button>
       <button className="icon-button" title="重新读取 scripts 文件夹" aria-label="刷新脚本库" disabled={props.busy || !props.available} onClick={() => void props.refresh()}><RefreshCw size={14} /></button>
       <div className="library-create" ref={createMenu} onKeyDown={event => { if (event.key === 'Escape') { setCreating(false); createMenu.current?.querySelector('button')?.focus(); } }}>
         <button className="icon-button" title="新建脚本" aria-label="新建脚本" aria-expanded={creating} disabled={props.busy || !props.loaded} onClick={() => setCreating(value => !value)}><Plus size={16} /></button>
@@ -107,10 +110,11 @@ export function ScriptLibrary(props: Props) {
       {renderFolder('', 0)}
       {!props.available && <div className="library-empty"><Folder size={22} /><p>请在桌面应用中打开项目脚本库</p></div>}
       {props.available && !props.loaded && props.busy && <div className="library-empty"><p>正在读取脚本库…</p></div>}
-      {props.loaded && !props.scripts.length && !folders.length && <div className="library-empty"><FolderOpen size={22} /><p>scripts 文件夹为空</p><span>添加文件夹和 .rng 脚本后刷新</span></div>}
+      {props.loaded && !props.scripts.length && !folders.length && <div className="library-empty"><FolderOpen size={22} /><p>scripts 文件夹为空</p><span>添加文件夹和 .txt 脚本后刷新</span></div>}
       {query && !filtered.length && <div className="library-empty"><p>没有匹配的脚本</p><button className="text-button" onClick={() => setSearch('')}>清除搜索</button></div>}
     </div>
     {props.warnings.length > 0 && <details className="library-warnings"><summary>{props.warnings.length} 项未能读取</summary>{props.warnings.map(warning => <p key={warning}>{warning}</p>)}</details>}
     <footer className="library-footer"><kbd>Ctrl S</kbd><span>保存当前文件</span></footer>
+    {repositoryOpen && <ScriptRepositoryDialog close={() => setRepositoryOpen(false)} onInstalled={props.refresh} hasUnsaved={props.scripts.some(isScriptDirty)} />}
   </aside>;
 }
