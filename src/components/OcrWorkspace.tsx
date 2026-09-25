@@ -69,14 +69,14 @@ export function OcrWorkspace({ overlayTarget, previewTarget }: { overlayTarget?:
 
   const visibleRows = useMemo(() => rows.filter(row => row.visible), [rows]);
 
-  return <section className="ocr-workspace" aria-label="OCR设置工作区">
+  return <section className="ocr-workspace" aria-label="闪光反查区域工作区">
     <div className="ocr-settings-content">
       <header className="ocr-workspace-heading">
-        <div><ScanText size={17} /><div><h2>OCR 设置</h2><p>管理固定识别项目，在右侧视频中框选或预览对应区域。</p></div></div>
+        <div><ScanText size={17} /><div><h2>闪光反查区域</h2><p>设置反查所需的识别范围，在右侧视频中框选或预览对应区域。</p></div></div>
         <span className="ocr-source-badge">源画面 · {sourceSize.width} × {sourceSize.height}</span>
       </header>
 
-      <section className="ocr-settings-card ocr-region-card" aria-label="OCR识别区域">
+      <section className="ocr-settings-card ocr-region-card" aria-label="反查识别区域">
         <header className="ocr-region-heading">
           <div className="ocr-card-heading"><Target size={15} /><h3>识别项目与区域</h3><span className="ocr-region-count">{rows.length} 个项目 · 当前选中：{selectedRow.label}</span></div>
           <span className="ocr-table-hint">点击“框选”后，在右侧视频拖动设置区域</span>
@@ -138,7 +138,7 @@ function OcrRoiOverlay({ rows, selectedId, setRect }: { rows: OcrRow[]; selected
     if (svg.current?.hasPointerCapture(event.pointerId)) svg.current.releasePointerCapture(event.pointerId);
   };
   const active = rows.find(row => row.id === selectedId);
-  return <div className="video-roi-overlay" aria-label="OCR识别区域框选">
+  return <div className="video-roi-overlay" aria-label="反查识别区域框选">
     <svg ref={svg} viewBox={`0 0 ${sourceSize.width} ${sourceSize.height}`} preserveAspectRatio="none" onPointerDown={begin} onPointerMove={update} onPointerUp={end} onPointerCancel={end}>
       <rect className="ocr-roi-mask" x="0" y="0" width={sourceSize.width} height={sourceSize.height} />
       {rows.map(row => <rect key={row.id} className={row.id === selectedId ? 'ocr-roi-selection is-active' : 'ocr-roi-selection'} x={row.rect.x} y={row.rect.y} width={row.rect.width} height={row.rect.height} />)}
@@ -149,7 +149,7 @@ function OcrRoiOverlay({ rows, selectedId, setRect }: { rows: OcrRow[]; selected
 
 function OcrPreviewPanel({ row }: { row: OcrRow }) {
   const waiting = row.lastRecognition === '未测试';
-  return <section className="ocr-preview-panel" aria-label="OCR识别预览">
+  return <section className="ocr-preview-panel" aria-label="反查识别预览">
     <header className="ocr-preview-heading"><WandSparkles size={15} /><h2>识别预览 · {row.label}</h2><span>{waiting ? '待测试' : '已完成'}</span></header>
     <div className="ocr-preview-text">{waiting ? '尚未执行识别' : row.lastRecognition}</div>
     <dl className="ocr-preview-meta"><div><dt>区域</dt><dd>{row.rect.width} × {row.rect.height}</dd></div><div><dt>状态</dt><dd>{waiting ? '—' : '待确认'}</dd></div></dl>

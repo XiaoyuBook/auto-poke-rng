@@ -291,7 +291,7 @@ export default function App({ connections = initialConnections }: { connections?
   };
 
   const navigateToPage = (next: Page) => {
-    if ((next === '定点数据' || next === 'OCR 设置' || next === '眨眼捕获') && game !== 'bdsp') return;
+    if ((next === '定点数据' || next === '闪光反查区域' || next === '眨眼捕获') && game !== 'bdsp') return;
     setPage(next);
     if (inlineLabelsOpen) setVideoLabelsOpen(false);
   };
@@ -471,7 +471,7 @@ export default function App({ connections = initialConnections }: { connections?
     { label: '脚本编辑', keywords: 'script editor', icon: <TerminalSquare size={16} />, run: () => navigateToPage('脚本编辑') },
     ...(game === 'bdsp' ? [
       { label: '定点数据', keywords: 'static pokemon pokefinder encounter', icon: <Dices size={16} />, run: () => navigateToPage('定点数据') },
-      { label: 'OCR 设置', keywords: 'ocr recognition', icon: <ScanText size={16} />, run: () => navigateToPage('OCR 设置') },
+      { label: '闪光反查区域', keywords: 'ocr recognition shiny roi', icon: <ScanText size={16} />, run: () => navigateToPage('闪光反查区域') },
       { label: '眨眼捕获', keywords: 'blink seed project xs', icon: <Eye size={16} />, run: () => navigateToPage('眨眼捕获') },
     ] : []),
     { label: '视频预览', keywords: 'video preview', icon: <MonitorPlay size={16} />, run: () => showPanel('video') },
@@ -507,7 +507,7 @@ export default function App({ connections = initialConnections }: { connections?
                   <button key={item.id} role="menuitemradio" aria-checked={item.id === game} className={'game-option ' + (item.id === game ? 'selected' : '')}
                     onClick={() => {
                       setGame(item.id); setGameMenuOpen(false); gameButton.current?.focus();
-                      if (item.id !== 'bdsp' && (page === '定点数据' || page === 'OCR 设置' || page === '眨眼捕获')) setPage('首页');
+                      if (item.id !== 'bdsp' && (page === '定点数据' || page === '闪光反查区域' || page === '眨眼捕获')) setPage('首页');
                       if (item.id !== game) addLog('已切换查看：' + item.label + '。');
                     }}>
                     <span className="game-mark" style={{ background: item.color }} />
@@ -525,7 +525,7 @@ export default function App({ connections = initialConnections }: { connections?
           <NavItem label="首页" icon={<Home size={16} />} active={page === '首页'} onClick={() => navigateToPage('首页')} />
           <NavItem label="脚本编辑" icon={<TerminalSquare size={16} />} active={page === '脚本编辑'} onClick={() => navigateToPage('脚本编辑')} />
           {game === 'bdsp' && <NavItem label="定点数据" icon={<Dices size={16} />} active={page === '定点数据'} onClick={() => navigateToPage('定点数据')} />}
-          {game === 'bdsp' && <NavItem label="OCR 设置" icon={<ScanText size={16} />} active={page === 'OCR 设置'} onClick={() => navigateToPage('OCR 设置')} />}
+          {game === 'bdsp' && <NavItem label="闪光反查区域" icon={<ScanText size={16} />} active={page === '闪光反查区域'} onClick={() => navigateToPage('闪光反查区域')} />}
           {game === 'bdsp' && <NavItem label="眨眼捕获" icon={<Eye size={16} />} active={page === '眨眼捕获'} onClick={() => navigateToPage('眨眼捕获')} />}
         </nav>
         <footer className="sidebar-footer">
@@ -561,7 +561,7 @@ export default function App({ connections = initialConnections }: { connections?
                 progress={run?.progress} validation={validation} recording={recording} elapsed={elapsed} toggleRunning={toggleRunning} toggleRecording={toggleRecording} openModal={openModal}
                 virtualControllerOpen={virtualControllerOpen} toggleVirtualController={() => void toggleVirtualController()}
                 labelButton={<VideoLabelsButton variant="tool" expanded={panelWindows.videoLabelsOpen} toggle={toggleVideoLabels} />} />}
-              {page === 'OCR 设置' && <OcrWorkspace overlayTarget={ocrOverlayHost} previewTarget={ocrPreviewHost} />}
+              {page === '闪光反查区域' && <OcrWorkspace overlayTarget={ocrOverlayHost} previewTarget={ocrPreviewHost} />}
               {page === '定点数据' && <StaticDataWorkspace profile={bdspProfile} onLog={message => addLog(message, '系统', 'success')} />}
               {page === '眨眼捕获' && <BlinkWorkspace blink={blink} video={devices.video} />}
               {page === '首页' && (game === 'bdsp' ? <BdspHomeWorkspace profile={bdspProfile} onChange={setBdspProfile} onOpenScript={() => navigateToPage('脚本编辑')} /> : <div className="empty-state home-empty"><Home size={28} /><h2>开始你的工作</h2><p>当前游戏为{activeGame.label}，打开脚本编辑开始配置操作。</p><button className="button" onClick={() => navigateToPage('脚本编辑')}><TerminalSquare size={15} />打开脚本编辑</button></div>)}
@@ -578,15 +578,15 @@ export default function App({ connections = initialConnections }: { connections?
           <aside className="workspace-right-rail" aria-label="固定工作区侧栏">
             <section ref={videoRegion} className="persistent-video" aria-label="视频预览" tabIndex={-1} onContextMenu={openVideoContextMenu}>
               <VideoPreview previewOnly />
-              <div ref={setOcrOverlayHost} className="video-roi-host" aria-hidden={!(page === 'OCR 设置' || page === '眨眼捕获') || inlineLabelsOpen || undefined} hidden={!(page === 'OCR 设置' || page === '眨眼捕获') || inlineLabelsOpen} />
+              <div ref={setOcrOverlayHost} className="video-roi-host" aria-hidden={!(page === '闪光反查区域' || page === '眨眼捕获') || inlineLabelsOpen || undefined} hidden={!(page === '闪光反查区域' || page === '眨眼捕获') || inlineLabelsOpen} />
               {page === '眨眼捕获' && !inlineLabelsOpen && <BlinkVideoOverlay blink={blink} video={devices.video} target={ocrOverlayHost} />}
               <button className="video-resize-handle" type="button" aria-label="调整视频预览大小" title="拖动调整视频大小，保持 16:9"
                 onPointerDown={startVideoResize} onPointerMove={resizeVideo} onPointerUp={finishVideoResize} onPointerCancel={finishVideoResize}
                 onLostPointerCapture={() => { videoResize.current = null; }} onKeyDown={nudgeVideoSize}><Maximize2 size={13} aria-hidden="true" /></button>
             </section>
             <div ref={setLabelReferenceHost} className="persistent-label-reference" aria-label="搜图标签与标注步骤" aria-hidden={!inlineLabelsOpen || undefined} hidden={!inlineLabelsOpen} />
-            <div ref={setOcrPreviewHost} className="persistent-ocr-preview" aria-hidden={page !== 'OCR 设置' || undefined} hidden={page !== 'OCR 设置'} />
-            <section ref={logRegion} className="persistent-logs" aria-labelledby="persistent-logs-title" aria-hidden={paletteOpen || inlineLabelsOpen || page === 'OCR 设置' || undefined} hidden={inlineLabelsOpen || page === 'OCR 设置'} tabIndex={-1}>
+            <div ref={setOcrPreviewHost} className="persistent-ocr-preview" aria-hidden={page !== '闪光反查区域' || undefined} hidden={page !== '闪光反查区域'} />
+            <section ref={logRegion} className="persistent-logs" aria-labelledby="persistent-logs-title" aria-hidden={paletteOpen || inlineLabelsOpen || page === '闪光反查区域' || undefined} hidden={inlineLabelsOpen || page === '闪光反查区域'} tabIndex={-1}>
               <header className="persistent-logs-header">
                 <FileClock size={15} />
                 <h2 id="persistent-logs-title">日志中心</h2>
@@ -603,7 +603,7 @@ export default function App({ connections = initialConnections }: { connections?
               <span className="workspace-cursor">行 {cursor.line}，列 {cursor.column}</span>
               <span>UTF-8</span>
               <span>{script.split('\n').length} 行</span>
-            </> : page === 'OCR 设置' ? <span>OCR 设置</span> : page === '定点数据' ? <span>定点数据</span> : <span>{activeGame.label}</span>}
+            </> : page === '闪光反查区域' ? <span>闪光反查区域</span> : page === '定点数据' ? <span>定点数据</span> : <span>{activeGame.label}</span>}
           </div>
           <QuickTools panel={toolPanel} detached={panelWindows.detached} toggle={togglePanel} buttons={dockButtons.current} />
         </footer>

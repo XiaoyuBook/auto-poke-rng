@@ -1,4 +1,4 @@
-export type Page = '首页' | '脚本编辑' | 'OCR 设置' | '定点数据' | '眨眼捕获';
+export type Page = '首页' | '脚本编辑' | '闪光反查区域' | '定点数据' | '眨眼捕获';
 export type GameId = 'frlg' | 'bdsp' | 'swsh';
 export type Modal = 'controller' | 'easycon' | 'video' | 'notification' | 'mapping' | 'help' | 'settings';
 export type LogEntry = {

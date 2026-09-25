@@ -141,7 +141,7 @@ app.whenReady().then(async () => {
   })()`);
   assert.equal(scriptColumns.sameRow, true, 'script library stays in the left column of the editor');
   assert.ok(scriptColumns.libraryRight <= scriptColumns.editorLeft, 'script library does not move above the editor');
-  await evaluate(main, `document.querySelector('.nav-item[title="OCR 设置"]').click()`);
+  await evaluate(main, `document.querySelector('.nav-item[title="闪光反查区域"]').click()`);
   await until(() => evaluate(main, 'Boolean(document.querySelector(".ocr-workspace"))'), 'OCR workspace ready');
   assert.equal(await evaluate(main, 'Boolean(document.querySelector(".video-roi-overlay"))'), true, 'OCR mode overlays an ROI selector on the persistent video');
   assert.equal(await evaluate(main, 'Boolean(document.querySelector(".persistent-ocr-preview")) && !document.querySelector(".persistent-ocr-preview").hidden'), true, 'OCR mode shows the recognition preview below video');

@@ -22,8 +22,8 @@ export function BdspProfileCard({ profile, onChange }: ProfileProps) {
 }
 export function BdspHomeWorkspace({ profile, onChange, onOpenScript }: ProfileProps & { onOpenScript: () => void }) {
   return <section className="bdsp-home-workspace" aria-label="珍钻复刻首页">
-    <header className="bdsp-home-heading"><div><h2>珍钻复刻</h2><p>管理 BDSP 存档信息，并从左侧进入定点数据或 OCR 设置。</p></div></header>
+    <header className="bdsp-home-heading"><div><h2>珍钻复刻</h2><p>管理 BDSP 存档信息，并从左侧进入定点数据或闪光反查区域。</p></div></header>
     <BdspProfileCard profile={profile} onChange={onChange} />
-    <div className="bdsp-home-empty"><h3>准备开始</h3><p>脚本编辑、定点数据和 OCR 设置都使用当前珍钻复刻工作区。</p><button className="button" type="button" onClick={onOpenScript}>打开脚本编辑</button></div>
+    <div className="bdsp-home-empty"><h3>准备开始</h3><p>脚本编辑、定点数据和闪光反查区域都使用当前珍钻复刻工作区。</p><button className="button" type="button" onClick={onOpenScript}>打开脚本编辑</button></div>
   </section>;
 }

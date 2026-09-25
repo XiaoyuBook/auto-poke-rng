@@ -169,7 +169,7 @@ describe('workspace interactions', () => {
     expect(within(nav).getAllByRole('button').map(button => button.textContent)).toEqual(['首页', '脚本编辑']);
     expect(screen.queryByRole('button', { name: '定点数据' })).toBeNull();
     changeGame('珍钻复刻');
-    expect(within(nav).getAllByRole('button').map(button => button.textContent)).toEqual(['首页', '脚本编辑', '定点数据', 'OCR 设置', '眨眼捕获']);
+    expect(within(nav).getAllByRole('button').map(button => button.textContent)).toEqual(['首页', '脚本编辑', '定点数据', '闪光反查区域', '眨眼捕获']);
     fireEvent.click(screen.getByRole('button', { name: '首页' }));
     expect(screen.getByRole('region', { name: '存档信息' })).toBeTruthy();
     changeGame('火叶');
@@ -188,13 +188,13 @@ describe('workspace interactions', () => {
     changeGame('珍钻复刻');
     const video = screen.getByRole('region', { name: '视频预览' });
     const frame = within(video).getByLabelText('视频画面');
-    fireEvent.click(screen.getByRole('button', { name: 'OCR 设置' }));
-    expect(screen.getByRole('heading', { name: 'OCR 设置', level: 2 })).toBeTruthy();
-    expect(screen.getByRole('region', { name: 'OCR识别区域' })).toBeTruthy();
-    expect(screen.getByLabelText('OCR识别区域框选')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '闪光反查区域' }));
+    expect(screen.getByRole('heading', { name: '闪光反查区域', level: 2 })).toBeTruthy();
+    expect(screen.getByRole('region', { name: '反查识别区域' })).toBeTruthy();
+    expect(screen.getByLabelText('反查识别区域框选')).toBeTruthy();
     expect(within(video).getByLabelText('视频画面')).toBe(frame);
     fireEvent.click(screen.getByRole('button', { name: '测试当前项' }));
-    expect(within(screen.getByRole('region', { name: 'OCR识别预览' })).getByText('等待视频帧')).toBeTruthy();
+    expect(within(screen.getByRole('region', { name: '反查识别预览' })).getByText('等待视频帧')).toBeTruthy();
   });
 
   it('limits blink capture and its video menu to BDSP, keeping the video and logs mounted', async () => {
