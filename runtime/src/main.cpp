@@ -1,5 +1,6 @@
 #include "capture.hpp"
 #include "controller.hpp"
+#include "pokefinder_static.hpp"
 #include <iostream>
 
 int main(int argc,char** argv) {
@@ -13,11 +14,13 @@ int main(int argc,char** argv) {
     std::mutex output;
     Emit emit=[&](const Json& value) { std::lock_guard lock(output); std::cout<<value.dump()<<std::endl; };
     try {
-        if (role!="video" && role!="controller") throw Error("INVALID_ARGUMENT","Unknown runtime role");
+        if (role!="video" && role!="controller" && role!="rng") throw Error("INVALID_ARGUMENT","Unknown runtime role");
         std::unique_ptr<CaptureService> capture;
         std::unique_ptr<ControllerService> controller;
+        std::unique_ptr<PokeFinderStaticService> rng;
         if (role=="video") capture=std::make_unique<CaptureService>(emit,test_mode);
-        else controller=std::make_unique<ControllerService>(emit,test_mode);
+        else if (role=="controller") controller=std::make_unique<ControllerService>(emit,test_mode);
+        else rng=std::make_unique<PokeFinderStaticService>();
         Handle parent_handle(parent ? OpenProcess(SYNCHRONIZE,FALSE,parent) : nullptr);
         if (parent && !parent_handle.get()) throw Error("PARENT_MISSING","Cannot observe parent process");
         std::jthread guard([&](std::stop_token stop) {
@@ -47,7 +50,7 @@ int main(int argc,char** argv) {
                 auto method=request.at("method").get<std::string>();
                 if (method=="shutdown") { emit({{"id",id},{"ok",true},{"result",Json::object()}}); break; }
                 auto params=request.value("params",Json::object());
-                auto result=capture ? capture->command(method,params) : controller->command(method,params);
+                auto result=capture ? capture->command(method,params) : controller ? controller->command(method,params) : rng->command(method,params);
                 emit({{"id",id},{"ok",true},{"result",std::move(result)}});
             } catch (const Error& error) { emit({{"id",id},{"ok",false},{"error",{{"code",error.code},{"message",error.what()}}}}); }
               catch (const std::exception& error) { emit({{"id",id},{"ok",false},{"error",{{"code","INVALID_ARGUMENT"},{"message",error.what()}}}}); }

@@ -23,6 +23,28 @@ export interface PanelWindowsApi {
   onState: (listener: (state: PanelWindowState) => void) => () => void;
   onAction: (listener: (action: PanelAction) => void) => () => void;
 }
+export interface StaticGenerationRequest {
+  seed0: string; seed1: string; initialAdvances: number; maxAdvances: number; offset: number; lead: number;
+  target: string;
+  profile: import('./bdspProfile').BdspProfile;
+  filter: { skip: boolean; ability: number; gender: number; shiny: number; heightMin: number; heightMax: number; weightMin: number; weightMax: number; ivMin: number[]; ivMax: number[]; natures: boolean[] };
+}
+export interface NativeStaticResult {
+  advances: number; ec: string; pid: string; ivs: number[]; stats: number[]; ability: number; abilityIndex: number; gender: number; level: number;
+  nature: number; shiny: number; height: number; weight: number; characteristic: number;
+}
+export interface StaticEngineApi {
+  staticGenerate: (request: StaticGenerationRequest) => Promise<NativeStaticResult[]>;
+  cancel: () => Promise<void>;
+  calculateIvs: (request: IvCalculationRequest) => Promise<IvCalculationResult>;
+}
+export interface IvCalculationRequest {
+  species: number; form: number; nature: number; characteristic: number; hiddenPower: number;
+  entries: { level: number; stats: number[] }[];
+}
+export interface IvCalculationResult {
+  ivs: number[][]; baseStats: number[]; nextLevels: (number | null)[]; possible: boolean;
+}
 export interface ControllerOverlayState {
   visible: boolean; active: boolean; mode: 'off' | 'standby' | 'active'; scale: number;
   inputReport?: import('./devices').ControllerReport | null;
@@ -52,4 +74,5 @@ export interface DesktopApi {
   getMetadata: () => Promise<{ name: string; version: string; platform: string }>;
   panels: PanelWindowsApi;
   scripts: ScriptFilesApi;
+  rng?: StaticEngineApi;
 }

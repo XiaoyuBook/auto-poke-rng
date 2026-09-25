@@ -197,8 +197,14 @@ describe('workspace interactions', () => {
   });
 
   it('opens static data search, keeps the persistent video, and generates only after clicking generate', async () => {
+    const staticGenerate = vi.fn(async () => [{ advances: 0, ec: '220345D0', pid: '2203506A', ivs: [4,23,15,30,19,26], stats: [20,12,12,11,12,8], ability: 0, abilityIndex: 65, gender: 0, level: 5, nature: 22, shiny: 0, height: 124, weight: 99, characteristic: 20 }]);
+    window.desktop!.rng = { staticGenerate, cancel: vi.fn(async () => {}), calculateIvs: vi.fn() };
     await openApp();
     changeGame('珍钻复刻');
+    fireEvent.click(screen.getByRole('button', { name: '首页' }));
+    fireEvent.change(screen.getByLabelText('TID'), { target: { value: '10000' } });
+    fireEvent.change(screen.getByLabelText('SID'), { target: { value: '20000' } });
+    fireEvent.change(screen.getByLabelText('存档游戏版本'), { target: { value: 'SP' } });
     const videoFrame = screen.getByRole('region', { name: '视频预览' }).querySelector('.preview-frame');
     fireEvent.click(screen.getByRole('button', { name: '定点数据' }));
     expect(screen.getByRole('heading', { name: '定点数据', level: 2 })).toBeTruthy();
@@ -207,7 +213,11 @@ describe('workspace interactions', () => {
     expect(screen.getByRole('region', { name: '视频预览' }).querySelector('.preview-frame')).toBe(videoFrame);
     expect(within(screen.getByRole('region', { name: '定点搜索结果' })).getByText('尚未生成结果')).toBeTruthy();
     fireEvent.change(screen.getByLabelText('Seed 0'), { target: { value: 'DEADBEEF' } });
+    fireEvent.change(screen.getByLabelText('Seed 1'), { target: { value: '123456789ABCDEF0' } });
+    expect(staticGenerate).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: '生成' }));
+    await screen.findByText('已生成结果');
+    expect(staticGenerate).toHaveBeenCalledWith(expect.objectContaining({ seed1: '123456789ABCDEF0', profile: expect.objectContaining({ version: 'SP', tid: 10000, sid: 20000 }) }));
     const table = screen.getByRole('region', { name: '定点搜索结果' });
     const resultRows = within(table).getAllByRole('row');
     expect(resultRows.length).toBeGreaterThan(1);
@@ -215,6 +225,10 @@ describe('workspace interactions', () => {
     expect((screen.getByRole('button', { name: '复制选中行' }) as HTMLButtonElement).disabled).toBe(false);
     fireEvent.click(screen.getByRole('button', { name: '复制选中行' }));
     expect((screen.getByRole('button', { name: '复制选中行' }) as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: '首页' }));
+    expect((screen.getByLabelText('TID') as HTMLInputElement).value).toBe('10000');
+    expect((screen.getByLabelText('存档游戏版本') as HTMLSelectElement).value).toBe('SP');
+    expect(JSON.parse(localStorage.getItem('auto-poke-rng:bdsp-profile')!).sid).toBe(20000);
   });
 
   it('requires an EasyCon connection before opening the virtual controller', async () => {

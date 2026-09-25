@@ -60,6 +60,9 @@ $testFiles = @(
     'tests/device-regressions.cjs'
     'tests/frame-reader-regressions.cjs'
     'tests/runtime-launcher-regressions.cjs'
+    'tests/pokefinder-native.cjs'
+    'tests/pokefinder-iv.cjs'
+    'tests/rng-client-regressions.cjs'
 ) | ForEach-Object { Join-Path $projectRoot $_ }
 # Synthetic capture uses the same cross-process ownership mutex as real capture.
 # Separate test files must not compete for it.

@@ -1,2 +1,6 @@
 # Preserve the upstream bytes recorded in runtime/python/vendor-manifest.json.
 runtime/python/easycon/native/*.py -text
+# Preserve the canonical commit bytes hashed in the PokeFinder manifest.
+third_party/PokeFinder/** -text
+src/generated/bdsp-data.json text eol=lf
+runtime/generated/bdsp_data.hpp text eol=lf

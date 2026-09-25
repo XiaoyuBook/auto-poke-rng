@@ -1,0 +1,10715 @@
+{
+  "revision": "2d5c6afed9240f2bdb98634b5b8b1fab352aefa5",
+  "targets": [
+    {
+      "category": "starters",
+      "speciesKey": "Turtwig",
+      "speciesId": 387,
+      "species": "草苗龟",
+      "version": "BDSP",
+      "form": 0,
+      "level": 5,
+      "ability": 255,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 0,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "starters",
+      "speciesKey": "Chimchar",
+      "speciesId": 390,
+      "species": "小火焰猴",
+      "version": "BDSP",
+      "form": 0,
+      "level": 5,
+      "ability": 255,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 0,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "starters",
+      "speciesKey": "Piplup",
+      "speciesId": 393,
+      "species": "波加曼",
+      "version": "BDSP",
+      "form": 0,
+      "level": 5,
+      "ability": 255,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 0,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "gifts",
+      "speciesKey": "Eevee",
+      "speciesId": 133,
+      "species": "伊布",
+      "version": "BDSP",
+      "form": 0,
+      "level": 5,
+      "ability": 255,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 0,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "gifts",
+      "speciesKey": "Happiny egg",
+      "speciesId": 440,
+      "species": "小福蛋蛋",
+      "version": "BDSP",
+      "form": 0,
+      "level": 1,
+      "ability": 255,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 0,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "gifts",
+      "speciesKey": "Riolu egg",
+      "speciesId": 447,
+      "species": "利欧路蛋",
+      "version": "BDSP",
+      "form": 0,
+      "level": 1,
+      "ability": 255,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 0,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "fossils",
+      "speciesKey": "Omanyte",
+      "speciesId": 138,
+      "species": "菊石兽",
+      "version": "BDSP",
+      "form": 0,
+      "level": 1,
+      "ability": 255,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "fossils",
+      "speciesKey": "Kabuto",
+      "speciesId": 140,
+      "species": "化石盔",
+      "version": "BDSP",
+      "form": 0,
+      "level": 1,
+      "ability": 255,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "fossils",
+      "speciesKey": "Aerodactyl",
+      "speciesId": 142,
+      "species": "化石翼龙",
+      "version": "BDSP",
+      "form": 0,
+      "level": 1,
+      "ability": 255,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "fossils",
+      "speciesKey": "Lileep",
+      "speciesId": 345,
+      "species": "触手百合",
+      "version": "BDSP",
+      "form": 0,
+      "level": 1,
+      "ability": 255,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "fossils",
+      "speciesKey": "Anorith",
+      "speciesId": 347,
+      "species": "太古羽虫",
+      "version": "BDSP",
+      "form": 0,
+      "level": 1,
+      "ability": 255,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "fossils",
+      "speciesKey": "Cranidos",
+      "speciesId": 408,
+      "species": "头盖龙",
+      "version": "BDSP",
+      "form": 0,
+      "level": 1,
+      "ability": 255,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "fossils",
+      "speciesKey": "Shieldon",
+      "speciesId": 410,
+      "species": "盾甲龙",
+      "version": "BDSP",
+      "form": 0,
+      "level": 1,
+      "ability": 255,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "stationary",
+      "speciesKey": "Drifloon",
+      "speciesId": 425,
+      "species": "飘飘球",
+      "version": "BDSP",
+      "form": 0,
+      "level": 22,
+      "ability": 255,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "stationary",
+      "speciesKey": "Spiritomb",
+      "speciesId": 442,
+      "species": "花岩怪",
+      "version": "BDSP",
+      "form": 0,
+      "level": 25,
+      "ability": 255,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 0,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "stationary",
+      "speciesKey": "Rotom",
+      "speciesId": 479,
+      "species": "洛托姆",
+      "version": "BDSP",
+      "form": 0,
+      "level": 15,
+      "ability": 255,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 0,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "roamers",
+      "speciesKey": "Mespirit",
+      "speciesId": 481,
+      "species": "艾姆利多",
+      "version": "BDSP",
+      "form": 0,
+      "level": 50,
+      "ability": 255,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": false,
+      "roamer": true
+    },
+    {
+      "category": "roamers",
+      "speciesKey": "Cresselia",
+      "speciesId": 488,
+      "species": "克雷色利亚",
+      "version": "BDSP",
+      "form": 0,
+      "level": 50,
+      "ability": 255,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": false,
+      "roamer": true
+    },
+    {
+      "category": "legends",
+      "speciesKey": "Uxie",
+      "speciesId": 480,
+      "species": "由克希",
+      "version": "BDSP",
+      "form": 0,
+      "level": 50,
+      "ability": 255,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "legends",
+      "speciesKey": "Azelf",
+      "speciesId": 482,
+      "species": "亚克诺姆",
+      "version": "BDSP",
+      "form": 0,
+      "level": 50,
+      "ability": 255,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "legends",
+      "speciesKey": "Dialga",
+      "speciesId": 483,
+      "species": "帝牙卢卡",
+      "version": "BD",
+      "form": 0,
+      "level": 47,
+      "ability": 255,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "legends",
+      "speciesKey": "Palkia",
+      "speciesId": 484,
+      "species": "帕路奇亚",
+      "version": "SP",
+      "form": 0,
+      "level": 47,
+      "ability": 255,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "legends",
+      "speciesKey": "Heatran",
+      "speciesId": 485,
+      "species": "席多蓝恩",
+      "version": "BDSP",
+      "form": 0,
+      "level": 70,
+      "ability": 255,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "legends",
+      "speciesKey": "Regigigas",
+      "speciesId": 486,
+      "species": "雷吉奇卡斯",
+      "version": "BDSP",
+      "form": 0,
+      "level": 70,
+      "ability": 255,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "legends",
+      "speciesKey": "Giratina",
+      "speciesId": 487,
+      "species": "骑拉帝纳",
+      "version": "BDSP",
+      "form": 0,
+      "level": 70,
+      "ability": 255,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "ramanasParkPureSpace",
+      "speciesKey": "Articuno",
+      "speciesId": 144,
+      "species": "急冻鸟",
+      "version": "SP",
+      "form": 0,
+      "level": 70,
+      "ability": 2,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "ramanasParkPureSpace",
+      "speciesKey": "Zapdos",
+      "speciesId": 145,
+      "species": "闪电鸟",
+      "version": "SP",
+      "form": 0,
+      "level": 70,
+      "ability": 2,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "ramanasParkPureSpace",
+      "speciesKey": "Moltres",
+      "speciesId": 146,
+      "species": "火焰鸟",
+      "version": "SP",
+      "form": 0,
+      "level": 70,
+      "ability": 2,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "ramanasParkPureSpace",
+      "speciesKey": "Raikou",
+      "speciesId": 243,
+      "species": "雷公",
+      "version": "BD",
+      "form": 0,
+      "level": 70,
+      "ability": 2,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "ramanasParkPureSpace",
+      "speciesKey": "Entei",
+      "speciesId": 244,
+      "species": "炎帝",
+      "version": "BD",
+      "form": 0,
+      "level": 70,
+      "ability": 2,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "ramanasParkPureSpace",
+      "speciesKey": "Suicune",
+      "speciesId": 245,
+      "species": "水君",
+      "version": "BD",
+      "form": 0,
+      "level": 70,
+      "ability": 2,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "ramanasParkPureSpace",
+      "speciesKey": "Regirock",
+      "speciesId": 377,
+      "species": "雷吉洛克",
+      "version": "BDSP",
+      "form": 0,
+      "level": 70,
+      "ability": 2,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "ramanasParkPureSpace",
+      "speciesKey": "Regice",
+      "speciesId": 378,
+      "species": "雷吉艾斯",
+      "version": "BDSP",
+      "form": 0,
+      "level": 70,
+      "ability": 2,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "ramanasParkPureSpace",
+      "speciesKey": "Registeel",
+      "speciesId": 379,
+      "species": "雷吉斯奇鲁",
+      "version": "BDSP",
+      "form": 0,
+      "level": 70,
+      "ability": 2,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "ramanasParkPureSpace",
+      "speciesKey": "Latias",
+      "speciesId": 380,
+      "species": "拉帝亚斯",
+      "version": "BDSP",
+      "form": 0,
+      "level": 70,
+      "ability": 255,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "ramanasParkPureSpace",
+      "speciesKey": "Latios",
+      "speciesId": 381,
+      "species": "拉帝欧斯",
+      "version": "BDSP",
+      "form": 0,
+      "level": 70,
+      "ability": 255,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "ramanasParkStrangeSpace",
+      "speciesKey": "Mewtwo",
+      "speciesId": 150,
+      "species": "超梦",
+      "version": "BDSP",
+      "form": 0,
+      "level": 70,
+      "ability": 2,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "ramanasParkStrangeSpace",
+      "speciesKey": "Lugia",
+      "speciesId": 249,
+      "species": "洛奇亚",
+      "version": "SP",
+      "form": 0,
+      "level": 70,
+      "ability": 2,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "ramanasParkStrangeSpace",
+      "speciesKey": "Ho-Oh",
+      "speciesId": 250,
+      "species": "凤王",
+      "version": "BD",
+      "form": 0,
+      "level": 70,
+      "ability": 2,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "ramanasParkStrangeSpace",
+      "speciesKey": "Kyogre",
+      "speciesId": 382,
+      "species": "盖欧卡",
+      "version": "BDSP",
+      "form": 0,
+      "level": 70,
+      "ability": 255,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "ramanasParkStrangeSpace",
+      "speciesKey": "Groudon",
+      "speciesId": 383,
+      "species": "固拉多",
+      "version": "BDSP",
+      "form": 0,
+      "level": 70,
+      "ability": 255,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "ramanasParkStrangeSpace",
+      "speciesKey": "Rayquaza",
+      "speciesId": 384,
+      "species": "烈空坐",
+      "version": "BDSP",
+      "form": 0,
+      "level": 70,
+      "ability": 255,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": false,
+      "roamer": false
+    },
+    {
+      "category": "mythics",
+      "speciesKey": "Mew",
+      "speciesId": 151,
+      "species": "梦幻",
+      "version": "BDSP",
+      "form": 0,
+      "level": 1,
+      "ability": 1,
+      "shiny": 1,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": true,
+      "roamer": false
+    },
+    {
+      "category": "mythics",
+      "speciesKey": "Jirachi",
+      "speciesId": 385,
+      "species": "基拉祈",
+      "version": "BDSP",
+      "form": 0,
+      "level": 5,
+      "ability": 1,
+      "shiny": 1,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": true,
+      "roamer": false
+    },
+    {
+      "category": "mythics",
+      "speciesKey": "Darkrai",
+      "speciesId": 491,
+      "species": "达克莱伊",
+      "version": "BDSP",
+      "form": 0,
+      "level": 50,
+      "ability": 255,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": true,
+      "roamer": false
+    },
+    {
+      "category": "mythics",
+      "speciesKey": "Shaymin",
+      "speciesId": 492,
+      "species": "谢米",
+      "version": "BDSP",
+      "form": 0,
+      "level": 30,
+      "ability": 255,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": true,
+      "roamer": false
+    },
+    {
+      "category": "mythics",
+      "speciesKey": "Arceus",
+      "speciesId": 493,
+      "species": "阿尔宙斯",
+      "version": "BDSP",
+      "form": 0,
+      "level": 80,
+      "ability": 255,
+      "shiny": 0,
+      "gender": 255,
+      "ivCount": 3,
+      "fateful": true,
+      "roamer": false
+    }
+  ],
+  "calculatorSpecies": [
+    {
+      "id": 1,
+      "name": "妙蛙种子",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            45,
+            49,
+            49,
+            65,
+            65,
+            45
+          ]
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "妙蛙草",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            62,
+            63,
+            80,
+            80,
+            60
+          ]
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "妙蛙花",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            80,
+            82,
+            83,
+            100,
+            100,
+            80
+          ]
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "小火龙",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            39,
+            52,
+            43,
+            60,
+            50,
+            65
+          ]
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "name": "火恐龙",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            58,
+            64,
+            58,
+            80,
+            65,
+            80
+          ]
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "name": "喷火龙",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            78,
+            84,
+            78,
+            109,
+            85,
+            100
+          ]
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "name": "杰尼龟",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            44,
+            48,
+            65,
+            50,
+            64,
+            43
+          ]
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "name": "卡咪龟",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            59,
+            63,
+            80,
+            65,
+            80,
+            58
+          ]
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "name": "水箭龟",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            79,
+            83,
+            100,
+            85,
+            105,
+            78
+          ]
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "name": "绿毛虫",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            45,
+            30,
+            35,
+            20,
+            20,
+            45
+          ]
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "name": "铁甲蛹",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            50,
+            20,
+            55,
+            25,
+            25,
+            30
+          ]
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "name": "巴大蝶",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            45,
+            50,
+            90,
+            80,
+            70
+          ]
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "name": "独角虫",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            40,
+            35,
+            30,
+            20,
+            20,
+            50
+          ]
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "name": "铁壳蛹",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            45,
+            25,
+            50,
+            25,
+            25,
+            35
+          ]
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "name": "大针蜂",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            65,
+            90,
+            40,
+            45,
+            80,
+            75
+          ]
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "name": "波波",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            40,
+            45,
+            40,
+            35,
+            35,
+            56
+          ]
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "name": "比比鸟",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            63,
+            60,
+            55,
+            50,
+            50,
+            71
+          ]
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "name": "大比鸟",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            83,
+            80,
+            75,
+            70,
+            70,
+            101
+          ]
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "name": "小拉达",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            30,
+            56,
+            35,
+            25,
+            35,
+            72
+          ]
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "name": "拉达",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            55,
+            81,
+            60,
+            50,
+            70,
+            97
+          ]
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "name": "烈雀",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            40,
+            60,
+            30,
+            31,
+            31,
+            70
+          ]
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "name": "大嘴雀",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            65,
+            90,
+            65,
+            61,
+            61,
+            100
+          ]
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "name": "阿柏蛇",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            35,
+            60,
+            44,
+            40,
+            54,
+            55
+          ]
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "name": "阿柏怪",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            95,
+            69,
+            65,
+            79,
+            80
+          ]
+        }
+      ]
+    },
+    {
+      "id": 25,
+      "name": "皮卡丘",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            35,
+            55,
+            40,
+            50,
+            50,
+            90
+          ]
+        }
+      ]
+    },
+    {
+      "id": 26,
+      "name": "雷丘",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            90,
+            55,
+            90,
+            80,
+            110
+          ]
+        }
+      ]
+    },
+    {
+      "id": 27,
+      "name": "穿山鼠",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            50,
+            75,
+            85,
+            20,
+            30,
+            40
+          ]
+        }
+      ]
+    },
+    {
+      "id": 28,
+      "name": "穿山王",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            75,
+            100,
+            110,
+            45,
+            55,
+            65
+          ]
+        }
+      ]
+    },
+    {
+      "id": 29,
+      "name": "尼多兰",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            55,
+            47,
+            52,
+            40,
+            40,
+            41
+          ]
+        }
+      ]
+    },
+    {
+      "id": 30,
+      "name": "尼多娜",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            70,
+            62,
+            67,
+            55,
+            55,
+            56
+          ]
+        }
+      ]
+    },
+    {
+      "id": 31,
+      "name": "尼多后",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            90,
+            92,
+            87,
+            75,
+            85,
+            76
+          ]
+        }
+      ]
+    },
+    {
+      "id": 32,
+      "name": "尼多朗",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            46,
+            57,
+            40,
+            40,
+            40,
+            50
+          ]
+        }
+      ]
+    },
+    {
+      "id": 33,
+      "name": "尼多力诺",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            61,
+            72,
+            57,
+            55,
+            55,
+            65
+          ]
+        }
+      ]
+    },
+    {
+      "id": 34,
+      "name": "尼多王",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            81,
+            102,
+            77,
+            85,
+            75,
+            85
+          ]
+        }
+      ]
+    },
+    {
+      "id": 35,
+      "name": "皮皮",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            70,
+            45,
+            48,
+            60,
+            65,
+            35
+          ]
+        }
+      ]
+    },
+    {
+      "id": 36,
+      "name": "皮可西",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            95,
+            70,
+            73,
+            95,
+            90,
+            60
+          ]
+        }
+      ]
+    },
+    {
+      "id": 37,
+      "name": "六尾",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            38,
+            41,
+            40,
+            50,
+            65,
+            65
+          ]
+        }
+      ]
+    },
+    {
+      "id": 38,
+      "name": "九尾",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            73,
+            76,
+            75,
+            81,
+            100,
+            100
+          ]
+        }
+      ]
+    },
+    {
+      "id": 39,
+      "name": "胖丁",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            115,
+            45,
+            20,
+            45,
+            25,
+            20
+          ]
+        }
+      ]
+    },
+    {
+      "id": 40,
+      "name": "胖可丁",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            140,
+            70,
+            45,
+            85,
+            50,
+            45
+          ]
+        }
+      ]
+    },
+    {
+      "id": 41,
+      "name": "超音蝠",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            40,
+            45,
+            35,
+            30,
+            40,
+            55
+          ]
+        }
+      ]
+    },
+    {
+      "id": 42,
+      "name": "大嘴蝠",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            75,
+            80,
+            70,
+            65,
+            75,
+            90
+          ]
+        }
+      ]
+    },
+    {
+      "id": 43,
+      "name": "走路草",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            45,
+            50,
+            55,
+            75,
+            65,
+            30
+          ]
+        }
+      ]
+    },
+    {
+      "id": 44,
+      "name": "臭臭花",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            65,
+            70,
+            85,
+            75,
+            40
+          ]
+        }
+      ]
+    },
+    {
+      "id": 45,
+      "name": "霸王花",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            75,
+            80,
+            85,
+            110,
+            90,
+            50
+          ]
+        }
+      ]
+    },
+    {
+      "id": 46,
+      "name": "派拉斯",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            35,
+            70,
+            55,
+            45,
+            55,
+            25
+          ]
+        }
+      ]
+    },
+    {
+      "id": 47,
+      "name": "派拉斯特",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            95,
+            80,
+            60,
+            80,
+            30
+          ]
+        }
+      ]
+    },
+    {
+      "id": 48,
+      "name": "毛球",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            55,
+            50,
+            40,
+            55,
+            45
+          ]
+        }
+      ]
+    },
+    {
+      "id": 49,
+      "name": "摩鲁蛾",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            70,
+            65,
+            60,
+            90,
+            75,
+            90
+          ]
+        }
+      ]
+    },
+    {
+      "id": 50,
+      "name": "地鼠",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            10,
+            55,
+            25,
+            35,
+            45,
+            95
+          ]
+        }
+      ]
+    },
+    {
+      "id": 51,
+      "name": "三地鼠",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            35,
+            100,
+            50,
+            50,
+            70,
+            120
+          ]
+        }
+      ]
+    },
+    {
+      "id": 52,
+      "name": "喵喵",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            40,
+            45,
+            35,
+            40,
+            40,
+            90
+          ]
+        }
+      ]
+    },
+    {
+      "id": 53,
+      "name": "猫老大",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            65,
+            70,
+            60,
+            65,
+            65,
+            115
+          ]
+        }
+      ]
+    },
+    {
+      "id": 54,
+      "name": "可达鸭",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            50,
+            52,
+            48,
+            65,
+            50,
+            55
+          ]
+        }
+      ]
+    },
+    {
+      "id": 55,
+      "name": "哥达鸭",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            80,
+            82,
+            78,
+            95,
+            80,
+            85
+          ]
+        }
+      ]
+    },
+    {
+      "id": 56,
+      "name": "猴怪",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            40,
+            80,
+            35,
+            35,
+            45,
+            70
+          ]
+        }
+      ]
+    },
+    {
+      "id": 57,
+      "name": "火暴猴",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            65,
+            105,
+            60,
+            60,
+            70,
+            95
+          ]
+        }
+      ]
+    },
+    {
+      "id": 58,
+      "name": "卡蒂狗",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            55,
+            70,
+            45,
+            70,
+            50,
+            60
+          ]
+        }
+      ]
+    },
+    {
+      "id": 59,
+      "name": "风速狗",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            90,
+            110,
+            80,
+            100,
+            80,
+            95
+          ]
+        }
+      ]
+    },
+    {
+      "id": 60,
+      "name": "蚊香蝌蚪",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            40,
+            50,
+            40,
+            40,
+            40,
+            90
+          ]
+        }
+      ]
+    },
+    {
+      "id": 61,
+      "name": "蚊香君",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            65,
+            65,
+            65,
+            50,
+            50,
+            90
+          ]
+        }
+      ]
+    },
+    {
+      "id": 62,
+      "name": "蚊香泳士",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            90,
+            95,
+            95,
+            70,
+            90,
+            70
+          ]
+        }
+      ]
+    },
+    {
+      "id": 63,
+      "name": "凯西",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            25,
+            20,
+            15,
+            105,
+            55,
+            90
+          ]
+        }
+      ]
+    },
+    {
+      "id": 64,
+      "name": "勇基拉",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            40,
+            35,
+            30,
+            120,
+            70,
+            105
+          ]
+        }
+      ]
+    },
+    {
+      "id": 65,
+      "name": "胡地",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            55,
+            50,
+            45,
+            135,
+            95,
+            120
+          ]
+        }
+      ]
+    },
+    {
+      "id": 66,
+      "name": "腕力",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            70,
+            80,
+            50,
+            35,
+            35,
+            35
+          ]
+        }
+      ]
+    },
+    {
+      "id": 67,
+      "name": "豪力",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            80,
+            100,
+            70,
+            50,
+            60,
+            45
+          ]
+        }
+      ]
+    },
+    {
+      "id": 68,
+      "name": "怪力",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            90,
+            130,
+            80,
+            65,
+            85,
+            55
+          ]
+        }
+      ]
+    },
+    {
+      "id": 69,
+      "name": "喇叭芽",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            50,
+            75,
+            35,
+            70,
+            30,
+            40
+          ]
+        }
+      ]
+    },
+    {
+      "id": 70,
+      "name": "口呆花",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            65,
+            90,
+            50,
+            85,
+            45,
+            55
+          ]
+        }
+      ]
+    },
+    {
+      "id": 71,
+      "name": "大食花",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            80,
+            105,
+            65,
+            100,
+            70,
+            70
+          ]
+        }
+      ]
+    },
+    {
+      "id": 72,
+      "name": "玛瑙水母",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            40,
+            40,
+            35,
+            50,
+            100,
+            70
+          ]
+        }
+      ]
+    },
+    {
+      "id": 73,
+      "name": "毒刺水母",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            80,
+            70,
+            65,
+            80,
+            120,
+            100
+          ]
+        }
+      ]
+    },
+    {
+      "id": 74,
+      "name": "小拳石",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            40,
+            80,
+            100,
+            30,
+            30,
+            20
+          ]
+        }
+      ]
+    },
+    {
+      "id": 75,
+      "name": "隆隆石",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            55,
+            95,
+            115,
+            45,
+            45,
+            35
+          ]
+        }
+      ]
+    },
+    {
+      "id": 76,
+      "name": "隆隆岩",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            80,
+            120,
+            130,
+            55,
+            65,
+            45
+          ]
+        }
+      ]
+    },
+    {
+      "id": 77,
+      "name": "小火马",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            50,
+            85,
+            55,
+            65,
+            65,
+            90
+          ]
+        }
+      ]
+    },
+    {
+      "id": 78,
+      "name": "烈焰马",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            65,
+            100,
+            70,
+            80,
+            80,
+            105
+          ]
+        }
+      ]
+    },
+    {
+      "id": 79,
+      "name": "呆呆兽",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            90,
+            65,
+            65,
+            40,
+            40,
+            15
+          ]
+        }
+      ]
+    },
+    {
+      "id": 80,
+      "name": "呆壳兽",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            95,
+            75,
+            110,
+            100,
+            80,
+            30
+          ]
+        }
+      ]
+    },
+    {
+      "id": 81,
+      "name": "小磁怪",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            25,
+            35,
+            70,
+            95,
+            55,
+            45
+          ]
+        }
+      ]
+    },
+    {
+      "id": 82,
+      "name": "三合一磁怪",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            50,
+            60,
+            95,
+            120,
+            70,
+            70
+          ]
+        }
+      ]
+    },
+    {
+      "id": 83,
+      "name": "大葱鸭",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            52,
+            90,
+            55,
+            58,
+            62,
+            60
+          ]
+        }
+      ]
+    },
+    {
+      "id": 84,
+      "name": "嘟嘟",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            35,
+            85,
+            45,
+            35,
+            35,
+            75
+          ]
+        }
+      ]
+    },
+    {
+      "id": 85,
+      "name": "嘟嘟利",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            110,
+            70,
+            60,
+            60,
+            110
+          ]
+        }
+      ]
+    },
+    {
+      "id": 86,
+      "name": "小海狮",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            65,
+            45,
+            55,
+            45,
+            70,
+            45
+          ]
+        }
+      ]
+    },
+    {
+      "id": 87,
+      "name": "白海狮",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            90,
+            70,
+            80,
+            70,
+            95,
+            70
+          ]
+        }
+      ]
+    },
+    {
+      "id": 88,
+      "name": "臭泥",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            80,
+            80,
+            50,
+            40,
+            50,
+            25
+          ]
+        }
+      ]
+    },
+    {
+      "id": 89,
+      "name": "臭臭泥",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            105,
+            105,
+            75,
+            65,
+            100,
+            50
+          ]
+        }
+      ]
+    },
+    {
+      "id": 90,
+      "name": "大舌贝",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            30,
+            65,
+            100,
+            45,
+            25,
+            40
+          ]
+        }
+      ]
+    },
+    {
+      "id": 91,
+      "name": "刺甲贝",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            50,
+            95,
+            180,
+            85,
+            45,
+            70
+          ]
+        }
+      ]
+    },
+    {
+      "id": 92,
+      "name": "鬼斯",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            30,
+            35,
+            30,
+            100,
+            35,
+            80
+          ]
+        }
+      ]
+    },
+    {
+      "id": 93,
+      "name": "鬼斯通",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            45,
+            50,
+            45,
+            115,
+            55,
+            95
+          ]
+        }
+      ]
+    },
+    {
+      "id": 94,
+      "name": "耿鬼",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            65,
+            60,
+            130,
+            75,
+            110
+          ]
+        }
+      ]
+    },
+    {
+      "id": 95,
+      "name": "大岩蛇",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            35,
+            45,
+            160,
+            30,
+            45,
+            70
+          ]
+        }
+      ]
+    },
+    {
+      "id": 96,
+      "name": "催眠貘",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            48,
+            45,
+            43,
+            90,
+            42
+          ]
+        }
+      ]
+    },
+    {
+      "id": 97,
+      "name": "引梦貘人",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            85,
+            73,
+            70,
+            73,
+            115,
+            67
+          ]
+        }
+      ]
+    },
+    {
+      "id": 98,
+      "name": "大钳蟹",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            30,
+            105,
+            90,
+            25,
+            25,
+            50
+          ]
+        }
+      ]
+    },
+    {
+      "id": 99,
+      "name": "巨钳蟹",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            55,
+            130,
+            115,
+            50,
+            50,
+            75
+          ]
+        }
+      ]
+    },
+    {
+      "id": 100,
+      "name": "霹雳电球",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            40,
+            30,
+            50,
+            55,
+            55,
+            100
+          ]
+        }
+      ]
+    },
+    {
+      "id": 101,
+      "name": "顽皮雷弹",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            50,
+            70,
+            80,
+            80,
+            150
+          ]
+        }
+      ]
+    },
+    {
+      "id": 102,
+      "name": "蛋蛋",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            40,
+            80,
+            60,
+            45,
+            40
+          ]
+        }
+      ]
+    },
+    {
+      "id": 103,
+      "name": "椰蛋树",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            95,
+            95,
+            85,
+            125,
+            75,
+            55
+          ]
+        }
+      ]
+    },
+    {
+      "id": 104,
+      "name": "卡拉卡拉",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            50,
+            50,
+            95,
+            40,
+            50,
+            35
+          ]
+        }
+      ]
+    },
+    {
+      "id": 105,
+      "name": "嘎啦嘎啦",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            80,
+            110,
+            50,
+            80,
+            45
+          ]
+        }
+      ]
+    },
+    {
+      "id": 106,
+      "name": "飞腿郎",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            50,
+            120,
+            53,
+            35,
+            110,
+            87
+          ]
+        }
+      ]
+    },
+    {
+      "id": 107,
+      "name": "快拳郎",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            50,
+            105,
+            79,
+            35,
+            110,
+            76
+          ]
+        }
+      ]
+    },
+    {
+      "id": 108,
+      "name": "大舌头",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            90,
+            55,
+            75,
+            60,
+            75,
+            30
+          ]
+        }
+      ]
+    },
+    {
+      "id": 109,
+      "name": "瓦斯弹",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            40,
+            65,
+            95,
+            60,
+            45,
+            35
+          ]
+        }
+      ]
+    },
+    {
+      "id": 110,
+      "name": "双弹瓦斯",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            65,
+            90,
+            120,
+            85,
+            70,
+            60
+          ]
+        }
+      ]
+    },
+    {
+      "id": 111,
+      "name": "独角犀牛",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            80,
+            85,
+            95,
+            30,
+            30,
+            25
+          ]
+        }
+      ]
+    },
+    {
+      "id": 112,
+      "name": "钻角犀兽",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            105,
+            130,
+            120,
+            45,
+            45,
+            40
+          ]
+        }
+      ]
+    },
+    {
+      "id": 113,
+      "name": "吉利蛋",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            250,
+            5,
+            5,
+            35,
+            105,
+            50
+          ]
+        }
+      ]
+    },
+    {
+      "id": 114,
+      "name": "蔓藤怪",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            65,
+            55,
+            115,
+            100,
+            40,
+            60
+          ]
+        }
+      ]
+    },
+    {
+      "id": 115,
+      "name": "袋兽",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            105,
+            95,
+            80,
+            40,
+            80,
+            90
+          ]
+        }
+      ]
+    },
+    {
+      "id": 116,
+      "name": "墨海马",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            30,
+            40,
+            70,
+            70,
+            25,
+            60
+          ]
+        }
+      ]
+    },
+    {
+      "id": 117,
+      "name": "海刺龙",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            55,
+            65,
+            95,
+            95,
+            45,
+            85
+          ]
+        }
+      ]
+    },
+    {
+      "id": 118,
+      "name": "角金鱼",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            45,
+            67,
+            60,
+            35,
+            50,
+            63
+          ]
+        }
+      ]
+    },
+    {
+      "id": 119,
+      "name": "金鱼王",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            80,
+            92,
+            65,
+            65,
+            80,
+            68
+          ]
+        }
+      ]
+    },
+    {
+      "id": 120,
+      "name": "海星星",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            30,
+            45,
+            55,
+            70,
+            55,
+            85
+          ]
+        }
+      ]
+    },
+    {
+      "id": 121,
+      "name": "宝石海星",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            75,
+            85,
+            100,
+            85,
+            115
+          ]
+        }
+      ]
+    },
+    {
+      "id": 122,
+      "name": "魔墙人偶",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            40,
+            45,
+            65,
+            100,
+            120,
+            90
+          ]
+        }
+      ]
+    },
+    {
+      "id": 123,
+      "name": "飞天螳螂",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            70,
+            110,
+            80,
+            55,
+            80,
+            105
+          ]
+        }
+      ]
+    },
+    {
+      "id": 124,
+      "name": "迷唇姐",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            65,
+            50,
+            35,
+            115,
+            95,
+            95
+          ]
+        }
+      ]
+    },
+    {
+      "id": 125,
+      "name": "电击兽",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            65,
+            83,
+            57,
+            95,
+            85,
+            105
+          ]
+        }
+      ]
+    },
+    {
+      "id": 126,
+      "name": "鸭嘴火兽",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            65,
+            95,
+            57,
+            100,
+            85,
+            93
+          ]
+        }
+      ]
+    },
+    {
+      "id": 127,
+      "name": "凯罗斯",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            65,
+            125,
+            100,
+            55,
+            70,
+            85
+          ]
+        }
+      ]
+    },
+    {
+      "id": 128,
+      "name": "肯泰罗",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            75,
+            100,
+            95,
+            40,
+            70,
+            110
+          ]
+        }
+      ]
+    },
+    {
+      "id": 129,
+      "name": "鲤鱼王",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            20,
+            10,
+            55,
+            15,
+            20,
+            80
+          ]
+        }
+      ]
+    },
+    {
+      "id": 130,
+      "name": "暴鲤龙",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            95,
+            125,
+            79,
+            60,
+            100,
+            81
+          ]
+        }
+      ]
+    },
+    {
+      "id": 131,
+      "name": "拉普拉斯",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            130,
+            85,
+            80,
+            85,
+            95,
+            60
+          ]
+        }
+      ]
+    },
+    {
+      "id": 132,
+      "name": "百变怪",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            48,
+            48,
+            48,
+            48,
+            48,
+            48
+          ]
+        }
+      ]
+    },
+    {
+      "id": 133,
+      "name": "伊布",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            55,
+            55,
+            50,
+            45,
+            65,
+            55
+          ]
+        }
+      ]
+    },
+    {
+      "id": 134,
+      "name": "水伊布",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            130,
+            65,
+            60,
+            110,
+            95,
+            65
+          ]
+        }
+      ]
+    },
+    {
+      "id": 135,
+      "name": "雷伊布",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            65,
+            65,
+            60,
+            110,
+            95,
+            130
+          ]
+        }
+      ]
+    },
+    {
+      "id": 136,
+      "name": "火伊布",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            65,
+            130,
+            60,
+            95,
+            110,
+            65
+          ]
+        }
+      ]
+    },
+    {
+      "id": 137,
+      "name": "多边兽",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            65,
+            60,
+            70,
+            85,
+            75,
+            40
+          ]
+        }
+      ]
+    },
+    {
+      "id": 138,
+      "name": "菊石兽",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            35,
+            40,
+            100,
+            90,
+            55,
+            35
+          ]
+        }
+      ]
+    },
+    {
+      "id": 139,
+      "name": "多刺菊石兽",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            70,
+            60,
+            125,
+            115,
+            70,
+            55
+          ]
+        }
+      ]
+    },
+    {
+      "id": 140,
+      "name": "化石盔",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            30,
+            80,
+            90,
+            55,
+            45,
+            55
+          ]
+        }
+      ]
+    },
+    {
+      "id": 141,
+      "name": "镰刀盔",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            115,
+            105,
+            65,
+            70,
+            80
+          ]
+        }
+      ]
+    },
+    {
+      "id": 142,
+      "name": "化石翼龙",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            80,
+            105,
+            65,
+            60,
+            75,
+            130
+          ]
+        }
+      ]
+    },
+    {
+      "id": 143,
+      "name": "卡比兽",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            160,
+            110,
+            65,
+            65,
+            110,
+            30
+          ]
+        }
+      ]
+    },
+    {
+      "id": 144,
+      "name": "急冻鸟",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            90,
+            85,
+            100,
+            95,
+            125,
+            85
+          ]
+        }
+      ]
+    },
+    {
+      "id": 145,
+      "name": "闪电鸟",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            90,
+            90,
+            85,
+            125,
+            90,
+            100
+          ]
+        }
+      ]
+    },
+    {
+      "id": 146,
+      "name": "火焰鸟",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            90,
+            100,
+            90,
+            125,
+            85,
+            90
+          ]
+        }
+      ]
+    },
+    {
+      "id": 147,
+      "name": "迷你龙",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            41,
+            64,
+            45,
+            50,
+            50,
+            50
+          ]
+        }
+      ]
+    },
+    {
+      "id": 148,
+      "name": "哈克龙",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            61,
+            84,
+            65,
+            70,
+            70,
+            70
+          ]
+        }
+      ]
+    },
+    {
+      "id": 149,
+      "name": "快龙",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            91,
+            134,
+            95,
+            100,
+            100,
+            80
+          ]
+        }
+      ]
+    },
+    {
+      "id": 150,
+      "name": "超梦",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            106,
+            110,
+            90,
+            154,
+            90,
+            130
+          ]
+        }
+      ]
+    },
+    {
+      "id": 151,
+      "name": "梦幻",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            100,
+            100,
+            100,
+            100,
+            100,
+            100
+          ]
+        }
+      ]
+    },
+    {
+      "id": 152,
+      "name": "菊草叶",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            45,
+            49,
+            65,
+            49,
+            65,
+            45
+          ]
+        }
+      ]
+    },
+    {
+      "id": 153,
+      "name": "月桂叶",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            62,
+            80,
+            63,
+            80,
+            60
+          ]
+        }
+      ]
+    },
+    {
+      "id": 154,
+      "name": "大竺葵",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            80,
+            82,
+            100,
+            83,
+            100,
+            80
+          ]
+        }
+      ]
+    },
+    {
+      "id": 155,
+      "name": "火球鼠",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            39,
+            52,
+            43,
+            60,
+            50,
+            65
+          ]
+        }
+      ]
+    },
+    {
+      "id": 156,
+      "name": "火岩鼠",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            58,
+            64,
+            58,
+            80,
+            65,
+            80
+          ]
+        }
+      ]
+    },
+    {
+      "id": 157,
+      "name": "火暴兽",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            78,
+            84,
+            78,
+            109,
+            85,
+            100
+          ]
+        }
+      ]
+    },
+    {
+      "id": 158,
+      "name": "小锯鳄",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            50,
+            65,
+            64,
+            44,
+            48,
+            43
+          ]
+        }
+      ]
+    },
+    {
+      "id": 159,
+      "name": "蓝鳄",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            65,
+            80,
+            80,
+            59,
+            63,
+            58
+          ]
+        }
+      ]
+    },
+    {
+      "id": 160,
+      "name": "大力鳄",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            85,
+            105,
+            100,
+            79,
+            83,
+            78
+          ]
+        }
+      ]
+    },
+    {
+      "id": 161,
+      "name": "尾立",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            35,
+            46,
+            34,
+            35,
+            45,
+            20
+          ]
+        }
+      ]
+    },
+    {
+      "id": 162,
+      "name": "大尾立",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            85,
+            76,
+            64,
+            45,
+            55,
+            90
+          ]
+        }
+      ]
+    },
+    {
+      "id": 163,
+      "name": "咕咕",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            30,
+            30,
+            36,
+            56,
+            50
+          ]
+        }
+      ]
+    },
+    {
+      "id": 164,
+      "name": "猫头夜鹰",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            100,
+            50,
+            50,
+            86,
+            96,
+            70
+          ]
+        }
+      ]
+    },
+    {
+      "id": 165,
+      "name": "芭瓢虫",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            40,
+            20,
+            30,
+            40,
+            80,
+            55
+          ]
+        }
+      ]
+    },
+    {
+      "id": 166,
+      "name": "安瓢虫",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            55,
+            35,
+            50,
+            55,
+            110,
+            85
+          ]
+        }
+      ]
+    },
+    {
+      "id": 167,
+      "name": "圆丝蛛",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            40,
+            60,
+            40,
+            40,
+            40,
+            30
+          ]
+        }
+      ]
+    },
+    {
+      "id": 168,
+      "name": "阿利多斯",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            70,
+            90,
+            70,
+            60,
+            70,
+            40
+          ]
+        }
+      ]
+    },
+    {
+      "id": 169,
+      "name": "叉字蝠",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            85,
+            90,
+            80,
+            70,
+            80,
+            130
+          ]
+        }
+      ]
+    },
+    {
+      "id": 170,
+      "name": "灯笼鱼",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            75,
+            38,
+            38,
+            56,
+            56,
+            67
+          ]
+        }
+      ]
+    },
+    {
+      "id": 171,
+      "name": "电灯怪",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            125,
+            58,
+            58,
+            76,
+            76,
+            67
+          ]
+        }
+      ]
+    },
+    {
+      "id": 172,
+      "name": "皮丘",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            20,
+            40,
+            15,
+            35,
+            35,
+            60
+          ]
+        }
+      ]
+    },
+    {
+      "id": 173,
+      "name": "皮宝宝",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            50,
+            25,
+            28,
+            45,
+            55,
+            15
+          ]
+        }
+      ]
+    },
+    {
+      "id": 174,
+      "name": "宝宝丁",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            90,
+            30,
+            15,
+            40,
+            20,
+            15
+          ]
+        }
+      ]
+    },
+    {
+      "id": 175,
+      "name": "波克比",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            35,
+            20,
+            65,
+            40,
+            65,
+            20
+          ]
+        }
+      ]
+    },
+    {
+      "id": 176,
+      "name": "波克基古",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            55,
+            40,
+            85,
+            80,
+            105,
+            40
+          ]
+        }
+      ]
+    },
+    {
+      "id": 177,
+      "name": "天然雀",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            40,
+            50,
+            45,
+            70,
+            45,
+            70
+          ]
+        }
+      ]
+    },
+    {
+      "id": 178,
+      "name": "天然鸟",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            65,
+            75,
+            70,
+            95,
+            70,
+            95
+          ]
+        }
+      ]
+    },
+    {
+      "id": 179,
+      "name": "咩利羊",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            55,
+            40,
+            40,
+            65,
+            45,
+            35
+          ]
+        }
+      ]
+    },
+    {
+      "id": 180,
+      "name": "茸茸羊",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            70,
+            55,
+            55,
+            80,
+            60,
+            45
+          ]
+        }
+      ]
+    },
+    {
+      "id": 181,
+      "name": "电龙",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            90,
+            75,
+            85,
+            115,
+            90,
+            55
+          ]
+        }
+      ]
+    },
+    {
+      "id": 182,
+      "name": "美丽花",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            75,
+            80,
+            95,
+            90,
+            100,
+            50
+          ]
+        }
+      ]
+    },
+    {
+      "id": 183,
+      "name": "玛力露",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            70,
+            20,
+            50,
+            20,
+            50,
+            40
+          ]
+        }
+      ]
+    },
+    {
+      "id": 184,
+      "name": "玛力露丽",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            100,
+            50,
+            80,
+            60,
+            80,
+            50
+          ]
+        }
+      ]
+    },
+    {
+      "id": 185,
+      "name": "树才怪",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            70,
+            100,
+            115,
+            30,
+            65,
+            30
+          ]
+        }
+      ]
+    },
+    {
+      "id": 186,
+      "name": "蚊香蛙皇",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            90,
+            75,
+            75,
+            90,
+            100,
+            70
+          ]
+        }
+      ]
+    },
+    {
+      "id": 187,
+      "name": "毽子草",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            35,
+            35,
+            40,
+            35,
+            55,
+            50
+          ]
+        }
+      ]
+    },
+    {
+      "id": 188,
+      "name": "毽子花",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            55,
+            45,
+            50,
+            45,
+            65,
+            80
+          ]
+        }
+      ]
+    },
+    {
+      "id": 189,
+      "name": "毽子棉",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            75,
+            55,
+            70,
+            55,
+            95,
+            110
+          ]
+        }
+      ]
+    },
+    {
+      "id": 190,
+      "name": "长尾怪手",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            55,
+            70,
+            55,
+            40,
+            55,
+            85
+          ]
+        }
+      ]
+    },
+    {
+      "id": 191,
+      "name": "向日种子",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            30,
+            30,
+            30,
+            30,
+            30,
+            30
+          ]
+        }
+      ]
+    },
+    {
+      "id": 192,
+      "name": "向日花怪",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            75,
+            75,
+            55,
+            105,
+            85,
+            30
+          ]
+        }
+      ]
+    },
+    {
+      "id": 193,
+      "name": "蜻蜻蜓",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            65,
+            65,
+            45,
+            75,
+            45,
+            95
+          ]
+        }
+      ]
+    },
+    {
+      "id": 194,
+      "name": "乌波",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            55,
+            45,
+            45,
+            25,
+            25,
+            15
+          ]
+        }
+      ]
+    },
+    {
+      "id": 195,
+      "name": "沼王",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            95,
+            85,
+            85,
+            65,
+            65,
+            35
+          ]
+        }
+      ]
+    },
+    {
+      "id": 196,
+      "name": "太阳伊布",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            65,
+            65,
+            60,
+            130,
+            95,
+            110
+          ]
+        }
+      ]
+    },
+    {
+      "id": 197,
+      "name": "月亮伊布",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            95,
+            65,
+            110,
+            60,
+            130,
+            65
+          ]
+        }
+      ]
+    },
+    {
+      "id": 198,
+      "name": "黑暗鸦",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            85,
+            42,
+            85,
+            42,
+            91
+          ]
+        }
+      ]
+    },
+    {
+      "id": 199,
+      "name": "呆呆王",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            95,
+            75,
+            80,
+            100,
+            110,
+            30
+          ]
+        }
+      ]
+    },
+    {
+      "id": 200,
+      "name": "梦妖",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            60,
+            60,
+            85,
+            85,
+            85
+          ]
+        }
+      ]
+    },
+    {
+      "id": 201,
+      "name": "未知图腾",
+      "forms": [
+        {
+          "id": 0,
+          "name": "A",
+          "stats": [
+            48,
+            72,
+            48,
+            72,
+            48,
+            48
+          ]
+        },
+        {
+          "id": 1,
+          "name": "B",
+          "stats": [
+            48,
+            72,
+            48,
+            72,
+            48,
+            48
+          ]
+        },
+        {
+          "id": 2,
+          "name": "C",
+          "stats": [
+            48,
+            72,
+            48,
+            72,
+            48,
+            48
+          ]
+        },
+        {
+          "id": 3,
+          "name": "D",
+          "stats": [
+            48,
+            72,
+            48,
+            72,
+            48,
+            48
+          ]
+        },
+        {
+          "id": 4,
+          "name": "E",
+          "stats": [
+            48,
+            72,
+            48,
+            72,
+            48,
+            48
+          ]
+        },
+        {
+          "id": 5,
+          "name": "F",
+          "stats": [
+            48,
+            72,
+            48,
+            72,
+            48,
+            48
+          ]
+        },
+        {
+          "id": 6,
+          "name": "G",
+          "stats": [
+            48,
+            72,
+            48,
+            72,
+            48,
+            48
+          ]
+        },
+        {
+          "id": 7,
+          "name": "H",
+          "stats": [
+            48,
+            72,
+            48,
+            72,
+            48,
+            48
+          ]
+        },
+        {
+          "id": 8,
+          "name": "I",
+          "stats": [
+            48,
+            72,
+            48,
+            72,
+            48,
+            48
+          ]
+        },
+        {
+          "id": 9,
+          "name": "J",
+          "stats": [
+            48,
+            72,
+            48,
+            72,
+            48,
+            48
+          ]
+        },
+        {
+          "id": 10,
+          "name": "K",
+          "stats": [
+            48,
+            72,
+            48,
+            72,
+            48,
+            48
+          ]
+        },
+        {
+          "id": 11,
+          "name": "L",
+          "stats": [
+            48,
+            72,
+            48,
+            72,
+            48,
+            48
+          ]
+        },
+        {
+          "id": 12,
+          "name": "M",
+          "stats": [
+            48,
+            72,
+            48,
+            72,
+            48,
+            48
+          ]
+        },
+        {
+          "id": 13,
+          "name": "N",
+          "stats": [
+            48,
+            72,
+            48,
+            72,
+            48,
+            48
+          ]
+        },
+        {
+          "id": 14,
+          "name": "O",
+          "stats": [
+            48,
+            72,
+            48,
+            72,
+            48,
+            48
+          ]
+        },
+        {
+          "id": 15,
+          "name": "P",
+          "stats": [
+            48,
+            72,
+            48,
+            72,
+            48,
+            48
+          ]
+        },
+        {
+          "id": 16,
+          "name": "Q",
+          "stats": [
+            48,
+            72,
+            48,
+            72,
+            48,
+            48
+          ]
+        },
+        {
+          "id": 17,
+          "name": "R",
+          "stats": [
+            48,
+            72,
+            48,
+            72,
+            48,
+            48
+          ]
+        },
+        {
+          "id": 18,
+          "name": "S",
+          "stats": [
+            48,
+            72,
+            48,
+            72,
+            48,
+            48
+          ]
+        },
+        {
+          "id": 19,
+          "name": "T",
+          "stats": [
+            48,
+            72,
+            48,
+            72,
+            48,
+            48
+          ]
+        },
+        {
+          "id": 20,
+          "name": "U",
+          "stats": [
+            48,
+            72,
+            48,
+            72,
+            48,
+            48
+          ]
+        },
+        {
+          "id": 21,
+          "name": "V",
+          "stats": [
+            48,
+            72,
+            48,
+            72,
+            48,
+            48
+          ]
+        },
+        {
+          "id": 22,
+          "name": "W",
+          "stats": [
+            48,
+            72,
+            48,
+            72,
+            48,
+            48
+          ]
+        },
+        {
+          "id": 23,
+          "name": "X",
+          "stats": [
+            48,
+            72,
+            48,
+            72,
+            48,
+            48
+          ]
+        },
+        {
+          "id": 24,
+          "name": "Y",
+          "stats": [
+            48,
+            72,
+            48,
+            72,
+            48,
+            48
+          ]
+        },
+        {
+          "id": 25,
+          "name": "Z",
+          "stats": [
+            48,
+            72,
+            48,
+            72,
+            48,
+            48
+          ]
+        },
+        {
+          "id": 26,
+          "name": "!",
+          "stats": [
+            48,
+            72,
+            48,
+            72,
+            48,
+            48
+          ]
+        },
+        {
+          "id": 27,
+          "name": "?",
+          "stats": [
+            48,
+            72,
+            48,
+            72,
+            48,
+            48
+          ]
+        }
+      ]
+    },
+    {
+      "id": 202,
+      "name": "果然翁",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            190,
+            33,
+            58,
+            33,
+            58,
+            33
+          ]
+        }
+      ]
+    },
+    {
+      "id": 203,
+      "name": "麒麟奇",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            70,
+            80,
+            65,
+            90,
+            65,
+            85
+          ]
+        }
+      ]
+    },
+    {
+      "id": 204,
+      "name": "榛果球",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            50,
+            65,
+            90,
+            35,
+            35,
+            15
+          ]
+        }
+      ]
+    },
+    {
+      "id": 205,
+      "name": "佛烈托斯",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            75,
+            90,
+            140,
+            60,
+            60,
+            40
+          ]
+        }
+      ]
+    },
+    {
+      "id": 206,
+      "name": "土龙弟弟",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            100,
+            70,
+            70,
+            65,
+            65,
+            45
+          ]
+        }
+      ]
+    },
+    {
+      "id": 207,
+      "name": "天蝎",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            65,
+            75,
+            105,
+            35,
+            65,
+            85
+          ]
+        }
+      ]
+    },
+    {
+      "id": 208,
+      "name": "大钢蛇",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            75,
+            85,
+            200,
+            55,
+            65,
+            30
+          ]
+        }
+      ]
+    },
+    {
+      "id": 209,
+      "name": "布鲁",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            80,
+            50,
+            40,
+            40,
+            30
+          ]
+        }
+      ]
+    },
+    {
+      "id": 210,
+      "name": "布鲁皇",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            90,
+            120,
+            75,
+            60,
+            60,
+            45
+          ]
+        }
+      ]
+    },
+    {
+      "id": 211,
+      "name": "千针鱼",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            65,
+            95,
+            85,
+            55,
+            55,
+            85
+          ]
+        }
+      ]
+    },
+    {
+      "id": 212,
+      "name": "巨钳螳螂",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            70,
+            130,
+            100,
+            55,
+            80,
+            65
+          ]
+        }
+      ]
+    },
+    {
+      "id": 213,
+      "name": "壶壶",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            20,
+            10,
+            230,
+            10,
+            230,
+            5
+          ]
+        }
+      ]
+    },
+    {
+      "id": 214,
+      "name": "赫拉克罗斯",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            80,
+            125,
+            75,
+            40,
+            95,
+            85
+          ]
+        }
+      ]
+    },
+    {
+      "id": 215,
+      "name": "狃拉",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            55,
+            95,
+            55,
+            35,
+            75,
+            115
+          ]
+        }
+      ]
+    },
+    {
+      "id": 216,
+      "name": "熊宝宝",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            80,
+            50,
+            50,
+            50,
+            40
+          ]
+        }
+      ]
+    },
+    {
+      "id": 217,
+      "name": "圈圈熊",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            90,
+            130,
+            75,
+            75,
+            75,
+            55
+          ]
+        }
+      ]
+    },
+    {
+      "id": 218,
+      "name": "熔岩虫",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            40,
+            40,
+            40,
+            70,
+            40,
+            20
+          ]
+        }
+      ]
+    },
+    {
+      "id": 219,
+      "name": "熔岩蜗牛",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            50,
+            120,
+            90,
+            80,
+            30
+          ]
+        }
+      ]
+    },
+    {
+      "id": 220,
+      "name": "小山猪",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            50,
+            50,
+            40,
+            30,
+            30,
+            50
+          ]
+        }
+      ]
+    },
+    {
+      "id": 221,
+      "name": "长毛猪",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            100,
+            100,
+            80,
+            60,
+            60,
+            50
+          ]
+        }
+      ]
+    },
+    {
+      "id": 222,
+      "name": "太阳珊瑚",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            65,
+            55,
+            95,
+            65,
+            95,
+            35
+          ]
+        }
+      ]
+    },
+    {
+      "id": 223,
+      "name": "铁炮鱼",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            35,
+            65,
+            35,
+            65,
+            35,
+            65
+          ]
+        }
+      ]
+    },
+    {
+      "id": 224,
+      "name": "章鱼桶",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            75,
+            105,
+            75,
+            105,
+            75,
+            45
+          ]
+        }
+      ]
+    },
+    {
+      "id": 225,
+      "name": "信使鸟",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            45,
+            55,
+            45,
+            65,
+            45,
+            75
+          ]
+        }
+      ]
+    },
+    {
+      "id": 226,
+      "name": "巨翅飞鱼",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            85,
+            40,
+            70,
+            80,
+            140,
+            70
+          ]
+        }
+      ]
+    },
+    {
+      "id": 227,
+      "name": "盔甲鸟",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            65,
+            80,
+            140,
+            40,
+            70,
+            70
+          ]
+        }
+      ]
+    },
+    {
+      "id": 228,
+      "name": "戴鲁比",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            45,
+            60,
+            30,
+            80,
+            50,
+            65
+          ]
+        }
+      ]
+    },
+    {
+      "id": 229,
+      "name": "黑鲁加",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            75,
+            90,
+            50,
+            110,
+            80,
+            95
+          ]
+        }
+      ]
+    },
+    {
+      "id": 230,
+      "name": "刺龙王",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            75,
+            95,
+            95,
+            95,
+            95,
+            85
+          ]
+        }
+      ]
+    },
+    {
+      "id": 231,
+      "name": "小小象",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            90,
+            60,
+            60,
+            40,
+            40,
+            40
+          ]
+        }
+      ]
+    },
+    {
+      "id": 232,
+      "name": "顿甲",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            90,
+            120,
+            120,
+            60,
+            60,
+            50
+          ]
+        }
+      ]
+    },
+    {
+      "id": 233,
+      "name": "多边兽Ⅱ",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            85,
+            80,
+            90,
+            105,
+            95,
+            60
+          ]
+        }
+      ]
+    },
+    {
+      "id": 234,
+      "name": "惊角鹿",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            73,
+            95,
+            62,
+            85,
+            65,
+            85
+          ]
+        }
+      ]
+    },
+    {
+      "id": 235,
+      "name": "图图犬",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            55,
+            20,
+            35,
+            20,
+            45,
+            75
+          ]
+        }
+      ]
+    },
+    {
+      "id": 236,
+      "name": "无畏小子",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            35,
+            35,
+            35,
+            35,
+            35,
+            35
+          ]
+        }
+      ]
+    },
+    {
+      "id": 237,
+      "name": "战舞郎",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            50,
+            95,
+            95,
+            35,
+            110,
+            70
+          ]
+        }
+      ]
+    },
+    {
+      "id": 238,
+      "name": "迷唇娃",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            45,
+            30,
+            15,
+            85,
+            65,
+            65
+          ]
+        }
+      ]
+    },
+    {
+      "id": 239,
+      "name": "电击怪",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            45,
+            63,
+            37,
+            65,
+            55,
+            95
+          ]
+        }
+      ]
+    },
+    {
+      "id": 240,
+      "name": "鸭嘴宝宝",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            45,
+            75,
+            37,
+            70,
+            55,
+            83
+          ]
+        }
+      ]
+    },
+    {
+      "id": 241,
+      "name": "大奶罐",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            95,
+            80,
+            105,
+            40,
+            70,
+            100
+          ]
+        }
+      ]
+    },
+    {
+      "id": 242,
+      "name": "幸福蛋",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            255,
+            10,
+            10,
+            75,
+            135,
+            55
+          ]
+        }
+      ]
+    },
+    {
+      "id": 243,
+      "name": "雷公",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            90,
+            85,
+            75,
+            115,
+            100,
+            115
+          ]
+        }
+      ]
+    },
+    {
+      "id": 244,
+      "name": "炎帝",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            115,
+            115,
+            85,
+            90,
+            75,
+            100
+          ]
+        }
+      ]
+    },
+    {
+      "id": 245,
+      "name": "水君",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            100,
+            75,
+            115,
+            90,
+            115,
+            85
+          ]
+        }
+      ]
+    },
+    {
+      "id": 246,
+      "name": "幼基拉斯",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            50,
+            64,
+            50,
+            45,
+            50,
+            41
+          ]
+        }
+      ]
+    },
+    {
+      "id": 247,
+      "name": "沙基拉斯",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            70,
+            84,
+            70,
+            65,
+            70,
+            51
+          ]
+        }
+      ]
+    },
+    {
+      "id": 248,
+      "name": "班基拉斯",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            100,
+            134,
+            110,
+            95,
+            100,
+            61
+          ]
+        }
+      ]
+    },
+    {
+      "id": 249,
+      "name": "洛奇亚",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            106,
+            90,
+            130,
+            90,
+            154,
+            110
+          ]
+        }
+      ]
+    },
+    {
+      "id": 250,
+      "name": "凤王",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            106,
+            130,
+            90,
+            110,
+            154,
+            90
+          ]
+        }
+      ]
+    },
+    {
+      "id": 251,
+      "name": "时拉比",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            100,
+            100,
+            100,
+            100,
+            100,
+            100
+          ]
+        }
+      ]
+    },
+    {
+      "id": 252,
+      "name": "木守宫",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            40,
+            45,
+            35,
+            65,
+            55,
+            70
+          ]
+        }
+      ]
+    },
+    {
+      "id": 253,
+      "name": "森林蜥蜴",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            50,
+            65,
+            45,
+            85,
+            65,
+            95
+          ]
+        }
+      ]
+    },
+    {
+      "id": 254,
+      "name": "蜥蜴王",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            70,
+            85,
+            65,
+            105,
+            85,
+            120
+          ]
+        }
+      ]
+    },
+    {
+      "id": 255,
+      "name": "火稚鸡",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            45,
+            60,
+            40,
+            70,
+            50,
+            45
+          ]
+        }
+      ]
+    },
+    {
+      "id": 256,
+      "name": "力壮鸡",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            85,
+            60,
+            85,
+            60,
+            55
+          ]
+        }
+      ]
+    },
+    {
+      "id": 257,
+      "name": "火焰鸡",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            80,
+            120,
+            70,
+            110,
+            70,
+            80
+          ]
+        }
+      ]
+    },
+    {
+      "id": 258,
+      "name": "水跃鱼",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            50,
+            70,
+            50,
+            50,
+            50,
+            40
+          ]
+        }
+      ]
+    },
+    {
+      "id": 259,
+      "name": "沼跃鱼",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            70,
+            85,
+            70,
+            60,
+            70,
+            50
+          ]
+        }
+      ]
+    },
+    {
+      "id": 260,
+      "name": "巨沼怪",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            100,
+            110,
+            90,
+            85,
+            90,
+            60
+          ]
+        }
+      ]
+    },
+    {
+      "id": 261,
+      "name": "土狼犬",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            35,
+            55,
+            35,
+            30,
+            30,
+            35
+          ]
+        }
+      ]
+    },
+    {
+      "id": 262,
+      "name": "大狼犬",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            70,
+            90,
+            70,
+            60,
+            60,
+            70
+          ]
+        }
+      ]
+    },
+    {
+      "id": 263,
+      "name": "蛇纹熊",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            38,
+            30,
+            41,
+            30,
+            41,
+            60
+          ]
+        }
+      ]
+    },
+    {
+      "id": 264,
+      "name": "直冲熊",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            78,
+            70,
+            61,
+            50,
+            61,
+            100
+          ]
+        }
+      ]
+    },
+    {
+      "id": 265,
+      "name": "刺尾虫",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            45,
+            45,
+            35,
+            20,
+            30,
+            20
+          ]
+        }
+      ]
+    },
+    {
+      "id": 266,
+      "name": "甲壳茧",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            50,
+            35,
+            55,
+            25,
+            25,
+            15
+          ]
+        }
+      ]
+    },
+    {
+      "id": 267,
+      "name": "狩猎凤蝶",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            70,
+            50,
+            100,
+            50,
+            65
+          ]
+        }
+      ]
+    },
+    {
+      "id": 268,
+      "name": "盾甲茧",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            50,
+            35,
+            55,
+            25,
+            25,
+            15
+          ]
+        }
+      ]
+    },
+    {
+      "id": 269,
+      "name": "毒粉蛾",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            50,
+            70,
+            50,
+            90,
+            65
+          ]
+        }
+      ]
+    },
+    {
+      "id": 270,
+      "name": "莲叶童子",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            40,
+            30,
+            30,
+            40,
+            50,
+            30
+          ]
+        }
+      ]
+    },
+    {
+      "id": 271,
+      "name": "莲帽小童",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            50,
+            50,
+            60,
+            70,
+            50
+          ]
+        }
+      ]
+    },
+    {
+      "id": 272,
+      "name": "乐天河童",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            80,
+            70,
+            70,
+            90,
+            100,
+            70
+          ]
+        }
+      ]
+    },
+    {
+      "id": 273,
+      "name": "橡实果",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            40,
+            40,
+            50,
+            30,
+            30,
+            30
+          ]
+        }
+      ]
+    },
+    {
+      "id": 274,
+      "name": "长鼻叶",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            70,
+            70,
+            40,
+            60,
+            40,
+            60
+          ]
+        }
+      ]
+    },
+    {
+      "id": 275,
+      "name": "狡猾天狗",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            90,
+            100,
+            60,
+            90,
+            60,
+            80
+          ]
+        }
+      ]
+    },
+    {
+      "id": 276,
+      "name": "傲骨燕",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            40,
+            55,
+            30,
+            30,
+            30,
+            85
+          ]
+        }
+      ]
+    },
+    {
+      "id": 277,
+      "name": "大王燕",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            85,
+            60,
+            75,
+            50,
+            125
+          ]
+        }
+      ]
+    },
+    {
+      "id": 278,
+      "name": "长翅鸥",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            40,
+            30,
+            30,
+            55,
+            30,
+            85
+          ]
+        }
+      ]
+    },
+    {
+      "id": 279,
+      "name": "大嘴鸥",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            50,
+            100,
+            95,
+            70,
+            65
+          ]
+        }
+      ]
+    },
+    {
+      "id": 280,
+      "name": "拉鲁拉丝",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            28,
+            25,
+            25,
+            45,
+            35,
+            40
+          ]
+        }
+      ]
+    },
+    {
+      "id": 281,
+      "name": "奇鲁莉安",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            38,
+            35,
+            35,
+            65,
+            55,
+            50
+          ]
+        }
+      ]
+    },
+    {
+      "id": 282,
+      "name": "沙奈朵",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            68,
+            65,
+            65,
+            125,
+            115,
+            80
+          ]
+        }
+      ]
+    },
+    {
+      "id": 283,
+      "name": "溜溜糖球",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            40,
+            30,
+            32,
+            50,
+            52,
+            65
+          ]
+        }
+      ]
+    },
+    {
+      "id": 284,
+      "name": "雨翅蛾",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            70,
+            60,
+            62,
+            100,
+            82,
+            80
+          ]
+        }
+      ]
+    },
+    {
+      "id": 285,
+      "name": "蘑蘑菇",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            40,
+            60,
+            40,
+            60,
+            35
+          ]
+        }
+      ]
+    },
+    {
+      "id": 286,
+      "name": "斗笠菇",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            130,
+            80,
+            60,
+            60,
+            70
+          ]
+        }
+      ]
+    },
+    {
+      "id": 287,
+      "name": "懒人獭",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            60,
+            60,
+            35,
+            35,
+            30
+          ]
+        }
+      ]
+    },
+    {
+      "id": 288,
+      "name": "过动猿",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            80,
+            80,
+            80,
+            55,
+            55,
+            90
+          ]
+        }
+      ]
+    },
+    {
+      "id": 289,
+      "name": "请假王",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            150,
+            160,
+            100,
+            95,
+            65,
+            100
+          ]
+        }
+      ]
+    },
+    {
+      "id": 290,
+      "name": "土居忍士",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            31,
+            45,
+            90,
+            30,
+            30,
+            40
+          ]
+        }
+      ]
+    },
+    {
+      "id": 291,
+      "name": "铁面忍者",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            61,
+            90,
+            45,
+            50,
+            50,
+            160
+          ]
+        }
+      ]
+    },
+    {
+      "id": 292,
+      "name": "脱壳忍者",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            1,
+            90,
+            45,
+            30,
+            30,
+            40
+          ]
+        }
+      ]
+    },
+    {
+      "id": 293,
+      "name": "咕妞妞",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            64,
+            51,
+            23,
+            51,
+            23,
+            28
+          ]
+        }
+      ]
+    },
+    {
+      "id": 294,
+      "name": "吼爆弹",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            84,
+            71,
+            43,
+            71,
+            43,
+            48
+          ]
+        }
+      ]
+    },
+    {
+      "id": 295,
+      "name": "爆音怪",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            104,
+            91,
+            63,
+            91,
+            73,
+            68
+          ]
+        }
+      ]
+    },
+    {
+      "id": 296,
+      "name": "幕下力士",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            72,
+            60,
+            30,
+            20,
+            30,
+            25
+          ]
+        }
+      ]
+    },
+    {
+      "id": 297,
+      "name": "铁掌力士",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            144,
+            120,
+            60,
+            40,
+            60,
+            50
+          ]
+        }
+      ]
+    },
+    {
+      "id": 298,
+      "name": "露力丽",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            50,
+            20,
+            40,
+            20,
+            40,
+            20
+          ]
+        }
+      ]
+    },
+    {
+      "id": 299,
+      "name": "朝北鼻",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            30,
+            45,
+            135,
+            45,
+            90,
+            30
+          ]
+        }
+      ]
+    },
+    {
+      "id": 300,
+      "name": "向尾喵",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            50,
+            45,
+            45,
+            35,
+            35,
+            50
+          ]
+        }
+      ]
+    },
+    {
+      "id": 301,
+      "name": "优雅猫",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            70,
+            65,
+            65,
+            55,
+            55,
+            90
+          ]
+        }
+      ]
+    },
+    {
+      "id": 302,
+      "name": "勾魂眼",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            50,
+            75,
+            75,
+            65,
+            65,
+            50
+          ]
+        }
+      ]
+    },
+    {
+      "id": 303,
+      "name": "大嘴娃",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            50,
+            85,
+            85,
+            55,
+            55,
+            50
+          ]
+        }
+      ]
+    },
+    {
+      "id": 304,
+      "name": "可可多拉",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            50,
+            70,
+            100,
+            40,
+            40,
+            30
+          ]
+        }
+      ]
+    },
+    {
+      "id": 305,
+      "name": "可多拉",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            90,
+            140,
+            50,
+            50,
+            40
+          ]
+        }
+      ]
+    },
+    {
+      "id": 306,
+      "name": "波士可多拉",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            70,
+            110,
+            180,
+            60,
+            60,
+            50
+          ]
+        }
+      ]
+    },
+    {
+      "id": 307,
+      "name": "玛沙那",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            30,
+            40,
+            55,
+            40,
+            55,
+            60
+          ]
+        }
+      ]
+    },
+    {
+      "id": 308,
+      "name": "恰雷姆",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            60,
+            75,
+            60,
+            75,
+            80
+          ]
+        }
+      ]
+    },
+    {
+      "id": 309,
+      "name": "落雷兽",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            40,
+            45,
+            40,
+            65,
+            40,
+            65
+          ]
+        }
+      ]
+    },
+    {
+      "id": 310,
+      "name": "雷电兽",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            70,
+            75,
+            60,
+            105,
+            60,
+            105
+          ]
+        }
+      ]
+    },
+    {
+      "id": 311,
+      "name": "正电拍拍",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            50,
+            40,
+            85,
+            75,
+            95
+          ]
+        }
+      ]
+    },
+    {
+      "id": 312,
+      "name": "负电拍拍",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            40,
+            50,
+            75,
+            85,
+            95
+          ]
+        }
+      ]
+    },
+    {
+      "id": 313,
+      "name": "电萤虫",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            65,
+            73,
+            75,
+            47,
+            85,
+            85
+          ]
+        }
+      ]
+    },
+    {
+      "id": 314,
+      "name": "甜甜萤",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            65,
+            47,
+            75,
+            73,
+            85,
+            85
+          ]
+        }
+      ]
+    },
+    {
+      "id": 315,
+      "name": "毒蔷薇",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            50,
+            60,
+            45,
+            100,
+            80,
+            65
+          ]
+        }
+      ]
+    },
+    {
+      "id": 316,
+      "name": "溶食兽",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            70,
+            43,
+            53,
+            43,
+            53,
+            40
+          ]
+        }
+      ]
+    },
+    {
+      "id": 317,
+      "name": "吞食兽",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            100,
+            73,
+            83,
+            73,
+            83,
+            55
+          ]
+        }
+      ]
+    },
+    {
+      "id": 318,
+      "name": "利牙鱼",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            45,
+            90,
+            20,
+            65,
+            20,
+            65
+          ]
+        }
+      ]
+    },
+    {
+      "id": 319,
+      "name": "巨牙鲨",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            70,
+            120,
+            40,
+            95,
+            40,
+            95
+          ]
+        }
+      ]
+    },
+    {
+      "id": 320,
+      "name": "吼吼鲸",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            130,
+            70,
+            35,
+            70,
+            35,
+            60
+          ]
+        }
+      ]
+    },
+    {
+      "id": 321,
+      "name": "吼鲸王",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            170,
+            90,
+            45,
+            90,
+            45,
+            60
+          ]
+        }
+      ]
+    },
+    {
+      "id": 322,
+      "name": "呆火驼",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            60,
+            40,
+            65,
+            45,
+            35
+          ]
+        }
+      ]
+    },
+    {
+      "id": 323,
+      "name": "喷火驼",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            70,
+            100,
+            70,
+            105,
+            75,
+            40
+          ]
+        }
+      ]
+    },
+    {
+      "id": 324,
+      "name": "煤炭龟",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            70,
+            85,
+            140,
+            85,
+            70,
+            20
+          ]
+        }
+      ]
+    },
+    {
+      "id": 325,
+      "name": "跳跳猪",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            25,
+            35,
+            70,
+            80,
+            60
+          ]
+        }
+      ]
+    },
+    {
+      "id": 326,
+      "name": "噗噗猪",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            80,
+            45,
+            65,
+            90,
+            110,
+            80
+          ]
+        }
+      ]
+    },
+    {
+      "id": 327,
+      "name": "晃晃斑",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            60,
+            60,
+            60,
+            60,
+            60
+          ]
+        }
+      ]
+    },
+    {
+      "id": 328,
+      "name": "大颚蚁",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            45,
+            100,
+            45,
+            45,
+            45,
+            10
+          ]
+        }
+      ]
+    },
+    {
+      "id": 329,
+      "name": "超音波幼虫",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            50,
+            70,
+            50,
+            50,
+            50,
+            70
+          ]
+        }
+      ]
+    },
+    {
+      "id": 330,
+      "name": "沙漠蜻蜓",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            80,
+            100,
+            80,
+            80,
+            80,
+            100
+          ]
+        }
+      ]
+    },
+    {
+      "id": 331,
+      "name": "刺球仙人掌",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            50,
+            85,
+            40,
+            85,
+            40,
+            35
+          ]
+        }
+      ]
+    },
+    {
+      "id": 332,
+      "name": "梦歌仙人掌",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            70,
+            115,
+            60,
+            115,
+            60,
+            55
+          ]
+        }
+      ]
+    },
+    {
+      "id": 333,
+      "name": "青绵鸟",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            45,
+            40,
+            60,
+            40,
+            75,
+            50
+          ]
+        }
+      ]
+    },
+    {
+      "id": 334,
+      "name": "七夕青鸟",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            75,
+            70,
+            90,
+            70,
+            105,
+            80
+          ]
+        }
+      ]
+    },
+    {
+      "id": 335,
+      "name": "猫鼬斩",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            73,
+            115,
+            60,
+            60,
+            60,
+            90
+          ]
+        }
+      ]
+    },
+    {
+      "id": 336,
+      "name": "饭匙蛇",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            73,
+            100,
+            60,
+            100,
+            60,
+            65
+          ]
+        }
+      ]
+    },
+    {
+      "id": 337,
+      "name": "月石",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            90,
+            55,
+            65,
+            95,
+            85,
+            70
+          ]
+        }
+      ]
+    },
+    {
+      "id": 338,
+      "name": "太阳岩",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            90,
+            95,
+            85,
+            55,
+            65,
+            70
+          ]
+        }
+      ]
+    },
+    {
+      "id": 339,
+      "name": "泥泥鳅",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            50,
+            48,
+            43,
+            46,
+            41,
+            60
+          ]
+        }
+      ]
+    },
+    {
+      "id": 340,
+      "name": "鲶鱼王",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            110,
+            78,
+            73,
+            76,
+            71,
+            60
+          ]
+        }
+      ]
+    },
+    {
+      "id": 341,
+      "name": "龙虾小兵",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            43,
+            80,
+            65,
+            50,
+            35,
+            35
+          ]
+        }
+      ]
+    },
+    {
+      "id": 342,
+      "name": "铁螯龙虾",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            63,
+            120,
+            85,
+            90,
+            55,
+            55
+          ]
+        }
+      ]
+    },
+    {
+      "id": 343,
+      "name": "天秤偶",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            40,
+            40,
+            55,
+            40,
+            70,
+            55
+          ]
+        }
+      ]
+    },
+    {
+      "id": 344,
+      "name": "念力土偶",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            70,
+            105,
+            70,
+            120,
+            75
+          ]
+        }
+      ]
+    },
+    {
+      "id": 345,
+      "name": "触手百合",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            66,
+            41,
+            77,
+            61,
+            87,
+            23
+          ]
+        }
+      ]
+    },
+    {
+      "id": 346,
+      "name": "摇篮百合",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            86,
+            81,
+            97,
+            81,
+            107,
+            43
+          ]
+        }
+      ]
+    },
+    {
+      "id": 347,
+      "name": "太古羽虫",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            45,
+            95,
+            50,
+            40,
+            50,
+            75
+          ]
+        }
+      ]
+    },
+    {
+      "id": 348,
+      "name": "太古盔甲",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            75,
+            125,
+            100,
+            70,
+            80,
+            45
+          ]
+        }
+      ]
+    },
+    {
+      "id": 349,
+      "name": "丑丑鱼",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            20,
+            15,
+            20,
+            10,
+            55,
+            80
+          ]
+        }
+      ]
+    },
+    {
+      "id": 350,
+      "name": "美纳斯",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            95,
+            60,
+            79,
+            100,
+            125,
+            81
+          ]
+        }
+      ]
+    },
+    {
+      "id": 351,
+      "name": "飘浮泡泡",
+      "forms": [
+        {
+          "id": 0,
+          "name": "普通形态",
+          "stats": [
+            70,
+            70,
+            70,
+            70,
+            70,
+            70
+          ]
+        },
+        {
+          "id": 1,
+          "name": "太阳形态",
+          "stats": [
+            70,
+            70,
+            70,
+            70,
+            70,
+            70
+          ]
+        },
+        {
+          "id": 2,
+          "name": "雨水形态",
+          "stats": [
+            70,
+            70,
+            70,
+            70,
+            70,
+            70
+          ]
+        },
+        {
+          "id": 3,
+          "name": "雪云形态",
+          "stats": [
+            70,
+            70,
+            70,
+            70,
+            70,
+            70
+          ]
+        }
+      ]
+    },
+    {
+      "id": 352,
+      "name": "变隐龙",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            90,
+            70,
+            60,
+            120,
+            40
+          ]
+        }
+      ]
+    },
+    {
+      "id": 353,
+      "name": "怨影娃娃",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            44,
+            75,
+            35,
+            63,
+            33,
+            45
+          ]
+        }
+      ]
+    },
+    {
+      "id": 354,
+      "name": "诅咒娃娃",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            64,
+            115,
+            65,
+            83,
+            63,
+            65
+          ]
+        }
+      ]
+    },
+    {
+      "id": 355,
+      "name": "夜巡灵",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            20,
+            40,
+            90,
+            30,
+            90,
+            25
+          ]
+        }
+      ]
+    },
+    {
+      "id": 356,
+      "name": "彷徨夜灵",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            40,
+            70,
+            130,
+            60,
+            130,
+            25
+          ]
+        }
+      ]
+    },
+    {
+      "id": 357,
+      "name": "热带龙",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            99,
+            68,
+            83,
+            72,
+            87,
+            51
+          ]
+        }
+      ]
+    },
+    {
+      "id": 358,
+      "name": "风铃铃",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            75,
+            50,
+            80,
+            95,
+            90,
+            65
+          ]
+        }
+      ]
+    },
+    {
+      "id": 359,
+      "name": "阿勃梭鲁",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            65,
+            130,
+            60,
+            75,
+            60,
+            75
+          ]
+        }
+      ]
+    },
+    {
+      "id": 360,
+      "name": "小果然",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            95,
+            23,
+            48,
+            23,
+            48,
+            23
+          ]
+        }
+      ]
+    },
+    {
+      "id": 361,
+      "name": "雪童子",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            50,
+            50,
+            50,
+            50,
+            50,
+            50
+          ]
+        }
+      ]
+    },
+    {
+      "id": 362,
+      "name": "冰鬼护",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            80,
+            80,
+            80,
+            80,
+            80,
+            80
+          ]
+        }
+      ]
+    },
+    {
+      "id": 363,
+      "name": "海豹球",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            70,
+            40,
+            50,
+            55,
+            50,
+            25
+          ]
+        }
+      ]
+    },
+    {
+      "id": 364,
+      "name": "海魔狮",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            90,
+            60,
+            70,
+            75,
+            70,
+            45
+          ]
+        }
+      ]
+    },
+    {
+      "id": 365,
+      "name": "帝牙海狮",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            110,
+            80,
+            90,
+            95,
+            90,
+            65
+          ]
+        }
+      ]
+    },
+    {
+      "id": 366,
+      "name": "珍珠贝",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            35,
+            64,
+            85,
+            74,
+            55,
+            32
+          ]
+        }
+      ]
+    },
+    {
+      "id": 367,
+      "name": "猎斑鱼",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            55,
+            104,
+            105,
+            94,
+            75,
+            52
+          ]
+        }
+      ]
+    },
+    {
+      "id": 368,
+      "name": "樱花鱼",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            55,
+            84,
+            105,
+            114,
+            75,
+            52
+          ]
+        }
+      ]
+    },
+    {
+      "id": 369,
+      "name": "古空棘鱼",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            100,
+            90,
+            130,
+            45,
+            65,
+            55
+          ]
+        }
+      ]
+    },
+    {
+      "id": 370,
+      "name": "爱心鱼",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            43,
+            30,
+            55,
+            40,
+            65,
+            97
+          ]
+        }
+      ]
+    },
+    {
+      "id": 371,
+      "name": "宝贝龙",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            45,
+            75,
+            60,
+            40,
+            30,
+            50
+          ]
+        }
+      ]
+    },
+    {
+      "id": 372,
+      "name": "甲壳龙",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            65,
+            95,
+            100,
+            60,
+            50,
+            50
+          ]
+        }
+      ]
+    },
+    {
+      "id": 373,
+      "name": "暴飞龙",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            95,
+            135,
+            80,
+            110,
+            80,
+            100
+          ]
+        }
+      ]
+    },
+    {
+      "id": 374,
+      "name": "铁哑铃",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            40,
+            55,
+            80,
+            35,
+            60,
+            30
+          ]
+        }
+      ]
+    },
+    {
+      "id": 375,
+      "name": "金属怪",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            75,
+            100,
+            55,
+            80,
+            50
+          ]
+        }
+      ]
+    },
+    {
+      "id": 376,
+      "name": "巨金怪",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            80,
+            135,
+            130,
+            95,
+            90,
+            70
+          ]
+        }
+      ]
+    },
+    {
+      "id": 377,
+      "name": "雷吉洛克",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            80,
+            100,
+            200,
+            50,
+            100,
+            50
+          ]
+        }
+      ]
+    },
+    {
+      "id": 378,
+      "name": "雷吉艾斯",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            80,
+            50,
+            100,
+            100,
+            200,
+            50
+          ]
+        }
+      ]
+    },
+    {
+      "id": 379,
+      "name": "雷吉斯奇鲁",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            80,
+            75,
+            150,
+            75,
+            150,
+            50
+          ]
+        }
+      ]
+    },
+    {
+      "id": 380,
+      "name": "拉帝亚斯",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            80,
+            80,
+            90,
+            110,
+            130,
+            110
+          ]
+        }
+      ]
+    },
+    {
+      "id": 381,
+      "name": "拉帝欧斯",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            80,
+            90,
+            80,
+            130,
+            110,
+            110
+          ]
+        }
+      ]
+    },
+    {
+      "id": 382,
+      "name": "盖欧卡",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            100,
+            100,
+            90,
+            150,
+            140,
+            90
+          ]
+        }
+      ]
+    },
+    {
+      "id": 383,
+      "name": "固拉多",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            100,
+            150,
+            140,
+            100,
+            90,
+            90
+          ]
+        }
+      ]
+    },
+    {
+      "id": 384,
+      "name": "烈空坐",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            105,
+            150,
+            90,
+            150,
+            90,
+            95
+          ]
+        }
+      ]
+    },
+    {
+      "id": 385,
+      "name": "基拉祈",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            100,
+            100,
+            100,
+            100,
+            100,
+            100
+          ]
+        }
+      ]
+    },
+    {
+      "id": 386,
+      "name": "代欧奇希斯",
+      "forms": [
+        {
+          "id": 0,
+          "name": "普通形态",
+          "stats": [
+            50,
+            150,
+            50,
+            150,
+            50,
+            150
+          ]
+        },
+        {
+          "id": 1,
+          "name": "攻击形态",
+          "stats": [
+            50,
+            180,
+            20,
+            180,
+            20,
+            150
+          ]
+        },
+        {
+          "id": 2,
+          "name": "防御形态",
+          "stats": [
+            50,
+            70,
+            160,
+            70,
+            160,
+            90
+          ]
+        },
+        {
+          "id": 3,
+          "name": "速度形态",
+          "stats": [
+            50,
+            95,
+            90,
+            95,
+            90,
+            180
+          ]
+        }
+      ]
+    },
+    {
+      "id": 387,
+      "name": "草苗龟",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            55,
+            68,
+            64,
+            45,
+            55,
+            31
+          ]
+        }
+      ]
+    },
+    {
+      "id": 388,
+      "name": "树林龟",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            75,
+            89,
+            85,
+            55,
+            65,
+            36
+          ]
+        }
+      ]
+    },
+    {
+      "id": 389,
+      "name": "土台龟",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            95,
+            109,
+            105,
+            75,
+            85,
+            56
+          ]
+        }
+      ]
+    },
+    {
+      "id": 390,
+      "name": "小火焰猴",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            44,
+            58,
+            44,
+            58,
+            44,
+            61
+          ]
+        }
+      ]
+    },
+    {
+      "id": 391,
+      "name": "猛火猴",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            64,
+            78,
+            52,
+            78,
+            52,
+            81
+          ]
+        }
+      ]
+    },
+    {
+      "id": 392,
+      "name": "烈焰猴",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            76,
+            104,
+            71,
+            104,
+            71,
+            108
+          ]
+        }
+      ]
+    },
+    {
+      "id": 393,
+      "name": "波加曼",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            53,
+            51,
+            53,
+            61,
+            56,
+            40
+          ]
+        }
+      ]
+    },
+    {
+      "id": 394,
+      "name": "波皇子",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            64,
+            66,
+            68,
+            81,
+            76,
+            50
+          ]
+        }
+      ]
+    },
+    {
+      "id": 395,
+      "name": "帝王拿波",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            84,
+            86,
+            88,
+            111,
+            101,
+            60
+          ]
+        }
+      ]
+    },
+    {
+      "id": 396,
+      "name": "姆克儿",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            40,
+            55,
+            30,
+            30,
+            30,
+            60
+          ]
+        }
+      ]
+    },
+    {
+      "id": 397,
+      "name": "姆克鸟",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            55,
+            75,
+            50,
+            40,
+            40,
+            80
+          ]
+        }
+      ]
+    },
+    {
+      "id": 398,
+      "name": "姆克鹰",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            85,
+            120,
+            70,
+            50,
+            60,
+            100
+          ]
+        }
+      ]
+    },
+    {
+      "id": 399,
+      "name": "大牙狸",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            59,
+            45,
+            40,
+            35,
+            40,
+            31
+          ]
+        }
+      ]
+    },
+    {
+      "id": 400,
+      "name": "大尾狸",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            79,
+            85,
+            60,
+            55,
+            60,
+            71
+          ]
+        }
+      ]
+    },
+    {
+      "id": 401,
+      "name": "圆法师",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            37,
+            25,
+            41,
+            25,
+            41,
+            25
+          ]
+        }
+      ]
+    },
+    {
+      "id": 402,
+      "name": "音箱蟀",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            77,
+            85,
+            51,
+            55,
+            51,
+            65
+          ]
+        }
+      ]
+    },
+    {
+      "id": 403,
+      "name": "小猫怪",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            45,
+            65,
+            34,
+            40,
+            34,
+            45
+          ]
+        }
+      ]
+    },
+    {
+      "id": 404,
+      "name": "勒克猫",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            85,
+            49,
+            60,
+            49,
+            60
+          ]
+        }
+      ]
+    },
+    {
+      "id": 405,
+      "name": "伦琴猫",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            80,
+            120,
+            79,
+            95,
+            79,
+            70
+          ]
+        }
+      ]
+    },
+    {
+      "id": 406,
+      "name": "含羞苞",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            40,
+            30,
+            35,
+            50,
+            70,
+            55
+          ]
+        }
+      ]
+    },
+    {
+      "id": 407,
+      "name": "罗丝雷朵",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            70,
+            65,
+            125,
+            105,
+            90
+          ]
+        }
+      ]
+    },
+    {
+      "id": 408,
+      "name": "头盖龙",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            67,
+            125,
+            40,
+            30,
+            30,
+            58
+          ]
+        }
+      ]
+    },
+    {
+      "id": 409,
+      "name": "战槌龙",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            97,
+            165,
+            60,
+            65,
+            50,
+            58
+          ]
+        }
+      ]
+    },
+    {
+      "id": 410,
+      "name": "盾甲龙",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            30,
+            42,
+            118,
+            42,
+            88,
+            30
+          ]
+        }
+      ]
+    },
+    {
+      "id": 411,
+      "name": "护城龙",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            52,
+            168,
+            47,
+            138,
+            30
+          ]
+        }
+      ]
+    },
+    {
+      "id": 412,
+      "name": "结草儿",
+      "forms": [
+        {
+          "id": 0,
+          "name": "草木蓑衣",
+          "stats": [
+            40,
+            29,
+            45,
+            29,
+            45,
+            36
+          ]
+        },
+        {
+          "id": 1,
+          "name": "砂土蓑衣",
+          "stats": [
+            40,
+            29,
+            45,
+            29,
+            45,
+            36
+          ]
+        },
+        {
+          "id": 2,
+          "name": "垃圾蓑衣",
+          "stats": [
+            40,
+            29,
+            45,
+            29,
+            45,
+            36
+          ]
+        }
+      ]
+    },
+    {
+      "id": 413,
+      "name": "结草贵妇",
+      "forms": [
+        {
+          "id": 0,
+          "name": "草木蓑衣",
+          "stats": [
+            60,
+            59,
+            85,
+            79,
+            105,
+            36
+          ]
+        },
+        {
+          "id": 1,
+          "name": "砂土蓑衣",
+          "stats": [
+            60,
+            79,
+            105,
+            59,
+            85,
+            36
+          ]
+        },
+        {
+          "id": 2,
+          "name": "垃圾蓑衣",
+          "stats": [
+            60,
+            69,
+            95,
+            69,
+            95,
+            36
+          ]
+        }
+      ]
+    },
+    {
+      "id": 414,
+      "name": "绅士蛾",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            70,
+            94,
+            50,
+            94,
+            50,
+            66
+          ]
+        },
+        {
+          "id": 1,
+          "name": "1",
+          "stats": [
+            70,
+            94,
+            50,
+            94,
+            50,
+            66
+          ]
+        },
+        {
+          "id": 2,
+          "name": "2",
+          "stats": [
+            70,
+            94,
+            50,
+            94,
+            50,
+            66
+          ]
+        }
+      ]
+    },
+    {
+      "id": 415,
+      "name": "三蜜蜂",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            30,
+            30,
+            42,
+            30,
+            42,
+            70
+          ]
+        }
+      ]
+    },
+    {
+      "id": 416,
+      "name": "蜂女王",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            70,
+            80,
+            102,
+            80,
+            102,
+            40
+          ]
+        }
+      ]
+    },
+    {
+      "id": 417,
+      "name": "帕奇利兹",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            45,
+            70,
+            45,
+            90,
+            95
+          ]
+        }
+      ]
+    },
+    {
+      "id": 418,
+      "name": "泳圈鼬",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            55,
+            65,
+            35,
+            60,
+            30,
+            85
+          ]
+        }
+      ]
+    },
+    {
+      "id": 419,
+      "name": "浮潜鼬",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            85,
+            105,
+            55,
+            85,
+            50,
+            115
+          ]
+        }
+      ]
+    },
+    {
+      "id": 420,
+      "name": "樱花宝",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            45,
+            35,
+            45,
+            62,
+            53,
+            35
+          ]
+        }
+      ]
+    },
+    {
+      "id": 421,
+      "name": "樱花儿",
+      "forms": [
+        {
+          "id": 0,
+          "name": "阴天形态",
+          "stats": [
+            70,
+            60,
+            70,
+            87,
+            78,
+            85
+          ]
+        },
+        {
+          "id": 1,
+          "name": "晴天形态",
+          "stats": [
+            70,
+            60,
+            70,
+            87,
+            78,
+            85
+          ]
+        }
+      ]
+    },
+    {
+      "id": 422,
+      "name": "无壳海兔",
+      "forms": [
+        {
+          "id": 0,
+          "name": "西海",
+          "stats": [
+            76,
+            48,
+            48,
+            57,
+            62,
+            34
+          ]
+        },
+        {
+          "id": 1,
+          "name": "东海",
+          "stats": [
+            76,
+            48,
+            48,
+            57,
+            62,
+            34
+          ]
+        }
+      ]
+    },
+    {
+      "id": 423,
+      "name": "海兔兽",
+      "forms": [
+        {
+          "id": 0,
+          "name": "西海",
+          "stats": [
+            111,
+            83,
+            68,
+            92,
+            82,
+            39
+          ]
+        },
+        {
+          "id": 1,
+          "name": "东海",
+          "stats": [
+            111,
+            83,
+            68,
+            92,
+            82,
+            39
+          ]
+        }
+      ]
+    },
+    {
+      "id": 424,
+      "name": "双尾怪手",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            75,
+            100,
+            66,
+            60,
+            66,
+            115
+          ]
+        }
+      ]
+    },
+    {
+      "id": 425,
+      "name": "飘飘球",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            90,
+            50,
+            34,
+            60,
+            44,
+            70
+          ]
+        }
+      ]
+    },
+    {
+      "id": 426,
+      "name": "随风球",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            150,
+            80,
+            44,
+            90,
+            54,
+            80
+          ]
+        }
+      ]
+    },
+    {
+      "id": 427,
+      "name": "卷卷耳",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            55,
+            66,
+            44,
+            44,
+            56,
+            85
+          ]
+        }
+      ]
+    },
+    {
+      "id": 428,
+      "name": "长耳兔",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            65,
+            76,
+            84,
+            54,
+            96,
+            105
+          ]
+        }
+      ]
+    },
+    {
+      "id": 429,
+      "name": "梦妖魔",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            60,
+            60,
+            105,
+            105,
+            105
+          ]
+        }
+      ]
+    },
+    {
+      "id": 430,
+      "name": "乌鸦头头",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            100,
+            125,
+            52,
+            105,
+            52,
+            71
+          ]
+        }
+      ]
+    },
+    {
+      "id": 431,
+      "name": "魅力喵",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            49,
+            55,
+            42,
+            42,
+            37,
+            85
+          ]
+        }
+      ]
+    },
+    {
+      "id": 432,
+      "name": "东施喵",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            71,
+            82,
+            64,
+            64,
+            59,
+            112
+          ]
+        }
+      ]
+    },
+    {
+      "id": 433,
+      "name": "铃铛响",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            45,
+            30,
+            50,
+            65,
+            50,
+            45
+          ]
+        }
+      ]
+    },
+    {
+      "id": 434,
+      "name": "臭鼬噗",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            63,
+            63,
+            47,
+            41,
+            41,
+            74
+          ]
+        }
+      ]
+    },
+    {
+      "id": 435,
+      "name": "坦克臭鼬",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            103,
+            93,
+            67,
+            71,
+            61,
+            84
+          ]
+        }
+      ]
+    },
+    {
+      "id": 436,
+      "name": "铜镜怪",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            57,
+            24,
+            86,
+            24,
+            86,
+            23
+          ]
+        }
+      ]
+    },
+    {
+      "id": 437,
+      "name": "青铜钟",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            67,
+            89,
+            116,
+            79,
+            116,
+            33
+          ]
+        }
+      ]
+    },
+    {
+      "id": 438,
+      "name": "盆才怪",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            50,
+            80,
+            95,
+            10,
+            45,
+            10
+          ]
+        }
+      ]
+    },
+    {
+      "id": 439,
+      "name": "魔尼尼",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            20,
+            25,
+            45,
+            70,
+            90,
+            60
+          ]
+        }
+      ]
+    },
+    {
+      "id": 440,
+      "name": "小福蛋",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            100,
+            5,
+            5,
+            15,
+            65,
+            30
+          ]
+        }
+      ]
+    },
+    {
+      "id": 441,
+      "name": "聒噪鸟",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            76,
+            65,
+            45,
+            92,
+            42,
+            91
+          ]
+        }
+      ]
+    },
+    {
+      "id": 442,
+      "name": "花岩怪",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            50,
+            92,
+            108,
+            92,
+            108,
+            35
+          ]
+        }
+      ]
+    },
+    {
+      "id": 443,
+      "name": "圆陆鲨",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            58,
+            70,
+            45,
+            40,
+            45,
+            42
+          ]
+        }
+      ]
+    },
+    {
+      "id": 444,
+      "name": "尖牙陆鲨",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            68,
+            90,
+            65,
+            50,
+            55,
+            82
+          ]
+        }
+      ]
+    },
+    {
+      "id": 445,
+      "name": "烈咬陆鲨",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            108,
+            130,
+            95,
+            80,
+            85,
+            102
+          ]
+        }
+      ]
+    },
+    {
+      "id": 446,
+      "name": "小卡比兽",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            135,
+            85,
+            40,
+            40,
+            85,
+            5
+          ]
+        }
+      ]
+    },
+    {
+      "id": 447,
+      "name": "利欧路",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            40,
+            70,
+            40,
+            35,
+            40,
+            60
+          ]
+        }
+      ]
+    },
+    {
+      "id": 448,
+      "name": "路卡利欧",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            70,
+            110,
+            70,
+            115,
+            70,
+            90
+          ]
+        }
+      ]
+    },
+    {
+      "id": 449,
+      "name": "沙河马",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            68,
+            72,
+            78,
+            38,
+            42,
+            32
+          ]
+        }
+      ]
+    },
+    {
+      "id": 450,
+      "name": "河马兽",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            108,
+            112,
+            118,
+            68,
+            72,
+            47
+          ]
+        }
+      ]
+    },
+    {
+      "id": 451,
+      "name": "钳尾蝎",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            40,
+            50,
+            90,
+            30,
+            55,
+            65
+          ]
+        }
+      ]
+    },
+    {
+      "id": 452,
+      "name": "龙王蝎",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            70,
+            90,
+            110,
+            60,
+            75,
+            95
+          ]
+        }
+      ]
+    },
+    {
+      "id": 453,
+      "name": "不良蛙",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            48,
+            61,
+            40,
+            61,
+            40,
+            50
+          ]
+        }
+      ]
+    },
+    {
+      "id": 454,
+      "name": "毒骷蛙",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            83,
+            106,
+            65,
+            86,
+            65,
+            85
+          ]
+        }
+      ]
+    },
+    {
+      "id": 455,
+      "name": "尖牙笼",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            74,
+            100,
+            72,
+            90,
+            72,
+            46
+          ]
+        }
+      ]
+    },
+    {
+      "id": 456,
+      "name": "荧光鱼",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            49,
+            49,
+            56,
+            49,
+            61,
+            66
+          ]
+        }
+      ]
+    },
+    {
+      "id": 457,
+      "name": "霓虹鱼",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            69,
+            69,
+            76,
+            69,
+            86,
+            91
+          ]
+        }
+      ]
+    },
+    {
+      "id": 458,
+      "name": "小球飞鱼",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            45,
+            20,
+            50,
+            60,
+            120,
+            50
+          ]
+        }
+      ]
+    },
+    {
+      "id": 459,
+      "name": "雪笠怪",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            62,
+            50,
+            62,
+            60,
+            40
+          ]
+        }
+      ]
+    },
+    {
+      "id": 460,
+      "name": "暴雪王",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            90,
+            92,
+            75,
+            92,
+            85,
+            60
+          ]
+        }
+      ]
+    },
+    {
+      "id": 461,
+      "name": "玛狃拉",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            70,
+            120,
+            65,
+            45,
+            85,
+            125
+          ]
+        }
+      ]
+    },
+    {
+      "id": 462,
+      "name": "自爆磁怪",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            70,
+            70,
+            115,
+            130,
+            90,
+            60
+          ]
+        }
+      ]
+    },
+    {
+      "id": 463,
+      "name": "大舌舔",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            110,
+            85,
+            95,
+            80,
+            95,
+            50
+          ]
+        }
+      ]
+    },
+    {
+      "id": 464,
+      "name": "超甲狂犀",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            115,
+            140,
+            130,
+            55,
+            55,
+            40
+          ]
+        }
+      ]
+    },
+    {
+      "id": 465,
+      "name": "巨蔓藤",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            100,
+            100,
+            125,
+            110,
+            50,
+            50
+          ]
+        }
+      ]
+    },
+    {
+      "id": 466,
+      "name": "电击魔兽",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            75,
+            123,
+            67,
+            95,
+            85,
+            95
+          ]
+        }
+      ]
+    },
+    {
+      "id": 467,
+      "name": "鸭嘴炎兽",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            75,
+            95,
+            67,
+            125,
+            95,
+            83
+          ]
+        }
+      ]
+    },
+    {
+      "id": 468,
+      "name": "波克基斯",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            85,
+            50,
+            95,
+            120,
+            115,
+            80
+          ]
+        }
+      ]
+    },
+    {
+      "id": 469,
+      "name": "远古巨蜓",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            86,
+            76,
+            86,
+            116,
+            56,
+            95
+          ]
+        }
+      ]
+    },
+    {
+      "id": 470,
+      "name": "叶伊布",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            65,
+            110,
+            130,
+            60,
+            65,
+            95
+          ]
+        }
+      ]
+    },
+    {
+      "id": 471,
+      "name": "冰伊布",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            65,
+            60,
+            110,
+            130,
+            95,
+            65
+          ]
+        }
+      ]
+    },
+    {
+      "id": 472,
+      "name": "天蝎王",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            75,
+            95,
+            125,
+            45,
+            75,
+            95
+          ]
+        }
+      ]
+    },
+    {
+      "id": 473,
+      "name": "象牙猪",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            110,
+            130,
+            80,
+            70,
+            60,
+            80
+          ]
+        }
+      ]
+    },
+    {
+      "id": 474,
+      "name": "多边兽Ｚ",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            85,
+            80,
+            70,
+            135,
+            75,
+            90
+          ]
+        }
+      ]
+    },
+    {
+      "id": 475,
+      "name": "艾路雷朵",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            68,
+            125,
+            65,
+            65,
+            115,
+            80
+          ]
+        }
+      ]
+    },
+    {
+      "id": 476,
+      "name": "大朝北鼻",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            60,
+            55,
+            145,
+            75,
+            150,
+            40
+          ]
+        }
+      ]
+    },
+    {
+      "id": 477,
+      "name": "黑夜魔灵",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            45,
+            100,
+            135,
+            65,
+            135,
+            45
+          ]
+        }
+      ]
+    },
+    {
+      "id": 478,
+      "name": "雪妖女",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            70,
+            80,
+            70,
+            80,
+            70,
+            110
+          ]
+        }
+      ]
+    },
+    {
+      "id": 479,
+      "name": "洛托姆",
+      "forms": [
+        {
+          "id": 0,
+          "name": "普通形态",
+          "stats": [
+            50,
+            50,
+            77,
+            95,
+            77,
+            91
+          ]
+        },
+        {
+          "id": 1,
+          "name": "加热形态",
+          "stats": [
+            50,
+            65,
+            107,
+            105,
+            107,
+            86
+          ]
+        },
+        {
+          "id": 2,
+          "name": "清洗形态",
+          "stats": [
+            50,
+            65,
+            107,
+            105,
+            107,
+            86
+          ]
+        },
+        {
+          "id": 3,
+          "name": "结冰形态",
+          "stats": [
+            50,
+            65,
+            107,
+            105,
+            107,
+            86
+          ]
+        },
+        {
+          "id": 4,
+          "name": "旋转形态",
+          "stats": [
+            50,
+            65,
+            107,
+            105,
+            107,
+            86
+          ]
+        },
+        {
+          "id": 5,
+          "name": "切割形态",
+          "stats": [
+            50,
+            65,
+            107,
+            105,
+            107,
+            86
+          ]
+        }
+      ]
+    },
+    {
+      "id": 480,
+      "name": "由克希",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            75,
+            75,
+            130,
+            75,
+            130,
+            95
+          ]
+        }
+      ]
+    },
+    {
+      "id": 481,
+      "name": "艾姆利多",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            80,
+            105,
+            105,
+            105,
+            105,
+            80
+          ]
+        }
+      ]
+    },
+    {
+      "id": 482,
+      "name": "亚克诺姆",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            75,
+            125,
+            70,
+            125,
+            70,
+            115
+          ]
+        }
+      ]
+    },
+    {
+      "id": 483,
+      "name": "帝牙卢卡",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            100,
+            120,
+            120,
+            150,
+            100,
+            90
+          ]
+        }
+      ]
+    },
+    {
+      "id": 484,
+      "name": "帕路奇亚",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            90,
+            120,
+            100,
+            150,
+            120,
+            100
+          ]
+        }
+      ]
+    },
+    {
+      "id": 485,
+      "name": "席多蓝恩",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            91,
+            90,
+            106,
+            130,
+            106,
+            77
+          ]
+        }
+      ]
+    },
+    {
+      "id": 486,
+      "name": "雷吉奇卡斯",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            110,
+            160,
+            110,
+            80,
+            110,
+            100
+          ]
+        }
+      ]
+    },
+    {
+      "id": 487,
+      "name": "骑拉帝纳",
+      "forms": [
+        {
+          "id": 0,
+          "name": "别种形态",
+          "stats": [
+            150,
+            100,
+            120,
+            100,
+            120,
+            90
+          ]
+        },
+        {
+          "id": 1,
+          "name": "起源形态",
+          "stats": [
+            150,
+            120,
+            100,
+            120,
+            100,
+            90
+          ]
+        }
+      ]
+    },
+    {
+      "id": 488,
+      "name": "克雷色利亚",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            120,
+            70,
+            120,
+            75,
+            130,
+            85
+          ]
+        }
+      ]
+    },
+    {
+      "id": 489,
+      "name": "霏欧纳",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            80,
+            80,
+            80,
+            80,
+            80,
+            80
+          ]
+        }
+      ]
+    },
+    {
+      "id": 490,
+      "name": "玛纳霏",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            100,
+            100,
+            100,
+            100,
+            100,
+            100
+          ]
+        }
+      ]
+    },
+    {
+      "id": 491,
+      "name": "达克莱伊",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            70,
+            90,
+            90,
+            135,
+            90,
+            125
+          ]
+        }
+      ]
+    },
+    {
+      "id": 492,
+      "name": "谢米",
+      "forms": [
+        {
+          "id": 0,
+          "name": "陆上形态",
+          "stats": [
+            100,
+            100,
+            100,
+            100,
+            100,
+            100
+          ]
+        },
+        {
+          "id": 1,
+          "name": "天空形态",
+          "stats": [
+            100,
+            103,
+            75,
+            120,
+            75,
+            127
+          ]
+        }
+      ]
+    },
+    {
+      "id": 493,
+      "name": "阿尔宙斯",
+      "forms": [
+        {
+          "id": 0,
+          "name": "0",
+          "stats": [
+            120,
+            120,
+            120,
+            120,
+            120,
+            120
+          ]
+        },
+        {
+          "id": 1,
+          "name": "1",
+          "stats": [
+            120,
+            120,
+            120,
+            120,
+            120,
+            120
+          ]
+        },
+        {
+          "id": 2,
+          "name": "2",
+          "stats": [
+            120,
+            120,
+            120,
+            120,
+            120,
+            120
+          ]
+        },
+        {
+          "id": 3,
+          "name": "3",
+          "stats": [
+            120,
+            120,
+            120,
+            120,
+            120,
+            120
+          ]
+        },
+        {
+          "id": 4,
+          "name": "4",
+          "stats": [
+            120,
+            120,
+            120,
+            120,
+            120,
+            120
+          ]
+        },
+        {
+          "id": 5,
+          "name": "5",
+          "stats": [
+            120,
+            120,
+            120,
+            120,
+            120,
+            120
+          ]
+        },
+        {
+          "id": 6,
+          "name": "6",
+          "stats": [
+            120,
+            120,
+            120,
+            120,
+            120,
+            120
+          ]
+        },
+        {
+          "id": 7,
+          "name": "7",
+          "stats": [
+            120,
+            120,
+            120,
+            120,
+            120,
+            120
+          ]
+        },
+        {
+          "id": 8,
+          "name": "8",
+          "stats": [
+            120,
+            120,
+            120,
+            120,
+            120,
+            120
+          ]
+        },
+        {
+          "id": 9,
+          "name": "9",
+          "stats": [
+            120,
+            120,
+            120,
+            120,
+            120,
+            120
+          ]
+        },
+        {
+          "id": 10,
+          "name": "10",
+          "stats": [
+            120,
+            120,
+            120,
+            120,
+            120,
+            120
+          ]
+        },
+        {
+          "id": 11,
+          "name": "11",
+          "stats": [
+            120,
+            120,
+            120,
+            120,
+            120,
+            120
+          ]
+        },
+        {
+          "id": 12,
+          "name": "12",
+          "stats": [
+            120,
+            120,
+            120,
+            120,
+            120,
+            120
+          ]
+        },
+        {
+          "id": 13,
+          "name": "13",
+          "stats": [
+            120,
+            120,
+            120,
+            120,
+            120,
+            120
+          ]
+        },
+        {
+          "id": 14,
+          "name": "14",
+          "stats": [
+            120,
+            120,
+            120,
+            120,
+            120,
+            120
+          ]
+        },
+        {
+          "id": 15,
+          "name": "15",
+          "stats": [
+            120,
+            120,
+            120,
+            120,
+            120,
+            120
+          ]
+        },
+        {
+          "id": 16,
+          "name": "16",
+          "stats": [
+            120,
+            120,
+            120,
+            120,
+            120,
+            120
+          ]
+        },
+        {
+          "id": 17,
+          "name": "17",
+          "stats": [
+            120,
+            120,
+            120,
+            120,
+            120,
+            120
+          ]
+        }
+      ]
+    }
+  ],
+  "natures": [
+    "勤奋",
+    "怕寂寞",
+    "勇敢",
+    "固执",
+    "顽皮",
+    "大胆",
+    "坦率",
+    "悠闲",
+    "淘气",
+    "乐天",
+    "胆小",
+    "急躁",
+    "认真",
+    "爽朗",
+    "天真",
+    "内敛",
+    "慢吞吞",
+    "冷静",
+    "害羞",
+    "马虎",
+    "温和",
+    "温顺",
+    "自大",
+    "慎重",
+    "浮躁"
+  ],
+  "characteristics": [
+    "非常喜欢吃东西",
+    "经常睡午觉",
+    "常常打瞌睡",
+    "经常乱扔东西",
+    "喜欢悠然自在",
+    "以力气大为傲",
+    "喜欢胡闹",
+    "有点容易生气",
+    "喜欢打架",
+    "血气方刚",
+    "身体强壮",
+    "抗打能力强",
+    "顽强不屈",
+    "能吃苦耐劳",
+    "善于忍耐",
+    "喜欢比谁跑得快",
+    "对声音敏感",
+    "冒冒失失",
+    "有点容易得意忘形",
+    "逃得快",
+    "好奇心强",
+    "喜欢恶作剧",
+    "做事万无一失",
+    "经常思考",
+    "一丝不苟",
+    "性格强势",
+    "有一点点爱慕虚荣",
+    "争强好胜",
+    "不服输",
+    "有一点点固执"
+  ],
+  "abilities": [
+    "恶臭",
+    "降雨",
+    "加速",
+    "战斗盔甲",
+    "结实",
+    "湿气",
+    "柔软",
+    "沙隐",
+    "静电",
+    "蓄电",
+    "储水",
+    "迟钝",
+    "无关天气",
+    "复眼",
+    "不眠",
+    "变色",
+    "免疫",
+    "引火",
+    "鳞粉",
+    "我行我素",
+    "吸盘",
+    "威吓",
+    "踩影",
+    "粗糙皮肤",
+    "神奇守护",
+    "飘浮",
+    "孢子",
+    "同步",
+    "恒净之躯",
+    "自然回复",
+    "避雷针",
+    "天恩",
+    "悠游自如",
+    "叶绿素",
+    "发光",
+    "复制",
+    "大力士",
+    "毒刺",
+    "精神力",
+    "熔岩铠甲",
+    "水幕",
+    "磁力",
+    "隔音",
+    "雨盘",
+    "扬沙",
+    "压迫感",
+    "厚脂肪",
+    "早起",
+    "火焰之躯",
+    "逃跑",
+    "锐利目光",
+    "怪力钳",
+    "捡拾",
+    "懒惰",
+    "活力",
+    "迷人之躯",
+    "正电",
+    "负电",
+    "阴晴不定",
+    "黏着",
+    "蜕皮",
+    "毅力",
+    "神奇鳞片",
+    "污泥浆",
+    "茂盛",
+    "猛火",
+    "激流",
+    "虫之预感",
+    "坚硬脑袋",
+    "日照",
+    "沙穴",
+    "干劲",
+    "白色烟雾",
+    "瑜伽之力",
+    "硬壳盔甲",
+    "气闸",
+    "蹒跚",
+    "电气引擎",
+    "斗争心",
+    "不屈之心",
+    "雪隐",
+    "贪吃鬼",
+    "愤怒穴位",
+    "轻装",
+    "耐热",
+    "单纯",
+    "干燥皮肤",
+    "下载",
+    "铁拳",
+    "毒疗",
+    "适应力",
+    "连续攻击",
+    "湿润之躯",
+    "太阳之力",
+    "飞毛腿",
+    "一般皮肤",
+    "狙击手",
+    "魔法防守",
+    "无防守",
+    "慢出",
+    "技术高手",
+    "叶子防守",
+    "笨拙",
+    "破格",
+    "超幸运",
+    "引爆",
+    "危险预知",
+    "预知梦",
+    "纯朴",
+    "有色眼镜",
+    "过滤",
+    "慢启动",
+    "胆量",
+    "引水",
+    "冰冻之躯",
+    "坚硬岩石",
+    "降雪",
+    "采蜜",
+    "察觉",
+    "舍身",
+    "多属性",
+    "花之礼",
+    "梦魇",
+    "顺手牵羊",
+    "强行",
+    "唱反调",
+    "紧张感",
+    "不服输",
+    "软弱",
+    "诅咒之躯",
+    "治愈之心",
+    "友情防守",
+    "碎裂铠甲",
+    "重金属",
+    "轻金属",
+    "多重鳞片",
+    "中毒激升",
+    "受热激升",
+    "收获",
+    "心灵感应",
+    "心情不定",
+    "防尘",
+    "毒手",
+    "再生力",
+    "健壮胸肌",
+    "拨沙",
+    "奇迹皮肤",
+    "分析",
+    "幻觉",
+    "变身者",
+    "穿透",
+    "木乃伊",
+    "自信过度",
+    "正义之心",
+    "胆怯",
+    "魔法镜",
+    "食草",
+    "恶作剧之心",
+    "沙之力",
+    "铁刺",
+    "达摩模式",
+    "胜利之星",
+    "涡轮火焰",
+    "兆级电压",
+    "芳香幕",
+    "花幕",
+    "颊囊",
+    "变幻自如",
+    "毛皮大衣",
+    "魔术师",
+    "防弹",
+    "好胜",
+    "强壮之颚",
+    "冰冻皮肤",
+    "甜幕",
+    "战斗切换",
+    "疾风之翼",
+    "超级发射器",
+    "草之毛皮",
+    "共生",
+    "硬爪",
+    "妖精皮肤",
+    "黏滑",
+    "飞行皮肤",
+    "亲子爱",
+    "暗黑气场",
+    "妖精气场",
+    "气场破坏",
+    "始源之海",
+    "终结之地",
+    "德尔塔气流",
+    "持久力",
+    "跃跃欲逃",
+    "危险回避",
+    "遇水凝固",
+    "不仁不义",
+    "界限盾壳",
+    "蹲守",
+    "水泡",
+    "钢能力者",
+    "怒火冲天",
+    "拨雪",
+    "远隔",
+    "湿润之声",
+    "先行治疗",
+    "电气皮肤",
+    "冲浪之尾",
+    "鱼群",
+    "画皮",
+    "牵绊变身",
+    "群聚变形",
+    "腐蚀",
+    "绝对睡眠",
+    "女王的威严",
+    "飞出的内在物",
+    "舞者",
+    "蓄电池",
+    "毛茸茸",
+    "鲜艳之躯",
+    "魂心",
+    "卷发",
+    "接球手",
+    "化学之力",
+    "异兽提升",
+    "ＡＲ系统",
+    "电气制造者",
+    "精神制造者",
+    "薄雾制造者",
+    "青草制造者",
+    "金属防护",
+    "幻影防守",
+    "棱镜装甲",
+    "脑核之力",
+    "不挠之剑",
+    "不屈之盾",
+    "自由者",
+    "捡球",
+    "棉絮",
+    "螺旋尾鳍",
+    "镜甲",
+    "一口导弹",
+    "坚毅",
+    "蒸汽机",
+    "庞克摇滚",
+    "吐沙",
+    "冰鳞粉",
+    "熟成",
+    "结冻头",
+    "能量点",
+    "拟态",
+    "除障",
+    "钢之意志",
+    "灭亡之躯",
+    "游魂",
+    "一猩一意",
+    "化学变化气体",
+    "粉彩护幕",
+    "饱了又饿"
+  ],
+  "hiddenPowers": [
+    "格斗",
+    "飞行",
+    "毒",
+    "地面",
+    "岩石",
+    "虫",
+    "幽灵",
+    "钢",
+    "火",
+    "水",
+    "草",
+    "电",
+    "超能力",
+    "冰",
+    "龙",
+    "恶"
+  ]
+}

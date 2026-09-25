@@ -47,4 +47,11 @@ describe('BDSP static encounter metadata', () => {
       '温和', '温顺', '自大', '慎重', '浮躁',
     ]);
   });
+
+  it('uses upstream gift levels and Ramanas hidden abilities instead of the old guessed templates', () => {
+    expect(getStaticTargets('mythics').filter(row => ['Mew', 'Jirachi'].includes(row.speciesKey)).map(row => [row.speciesKey, row.level, row.ability, row.shiny])).toEqual([
+      ['Mew', 1, 1, 1], ['Jirachi', 5, 1, 1],
+    ]);
+    for (const key of ['Articuno', 'Raikou', 'Regirock', 'Mewtwo', 'Lugia', 'Ho-Oh']) expect(getStaticTargets().find(row => row.speciesKey === key)?.ability).toBe(2);
+  });
 });

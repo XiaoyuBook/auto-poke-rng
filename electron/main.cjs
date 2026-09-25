@@ -4,11 +4,13 @@ const { registerPanelWindows } = require('./panel-windows.cjs');
 const { registerScriptFiles } = require('./script-files.cjs');
 const { registerDevices } = require('./devices.cjs');
 const { registerQQNotifications } = require('./qq-notifications.cjs');
+const { registerRng } = require('./rng-client.cjs');
 
 let mainWindow = null;
 let panels;
 let devices;
 let notifications;
+let rng;
 let quitting = false;
 
 function loadWindow(window, query = {}) {
@@ -58,6 +60,7 @@ app.whenReady().then(() => {
   const testDevices = !app.isPackaged || process.env.AUTO_POKE_TEST_DEVICES === '1';
   devices = registerDevices({ ipcMain, getWindows: () => BrowserWindow.getAllWindows(), loadWindow, testMode: testDevices });
   notifications = registerQQNotifications({ ipcMain, getMainWindow: () => mainWindow, safeStorage, nativeImage, userData: app.getPath('userData') });
+  rng = registerRng({ ipcMain, getMainWindow: () => mainWindow });
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -68,7 +71,7 @@ app.on('before-quit', event => {
   if (quitting || !devices) return;
   event.preventDefault(); quitting = true;
   notifications?.close();
-  void devices.close().finally(() => app.quit());
+  void Promise.allSettled([devices.close(), rng?.close?.()]).finally(() => app.quit());
 });
 
 app.on('window-all-closed', () => {

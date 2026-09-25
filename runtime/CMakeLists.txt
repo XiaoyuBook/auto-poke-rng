@@ -18,8 +18,28 @@ function(download_header name url hash)
 endfunction()
 download_header(json.hpp https://raw.githubusercontent.com/nlohmann/json/v3.12.0/single_include/nlohmann/json.hpp aaf127c04cb31c406e5b04a63f1ae89369fccde6d8fa7cdda1ed4f32dfc5de63)
 download_header(httplib.h https://raw.githubusercontent.com/yhirose/cpp-httplib/v0.20.1/httplib.h 7d3f813d05dad23b9c66eb6d9c1ff3d66f6acfaf6e5900ce960f7990e78079ea)
-add_library(runtime_core src/platform.cpp src/frame_hub.cpp src/shared_frames.cpp src/capture.cpp src/controller.cpp)
-target_include_directories(runtime_core PUBLIC include "${DEPS}" ${OpenCV_INCLUDE_DIRS})
+set(POKEFINDER "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/PokeFinder")
+find_program(NODE_EXECUTABLE node REQUIRED)
+execute_process(COMMAND "${NODE_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/../tools/generate-bdsp-data.mjs" COMMAND_ERROR_IS_FATAL ANY)
+add_library(pokefinder_bdsp STATIC
+  "${POKEFINDER}/Core/Gen8/Generators/StaticGenerator8.cpp"
+  "${POKEFINDER}/Core/Gen8/Profile8.cpp"
+  "${POKEFINDER}/Core/Parents/Profile.cpp"
+  "${POKEFINDER}/Core/Parents/States/State.cpp"
+  "${POKEFINDER}/Core/Parents/Filters/StateFilter.cpp"
+  "${POKEFINDER}/Core/RNG/Xorshift.cpp"
+  "${POKEFINDER}/Core/RNG/Xoroshiro.cpp"
+  "${POKEFINDER}/Core/Util/Nature.cpp"
+  "${POKEFINDER}/Core/Util/IVChecker.cpp"
+  src/bdsp_personal_loader.cpp)
+target_include_directories(pokefinder_bdsp PUBLIC "${POKEFINDER}" PRIVATE generated)
+set_target_properties(pokefinder_bdsp PROPERTIES CXX_STANDARD 23)
+if(MSVC)
+  target_compile_options(pokefinder_bdsp PRIVATE /utf-8 /EHsc)
+endif()
+add_library(runtime_core src/platform.cpp src/frame_hub.cpp src/shared_frames.cpp src/capture.cpp src/controller.cpp src/pokefinder_static.cpp src/pokefinder_iv.cpp)
+target_include_directories(runtime_core PUBLIC include "${DEPS}" ${OpenCV_INCLUDE_DIRS} PRIVATE generated)
+target_link_libraries(runtime_core PUBLIC pokefinder_bdsp)
 target_compile_definitions(runtime_core PUBLIC NOMINMAX WIN32_LEAN_AND_MEAN _WIN32_WINNT=0x0A00)
 target_link_libraries(runtime_core PUBLIC ${OpenCV_LIBS} mfplat mf mfuuid strmiids ole32 oleaut32 advapi32 ws2_32)
 if(MSVC)

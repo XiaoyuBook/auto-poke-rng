@@ -73,6 +73,11 @@ contextBridge.exposeInMainWorld('desktop', {
     labelRead: (folder, name) => ipcRenderer.invoke('scripts:label-read', { folder, name }),
     labelSave: label => ipcRenderer.invoke('scripts:label-save', label),
   },
+  rng: {
+    staticGenerate: request => ipcRenderer.invoke('rng:static-generate', request),
+    cancel: () => ipcRenderer.invoke('rng:cancel'),
+    calculateIvs: request => ipcRenderer.invoke('rng:iv-calculate', request),
+  },
   panels: {
     open: tool => ipcRenderer.invoke('panels:open', tool),
     getState: () => ipcRenderer.invoke('panels:get-state'),
