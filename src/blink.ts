@@ -31,8 +31,9 @@ export interface BlinkApi {
 }
 export type BlinkSelection = { kind: 'eye' | 'roi'; frame: Snapshot };
 export const blinkBusy = (state: BlinkState) => ['starting', 'preview', 'capturing', 'solving', 'tracking', 'countdown', 'timeline', 'stopping'].includes(state.status);
+const fixedSearchRange = { searchMin: 0, searchMax: 1_000_000 };
 export const newBlinkConfig = (): BlinkConfig => ({ name: '默认', mode: 'recover', eye: '', eyeRect: null, roi: null,
-  sourceWidth: 0, sourceHeight: 0, threshold: 0.9, npc: 0, noisy: false, seed: ['', '', '', ''], searchMin: 0, searchMax: 1000000,
+  sourceWidth: 0, sourceHeight: 0, threshold: 0.9, npc: 0, noisy: false, seed: ['', '', '', ''], ...fixedSearchRange,
   timeDelay: 0, advanceDelay: 0, advanceDelay2: 0, timelineNpc: 0, pokemonNpc: 0, menuClose: true });
 const storageKey = 'auto-poke-rng:bdsp-blink-configs';
 function loadConfigs(): BlinkConfig[] {
@@ -41,7 +42,7 @@ function loadConfigs(): BlinkConfig[] {
     if (!Array.isArray(parsed)) return [];
     return parsed.filter(value => value && typeof value.name === 'string' && typeof value.eye === 'string'
       && ['recover', 'reidentify', 'munchlax'].includes(value.mode) && Array.isArray(value.seed) && value.seed.length === 4)
-      .slice(0, 20).map(value => ({ ...newBlinkConfig(), ...value }));
+      .slice(0, 20).map(value => ({ ...newBlinkConfig(), ...value, ...fixedSearchRange }));
   } catch { return []; }
 }
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : String(error);
@@ -157,7 +158,7 @@ export function useBlink(video: VideoState, enabled: boolean, viewActive = false
   const run = async (mode: BlinkMode | 'preview' = config.mode) => {
     if (!api || busy || selection || selecting) return;
     setNotice('');
-    const parameters = { ...config, mode, ...(mode === 'reidentify' && config.noisy ? { pokemonNpc: 1 } : {}) };
+    const parameters = { ...config, mode, ...fixedSearchRange, ...(mode === 'reidentify' && config.noisy ? { pokemonNpc: 1 } : {}) };
     if (mode !== 'preview') setConfig(current => ({ ...current, ...parameters, mode }));
     try { await api.start(parameters); }
     catch (error) { setNotice(errorMessage(error)); }
@@ -170,15 +171,16 @@ export function useBlink(video: VideoState, enabled: boolean, viewActive = false
     try {
       const imported = await api.importConfig();
       if (!imported || version !== selectionVersion.current || !active.current) return;
-      setConfig({ ...newBlinkConfig(), ...imported });
+      setConfig({ ...newBlinkConfig(), ...imported, ...fixedSearchRange });
       setNotice(imported.eye && imported.roi ? '已导入原版配置，请用识别预览核对当前画面后保存。' : '参数已导入，请在当前视频重新框选模板与 ROI 后保存。');
     } catch (error) { setNotice(errorMessage(error)); }
   };
   const save = () => {
     const name = config.name.trim();
     if (!name) { setNotice('请输入配置名称。'); return; }
-    const next = [{ ...config, name }, ...configs.filter(item => item.name !== name)].slice(0, 20);
-    try { localStorage.setItem(storageKey, JSON.stringify(next)); setConfigs(next); setConfig({ ...config, name }); setNotice('配置已保存'); }
+    const saved = { ...config, name, ...fixedSearchRange };
+    const next = [saved, ...configs.filter(item => item.name !== name)].slice(0, 20);
+    try { localStorage.setItem(storageKey, JSON.stringify(next)); setConfigs(next); setConfig(saved); setNotice('配置已保存'); }
     catch { setNotice('配置保存失败，本地存储空间不足。'); }
   };
   return { configs, config, setConfig, state, observation, busy, selection, selecting, notice, setNotice, beginSelection, cancelSelection, finishSelection,

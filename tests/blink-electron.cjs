@@ -63,7 +63,7 @@ app.whenReady().then(async () => {
   await until(`Boolean(document.querySelector('.blink-roi') && document.querySelector('.blink-match'))`, 'live ROI and matched eye boxes');
   assert.equal(await js(`Boolean(document.querySelector('.blink-video-status [aria-label="眨眼匹配阈值"]')) && !document.querySelector('.blink-eye-strip')`), true, 'threshold and score stay in the video corner');
   assert.equal(blink.getState().status, 'idle', 'live overlay does not occupy the capture job');
-  await click('保存配置');
+  await click('保存');
   const saved = await js(`JSON.parse(localStorage.getItem('auto-poke-rng:bdsp-blink-configs'))[0]`);
   assert.equal(saved.sourceWidth, 640); assert.equal(saved.sourceHeight, 480);
   assert.ok(Math.abs(saved.roi.x - 18) <= 2 && Math.abs(saved.roi.width - 128) <= 3, 'letterboxed display uses native pixel coordinates');
@@ -79,15 +79,20 @@ app.whenReady().then(async () => {
     const logs=document.querySelector('.persistent-logs');
     const logArea=logs.getBoundingClientRect();
     const config=document.querySelector('.blink-config-row');
+    const configArea=config.getBoundingClientRect();
+    const picker=config.querySelector('.blink-config-picker').getBoundingClientRect();
     const controls=[...config.querySelectorAll('select,input,button')].map(x=>x.getBoundingClientRect());
+    const configButtons=[...config.querySelectorAll(':scope > button')].map(x=>x.getBoundingClientRect());
     const buttons=[...document.querySelectorAll('.blink-capture-actions button')].map(x=>x.getBoundingClientRect());
     return {logsBelowVideo:!logs.hidden && logArea.top>=video.bottom,
       seedInVideo:seed.left>=video.left && seed.right<=video.right && seed.bottom<=video.bottom,
       badgesSeparate:!threshold || seed.right<=threshold.left || seed.top>=threshold.bottom,
       actionsOnTwoRows:buttons.length===4 && Math.abs(buttons[0].top-buttons[1].top)<2 && Math.abs(buttons[2].top-buttons[3].top)<2,
-      configOnOneRow:controls.every(r=>Math.abs(r.bottom-controls[0].bottom)<2)};
+      configOnOneRow:controls.every(r=>Math.abs(r.bottom-controls[0].bottom)<2),
+      configFits:controls.every(r=>r.left>=configArea.left-1 && r.right<=configArea.right+1 && r.top>=configArea.top-1 && r.bottom<=configArea.bottom+1),
+      configWrapped:configButtons.length===3 && configButtons.every(r=>r.top>=picker.bottom && Math.abs(r.top-configButtons[0].top)<2)};
   })()`);
-  assert.deepEqual(await compactLayout(), { logsBelowVideo: true, seedInVideo: true, badgesSeparate: true, actionsOnTwoRows: true, configOnOneRow: true }, 'logs stay below the video while frame and Seed fit in its top-left corner');
+  assert.deepEqual(await compactLayout(), { logsBelowVideo: true, seedInVideo: true, badgesSeparate: true, actionsOnTwoRows: true, configOnOneRow: true, configFits: true, configWrapped: false }, 'logs stay below the video while frame and Seed fit in its top-left corner');
   fs.writeFileSync(path.join(output, 'blink-preview-1500.png'), (await main.webContents.capturePage()).toPNG());
   await click('停止'); await until(`window.desktop.blink.getState().then(x=>x.status==='stopped')`, 'stop preview');
   await js(`document.querySelector('.blink-advanced').open=true`);
@@ -112,7 +117,8 @@ app.whenReady().then(async () => {
   await click('眨眼捕获');
   main.setSize(1100, 720); await delay(100);
   assert.equal(await js(`(() => {const s=document.querySelector('.blink-scroll');return s.scrollWidth<=s.clientWidth+1;})()`), true, 'narrow workspace must not clip controls horizontally');
-  assert.equal((await compactLayout()).configOnOneRow, true, 'compact save button keeps configuration on one row in small windows');
+  assert.equal((await compactLayout()).configFits, true, 'configuration input and buttons fit in a small window');
+  assert.equal((await compactLayout()).configWrapped, true, 'configuration actions wrap beneath the name in a small window');
   assert.equal(await js(`(() => {const r=document.querySelector('.blink-footer').getBoundingClientRect();return r.bottom<innerHeight && r.top>50;})()`), true, 'stop and status remain reachable in a small window');
   fs.writeFileSync(path.join(output, 'blink-compact-1100.png'), (await main.webContents.capturePage()).toPNG());
   await js(`window.desktop.devices.video.disconnect()`);

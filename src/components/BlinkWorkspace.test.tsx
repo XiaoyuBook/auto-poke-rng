@@ -53,6 +53,35 @@ it('requires real template/ROI, sends chosen mode and persists saved configurati
   fireEvent.click(screen.getByRole('button', { name: '保存配置' }));
   expect(JSON.parse(localStorage.getItem('auto-poke-rng:bdsp-blink-configs')!)[0].name).toBe('洞窟');
 });
+it('edits Chinese config names and creates, saves, and selects configurations in the header', async () => {
+  const api = setup(); render(<api.Harness />);
+  await act(async () => {});
+  expect(screen.queryByText('校正范围与初始 Seed')).toBeNull();
+  expect(screen.queryByLabelText('眨眼搜索起点')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: '准备配置' }));
+  fireEvent.change(screen.getByLabelText('眨眼配置名称'), { target: { value: '洞窟眨眼' } });
+  fireEvent.click(screen.getByRole('button', { name: '保存配置' }));
+  fireEvent.click(screen.getByRole('button', { name: '新增配置' }));
+  expect((screen.getByLabelText('眨眼配置名称') as HTMLInputElement).value).toBe('');
+  fireEvent.change(screen.getByLabelText('眨眼配置名称'), { target: { value: '新配置' } });
+  fireEvent.click(screen.getByRole('button', { name: '保存配置' }));
+  fireEvent.click(screen.getByRole('button', { name: '展开眨眼配置' }));
+  expect(screen.getByRole('combobox', { name: '眨眼配置名称' }).getAttribute('aria-expanded')).toBe('true');
+  fireEvent.click(screen.getByRole('option', { name: '洞窟眨眼' }));
+  expect((screen.getByLabelText('眨眼配置名称') as HTMLInputElement).value).toBe('洞窟眨眼');
+  expect((screen.getByRole('button', { name: '捕捉 Seed' }) as HTMLButtonElement).disabled).toBe(false);
+  expect(screen.queryByRole('listbox', { name: '已保存的眨眼配置' })).toBeNull();
+});
+it('uses the fixed million-step calibration range for legacy configurations', async () => {
+  const legacy = { ...newBlinkConfig(), name: '旧配置', eye: 'data:image/png;base64,AAAA', roi: { x: 0, y: 0, width: 50, height: 50 }, sourceWidth: 1920, sourceHeight: 1080, seed: ['12345678', '87654321', '87654321', '12345678'], searchMin: 25, searchMax: 500 };
+  localStorage.setItem('auto-poke-rng:bdsp-blink-configs', JSON.stringify([legacy]));
+  const api = setup(); render(<api.Harness />);
+  await act(async () => {});
+  fireEvent.click(screen.getByRole('button', { name: '校正' }));
+  await waitFor(() => expect(api.start).toHaveBeenCalledWith(expect.objectContaining({ mode: 'reidentify', searchMin: 0, searchMax: 1_000_000 })));
+  fireEvent.click(screen.getByRole('button', { name: '保存配置' }));
+  expect(JSON.parse(localStorage.getItem('auto-poke-rng:bdsp-blink-configs')!)[0]).toMatchObject({ searchMin: 0, searchMax: 1_000_000 });
+});
 it('shows capture progress in the footer for the selected mode', async () => {
   const api = setup(); render(<api.Harness />);
   await act(async () => {});
@@ -60,7 +89,7 @@ it('shows capture progress in the footer for the selected mode', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'TID/SID 测种' }));
   api.update({ revision: 3, mode: 'munchlax', status: 'capturing', captured: 2, target: 64, blinks: [0,0], intervals: [1.23,4.56], message: '捕获中' });
   expect(screen.getByText('2 / 64')).toBeTruthy();
-  api.update({ revision: 4, mode: 'munchlax', status: 'stopped', captured: 2, target: 64, message: '已停止' });
+  api.update({ revision: 4, mode: 'munchlax', status: 'stopped', captured: 2, target: 64, message: '已停止', result: { words: ['12345678', '87654321', '87654321', '12345678'], pair: ['1234567887654321', '8765432112345678'], mode: 'munchlax', matchedAdvance: null, capturedAt: 1, blinks: [], intervals: [] } });
   fireEvent.click(screen.getByRole('button', { name: '校正' }));
   api.update({ revision: 5, mode: 'reidentify', status: 'capturing', captured: 0, target: 7, message: '捕获中' });
   expect(screen.getByText('0 / 7')).toBeTruthy();
