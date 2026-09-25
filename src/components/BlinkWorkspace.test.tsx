@@ -114,6 +114,9 @@ it('shows capture progress under the video threshold for the selected mode', asy
   fireEvent.click(screen.getByRole('button', { name: '校正' }));
   api.update({ revision: 7, mode: 'reidentify', status: 'capturing', captured: 0, target: 20, message: '捕获中' });
   expect(screen.getByRole('status', { name: '眨眼捕捉进度' }).textContent).toContain('0 / 20');
+  api.update({ revision: 8, mode: 'reidentify', status: 'tracking', captured: 20, target: 20, message: '校正完成，正在推进', tracking: { advances: 31, phase: 'tracking', nextIn: .5, countdown: null, words: ['12345678', '87654321', '87654321', '12345678'], pair: ['1234567887654321', '8765432112345678'] } });
+  expect(screen.getByRole('button', { name: '校正' })).toBeTruthy();
+  expect(screen.queryByRole('button', { name: '停止校正' })).toBeNull();
 });
 
 it('persists every original timing parameter and sends them to capture and Timeline', async () => {
@@ -133,12 +136,31 @@ it('persists every original timing parameter and sends them to capture and Timel
   await waitFor(() => expect(api.start).toHaveBeenCalledWith(expect.objectContaining(timing)));
   api.update({ revision: 3, mode: 'recover', status: 'tracking', captured: 40, target: 40, message: '正在推进', tracking: { advances: 25, phase: 'tracking', nextIn: .5, countdown: null, words: ['1','2','3','4'], pair: [] } });
   expect(screen.getByLabelText('当前帧数').textContent).toBe('25');
-  expect(screen.getByRole('button', { name: '停止捕捉 Seed' }).textContent).toContain('停止');
-  expect((screen.getByRole('button', { name: 'TID/SID 测种' }) as HTMLButtonElement).disabled).toBe(true);
+  expect((screen.getByRole('button', { name: '捕捉 Seed' }) as HTMLButtonElement).disabled).toBe(false);
+  expect((screen.getByRole('button', { name: 'TID/SID 测种' }) as HTMLButtonElement).disabled).toBe(false);
+  expect(screen.getByRole('button', { name: '停止推进' })).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Timeline' }));
   expect(api.timeline).toHaveBeenCalledOnce();
   api.update({ revision: 4, mode: 'munchlax', status: 'tracking', captured: 64, target: 64, message: '正在推进' });
   expect((screen.getByRole('button', { name: 'Timeline' }) as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.click(screen.getByRole('button', { name: '停止推进' }));
+  expect(api.stop).toHaveBeenCalledOnce();
+});
+it('restores capture buttons after recovery and stops old tracking before calibration', async () => {
+  const api = setup(); render(<api.Harness overlay />); await act(async () => {});
+  fireEvent.click(screen.getByRole('button', { name: '准备配置' }));
+  fireEvent.click(screen.getByRole('button', { name: '捕捉 Seed' }));
+  api.update({ revision: 3, mode: 'recover', status: 'tracking', captured: 40, target: 40, message: '正在推进',
+    result: { words: ['12345678', '87654321', '87654321', '12345678'], pair: ['1234567887654321', '8765432112345678'], mode: 'recover', matchedAdvance: null, capturedAt: 1, blinks: [], intervals: [] },
+    tracking: { advances: 25, phase: 'tracking', nextIn: .5, countdown: null, words: ['12345678', '87654321', '87654321', '12345678'], pair: ['1234567887654321', '8765432112345678'] } });
+  await act(async () => {});
+  expect(screen.queryByRole('status', { name: '眨眼捕捉进度' })).toBeNull();
+  expect(screen.getByRole('status', { name: '眨眼推进状态' }).textContent).toContain('持续推进中');
+  expect(screen.getByRole('button', { name: '捕捉 Seed' })).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: '校正' }));
+  await waitFor(() => expect(api.start).toHaveBeenCalledWith(expect.objectContaining({ mode: 'reidentify' })));
+  expect(api.stop).toHaveBeenCalledOnce();
+  expect(api.stop.mock.invocationCallOrder[0]).toBeLessThan(api.start.mock.invocationCallOrder[1]);
 });
 it('reports real progress, locks settings, and stops on game exit', async () => {
   const api = setup(); const app = render(<api.Harness overlay />);

@@ -19,10 +19,11 @@ export function BlinkWorkspace({ blink, video }: { blink: BlinkController; video
   const rect = config.roi;
   const ready = Boolean(config.eye && rect && video.status === 'connected' && config.sourceWidth === video.width && config.sourceHeight === video.height);
   const locked = busy || Boolean(blink.selection) || blink.selecting;
-  const unavailable = !ready || locked || !window.desktop?.blink;
+  const unavailable = !ready || Boolean(blink.selection) || blink.selecting || (busy && state.status !== 'tracking') || !window.desktop?.blink;
+  const capturing = ['starting', 'capturing', 'solving'].includes(state.status) || (state.status === 'stopping' && !state.tracking);
   const hasSeed = config.seed.length === 4 && config.seed.every(word => /^[\da-f]{1,8}$/i.test(word)) && config.seed.some(word => !/^0+$/.test(word));
   const actionButton = (mode: BlinkMode, label: string, primary = false) => {
-    const active = busy && state.mode === mode;
+    const active = capturing && state.mode === mode;
     return <button className={'button' + (active ? ' danger' : primary ? ' primary' : '')} type="button"
       aria-label={active ? `停止${label}` : label}
       title={mode === 'reidentify' && !active && !hasSeed ? '先捕捉 Seed 或选择已有配置，再进行校正' : undefined}

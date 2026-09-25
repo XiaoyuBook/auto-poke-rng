@@ -1129,6 +1129,7 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .blink-video-status input:disabled { opacity: .6; }
 .blink-video-progress { display: flex; justify-content: space-between; gap: 12px; padding-top: 4px; border-top: 1px solid #59645c99; }
 .blink-video-progress strong { color: #a6d8b8; font: 11px var(--mono); }
+.blink-video-progress button { padding: 1px 4px; border: 1px solid #755453; border-radius: 3px; background: #382828; color: #e4b0b0; font-size: 10px; }
 @container (max-width: 360px) {
   .blink-video-seeds { top: 40px; }
 }

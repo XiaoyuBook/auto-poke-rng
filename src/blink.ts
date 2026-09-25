@@ -76,6 +76,7 @@ export function useBlink(video: VideoState, enabled: boolean, viewActive = false
   const [selection, setSelection] = useState<BlinkSelection | null>(null);
   const [selecting, setSelecting] = useState(false);
   const [notice, setNotice] = useState('');
+  const launching = useRef(false);
   const selectionVersion = useRef(0);
   const suppressContextMenuUntil = useRef(0);
   const currentVideo = useRef(video); currentVideo.current = video;
@@ -156,12 +157,17 @@ export function useBlink(video: VideoState, enabled: boolean, viewActive = false
     } catch (error) { setNotice(errorMessage(error)); }
   };
   const run = async (mode: BlinkMode = config.mode) => {
-    if (!api || busy || selection || selecting) return;
+    if (!api || launching.current || selection || selecting || (busy && state.status !== 'tracking')) return;
+    launching.current = true;
     setNotice('');
     const parameters = { ...config, mode, ...fixedSearchRange, ...(mode === 'reidentify' && config.noisy ? { pokemonNpc: 1 } : {}) };
-    setConfig(current => ({ ...current, ...parameters, mode }));
-    try { await api.start(parameters); }
+    try {
+      if (state.status === 'tracking') await api.stop();
+      setConfig(current => ({ ...current, ...parameters, mode }));
+      await api.start(parameters);
+    }
     catch (error) { setNotice(errorMessage(error)); }
+    finally { launching.current = false; }
   };
   const stop = async () => { try { await api?.stop(); } catch (error) { setNotice(errorMessage(error)); } };
   const timeline = async () => { setNotice(''); try { await api?.timeline(); } catch (error) { setNotice(errorMessage(error)); } };
