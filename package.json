@@ -8,6 +8,8 @@
   "scripts": {
     "test:automation:reference": "node tools/test-automation.cjs --reference",
     "test:automation": "node tools/test-automation.cjs",
+    "test:automation:adapters": "node tools/test-automation-adapters.cjs",
+    "test:automation:electron": "npm run build && node tests/run-electron.cjs automation-electron.cjs",
     "test:blink": "node tools/vendor-project-xs.mjs --check && node --test tests/blink-regressions.cjs",
     "test:blink:electron": "npm run build && node tests/run-electron.cjs blink-electron.cjs",
     "dev": "concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && electron .\"",

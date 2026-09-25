@@ -74,10 +74,11 @@
 | O04 | 游走先等脚本确认进入战斗，再开始计时；未确认/未知结果停止交给用户，不擅自逃跑 | 原 main_window `run_hit_script_with_shiny_check_service`；runner special_species |
 | O05 | 首关键词在脚本运行中持续等，脚本结束后宽限 30s；第二关键词独立 30s；UI服务脚本硬超时 300s；采集/OCR耗时计入轮询周期 | dialog_timing: independent_window / hard_timeout / deducts_capture |
 | O06 | 普通物种 OCR 关键词超时沿用原版“未闪继续”；御三家/游走未知则停止；采集、OCR执行错误和取消独立处理 | runner ordinary_species / special_species；dialog_timing error tests |
-| O07 | 反查：反查脚本→能力页六项数值→训练家笔记性格/个性→按能力值、性格及可用个性筛选附近状态 | pokemon_info_ocr；新增反查适配器轨迹 |
+| O07 | 反查：反查脚本→训练家笔记性格/个性→RIGHT 翻到能力页读取六项数值→按能力值、性格及可用个性筛选附近状态；拉帝兄妹、雷公/炎帝/水君、三圣鸟、三神柱分别按组反查 | pokemon_info_ocr；新增反查适配器轨迹 |
 | O08 | 个性 ROI 匹配失败后全图重试；仍无法匹配只跳过个性过滤并明确提示；性格和能力值失败不能造数值 | pokemon_info_ocr: characteristic / full_frame；适配器契约 |
 | O09 | 判闪区域无效回退画面下半部；御三家区域按当前分辨率用默认位置；普通详情字段无有效区域则明确错误 | ocr_regions |
 | O10 | OCR 模型沿用 PP-OCRv6/RapidOCR；文本/坐标适配保留原解析规则；不加载原 Paddle 模型 | 新 OCR provider 测试 |
+| O11 | 判闪校准只监测手动遭遇，不发按键；御三家切换两个 ROI，每阶段窗口45秒；建议值为实测×1.2（3位小数），用户选择采用 | host calibration / integration O11 |
 
 ## Delay、配置、设备与停止
 
@@ -113,4 +114,14 @@
 
 2026-09-25 基线：`npm run test:automation:reference` **407 passed**（虚拟时钟，不连接硬件）；`npm run test:automation` 已确认在新运行时缺失时失败，未回退参考源码。十份测试覆盖定点/TID状态机、脚本参数、八种delay策略、物种样本、OCR区域/解析/判闪、缩放恢复以及PokeFinder ID参考数据。
 
-状态：业务梳理和原版基线已建立；运行服务、OCR接线、UI、日志适配均未完成。表中标明“新/适配器/React/Electron”的测试属于后续各节点的先行测试，不能用这407个业务测试替代。后续提交更新实际测试结果，未完成项不得标记通过。
+2026-09-25 迁移节点：原版业务包已迁入现有 Python 运行时；Electron 负责 IPC、启动快照、设备占用、取消与日志；React 已接入自动定点、自动 TID、OCR 设置、delay 策略和日志中心。运行测试仍校验冻结参考文件哈希，测试不会自动回退原版。
+
+已补充 `tests/automation-services.cjs`、`automation-worker.cjs`、`automation-integration.cjs`、`automation-script-cancellation.cjs`，共22项，覆盖 JSONL、预检、快照、delay 持久化、日志保留、设备断线、全局停止、迟到脚本拒绝、全部 OCR 顺序、传说组反查、判闪校准及所有附带脚本的实际编译。`runtime/tests/test_automation_*.py` 共13项，覆盖 PP-OCR 输出适配、真实原版状态机接线、搜索窗口、过场 noisy 模式、预热期双眨眼、捕获保活、反查重试、TID 停止诊断与校准。发现的基准值退回100、过场模式错误、预热双眨眼、迟到脚本、旧 TID 表格及轮次状态问题，均已补充回归再修复。
+
+`tests/automation-ui.test.jsx` 的7项交互契约覆盖独立保存、只读检查、轮次关联和新运行解除筛选、OCR 失败/全部测试、TID 全表复制及重测清理；`tests/automation-electron.cjs` 使用真实 Electron、模拟视频和手柄、真实 ID worker 验证页面草稿、IPC、占用和释放、日志弹出/收回同步及截图。Electron 中的长时间自动流程事件使用模拟 worker，不能据此声称实际游戏捕获已通过。
+
+适配边界：TID 完整结果经 JSONL/IPC 保存在内存，当前范围上限250000，超限明确拒绝；原版界面允许输入十亿，迁移版不尝试分配十亿行或静默截断。设置、delay样本与每日详细日志持久化；轮次候选保留当前会话并支持导出 JSON。QQ通知仍属于独立功能，未自动发送。OCR设置支持显式保存，识别前会保存当前区域；默认坐标仍对应1920×1080，其他分辨率需重新框选。
+
+实机验收待执行：分别用御三家、普通定点和游走画面确认眼睛模板/丢帧、两阶段判闪、脚本进入战斗信号、详情页翻页和反查；确认现场输入延迟与本机 delay。测试不能替代这些依赖游戏画面的检查。界面布局和交互已按当前技术栈接入，视觉样式可继续独立优化。
+
+本次验证：`test:automation` 407通过；`test:automation:adapters` 22项Node与13项Python通过；`npm test -- --maxWorkers=1` 120通过；既有设备回归7通过；构建与自动流程Electron测试通过。全量Vitest并行运行曾触发旧用例的5秒超时，单worker复验保留了原断言与超时配置。截图位于 `node_modules/.tmp/automation-review/`；开发机验证未操作真实游戏设备。

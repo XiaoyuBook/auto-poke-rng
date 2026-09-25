@@ -7,6 +7,8 @@
 | `npm test` | Vitest 单元和组件测试 |
 | `npm run test:automation:reference` | 固定旧版自动流程行为基线（不代表本项目已接入） |
 | `npm run test:automation` | 对本项目运行时执行同一批自动流程契约测试；未迁移时必须失败 |
+| `npm run test:automation:adapters` | JSONL worker、设备占用/停止竞态、配置与日志、原版脚本编译、捕获与 OCR 适配器；22 项 Node + 13 项 Python |
+| `npm run test:automation:electron` | 真实 Electron IPC、模拟视频/手柄、自动流程页面、参数保存、相关日志/浮窗同步、ID worker、OCR 设置；截图保存于 `node_modules/.tmp/automation-review/` |
 | `npm run test:devices:regression` | 公共伊机控、视频源、Python 帧读取及测试启动器的审查回归 |
 | `npm run test:runtime` | OCR 适配器单测、CTest 核心测试、脚本/设备 Node 集成测试，以及全部设备审查回归 |
 | `npm run test:devices` | 构建界面后，在真实 Electron 中验证模拟设备接线 |
@@ -33,6 +35,8 @@ node --test --test-name-pattern=DEV-003 tests/device-regressions.cjs
 ```
 
 测试输入夹具位于 `tests/helpers`、`tests/fixtures` 和 `runtime/tests/test_frames.py`。它们可由版本控制复现，执行不依赖审查期间的 `.deps/module-review` 临时文件。设备用例退出时释放自身资源；测试结果、截图和构建目录仍按项目现有忽略规则处理。
+
+自动流程先运行固定版本原版基线，再运行当前实现、适配器与Electron测试；完整行为编号与实机验收边界见 [迁移契约](../docs/AUTOMATION_PARITY.md)。全量前端可使用 `npm test -- --maxWorkers=1`，避免多组jsdom与Python编译用例并发争抢CPU而触发既有5秒超时。自动流程测试不需要向QQ发送消息，不连接真实串口；长流程状态由模拟worker驱动，真实捕获/OCR/按键时序另做实机验收。
 
 QQ 测试只访问本地模拟服务，不使用真实 QQ 凭据或向外部接收方发消息。Electron 测试使用隔离配置目录，验证实际系统加密和有效 JPEG 图片，截图保存在 `node_modules/.tmp/qq-notifications-review/`。回归包含旧码／错误事件拒绝、部分失败不重发、取消清理、保存失败保留旧配置、清除密钥同时清除客户端缓存，以及绑定码自动滚动到可见区域。真实 QQ 开放平台权限和实际收件情况需要使用自己的机器人手动验证。
 

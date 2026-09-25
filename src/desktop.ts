@@ -68,6 +68,7 @@ export interface ControllerOverlayApi {
 }
 
 export interface DesktopApi {
+  automation?: import('./automation').AutomationApi;
   blink?: import('./blink').BlinkApi;
   notifications?: import('./notifications').QQApi;
   devices?: import('./devices').DevicesApi;

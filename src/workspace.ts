@@ -1,10 +1,13 @@
-export type Page = '首页' | '脚本编辑' | '闪光反查区域' | '定点数据' | '眨眼捕获';
+export type Page = '首页' | '脚本编辑' | '闪光反查区域' | '定点数据' | '眨眼捕获' | '自动定点' | '自动TID';
 export type GameId = 'frlg' | 'bdsp' | 'swsh';
 export type Modal = 'controller' | 'easycon' | 'video' | 'notification' | 'mapping' | 'help' | 'settings';
 export type LogEntry = {
   id: string;
   time: string;
-  source: '系统' | '脚本' | '手柄';
+  source: '系统' | '脚本' | '手柄' | '自动定点' | '自动TID' | '眨眼' | 'OCR';
+  runId?: string;
+  round?: number;
+  timestamp?: string;
   message: string;
   level: 'info' | 'success' | 'warning';
 };
