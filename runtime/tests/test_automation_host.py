@@ -60,6 +60,39 @@ class AdapterContracts(unittest.TestCase):
         self.assertIs(result.seed, seed)
         self.assertEqual(result.advance_mode, 'timeline')
 
+    def test_post_exit_advance_and_recapture_keeps_forced_timeline_config(self):
+        import blink_core
+        blink = {'noisy': False, 'seed': ['1','2','3','4'], 'npc': 2,
+                 'sourceWidth': 2, 'sourceHeight': 2, 'threshold': .9, 'eye': '', 'roi': {}}
+        exit_blink = {**blink, 'npc': 3, 'timelineNpc': 2, 'pokemonNpc': 1, 'timeDelay': 12}
+        session = host.Session({'blink': blink, 'exitBlink': exit_blink,
+            'parameters': {'max_advances': 800000}, 'video': {'sharedMemory': 'fake'}}, lambda **_: None)
+        class FrameContext:
+            def __init__(self, *_): pass
+            def __enter__(self): return self
+            def __exit__(self, *_): pass
+            def read(self, **_): return SimpleNamespace(timestamp_ns=10000000000, width=2, height=2, bgr=bytes(12))
+        detector = SimpleNamespace(feed=lambda *_: None, intervals=list(range(20)), blinks=[0]*20, offset=10, done=True)
+        rng = SimpleNamespace(advance=lambda _: None, get_state=lambda: [5,6,7,8])
+        previous = host.AutoRngSeedResult(host.SeedState32(1,2,3,4))
+        with patch.dict(sys.modules, {'frames': SimpleNamespace(Frames=FrameContext)}), \
+             patch.object(blink_core, 'BlinkDetector', return_value=detector) as capture, \
+             patch.object(blink_core, 'decode_eye'), patch.object(blink_core, 'match_eye', return_value=(.8, {}, None)), \
+             patch.object(blink_core, 'recover', return_value=(rng, {'matchedAdvance': 100})) as recover, \
+             patch.object(host.time, 'perf_counter', return_value=11):
+            first = session.capture(previous, exit_scene=True)
+            # The original runner marks post-exit seeds and supplies a hint after advancing.
+            after_advance = host.replace(first, after_exit_reseed=True, expected_advances_hint=250000)
+            second = session.capture(after_advance)
+        self.assertEqual([call.args[2] for call in capture.call_args_list], [20, 20])
+        self.assertEqual([call.args[0]['noisy'] for call in recover.call_args_list], [True, True])
+        self.assertEqual(second.advance_mode, 'timeline')
+        self.assertEqual((second.timeline_npc, second.pokemon_npc, second.white_delay), (2, 1, 12))
+        self.assertIs(second.seed, previous.seed)
+        self.assertTrue(second.after_exit_reseed)
+        self.assertFalse(blink['noisy'])
+        self.assertFalse(exit_blink['noisy'])
+
     def test_capture_entry_allows_empty_seed_script(self):
         session = host.Session({'kind': 'tid', 'scriptRoot': '.', 'parameters': {'start': 'capture'},
             'scripts': {'name': {'path': 'name.rng', 'text': 'A 1'}}}, lambda **_: None)

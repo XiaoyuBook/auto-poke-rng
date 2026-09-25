@@ -157,9 +157,10 @@ class Session:
         import numpy as np
         from frames import Frames
         from blink_core import BlinkDetector, decode_eye, match_eye, recover
-        config = dict(self.config.get('exitBlink') or self.config['blink']) if exit_scene or (previous and previous.after_exit_reseed) else dict(self.config['blink'])
+        post_exit = exit_scene or (previous is not None and previous.after_exit_reseed)
+        config = dict(self.config.get('exitBlink') or self.config['blink']) if post_exit else dict(self.config['blink'])
         config['mode'] = 'munchlax' if tid else 'reidentify' if previous else 'recover'
-        if exit_scene:
+        if post_exit:
             config['noisy'] = True
         config['seed'] = [f'{word:08X}' for word in previous.seed.words] if previous else config['seed']
         count = 64 if tid else 20 if exit_scene or (previous and config['noisy']) else 7 if previous else 40
