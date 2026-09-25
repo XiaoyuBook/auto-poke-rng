@@ -102,6 +102,7 @@ function ImageLabelWorkspace({ active, labelFolder, cornerLayout, referenceTarge
   const svgRef = useRef<SVGSVGElement | null>(null);
   const drag = useRef<{ kind: SelectionKind; start: { x: number; y: number } } | null>(null);
   const dynamicTimer = useRef<number | null>(null);
+  const dynamicRun = useRef<object | null>(null);
   const mounted = useRef(false);
   useEffect(() => {
     mounted.current = true;
@@ -116,13 +117,14 @@ function ImageLabelWorkspace({ active, labelFolder, cornerLayout, referenceTarge
   }, [labelFolder]);
   useEffect(() => { void reloadLabels(); }, [reloadLabels]);
   useEffect(() => {
-    if (active) return;
-    if (dynamicTimer.current !== null) window.clearInterval(dynamicTimer.current);
-    dynamicTimer.current = null;
-    setDynamicTesting(false);
-    return undefined;
+    if (!active) setDynamicTesting(false);
+    return () => {
+      // Hiding keeps this workspace mounted. Invalidate pending work as well as its timer.
+      dynamicRun.current = null;
+      if (dynamicTimer.current !== null) window.clearInterval(dynamicTimer.current);
+      dynamicTimer.current = null;
+    };
   }, [active]);
-  useEffect(() => () => { if (dynamicTimer.current !== null) window.clearInterval(dynamicTimer.current); }, []);
 
   const sourcePoint = (event: ReactPointerEvent<SVGSVGElement>) => {
     if (!snapshot || !svgRef.current) return { x: 0, y: 0 };
@@ -163,19 +165,23 @@ function ImageLabelWorkspace({ active, labelFolder, cornerLayout, referenceTarge
       setExpectedText(full.searchMethod === 107 ? full.imageBase64 || '' : ''); setNotice(`已加载标签“${full.name}”。`);
     } catch (error) { setNotice(error instanceof Error ? error.message : String(error)); }
   };
-  const performSearch = useCallback(async () => {
+  const performSearch = useCallback(async (isCurrent: () => boolean = () => true) => {
+    if (!isCurrent()) return;
     if (!snapshot) throw new Error('请先截图。');
     if (range.width <= 0 || range.height <= 0 || target.width <= 0 || target.height <= 0) throw new Error('请先圈选搜索范围和搜索目标。');
     if (!rectInside(range, snapshot.width, snapshot.height) || !rectInside(target, snapshot.width, snapshot.height)) throw new Error('圈选区域必须位于截图范围内。');
     if (target.x < range.x || target.y < range.y || target.x + target.width > range.x + range.width || target.y + target.height > range.y + range.height) throw new Error('搜索目标必须位于搜索范围内。');
     if (searchMethod === 107 && !expectedText.trim()) throw new Error('请填写 OCR 期望文本。');
     const targetUrl = searchMethod !== 107 && templateBase64 ? `data:image/png;base64,${templateBase64}` : await cropImage(snapshot.url, target);
+    if (!isCurrent()) return;
     const videoApi = window.desktop?.devices?.video;
     if (!videoApi) throw new Error('请使用桌面应用连接视频源。');
     const started = performance.now(); const live = await videoApi.captureFrame();
+    if (!isCurrent()) return;
     let result: LabelMatchResult;
     if (searchMethod === 107) {
       const liveTargetUrl = await cropImage(live.url, target);
+      if (!isCurrent()) return;
       const encoded = liveTargetUrl.split(',')[1] || '';
       const recognized = await videoApi.ocr(encoded);
       const text = recognized.text.trim();
@@ -185,17 +191,31 @@ function ImageLabelWorkspace({ active, labelFolder, cornerLayout, referenceTarge
     } else {
       result = await videoApi.matchLabel(live.url.split(',')[1], { searchMethod, threshold, range, target, imageBase64: targetUrl.split(',')[1] });
     }
+    if (!isCurrent()) return;
     const liveTargetUrl = await cropImage(live.url, result);
+    if (!isCurrent()) return;
     setMatch(current => ({ ...result, maxScore: Math.max(current?.maxScore ?? result.score, result.score), elapsedMs: Math.round(performance.now() - started), liveUrl: liveTargetUrl, targetUrl }));
     setNotice(`识别完成：${scoreText(result.score, result.unit)}${result.recognizedText === undefined ? '' : ` · “${result.recognizedText}”`} · ${Math.round(performance.now() - started)} ms`);
   }, [expectedText, range, searchMethod, snapshot, target, templateBase64, threshold]);
+  const stopDynamic = () => {
+    dynamicRun.current = null;
+    if (dynamicTimer.current !== null) window.clearInterval(dynamicTimer.current);
+    dynamicTimer.current = null;
+    setDynamicTesting(false);
+  };
   const startDynamic = () => {
-    if (dynamicTesting) { if (dynamicTimer.current !== null) window.clearInterval(dynamicTimer.current); dynamicTimer.current = null; setDynamicTesting(false); setNotice('动态测试已停止。'); return; }
-    void performSearch().then(() => {
-      if (!active || !mounted.current) return;
-      setDynamicTesting(true); setNotice('动态测试运行中…');
-      dynamicTimer.current = window.setInterval(() => { void performSearch().catch(error => setNotice(error instanceof Error ? error.message : String(error))); }, 1000);
-    }).catch(error => setNotice(error instanceof Error ? error.message : String(error)));
+    if (dynamicRun.current) { stopDynamic(); setNotice('动态测试已停止。'); return; }
+    if (!active) return;
+    const run = {};
+    dynamicRun.current = run;
+    const isCurrent = () => mounted.current && dynamicRun.current === run;
+    const reportError = (error: unknown) => { if (isCurrent()) setNotice(error instanceof Error ? error.message : String(error)); };
+    setDynamicTesting(true); setNotice('动态测试启动中…');
+    void performSearch(isCurrent).then(() => {
+      if (!isCurrent()) return;
+      setNotice('动态测试运行中…');
+      dynamicTimer.current = window.setInterval(() => { void performSearch(isCurrent).catch(reportError); }, 1000);
+    }).catch(error => { if (isCurrent()) { reportError(error); stopDynamic(); } });
   };
   const saveLabel = async () => {
     const save = window.desktop?.scripts?.labelSave;

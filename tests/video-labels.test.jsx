@@ -141,3 +141,75 @@ test('switching folders while dynamic testing starts does not leave an old timer
   await act(async()=>completeMatch({score:100,scriptValue:100,matched:true,unit:'percent',x:1,y:1,width:2,height:2}));
   expect(interval).not.toHaveBeenCalled();
 });
+
+const matchResult=score=>({score,scriptValue:score,matched:score>=95,unit:'percent',x:1,y:1,width:2,height:2});
+const deferred=()=>{let resolve,reject;const promise=new Promise((done,fail)=>{resolve=done;reject=fail;});return {promise,resolve,reject};};
+
+test.each([false,true])('closing the same folder invalidates a pending dynamic start, reopened=%s',async reopen=>{
+  const {video}=fixture(),pending=deferred();
+  video.matchLabel.mockReturnValueOnce(pending.promise);
+  const view=render(<VideoPreview labelsOpen labelFolder="BDSP" />);await load();
+  fireEvent.click(screen.getByRole('button',{name:'动态测试'}));
+  await waitFor(()=>expect(video.matchLabel).toHaveBeenCalledOnce());
+  view.rerender(<VideoPreview labelsOpen={false} labelFolder="BDSP" />);
+  if(reopen)view.rerender(<VideoPreview labelsOpen labelFolder="BDSP" />);
+  const interval=vi.spyOn(window,'setInterval');
+  await act(async()=>pending.resolve(matchResult(100)));
+  expect(interval).not.toHaveBeenCalled();
+  expect(screen.queryByAltText('实时匹配画面')).toBeNull();
+  expect(video.captureFrame).toHaveBeenCalledOnce();
+  view.rerender(<VideoPreview labelsOpen labelFolder="BDSP" />);
+  expect(screen.getByRole('button',{name:'动态测试'}).getAttribute('aria-pressed')).toBe('false');
+});
+
+test('dynamic testing can be stopped while its first match is pending',async()=>{
+  const {video}=fixture(),pending=deferred();video.matchLabel.mockReturnValueOnce(pending.promise);
+  render(<VideoPreview labelsOpen labelFolder="BDSP" />);await load();
+  fireEvent.click(screen.getByRole('button',{name:'动态测试'}));
+  await waitFor(()=>expect(video.matchLabel).toHaveBeenCalledOnce());
+  fireEvent.click(screen.getByRole('button',{name:'停止动态'}));
+  const interval=vi.spyOn(window,'setInterval');
+  await act(async()=>pending.resolve(matchResult(100)));
+  expect(interval).not.toHaveBeenCalled();
+  expect(screen.queryByAltText('实时匹配画面')).toBeNull();
+  expect(screen.getByRole('status').textContent).toBe('动态测试已停止。');
+});
+
+test.each(['resolve','reject'])('a previous dynamic session cannot overwrite or restart a new session on late %s',async outcome=>{
+  const {video}=fixture(),old=deferred(),current=deferred();
+  video.matchLabel.mockReturnValueOnce(old.promise).mockReturnValueOnce(current.promise);
+  const view=render(<VideoPreview labelsOpen labelFolder="BDSP" />);await load();
+  fireEvent.click(screen.getByRole('button',{name:'动态测试'}));
+  await waitFor(()=>expect(video.matchLabel).toHaveBeenCalledOnce());
+  view.rerender(<VideoPreview labelsOpen={false} labelFolder="BDSP" />);
+  view.rerender(<VideoPreview labelsOpen labelFolder="BDSP" />);
+  fireEvent.click(screen.getByRole('button',{name:'动态测试'}));
+  await waitFor(()=>expect(video.matchLabel).toHaveBeenCalledTimes(2));
+  const interval=vi.spyOn(window,'setInterval');
+  await act(async()=>current.resolve(matchResult(100)));
+  expect(interval).toHaveBeenCalledOnce();
+  const notice=screen.getByRole('status').textContent;
+  await act(async()=>outcome==='resolve'?old.resolve(matchResult(20)):old.reject(new Error('stale failure')));
+  expect(interval).toHaveBeenCalledOnce();
+  expect(screen.getByText('脚本值 100 · 通过')).toBeTruthy();
+  expect(screen.getByRole('status').textContent).toBe(notice);
+});
+
+test('closing a running dynamic session discards its pending poll result',async()=>{
+  const {video}=fixture(),pending=deferred();
+  const view=render(<VideoPreview labelsOpen labelFolder="BDSP" />);await load();
+  let poll;
+  vi.spyOn(window,'setInterval').mockImplementation(callback=>{poll=callback;return 77;});
+  const clear=vi.spyOn(window,'clearInterval');
+  await act(async()=>fireEvent.click(screen.getByRole('button',{name:'动态测试'})));
+  expect(poll).toBeTypeOf('function');
+  video.matchLabel.mockReturnValueOnce(pending.promise);
+  await act(async()=>poll());
+  expect(video.matchLabel).toHaveBeenCalledTimes(2);
+  view.rerender(<VideoPreview labelsOpen={false} labelFolder="BDSP" />);
+  expect(clear).toHaveBeenCalledWith(77);
+  view.rerender(<VideoPreview labelsOpen labelFolder="BDSP" />);
+  await act(async()=>pending.resolve(matchResult(20)));
+  expect(screen.getByText('脚本值 100 · 通过')).toBeTruthy();
+  expect(screen.getByRole('button',{name:'动态测试'}).getAttribute('aria-pressed')).toBe('false');
+});
