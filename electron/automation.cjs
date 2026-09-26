@@ -239,6 +239,7 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
   handle('check',async input=>{if(active||auxiliary)throw Error('已有流程正在运行');const {ready,checks:items}=await checks(input);return {ready,checks:items};});
   handle('start',start);handle('stop',()=>stop());
   handle('save',({kind,scope,values})=>store.save(kind,scope,values));
+  handle('static-group',input=>{store.manageStaticGroup(input);return snapshot();});
   handle('ocr-save',rows=>store.saveOcr(rows));handle('ocr-defaults',()=>defaults().ocr);
   handle('delay',({species,action,config,number,excluded})=>action==='save'?store.saveDelay(species,config):action==='clear'?store.clearDelay(species):store.excludeDelay(species,number,excluded));
   handle('logging',value=>store.setLogging(value),false);handle('clear-logs',()=>store.clearLogs(),false);

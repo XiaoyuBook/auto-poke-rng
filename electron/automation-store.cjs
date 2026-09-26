@@ -25,7 +25,7 @@ const clone = value => structuredClone(value);
 class AutomationStore extends EventEmitter {
   constructor(directory, { now = () => new Date() } = {}) {
     super(); this.directory = directory; this.now = now; this.logs = []; this.runs = []; this.error = '';
-    this.data = { version: 1, config: defaults(), profiles: {}, logging: true };
+    this.data = { version: 1, config: defaults(), profiles: {}, logging: true, staticGroups: null };
     const file = path.join(directory, 'automation.json');
     try {
       const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -33,7 +33,15 @@ class AutomationStore extends EventEmitter {
       for (const kind of ['static','tid']) for (const scope of ['parameters','scripts']) Object.assign(this.data.config[kind][scope], saved.config?.[kind]?.[scope]);
       if (Array.isArray(saved.config?.ocr) && saved.config.ocr.length === 10) this.data.config.ocr = saved.config.ocr;
       this.data.profiles = saved.profiles || {}; this.data.logging = saved.logging !== false;
+      if (Array.isArray(saved.staticGroups?.items) && saved.staticGroups.items.length && saved.staticGroups.items.every(item =>
+        typeof item.id === 'string' && typeof item.name === 'string' && item.config?.parameters && item.config?.scripts)) {
+        this.data.staticGroups = clone(saved.staticGroups);
+      }
     } catch (error) { if (error.code !== 'ENOENT') this.error = `无法加载自动流程配置，原文件保留：${error.message}`; }
+    if (!this.data.staticGroups) this.data.staticGroups = { activeId: 'default', items: [{ id: 'default', name: '默认流程', config: clone(this.data.config.static) }] };
+    const active = this.data.staticGroups.items.find(item => item.id === this.data.staticGroups.activeId) || this.data.staticGroups.items[0];
+    this.data.staticGroups.activeId = active.id;
+    this.data.config.static = clone(active.config);
   }
   persist(data) {
     fs.mkdirSync(this.directory, { recursive: true });
@@ -50,12 +58,41 @@ class AutomationStore extends EventEmitter {
     return this.change(next => { for (const [key,value] of Object.entries(values)) {
       if (!Object.hasOwn(next.config[kind][scope], key)) throw Error(`未知配置：${key}`);
       next.config[kind][scope][key] = clone(value);
-    } });
+    } if (kind === 'static') next.staticGroups.items.find(item => item.id === next.staticGroups.activeId).config = clone(next.config.static); });
+  }
+  manageStaticGroup({ action, id, name } = {}) {
+    if (!['create', 'select', 'rename', 'delete'].includes(action)) throw Error('配置组操作无效');
+    const title = typeof name === 'string' ? name.trim() : '';
+    if (['create', 'rename'].includes(action) && (!title || title.length > 40)) throw Error('配置名称需要 1–40 个字符');
+    return this.change(next => {
+      const groups = next.staticGroups;
+      const entry = groups.items.find(item => item.id === id);
+      if (action !== 'create' && !entry) throw Error('配置不存在');
+      if (['create', 'rename'].includes(action) && groups.items.some(item => item.name === title && item.id !== id)) throw Error('配置名称已存在');
+      if (action === 'create') {
+        const created = { id: randomUUID(), name: title, config: clone(next.config.static) };
+        groups.items.push(created); groups.activeId = created.id;
+        next.config.static = clone(created.config);
+      } else if (action === 'select') {
+        groups.activeId = entry.id; next.config.static = clone(entry.config);
+      } else if (action === 'rename') entry.name = title;
+      else {
+        if (groups.items.length === 1) throw Error('至少保留一套配置');
+        groups.items = groups.items.filter(item => item.id !== id);
+        if (groups.activeId === id) {
+          groups.activeId = groups.items[0].id;
+          next.config.static = clone(groups.items[0].config);
+        }
+      }
+    });
   }
   migrateScriptPaths(aliases) {
     const next = clone(this.data); let changed = false;
     for (const kind of ['static', 'tid']) for (const [key, value] of Object.entries(next.config[kind].scripts)) {
       if (typeof value === 'string' && aliases[value] && aliases[value] !== value) { next.config[kind].scripts[key] = aliases[value]; changed = true; }
+    }
+    for (const group of next.staticGroups.items) for (const [key, value] of Object.entries(group.config.scripts)) {
+      if (typeof value === 'string' && aliases[value] && aliases[value] !== value) { group.config.scripts[key] = aliases[value]; changed = true; }
     }
     if (changed) { this.persist(next); this.data = next; this.emit('change'); }
   }

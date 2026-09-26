@@ -16,6 +16,7 @@ export type AutomationParameters = {
   sync_mode: number; sync_nature: string; exit_blink_name: string; frame_threshold: number; delay: number; target_display_tids: number[];
 };
 export type AutomationConfig = { parameters: AutomationParameters; scripts: Record<string, string> };
+export type AutomationConfigGroup = { id: string; name: string; config: AutomationConfig };
 export type DelayConfig = { strategy: string; baseline_delay: number; multi_candidate_policy: string; window_size: number; ewma_alpha: number; dense_interval_width: number };
 export type DelayProfile = { config: DelayConfig; samples: { candidates: number[]; round_number: number; observed_at: string; excluded: boolean }[]; next_round_number: number };
 export type IdRow = { advances: number; tid: number; sid: number; tsv: number; display_tid: number };
@@ -31,6 +32,7 @@ export type AutomationRound = { number: number; seed?: string; outcome: string; 
 export type AutomationRun = { id: string; kind: AutomationKind; startedAt: string; endedAt?: string; status: string; message?: string; rounds: AutomationRound[] };
 export type AutomationSnapshot = {
   config: { static: AutomationConfig; tid: AutomationConfig; ocr: OcrRegionRow[] }; profiles: Record<string, DelayProfile>;
+  staticGroups: { activeId: string; items: AutomationConfigGroup[] };
   logs: LogEntry[]; runs: AutomationRun[]; logging: boolean; error: string;
   state: { revision: number; status: string; kind: AutomationKind | null; runId: string | null; message: string; progress: AutomationProgress | null;
     capture?: { captured: number; target: number } | null; roundDelay?: number; seed?: { seed: { words: string[]; pair: string[] } } };
@@ -44,6 +46,7 @@ export interface AutomationApi {
   start(input: AutomationInput): Promise<AutomationSnapshot>;
   stop(): Promise<void>;
   save(input: { kind: AutomationKind; scope: 'parameters' | 'scripts'; values: AutomationParameters | Record<string, string> }): Promise<AutomationSnapshot>;
+  manageStaticGroup(input: { action: 'create' | 'select' | 'rename' | 'delete'; id?: string; name?: string }): Promise<AutomationSnapshot>;
   saveOcr(rows: OcrRegionRow[]): Promise<AutomationSnapshot>;
   defaultOcr(): Promise<OcrRegionRow[]>;
   ocr(input: { operation: string; field?: string }): Promise<{ text?: string; results?: Record<string, string> }>;
@@ -67,7 +70,7 @@ export function useAutomation() {
     void api.getState().then(value => { if (alive && !received) setSnapshot(value); }).catch(error => { if (alive) setError(error.message); });
     return () => { alive = false; unsubscribe(); };
   },[api]);
-  return { api, snapshot, error, setError };
+  return { api, snapshot, error, setError, setSnapshot };
 }
 export function downloadText(text: string, filename: string, type = 'text/plain') {
   const url = URL.createObjectURL(new Blob(['\ufeff' + text], { type: type + ';charset=utf-8' }));

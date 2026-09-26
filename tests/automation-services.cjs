@@ -19,6 +19,23 @@ test('C01: parameter save preserves scripts, including deliberately empty choice
   assert.equal(restored.config.static.scripts.hit, '');
   assert.equal(restored.config.static.parameters.fixed_delay, 1234);
 });
+test('named static configurations keep independent targets and scripts after restart', t => {
+  const { directory, store } = fixture(t);
+  store.save('static', 'parameters', { target: 'Giratina' });
+  store.save('static', 'scripts', { seed: 'giratina.txt' });
+  const first = store.snapshot().staticGroups.activeId;
+  const created = store.manageStaticGroup({ action: 'create', name: '草苗龟初始' });
+  const second = created.staticGroups.activeId;
+  store.save('static', 'parameters', { target: 'Turtwig' });
+  store.save('static', 'scripts', { seed: 'turtwig.txt' });
+  store.manageStaticGroup({ action: 'select', id: first });
+  assert.equal(store.snapshot().config.static.parameters.target, 'Giratina');
+  assert.equal(store.snapshot().config.static.scripts.seed, 'giratina.txt');
+  const restored = new AutomationStore(directory);
+  restored.manageStaticGroup({ action: 'select', id: second });
+  assert.equal(restored.snapshot().config.static.parameters.target, 'Turtwig');
+  assert.equal(restored.snapshot().config.static.scripts.seed, 'turtwig.txt');
+});
 test('C01: a failed persistence write must not replace accepted settings', t => {
   const { store } = fixture(t);
   store.save('tid', 'parameters', { delay: 12 });

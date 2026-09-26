@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld('desktop', {
     start: input => ipcRenderer.invoke('automation:start', input),
     stop: () => ipcRenderer.invoke('automation:stop'),
     save: input => ipcRenderer.invoke('automation:save', input),
+    manageStaticGroup: input => ipcRenderer.invoke('automation:static-group', input),
     saveOcr: rows => ipcRenderer.invoke('automation:ocr-save', rows),
     defaultOcr: () => ipcRenderer.invoke('automation:ocr-defaults'),
     ocr: input => ipcRenderer.invoke('automation:ocr', input),
