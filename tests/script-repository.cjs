@@ -357,10 +357,20 @@ test('bundled catalog makes first offline browsing possible without claiming a c
   const f = await fixture(t, { bundledCatalog }); f.offline();
   const initial = await f.service.state();
   assert.equal(initial.cached, false); assert.equal(initial.catalogSource, 'bundled');
+  assert.match(initial.categoryReadmes['撞帧脚本'], /撞帧脚本/);
   assert.equal(initial.packages[0].name, require('../resources/script-catalog.json').packages[0].name);
-  assert.equal(initial.packages.flatMap(item => item.files).filter(file => file.path.endsWith('.txt')).length, 24);
+  assert.equal(initial.packages.flatMap(item => item.files).filter(file => file.path.endsWith('.txt')).length, 22);
   await assert.rejects(f.service.refresh(), /无法连接/);
   assert.deepEqual((await f.service.state()).packages, initial.packages);
+});
+
+test('old remote catalogs retain bundled category guides during transition', async t => {
+  const bundledCatalog = require('../resources/script-catalog.json');
+  const f = await fixture(t, { bundledCatalog });
+  await f.service.refresh();
+  const state = await f.service.state();
+  assert.equal(state.packages.length, 1);
+  assert.deepEqual(state.categoryReadmes, bundledCatalog.categoryReadmes);
 });
 
 test('Gitee channel persists, isolates its catalog, and never changes installed files', async t => {

@@ -38,6 +38,8 @@ function validatePackage(item) {
 }
 function validateCatalog(value) {
   if (!value || value.schemaVersion !== 1 || !Array.isArray(value.packages) || value.packages.length > 100) throw Error('脚本仓库索引无效。');
+  if (value.categoryReadmes != null && (typeof value.categoryReadmes !== 'object' || Array.isArray(value.categoryReadmes)
+    || Object.entries(value.categoryReadmes).length > 30 || Object.entries(value.categoryReadmes).some(([name, readme]) => !text(name, 50) || !text(readme, 30000) || name === '__proto__'))) throw Error('脚本仓库分类说明无效。');
   const ids = new Set(), folders = new Set();
   for (const item of value.packages) {
     validatePackage(item);
@@ -223,7 +225,7 @@ function createFixedRepository({ rootDirectory, userData, appVersion, bundledCat
       if (info.manifest.installFolder !== folder) throw Error('已安装脚本包目录与记录不一致。');
       installed.push({ ...info.manifest, modified: Object.entries(info.hashes).some(([name,value]) => !files[name] || hash(files[name]) !== value) });
     }
-    return { packages: index.packages, installed, rootPath: rootDirectory, source: SOURCES[channel].url, channel, sources: SOURCES, catalogSource, cached: ['cache', 'remote'].includes(catalogSource) };
+    return { packages: index.packages, categoryReadmes: { ...(bundledCatalog?.categoryReadmes || {}), ...(index.categoryReadmes || {}) }, installed, rootPath: rootDirectory, source: SOURCES[channel].url, channel, sources: SOURCES, catalogSource, cached: ['cache', 'remote'].includes(catalogSource) };
   }
   async function refresh() {
     const next = validateCatalog(JSON.parse((await fetchBytes('catalog.json', 2 * 1024 * 1024)).toString('utf8')));

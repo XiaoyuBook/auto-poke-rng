@@ -12,6 +12,23 @@ export function repositoryGame(value: string) {
 }
 export const gameName = (value: string) => repositoryGames.find(game => game.id === repositoryGame(value))?.name || value;
 export const repositoryText = (value: string) => value.replace(/\bBDSP\b/gi, '珍钻复刻').replace(/\bFRLG\b/gi, '火红／叶绿').replace(/\bSWSH\b/gi, '剑／盾');
+export const repositoryCategories = ['过帧脚本', '过场脚本', '反查脚本', '撞帧脚本', '逃跑脚本', '测种脚本'] as const;
+export const retiredRepositoryPackages = new Set(['bdsp-ocr-page', 'bdsp-record']);
+const legacyCategories: Record<string, string> = {
+  'bdsp-advance': '过帧脚本', 'bdsp-advance-optimized': '过帧脚本', 'bdsp-pokedex-advance': '过帧脚本',
+  'bdsp-darkrai-cutscene': '过场脚本',
+  'bdsp-darkrai-reverse': '反查脚本', 'bdsp-ramanas-reverse': '反查脚本', 'bdsp-reverse': '反查脚本',
+  'bdsp-roamer-reverse': '反查脚本', 'bdsp-starter-reverse': '反查脚本',
+  'bdsp-arceus': '撞帧脚本', 'bdsp-cresselia': '撞帧脚本', 'bdsp-darkrai': '撞帧脚本',
+  'bdsp-giratina': '撞帧脚本', 'bdsp-mesprit': '撞帧脚本', 'bdsp-name': '撞帧脚本',
+  'bdsp-ramanas': '撞帧脚本', 'bdsp-shaymin': '撞帧脚本', 'bdsp-starter-hit': '撞帧脚本',
+  'bdsp-seed': '测种脚本', 'bdsp-starter-seed': '测种脚本', 'bdsp-tid-seed': '测种脚本',
+  'bdsp-underground-seed': '测种脚本',
+};
+export function repositoryCategory(item: RepositoryPackage) {
+  const category = item.files?.find(file => /\.(txt|rng)$/i.test(file.path))?.category;
+  return category && (repositoryCategories as readonly string[]).includes(category) ? category : legacyCategories[item.id] || '其他脚本';
+}
 export function repositoryError(cause: unknown) {
   const message = scriptError(cause);
   return /fetch failed|network|offline|ERR_|timeout/i.test(message) ? '无法连接官方脚本仓库。请检查网络或系统代理后重试，也可以导入本地脚本包。' : message;
@@ -29,6 +46,7 @@ export interface RepositoryPackage {
 }
 export interface RepositoryState {
   packages: RepositoryPackage[];
+  categoryReadmes?: Record<string, string>;
   installed: (RepositoryPackage & { modified: boolean })[];
   rootPath: string; source: string; cached: boolean;
   catalogSource?: 'bundled' | 'cache' | 'remote' | 'empty';

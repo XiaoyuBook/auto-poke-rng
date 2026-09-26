@@ -115,21 +115,50 @@ test('starts in the active game, uses Chinese names, and switches games without 
   expect(f.api.prepare).not.toHaveBeenCalled();
 });
 
-test('browses a categorized file tree and safe Markdown without preparing an installation', async () => {
+test('browses script categories and filters package files without preparing an installation', async () => {
   const f = fixture();
-  f.pack.files = [{ path: '测种.txt', bytes: 4, category: '测种与识别' }, { path: 'ImgLabel/眼睛.IL', bytes: 4096, category: '图像标签' }];
+  f.pack.id = 'bdsp-seed';
+  f.state.categoryReadmes = { '测种脚本': '# 测种说明\n\n先核对画面。' };
+  f.pack.files = [{ path: '测种.txt', bytes: 4, category: '测种脚本' }, { path: 'ImgLabel/眼睛.IL', bytes: 4096, category: '图像标签' }];
   f.pack.readme = '## 开始使用\n\n先核对**游戏画面**。\n\n<script>alert(1)</script>\n\n[危险链接](javascript:alert(1))';
   render(<ScriptRepositoryDialog {...f} hasUnsaved={false} />);
   await screen.findByRole('heading', { name: '开始使用' });
   expect(screen.getByRole('tabpanel', { name: '使用说明' }).querySelector('script')).toBeNull();
   expect(screen.getByText('危险链接').getAttribute('href')).toBe('');
-  fireEvent.click(screen.getByRole('button', { name: '用途分类：测种与识别' }));
+  const category = screen.getByRole('button', { name: '脚本分类：测种脚本' });
+  fireEvent.click(category);
+  expect(screen.getByRole('heading', { name: '测种说明' })).toBeTruthy();
+  expect(screen.getByText('先核对画面。')).toBeTruthy();
+  const toggle = screen.getByRole('button', { name: '展开分类：测种脚本' });
+  expect(toggle.getAttribute('aria-expanded')).toBe('true');
+  fireEvent.click(toggle);
+  expect(toggle.getAttribute('aria-expanded')).toBe('false');
+  fireEvent.click(toggle);
+  fireEvent.click(screen.getByText('珍钻复刻 官方脚本包'));
+  expect(screen.getByRole('heading', { name: '开始使用' })).toBeTruthy();
+  fireEvent.click(screen.getByRole('tab', { name: '文件列表（2）' }));
   const panel = screen.getByRole('tabpanel', { name: '文件列表' });
   expect(within(panel).getByText('测种.txt')).toBeTruthy();
-  expect(within(panel).queryByText('ImgLabel/眼睛.IL')).toBeNull();
-  fireEvent.click(within(panel).getByRole('button', { name: '显示全部' }));
+  expect(within(panel).getByText('ImgLabel/眼睛.IL')).toBeTruthy();
+  fireEvent.click(within(panel).getByRole('button', { name: '文件分类：图像标签' }));
+  expect(within(panel).queryByText('测种.txt')).toBeNull();
   expect(within(panel).getByText('ImgLabel/眼睛.IL')).toBeTruthy();
   expect(f.api.prepare).not.toHaveBeenCalled();
+});
+
+test('retired packages stay hidden in old remote catalogs and naming is under hit frame', async () => {
+  const f = fixture();
+  f.state.packages = [
+    { ...f.pack, id: 'bdsp-name', name: '取名' },
+    { ...f.pack, id: 'bdsp-ocr-page', name: '文字识别翻页' },
+    { ...f.pack, id: 'bdsp-record', name: '录屏' },
+  ];
+  render(<ScriptRepositoryDialog {...f} hasUnsaved={false} />);
+  await screen.findByRole('heading', { name: '取名' });
+  expect(screen.getByRole('button', { name: '脚本分类：撞帧脚本' }).textContent).toContain('1');
+  expect(screen.queryByText('文字识别翻页')).toBeNull();
+  expect(screen.queryByText('录屏')).toBeNull();
+  expect(screen.getByRole('button', { name: '脚本分类：逃跑脚本' }).textContent).toContain('0');
 });
 
 test('bundled browsing remains available after a failed refresh and retry recovers', async () => {

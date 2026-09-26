@@ -178,10 +178,14 @@ app.whenReady().then(async () => {
   remote = { catalog: require('../resources/script-catalog.json') };
   await click('检查更新');
   await until(`Array.from(document.querySelectorAll('.repository-package-select strong')).some(b => b.textContent === '红圣菇')`, 'official package listed');
+  await js(`document.querySelector('[aria-label="脚本分类：撞帧脚本"]').click()`);
+  await until(`document.querySelector('.repository-category-detail h2')?.textContent === '撞帧脚本'`, 'category README shown');
+  await screenshot('repository-category.png');
   await js(`Array.from(document.querySelectorAll('.repository-package-select')).find(b => b.querySelector('strong').textContent === '红圣菇').click()`);
   await until(`document.querySelector('.repository-detail h2')?.textContent === '红圣菇'`, 'official categorized catalog');
   await screenshot('repository.png');
-  await js(`Array.from(document.querySelectorAll('.repository-package')).find(b => b.querySelector('strong').textContent === '红圣菇').querySelector('[aria-label="用途分类：图像标签"]').click()`);
+  await js(`Array.from(document.querySelectorAll('[role="tab"]')).find(b => b.textContent.startsWith('文件列表')).click()`);
+  await js(`document.querySelector('[aria-label="文件分类：图像标签"]').click()`);
   await until(`document.querySelectorAll('.repository-file-list tbody tr').length === 4`, 'category file list');
   await screenshot('repository-files.png');
   await click('仓库设置');

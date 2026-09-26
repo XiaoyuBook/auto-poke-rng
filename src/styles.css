@@ -748,25 +748,25 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .repository-search input { width: 100%; min-width: 0; background: transparent; border: 0; outline: 0; color: var(--text); font: inherit; font-size: 12px; }
 .repository-search:focus-within { border-color: #91b09c; }
 .repository-tree { flex: 1; min-height: 0; overflow: auto; padding: 0 10px 20px; }
-.repository-tree-package { display: flex; align-items: stretch; border: 1px solid transparent; border-radius: 6px; margin-bottom: 6px; }
-.repository-tree-package.selected { background: #abc7b70c; border-color: #abc7b72b; }
+.repository-section { margin-bottom: 4px; }
+.repository-section-heading { display: flex; align-items: stretch; width: 100%; min-height: 40px; border-radius: 6px; font-size: 12px; font-weight: 600; }
+.repository-section-heading.selected { background: #abc7b713; }
+.repository-section-toggle { display: grid; place-items: center; width: 27px; flex-shrink: 0; }
+.repository-section-toggle > svg.open { transform: rotate(90deg); }
+.repository-section-select { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; padding: 8px 10px 8px 0; font-weight: 600; }
+.repository-section-select > span { flex: 1; }
+.repository-section-select > small { min-width: 20px; text-align: center; color: var(--muted); font-size: 10px; }
+.repository-section-heading:hover { background: #ffffff08; }
+.repository-section .repository-package-select { width: calc(100% - 14px); margin: 2px 0 3px 14px; border-radius: 5px; padding: 9px 10px; }
+.repository-section .repository-package-select.selected { background: #abc7b713; color: #bfd7ca; }
+.repository-section .repository-package-select:not(:disabled):hover { background: #ffffff08; }
+.repository-section-empty { margin: 0 0 8px 40px; color: var(--muted); font-size: 11px; }
 .repository-tree button { border: 0; background: transparent; color: var(--text); text-align: left; }
-.repository-expand { display: grid; place-items: center; padding: 0 3px 0 7px; color: var(--secondary) !important; }
-.repository-expand[aria-expanded=true] svg, .repository-category .open { transform: rotate(90deg); }
 .repository-package-select { display: flex; flex: 1; align-items: flex-start; min-width: 0; gap: 8px; padding: 12px 7px 12px 3px; }
 .repository-package-select > svg { flex-shrink: 0; margin-top: 1px; color: #abc7b7; }
 .repository-package-select > span { min-width: 0; }
 .repository-package-select strong { display: block; font-weight: 500; font-size: 12px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .repository-package-select small { display: block; margin-top: 7px; font-size: 10px; color: var(--muted); }
-.repository-category { display: flex; align-items: center; width: 100%; gap: 8px; padding: 11px 9px 11px 20px; border-radius: 5px; font-size: 12px; }
-.repository-category > span { flex: 1; }
-.repository-category > small { color: var(--muted); font-size: 10px; }
-.repository-tree-file { display: flex; gap: 8px; align-items: center; width: 100%; padding: 9px 6px 9px 40px; border-radius: 5px; font-size: 11px; }
-.repository-tree-file > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.repository-tree-file > svg { flex-shrink: 0; color: var(--muted); }
-.repository-category.selected, .repository-tree-file.selected { background: #abc7b713; color: #bfd7ca; }
-.repository-category:not(:disabled):hover, .repository-tree-file:not(:disabled):hover { background: #ffffff06; }
-.repository-tree-hint { padding: 0 18px; font-size: 11px; color: var(--muted); }
 .repository-detail { display: flex; flex-direction: column; min-width: 0; min-height: 0; font-size: 12px; line-height: 1.8; }
 .repository-toolbar { display: flex; align-items: center; gap: 8px; min-height: 63px; padding: 12px 20px; border-bottom: 1px solid #333737; flex-shrink: 0; }
 .repository-toolbar > span { flex: 1; color: var(--muted); font-size: 11px; }
@@ -799,12 +799,16 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .repository-guide a { color: #abcdb9; }
 .repository-guide pre { overflow: auto; background: #191d1b; padding: 12px; border-radius: 5px; }
 .repository-guide code { font-size: 11px; background: #ffffff08; border-radius: 3px; padding: 1px 4px; }
+.repository-script-instructions { white-space: pre-line; }
 .repository-guide img { max-width: 100%; }
 .repository-guide blockquote { border-left: 3px solid #809b8b; padding-left: 15px; margin-left: 0; color: var(--secondary); }
 .repository-requirement { border-top: 1px solid #333737; padding-top: 16px; margin-top: 24px; color: var(--muted); font-size: 11px; }
 .repository-file-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 20px; }
 .repository-file-filter > strong { flex: 1; font-size: 12px; overflow-wrap: anywhere; }
 .repository-file-filter > span { font-size: 11px; color: var(--muted); }
+.repository-file-categories { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+.repository-file-categories > button { border: 1px solid #414945; border-radius: 5px; padding: 5px 9px; background: transparent; color: var(--secondary); font-size: 11px; }
+.repository-file-categories > button[aria-pressed=true] { border-color: #789985; background: #abc7b71f; color: #c5dfd1; }
 .repository-file-list table { width: 100%; border-collapse: collapse; font-size: 11px; table-layout: fixed; }
 .repository-file-list th { padding: 9px 8px; text-align: left; color: var(--secondary); font-weight: 400; border-bottom: 1px solid #424944; }
 .repository-file-list th:first-child { width: 57%; }
