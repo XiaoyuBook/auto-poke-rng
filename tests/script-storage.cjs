@@ -10,7 +10,7 @@ const { ScriptRunner } = require('../electron/script-runner.cjs');
 
 async function fixture(t, options = {}) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'poke-storage-'));
-  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  t.after(() => fs.rm(directory, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 }));
   const userData = path.join(directory, 'profile'), target = path.join(directory, 'new-library'), gate = createScriptGate();
   await fs.mkdir(target);
   const storage = await createScriptStorage({ userData, gate, ...options });

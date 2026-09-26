@@ -38,6 +38,7 @@ export interface RepositoryState {
 export interface InstallPlan {
   token: string; package: RepositoryPackage; installedVersion: string | null;
   changes: { path: string; action: 'add' | 'update' | 'remove' }[]; conflicts: string[];
+  migrations?: { from: string; to: string }[];
 }
 export interface DirectoryMigrationPlan { token: string; from: string; to: string; files: number; bytes: number }
 export interface ScriptRepositoryApi {
@@ -50,5 +51,5 @@ export interface ScriptRepositoryApi {
   migrateDirectory?: (token: string) => Promise<{ state: RepositoryState; rootPath: string; backupPath: string }>;
   setChannel?: (channel: 'github' | 'gitee') => Promise<RepositoryState>;
   details?: (id: string) => Promise<RepositoryPackage>;
-  apply: (input: { token: string; policy: 'keep' | 'replace' }) => Promise<{ state: RepositoryState; kept: number; backupPath: string | null }>;
+  apply: (input: { token: string; policy: 'keep' | 'replace' }) => Promise<{ state: RepositoryState; kept: number; backupPath: string | null; warning?: string }>;
 }

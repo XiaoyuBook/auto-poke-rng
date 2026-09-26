@@ -90,6 +90,7 @@ export function ScriptRepositoryDialog({ close, onInstalled, hasUnsaved, current
     const result = await api.apply({ token: plan.token, policy });
     if (!mounted.current) return;
     setState(result.state); setPlan(null);
+    if (result.warning) setError(result.warning);
     setNotice(`安装完成${result.kept ? `，保留 ${result.kept} 项本地修改` : ''}。${result.backupPath ? `原文件备份：${result.backupPath}` : ''}`);
     await onInstalled();
   });
@@ -167,6 +168,7 @@ export function ScriptRepositoryDialog({ close, onInstalled, hasUnsaved, current
           </div> : plan ? <>
             <div className="repository-detail-heading"><span className="repository-game">{gameName(plan.package.game)}</span><h2>安装预览 · {repositoryText(plan.package.name)}</h2><p>{plan.installedVersion ? `版本 ${plan.installedVersion} → ` : '版本 '}{plan.package.version}</p></div>
             <p className="repository-change-summary">{plan.changes.length} 项文件变更 <span>·</span> {plan.conflicts.length} 项本地修改</p>
+            {!!plan.migrations?.length && <div className="repository-migrations"><h3>从旧目录迁移 {plan.migrations.length} 个文件</h3><p>原文件保留为备份；个人脚本和标签的修改按下方选项处理。自动流程中的旧脚本路径会对应到新包。</p><ul>{plan.migrations.map(item => <li key={item.to}><code>{item.from}</code> → <code>{item.to}</code></li>)}</ul></div>}
             <ul className="repository-changes">{plan.changes.map(change => <li key={change.path}><span>{({ add: '新增', update: '更新', remove: '移除' })[change.action]}</span><code>{change.path}</code>{plan.conflicts.includes(change.path) && <strong>本地已修改</strong>}</li>)}</ul>
             {!plan.changes.length && <p className="muted">文件内容已与仓库一致。</p>}
             {plan.conflicts.length > 0 && <fieldset className="repository-policy"><legend>处理本地修改</legend><label><input type="radio" name="repository-policy" checked={policy === 'keep'} disabled={busy} onChange={() => setPolicy('keep')} />保留我的修改，更新其余文件</label><label><input type="radio" name="repository-policy" checked={policy === 'replace'} disabled={busy} onChange={() => setPolicy('replace')} />备份后使用仓库版本</label></fieldset>}

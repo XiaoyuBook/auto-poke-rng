@@ -23,10 +23,10 @@ app.setPath('userData', path.join(fixture, 'profile'));
 app.disableHardwareAcceleration();
 app.on('window-all-closed', () => {});
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
-function pack(version, body) {
+function pack(version, body, extra = {}) {
   const contents = { '测试.txt': Buffer.from(body), 'ImgLabel/示例.IL': Buffer.from('{"ImgBase64":"ABC","searchMethod":5}') };
   const manifest = { schemaVersion: 1, id: 'bdsp-demo', name: 'BDSP 官方脚本包', description: '测种、过帧和撞闪脚本与配套图像标签。', instructions: '使用前请核对游戏画面与运行起点。', game: 'BDSP', authors: ['XiaoyuBook'], version, minimumAppVersion: '0.1.0', installFolder: 'BDSP',
-    files: Object.entries(contents).map(([name,bytes]) => ({ path: name, bytes: bytes.length, sha256: hash(bytes), category: name.endsWith('.txt') ? '测种与识别' : '图像标签' })) };
+    files: Object.entries(contents).map(([name,bytes]) => ({ path: name, bytes: bytes.length, sha256: hash(bytes), category: name.endsWith('.txt') ? '测种与识别' : '图像标签' })), ...extra };
   const bytes = Buffer.from(zipSync({ 'manifest.json': Buffer.from(JSON.stringify(manifest)), ...Object.fromEntries(Object.entries(contents).map(([name,bytes]) => ['files/' + name, bytes])) }));
   return { bytes, catalog: { schemaVersion: 1, packages: [{ ...manifest, archive: `packages/bdsp-demo/${version}.zip`, sha256: hash(bytes), bytes: bytes.length }] } };
 }
@@ -60,6 +60,7 @@ app.whenReady().then(async () => {
   notifications = registerQQNotifications({ ipcMain, getMainWindow: () => main, safeStorage, nativeImage, userData: app.getPath('userData') });
   const moveTo = path.join(fixture, 'custom-scripts'); fs.mkdirSync(moveTo);
   registerScriptRepository({ ipcMain, getMainWindow: () => main, rootDirectory: storage.getRoot, storage, userData: app.getPath('userData'), appVersion: '0.1.0', gate,
+    migrateScriptPaths: aliases => automation.store.migrateScriptPaths(aliases),
     isBusy: () => !!devices.runner.current || automation.isBusy(), log: message => { logs.push(message); automation.store.log(message, '系统', 'info'); },
     fetch: async url => { if (offline) throw new TypeError('fetch failed'); return new Response(url.endsWith('catalog.json') ? JSON.stringify(remote.catalog) : remote.bytes); },
     dialog: { showOpenDialog: async (_window, options) => { dialogs++; return { canceled: false, filePaths: [options.properties.includes('openDirectory') ? moveTo : zipPath] }; } },
@@ -147,9 +148,10 @@ app.whenReady().then(async () => {
   assert.equal(JSON.parse(fs.readFileSync(path.join(oldScripts, 'BDSP/.rng-package.json'))).manifest.version, '1.2.0');
 
   // Hold the same gate used by installation and verify both public launch paths.
-  let release;
-  const writing = gate.run(() => new Promise(resolve => { release = resolve; }));
-  await new Promise(setImmediate);
+  let release, entered;
+  const ready = new Promise(resolve => { entered = resolve; });
+  const writing = gate.run(() => new Promise(resolve => { release = resolve; entered(); }));
+  await ready;
   try {
     const error = await js(`window.desktop.devices.execution.start({path:'BDSP/测试.txt'}).then(() => '', e => e.message)`);
     assert.match(error, /脚本库正在更新/);
@@ -161,15 +163,25 @@ app.whenReady().then(async () => {
   await devices.releaseAutomation('fixture');
   assert.ok(logs.some(message => message.includes('保留 1 项本地修改')));
   assert.ok(automation.getState().logs.some(entry => entry.message.includes('已安装脚本包')));
+  automation.store.save('static', 'scripts', { seed: 'BDSP/测试.rng' });
+  fs.writeFileSync(zipPath, pack('0.0.2', 'Y 4\n', { id: 'bdsp-split', name: '独立测试包', installFolder: '珍钻复刻/测试', legacyPaths: { '测试.txt': 'BDSP/测试.txt', 'ImgLabel/示例.IL': 'BDSP/ImgLabel/示例.IL' } }).bytes);
+  await click('导入脚本包');
+  await until(`Boolean(document.querySelector('.repository-migrations'))`, 'split migration preview');
+  await click('确认安装');
+  await until(`document.querySelector('.repository-message[role="status"]')?.textContent.includes('安装完成')`, 'split installed');
+  assert.equal(automation.store.snapshot().config.static.scripts.seed, '珍钻复刻/测试/测试.txt');
+  assert.equal((await js('window.desktop.scripts.list()')).files[0].path, '珍钻复刻/测试/测试.txt');
+  assert.equal((await devices.runner.resolveScript('BDSP/测试.rng')).absolute, path.join(scripts, '珍钻复刻/测试/测试.txt'));
+  assert.equal(fs.readFileSync(path.join(scripts, '珍钻复刻/测试/测试.txt'), 'utf8'), 'Y 2\n');
   // Browse the real bundled publication without executing its scripts.
   fs.renameSync(path.join(scripts, 'BDSP'), path.join(fixture, 'installed-demo'));
   remote = { catalog: require('../resources/script-catalog.json') };
   await click('检查更新');
-  await until(`Array.from(document.querySelectorAll('.repository-package-select strong')).some(b => b.textContent === '珍钻复刻官方脚本包')`, 'official package listed');
-  await js(`Array.from(document.querySelectorAll('.repository-package-select')).find(b => b.querySelector('strong').textContent === '珍钻复刻官方脚本包').click()`);
-  await until(`document.querySelector('.repository-detail h2')?.textContent === '珍钻复刻官方脚本包'`, 'official categorized catalog');
+  await until(`Array.from(document.querySelectorAll('.repository-package-select strong')).some(b => b.textContent === '红圣菇')`, 'official package listed');
+  await js(`Array.from(document.querySelectorAll('.repository-package-select')).find(b => b.querySelector('strong').textContent === '红圣菇').click()`);
+  await until(`document.querySelector('.repository-detail h2')?.textContent === '红圣菇'`, 'official categorized catalog');
   await screenshot('repository.png');
-  await js(`document.querySelector('[aria-label="用途分类：测种与识别"]').click()`);
+  await js(`Array.from(document.querySelectorAll('.repository-package')).find(b => b.querySelector('strong').textContent === '红圣菇').querySelector('[aria-label="用途分类：图像标签"]').click()`);
   await until(`document.querySelectorAll('.repository-file-list tbody tr').length === 4`, 'category file list');
   await screenshot('repository-files.png');
   await click('仓库设置');
@@ -184,8 +196,8 @@ app.whenReady().then(async () => {
   offline = true;
   await click('检查更新');
   await until(`document.querySelector('[role="alert"]')?.textContent.includes('无法连接官方脚本仓库')`, 'Chinese network error');
-  await js(`document.querySelector('.repository-package-select').click()`);
-  await until(`document.querySelector('.repository-detail h2')?.textContent === '珍钻复刻官方脚本包'`, 'offline catalog still browsable');
+  await js(`Array.from(document.querySelectorAll('.repository-package-select')).find(b => b.querySelector('strong').textContent === '红圣菇').click()`);
+  await until(`document.querySelector('.repository-detail h2')?.textContent === '红圣菇'`, 'offline catalog still browsable');
   await screenshot('repository-offline.png');
   offline = false;
   await click('重试');

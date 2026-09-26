@@ -11,6 +11,7 @@ export interface ScriptListing {
   folders: ScriptFolder[];
   files: ScriptFile[];
   warnings: string[];
+  aliases?: Record<string, string>;
 }
 export interface ScriptFilesApi {
   list: () => Promise<ScriptListing>;

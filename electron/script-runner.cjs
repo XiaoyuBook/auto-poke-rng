@@ -12,14 +12,15 @@ class ScriptRunner {
   async resolveScript(relative) {
     if (typeof relative !== 'string' || !relative || relative.includes('\\') || relative.includes(':') || relative.split('/').some(part => !part || part === '..' || part === '.') || !/\.(txt|rng)$/i.test(relative)) throw new Error('脚本路径无效。');
     const root = path.resolve(typeof this.rootDirectory === 'function' ? this.rootDirectory() : this.rootDirectory);
-    let resolved = relative, absolute = path.resolve(root, resolved);
+    const aliases = await require('./script-paths.cjs').scriptAliases(root);
+    let resolved = aliases[relative] || relative, absolute = path.resolve(root, resolved);
     if (!absolute.startsWith(root + path.sep)) throw new Error('脚本必须位于脚本目录内。');
     const fs = require('node:fs/promises');
     if (/\.(rng|txt)$/i.test(relative)) {
       try { await fs.lstat(absolute); }
       catch (error) {
         if (error.code !== 'ENOENT') throw error;
-        resolved = relative.replace(/\.(rng|txt)$/i, (_, extension) => extension.toLowerCase() === 'rng' ? '.txt' : '.rng');
+        resolved = resolved.replace(/\.(rng|txt)$/i, (_, extension) => extension.toLowerCase() === 'rng' ? '.txt' : '.rng');
         absolute = path.resolve(root, resolved);
       }
     }

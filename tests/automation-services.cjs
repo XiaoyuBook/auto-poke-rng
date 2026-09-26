@@ -26,6 +26,21 @@ test('C01: a failed persistence write must not replace accepted settings', t => 
   assert.throws(() => store.save('tid', 'parameters', { delay: 99 }), /disk full/);
   assert.equal(store.snapshot().config.tid.parameters.delay, 12);
 });
+
+test('split package paths migrate only configured matches and persist atomically', t => {
+  const { directory, store } = fixture(t);
+  store.save('static', 'scripts', { seed: 'BDSP/测种.rng', hit: 'personal/custom.txt', exit: '' });
+  store.save('tid', 'scripts', { seed: 'BDSP/测种.txt' });
+  const target = '珍钻复刻/测种/测种.txt', aliases = { 'BDSP/测种.rng': target, 'BDSP/测种.txt': target };
+  const persist = store.persist.bind(store);
+  store.persist = () => { throw Error('disk full'); };
+  assert.throws(() => store.migrateScriptPaths(aliases), /disk full/);
+  assert.equal(store.snapshot().config.static.scripts.seed, 'BDSP/测种.rng');
+  store.persist = persist; store.migrateScriptPaths(aliases);
+  const config = new AutomationStore(directory).snapshot().config;
+  assert.equal(config.static.scripts.seed, target); assert.equal(config.tid.scripts.seed, target);
+  assert.equal(config.static.scripts.hit, 'personal/custom.txt'); assert.equal(config.static.scripts.exit, '');
+});
 test('D03: delay samples stay scoped to species and excluded samples can be restored', t => {
   const { directory, store } = fixture(t);
   store.recordDelay(492, [101, 100, 101, -1]);

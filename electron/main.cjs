@@ -76,6 +76,7 @@ app.whenReady().then(async () => {
   blink = registerBlink({ ipcMain, getMainWindow: () => mainWindow, getVideo: () => devices.getState().video, isAutomationBusy: () => devices.isAutomationBusy() });
   automation = registerAutomation({ ipcMain, getMainWindow: () => mainWindow, getWindows: () => BrowserWindow.getAllWindows(), devices, rng, blink, userData: app.getPath('userData') });
   registerScriptRepository({ ipcMain, getMainWindow: () => mainWindow, dialog, storage, rootDirectory, userData: app.getPath('userData'), appVersion: app.getVersion(), gate: scriptGate,
+    migrateScriptPaths: aliases => automation.store.migrateScriptPaths(aliases),
     isBusy: () => !!devices.runner.current || automation.isBusy(), log: (message, level = 'info') => automation.store.log(message, '系统', level) });
   createWindow();
   app.on('activate', () => {

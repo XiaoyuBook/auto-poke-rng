@@ -3,19 +3,22 @@
   "packages": [
     {
       "schemaVersion": 1,
-      "id": "bdsp-official",
-      "name": "珍钻复刻官方脚本包",
-      "version": "0.0.1",
+      "id": "bdsp-advance",
+      "name": "过帧",
+      "version": "0.0.2",
       "minimumAppVersion": "0.1.0",
-      "installFolder": "BDSP",
+      "installFolder": "珍钻复刻/过帧",
       "game": "BDSP",
       "authors": [
         "XiaoyuBook",
         "原版项目贡献者"
       ],
-      "description": "测试版：用于珍钻复刻的测种、推进、撞闪和捕捉反查脚本，包含配套图像标签。",
+      "description": "测试版：珍钻复刻过帧脚本，可单独安装和更新。无需图像标签。",
       "instructions": "在脚本库中查看已安装文件，并在自动流程中选择对应脚本。使用前请核对游戏版本、画面尺寸、运行起点及按键设置。",
       "updatedAt": "2026-09-26",
+      "legacyPaths": {
+        "bdsp过帧.txt": "BDSP/bdsp过帧.txt"
+      },
       "source": {
         "repository": "https://github.com/XiaoyuBook/auto-bdsp-rng",
         "revision": "494793ed467cd1a2ef376d5886d0add5924b620f",
@@ -24,23 +27,156 @@
       "license": "GPL-3.0-or-later",
       "files": [
         {
-          "path": "BDSP地下测种.txt",
-          "bytes": 270,
-          "sha256": "6f7d984e23e0ddbf20baa888903419a63b561aa8deedb2ee47788be26247cacb",
-          "category": "测种与识别"
+          "path": "LICENSE.md",
+          "bytes": 234,
+          "sha256": "45669c033b08b03fe29c74ea2376cd4bab100d7f4d24f86e8edfa1c7f2a373f2",
+          "category": "使用说明"
         },
         {
-          "path": "BDSP测种.txt",
-          "bytes": 317,
-          "sha256": "0a6478a919f1a726479a9669efb8dea0aea0c51ed9f86640504d96f5fef37212",
-          "category": "测种与识别"
+          "path": "README.md",
+          "bytes": 1016,
+          "sha256": "7beaf82fe2ad4c46e23c9c618d008a5419d5bb147d475e7df3354672d12d97b7",
+          "category": "使用说明"
         },
         {
-          "path": "ImgLabel/上吧嘴.IL",
-          "bytes": 14616,
-          "sha256": "4b07508479d233a738382c604fb79a6edf3cfc0fadae53270ebcefdc10c262c3",
-          "category": "图像标签"
+          "path": "bdsp过帧.txt",
+          "bytes": 3208,
+          "sha256": "17ce6178ab4c4259bfca797d8066cf6720541b97bc803c011bcfd8783c0ff246",
+          "category": "推进与撞帧"
+        }
+      ],
+      "readme": "# 过帧\n\n珍钻复刻 · **0.0.2 测试版** · 推进与撞帧\n\n## 安装与使用\n\n本包只安装 `bdsp过帧.txt`、必需资源与来源说明，可独立更新。安装位置：`珍钻复刻/过帧/`。本脚本不使用图像标签，无需安装其他脚本的标签。\n\n脚本保持原始 .txt 文件名和正文，兼容原版伊机控。运行前请阅读脚本注释，核对游戏版本、运行起点、按键及画面尺寸；安装不会自动运行。\n\n## 旧目录迁移\n\n如果曾使用 `BDSP/` 大包，安装预览会列出本包需要迁移的脚本与标签。默认保留个人修改，原文件留作备份；自动流程的旧脚本路径改为本包路径。未安装本包前，原有文件继续使用。\n\n## 来源与许可证\n\n来源：[auto-bdsp-rng](https://github.com/XiaoyuBook/auto-bdsp-rng)，修订 `494793ed467cd1a2ef376d5886d0add5924b620f`。脚本文本与已发布 0.0.1 包逐字节一致。详见 LICENSE.md。测试阶段使用 0.0.x，正式上线后再使用 1.0.0。\n",
+      "archive": "packages/bdsp-advance/0.0.2.zip",
+      "bytes": 3863,
+      "sha256": "98ea9a7dbf6579722937eba85c88ab47a7588ca4cafdd74d7d9122a1a54205b1"
+    },
+    {
+      "schemaVersion": 1,
+      "id": "bdsp-advance-optimized",
+      "name": "过帧优化",
+      "version": "0.0.2",
+      "minimumAppVersion": "0.1.0",
+      "installFolder": "珍钻复刻/过帧优化",
+      "game": "BDSP",
+      "authors": [
+        "XiaoyuBook",
+        "原版项目贡献者"
+      ],
+      "description": "测试版：珍钻复刻过帧优化脚本，可单独安装和更新。无需图像标签。",
+      "instructions": "在脚本库中查看已安装文件，并在自动流程中选择对应脚本。使用前请核对游戏版本、画面尺寸、运行起点及按键设置。",
+      "updatedAt": "2026-09-26",
+      "legacyPaths": {
+        "bdsp过帧(优化）.txt": "BDSP/bdsp过帧(优化）.txt"
+      },
+      "source": {
+        "repository": "https://github.com/XiaoyuBook/auto-bdsp-rng",
+        "revision": "494793ed467cd1a2ef376d5886d0add5924b620f",
+        "adaptedFrom": "https://github.com/XiaoyuBook/auto-poke-rng/tree/5a10dea/scripts/BDSP"
+      },
+      "license": "GPL-3.0-or-later",
+      "files": [
+        {
+          "path": "LICENSE.md",
+          "bytes": 234,
+          "sha256": "45669c033b08b03fe29c74ea2376cd4bab100d7f4d24f86e8edfa1c7f2a373f2",
+          "category": "使用说明"
         },
+        {
+          "path": "README.md",
+          "bytes": 1038,
+          "sha256": "ec1829c810ecb206e666b5db744dc8b49fe63076d7abcc1125723bf13307d059",
+          "category": "使用说明"
+        },
+        {
+          "path": "bdsp过帧(优化）.txt",
+          "bytes": 3721,
+          "sha256": "5796b7027bc60291739d4d55e8007c2c722b01744d03b0412354588e6935f640",
+          "category": "推进与撞帧"
+        }
+      ],
+      "readme": "# 过帧优化\n\n珍钻复刻 · **0.0.2 测试版** · 推进与撞帧\n\n## 安装与使用\n\n本包只安装 `bdsp过帧(优化）.txt`、必需资源与来源说明，可独立更新。安装位置：`珍钻复刻/过帧优化/`。本脚本不使用图像标签，无需安装其他脚本的标签。\n\n脚本保持原始 .txt 文件名和正文，兼容原版伊机控。运行前请阅读脚本注释，核对游戏版本、运行起点、按键及画面尺寸；安装不会自动运行。\n\n## 旧目录迁移\n\n如果曾使用 `BDSP/` 大包，安装预览会列出本包需要迁移的脚本与标签。默认保留个人修改，原文件留作备份；自动流程的旧脚本路径改为本包路径。未安装本包前，原有文件继续使用。\n\n## 来源与许可证\n\n来源：[auto-bdsp-rng](https://github.com/XiaoyuBook/auto-bdsp-rng)，修订 `494793ed467cd1a2ef376d5886d0add5924b620f`。脚本文本与已发布 0.0.1 包逐字节一致。详见 LICENSE.md。测试阶段使用 0.0.x，正式上线后再使用 1.0.0。\n",
+      "archive": "packages/bdsp-advance-optimized/0.0.2.zip",
+      "bytes": 4024,
+      "sha256": "aa934eb36b103d5ad81fe4b78104ca0a6bbc4f5be3ea6e8fb0457617db1521ea"
+    },
+    {
+      "schemaVersion": 1,
+      "id": "bdsp-arceus",
+      "name": "阿尔宙斯",
+      "version": "0.0.2",
+      "minimumAppVersion": "0.1.0",
+      "installFolder": "珍钻复刻/阿尔宙斯",
+      "game": "BDSP",
+      "authors": [
+        "XiaoyuBook",
+        "原版项目贡献者"
+      ],
+      "description": "测试版：珍钻复刻阿尔宙斯脚本，可单独安装和更新。无需图像标签。",
+      "instructions": "在脚本库中查看已安装文件，并在自动流程中选择对应脚本。使用前请核对游戏版本、画面尺寸、运行起点及按键设置。",
+      "updatedAt": "2026-09-26",
+      "legacyPaths": {
+        "阿尔宙斯.txt": "BDSP/阿尔宙斯.txt"
+      },
+      "source": {
+        "repository": "https://github.com/XiaoyuBook/auto-bdsp-rng",
+        "revision": "494793ed467cd1a2ef376d5886d0add5924b620f",
+        "adaptedFrom": "https://github.com/XiaoyuBook/auto-poke-rng/tree/5a10dea/scripts/BDSP"
+      },
+      "license": "GPL-3.0-or-later",
+      "files": [
+        {
+          "path": "LICENSE.md",
+          "bytes": 234,
+          "sha256": "45669c033b08b03fe29c74ea2376cd4bab100d7f4d24f86e8edfa1c7f2a373f2",
+          "category": "使用说明"
+        },
+        {
+          "path": "README.md",
+          "bytes": 1030,
+          "sha256": "ddadd8bcd5249315db24b67a4f13ea4b9d6e1bbeaa061a6abc3c7e13eb24d0b0",
+          "category": "使用说明"
+        },
+        {
+          "path": "阿尔宙斯.txt",
+          "bytes": 5077,
+          "sha256": "5b9f98fe74e36f7704eafe0b3b169418e38a382349a1ddbf3d52a466559a42d6",
+          "category": "定点与游走"
+        }
+      ],
+      "readme": "# 阿尔宙斯\n\n珍钻复刻 · **0.0.2 测试版** · 定点与游走\n\n## 安装与使用\n\n本包只安装 `阿尔宙斯.txt`、必需资源与来源说明，可独立更新。安装位置：`珍钻复刻/阿尔宙斯/`。本脚本不使用图像标签，无需安装其他脚本的标签。\n\n脚本保持原始 .txt 文件名和正文，兼容原版伊机控。运行前请阅读脚本注释，核对游戏版本、运行起点、按键及画面尺寸；安装不会自动运行。\n\n## 旧目录迁移\n\n如果曾使用 `BDSP/` 大包，安装预览会列出本包需要迁移的脚本与标签。默认保留个人修改，原文件留作备份；自动流程的旧脚本路径改为本包路径。未安装本包前，原有文件继续使用。\n\n## 来源与许可证\n\n来源：[auto-bdsp-rng](https://github.com/XiaoyuBook/auto-bdsp-rng)，修订 `494793ed467cd1a2ef376d5886d0add5924b620f`。脚本文本与已发布 0.0.1 包逐字节一致。详见 LICENSE.md。测试阶段使用 0.0.x，正式上线后再使用 1.0.0。\n",
+      "archive": "packages/bdsp-arceus/0.0.2.zip",
+      "bytes": 3532,
+      "sha256": "7ee3a3adc42d203a6b981c60b8c203eae368a3eabd9f94d0f77c51f0138cfa18"
+    },
+    {
+      "schemaVersion": 1,
+      "id": "bdsp-cresselia",
+      "name": "美梦神",
+      "version": "0.0.2",
+      "minimumAppVersion": "0.1.0",
+      "installFolder": "珍钻复刻/美梦神",
+      "game": "BDSP",
+      "authors": [
+        "XiaoyuBook",
+        "原版项目贡献者"
+      ],
+      "description": "测试版：珍钻复刻美梦神脚本，可单独安装和更新。含 4 个必需图像标签。",
+      "instructions": "在脚本库中查看已安装文件，并在自动流程中选择对应脚本。使用前请核对游戏版本、画面尺寸、运行起点及按键设置。",
+      "updatedAt": "2026-09-26",
+      "legacyPaths": {
+        "美梦神.txt": "BDSP/美梦神.txt",
+        "ImgLabel/喷雾消失了.IL": "BDSP/ImgLabel/喷雾消失了.IL",
+        "ImgLabel/宝可表.IL": "BDSP/ImgLabel/宝可表.IL",
+        "ImgLabel/艾姆利多在202路.IL": "BDSP/ImgLabel/艾姆利多在202路.IL",
+        "ImgLabel/艾姆利多在水域.IL": "BDSP/ImgLabel/艾姆利多在水域.IL"
+      },
+      "source": {
+        "repository": "https://github.com/XiaoyuBook/auto-bdsp-rng",
+        "revision": "494793ed467cd1a2ef376d5886d0add5924b620f",
+        "adaptedFrom": "https://github.com/XiaoyuBook/auto-poke-rng/tree/5a10dea/scripts/BDSP"
+      },
+      "license": "GPL-3.0-or-later",
+      "files": [
         {
           "path": "ImgLabel/喷雾消失了.IL",
           "bytes": 12510,
@@ -51,18 +187,6 @@
           "path": "ImgLabel/宝可表.IL",
           "bytes": 10031,
           "sha256": "5f57eb0f85d7674127ffa4732b938b244aeb638be7006c6a9cb3c239795e6f8d",
-          "category": "图像标签"
-        },
-        {
-          "path": "ImgLabel/站在艾姆利多面前.IL",
-          "bytes": 18504,
-          "sha256": "682c63e41c8b3313464a7e93263b7154d289175c2d4f68a6ee3811c25807a989",
-          "category": "图像标签"
-        },
-        {
-          "path": "ImgLabel/艾姆利多出现了.IL",
-          "bytes": 14628,
-          "sha256": "e356f8a31acd8b751cc38f1d5d5e540b529e85672ed1ae3aae4d73b99a8fbf41",
           "category": "图像标签"
         },
         {
@@ -84,6 +208,377 @@
           "category": "使用说明"
         },
         {
+          "path": "README.md",
+          "bytes": 1536,
+          "sha256": "8c7d244e590337404e1ce728289ad036457d61931b6d64bd56e2586af2149ca7",
+          "category": "使用说明"
+        },
+        {
+          "path": "美梦神.txt",
+          "bytes": 6625,
+          "sha256": "27e79927c1b82eeacbcdbcf21921b7000778c6f79bc0c66537069a5d0431c74e",
+          "category": "定点与游走"
+        }
+      ],
+      "readme": "# 美梦神\n\n珍钻复刻 · **0.0.2 测试版** · 定点与游走\n\n## 安装与使用\n\n本包只安装 `美梦神.txt`、必需资源与来源说明，可独立更新。安装位置：`珍钻复刻/美梦神/`。标签位于脚本旁的 `ImgLabel/`，共 4 个：喷雾消失了、宝可表、艾姆利多在202路、艾姆利多在水域。使用前按自己的画面核对标签。\n\n脚本保持原始 .txt 文件名和正文，兼容原版伊机控。运行前请阅读脚本注释，核对游戏版本、运行起点、按键及画面尺寸；安装不会自动运行。\n\n### 原脚本起始说明\n\n> 1．进出一次祝庆市pc,背包准备好黄金喷雾（喷雾要在物品的第一个位置）\n> 2．一只会瞬间移动的宝可梦和一只发光属性的宝可梦（同步凯西和海星），这两只濒死放在队首（凯西在前），一只等级在(40，49]之间的宝可梦在第三位\n> 3.  有需要请修改撞帧FUNC中内容，其余内容请轻易不要动。\n\n## 旧目录迁移\n\n如果曾使用 `BDSP/` 大包，安装预览会列出本包需要迁移的脚本与标签。默认保留个人修改，原文件留作备份；自动流程的旧脚本路径改为本包路径。未安装本包前，原有文件继续使用。\n\n## 来源与许可证\n\n来源：[auto-bdsp-rng](https://github.com/XiaoyuBook/auto-bdsp-rng)，修订 `494793ed467cd1a2ef376d5886d0add5924b620f`。脚本文本与已发布 0.0.1 包逐字节一致。详见 LICENSE.md。测试阶段使用 0.0.x，正式上线后再使用 1.0.0。\n",
+      "archive": "packages/bdsp-cresselia/0.0.2.zip",
+      "bytes": 15341,
+      "sha256": "71127792271ff6eec4bb703d28ab3c213e6e36b8732eaa9c70999a1e111d6943"
+    },
+    {
+      "schemaVersion": 1,
+      "id": "bdsp-darkrai",
+      "name": "达克莱伊",
+      "version": "0.0.2",
+      "minimumAppVersion": "0.1.0",
+      "installFolder": "珍钻复刻/达克莱伊",
+      "game": "BDSP",
+      "authors": [
+        "XiaoyuBook",
+        "原版项目贡献者"
+      ],
+      "description": "测试版：珍钻复刻达克莱伊脚本，可单独安装和更新。无需图像标签。",
+      "instructions": "在脚本库中查看已安装文件，并在自动流程中选择对应脚本。使用前请核对游戏版本、画面尺寸、运行起点及按键设置。",
+      "updatedAt": "2026-09-26",
+      "legacyPaths": {
+        "达克莱伊.txt": "BDSP/达克莱伊.txt"
+      },
+      "source": {
+        "repository": "https://github.com/XiaoyuBook/auto-bdsp-rng",
+        "revision": "494793ed467cd1a2ef376d5886d0add5924b620f",
+        "adaptedFrom": "https://github.com/XiaoyuBook/auto-poke-rng/tree/5a10dea/scripts/BDSP"
+      },
+      "license": "GPL-3.0-or-later",
+      "files": [
+        {
+          "path": "LICENSE.md",
+          "bytes": 234,
+          "sha256": "45669c033b08b03fe29c74ea2376cd4bab100d7f4d24f86e8edfa1c7f2a373f2",
+          "category": "使用说明"
+        },
+        {
+          "path": "README.md",
+          "bytes": 1030,
+          "sha256": "831f8926f5766f2956d050c2046a0b8c3d37240e0d2f78c1e4637b23d3530f22",
+          "category": "使用说明"
+        },
+        {
+          "path": "达克莱伊.txt",
+          "bytes": 1166,
+          "sha256": "ff293f4f31d5c00daa884c5bbc28d2e856ee16e42b464665bf39e2a701e0f7d8",
+          "category": "定点与游走"
+        }
+      ],
+      "readme": "# 达克莱伊\n\n珍钻复刻 · **0.0.2 测试版** · 定点与游走\n\n## 安装与使用\n\n本包只安装 `达克莱伊.txt`、必需资源与来源说明，可独立更新。安装位置：`珍钻复刻/达克莱伊/`。本脚本不使用图像标签，无需安装其他脚本的标签。\n\n脚本保持原始 .txt 文件名和正文，兼容原版伊机控。运行前请阅读脚本注释，核对游戏版本、运行起点、按键及画面尺寸；安装不会自动运行。\n\n## 旧目录迁移\n\n如果曾使用 `BDSP/` 大包，安装预览会列出本包需要迁移的脚本与标签。默认保留个人修改，原文件留作备份；自动流程的旧脚本路径改为本包路径。未安装本包前，原有文件继续使用。\n\n## 来源与许可证\n\n来源：[auto-bdsp-rng](https://github.com/XiaoyuBook/auto-bdsp-rng)，修订 `494793ed467cd1a2ef376d5886d0add5924b620f`。脚本文本与已发布 0.0.1 包逐字节一致。详见 LICENSE.md。测试阶段使用 0.0.x，正式上线后再使用 1.0.0。\n",
+      "archive": "packages/bdsp-darkrai/0.0.2.zip",
+      "bytes": 3009,
+      "sha256": "398edd9f2688090fcb4cb1d0c9b38111918b50984e7f2cc8e7a244f88d67e138"
+    },
+    {
+      "schemaVersion": 1,
+      "id": "bdsp-darkrai-cutscene",
+      "name": "达克莱伊过场",
+      "version": "0.0.2",
+      "minimumAppVersion": "0.1.0",
+      "installFolder": "珍钻复刻/达克莱伊过场",
+      "game": "BDSP",
+      "authors": [
+        "XiaoyuBook",
+        "原版项目贡献者"
+      ],
+      "description": "测试版：珍钻复刻达克莱伊过场脚本，可单独安装和更新。无需图像标签。",
+      "instructions": "在脚本库中查看已安装文件，并在自动流程中选择对应脚本。使用前请核对游戏版本、画面尺寸、运行起点及按键设置。",
+      "updatedAt": "2026-09-26",
+      "legacyPaths": {
+        "达克莱伊过场.txt": "BDSP/达克莱伊过场.txt"
+      },
+      "source": {
+        "repository": "https://github.com/XiaoyuBook/auto-bdsp-rng",
+        "revision": "494793ed467cd1a2ef376d5886d0add5924b620f",
+        "adaptedFrom": "https://github.com/XiaoyuBook/auto-poke-rng/tree/5a10dea/scripts/BDSP"
+      },
+      "license": "GPL-3.0-or-later",
+      "files": [
+        {
+          "path": "LICENSE.md",
+          "bytes": 234,
+          "sha256": "45669c033b08b03fe29c74ea2376cd4bab100d7f4d24f86e8edfa1c7f2a373f2",
+          "category": "使用说明"
+        },
+        {
+          "path": "README.md",
+          "bytes": 1048,
+          "sha256": "1824046d88b07191fd47eceedf61a5e78ba976964eab4c3c5619d99b747c97e1",
+          "category": "使用说明"
+        },
+        {
+          "path": "达克莱伊过场.txt",
+          "bytes": 529,
+          "sha256": "f17245dde2a0d8212e3aa6488403d3c8e5af02f81cca090ed7d00c2e0ed308e5",
+          "category": "定点与游走"
+        }
+      ],
+      "readme": "# 达克莱伊过场\n\n珍钻复刻 · **0.0.2 测试版** · 定点与游走\n\n## 安装与使用\n\n本包只安装 `达克莱伊过场.txt`、必需资源与来源说明，可独立更新。安装位置：`珍钻复刻/达克莱伊过场/`。本脚本不使用图像标签，无需安装其他脚本的标签。\n\n脚本保持原始 .txt 文件名和正文，兼容原版伊机控。运行前请阅读脚本注释，核对游戏版本、运行起点、按键及画面尺寸；安装不会自动运行。\n\n## 旧目录迁移\n\n如果曾使用 `BDSP/` 大包，安装预览会列出本包需要迁移的脚本与标签。默认保留个人修改，原文件留作备份；自动流程的旧脚本路径改为本包路径。未安装本包前，原有文件继续使用。\n\n## 来源与许可证\n\n来源：[auto-bdsp-rng](https://github.com/XiaoyuBook/auto-bdsp-rng)，修订 `494793ed467cd1a2ef376d5886d0add5924b620f`。脚本文本与已发布 0.0.1 包逐字节一致。详见 LICENSE.md。测试阶段使用 0.0.x，正式上线后再使用 1.0.0。\n",
+      "archive": "packages/bdsp-darkrai-cutscene/0.0.2.zip",
+      "bytes": 2950,
+      "sha256": "b5d7fc5cce3b516a5a7429f1db1b4eeed0402c6315279a37585acd4dbcf43f7a"
+    },
+    {
+      "schemaVersion": 1,
+      "id": "bdsp-darkrai-reverse",
+      "name": "达克莱伊捕捉反查",
+      "version": "0.0.2",
+      "minimumAppVersion": "0.1.0",
+      "installFolder": "珍钻复刻/达克莱伊捕捉反查",
+      "game": "BDSP",
+      "authors": [
+        "XiaoyuBook",
+        "原版项目贡献者"
+      ],
+      "description": "测试版：珍钻复刻达克莱伊捕捉反查脚本，可单独安装和更新。无需图像标签。",
+      "instructions": "在脚本库中查看已安装文件，并在自动流程中选择对应脚本。使用前请核对游戏版本、画面尺寸、运行起点及按键设置。",
+      "updatedAt": "2026-09-26",
+      "legacyPaths": {
+        "达克莱伊捕捉反查.txt": "BDSP/达克莱伊捕捉反查.txt"
+      },
+      "source": {
+        "repository": "https://github.com/XiaoyuBook/auto-bdsp-rng",
+        "revision": "494793ed467cd1a2ef376d5886d0add5924b620f",
+        "adaptedFrom": "https://github.com/XiaoyuBook/auto-poke-rng/tree/5a10dea/scripts/BDSP"
+      },
+      "license": "GPL-3.0-or-later",
+      "files": [
+        {
+          "path": "LICENSE.md",
+          "bytes": 234,
+          "sha256": "45669c033b08b03fe29c74ea2376cd4bab100d7f4d24f86e8edfa1c7f2a373f2",
+          "category": "使用说明"
+        },
+        {
+          "path": "README.md",
+          "bytes": 1066,
+          "sha256": "d058f6f4f8417de1a72c7eeab808c117c68c477429824dabca4f9265f4276f5a",
+          "category": "使用说明"
+        },
+        {
+          "path": "达克莱伊捕捉反查.txt",
+          "bytes": 363,
+          "sha256": "96d0f17e76c5d45ecdfe1627a8b896e7e4f2becfa343cb121a256ec47c61fdb3",
+          "category": "捕捉与反查"
+        }
+      ],
+      "readme": "# 达克莱伊捕捉反查\n\n珍钻复刻 · **0.0.2 测试版** · 捕捉与反查\n\n## 安装与使用\n\n本包只安装 `达克莱伊捕捉反查.txt`、必需资源与来源说明，可独立更新。安装位置：`珍钻复刻/达克莱伊捕捉反查/`。本脚本不使用图像标签，无需安装其他脚本的标签。\n\n脚本保持原始 .txt 文件名和正文，兼容原版伊机控。运行前请阅读脚本注释，核对游戏版本、运行起点、按键及画面尺寸；安装不会自动运行。\n\n## 旧目录迁移\n\n如果曾使用 `BDSP/` 大包，安装预览会列出本包需要迁移的脚本与标签。默认保留个人修改，原文件留作备份；自动流程的旧脚本路径改为本包路径。未安装本包前，原有文件继续使用。\n\n## 来源与许可证\n\n来源：[auto-bdsp-rng](https://github.com/XiaoyuBook/auto-bdsp-rng)，修订 `494793ed467cd1a2ef376d5886d0add5924b620f`。脚本文本与已发布 0.0.1 包逐字节一致。详见 LICENSE.md。测试阶段使用 0.0.x，正式上线后再使用 1.0.0。\n",
+      "archive": "packages/bdsp-darkrai-reverse/0.0.2.zip",
+      "bytes": 3001,
+      "sha256": "1af0c0888b465cb2a7c020c0a41488b06f0ef098552939730a32ba039c067e31"
+    },
+    {
+      "schemaVersion": 1,
+      "id": "bdsp-giratina",
+      "name": "冥王龙",
+      "version": "0.0.2",
+      "minimumAppVersion": "0.1.0",
+      "installFolder": "珍钻复刻/冥王龙",
+      "game": "BDSP",
+      "authors": [
+        "XiaoyuBook",
+        "原版项目贡献者"
+      ],
+      "description": "测试版：珍钻复刻冥王龙脚本，可单独安装和更新。无需图像标签。",
+      "instructions": "在脚本库中查看已安装文件，并在自动流程中选择对应脚本。使用前请核对游戏版本、画面尺寸、运行起点及按键设置。",
+      "updatedAt": "2026-09-26",
+      "legacyPaths": {
+        "冥王龙.txt": "BDSP/冥王龙.txt"
+      },
+      "source": {
+        "repository": "https://github.com/XiaoyuBook/auto-bdsp-rng",
+        "revision": "494793ed467cd1a2ef376d5886d0add5924b620f",
+        "adaptedFrom": "https://github.com/XiaoyuBook/auto-poke-rng/tree/5a10dea/scripts/BDSP"
+      },
+      "license": "GPL-3.0-or-later",
+      "files": [
+        {
+          "path": "LICENSE.md",
+          "bytes": 234,
+          "sha256": "45669c033b08b03fe29c74ea2376cd4bab100d7f4d24f86e8edfa1c7f2a373f2",
+          "category": "使用说明"
+        },
+        {
+          "path": "README.md",
+          "bytes": 1021,
+          "sha256": "f2cc68f968f60ac463a62eb554d8c25f452f959922842466dd870698aa6080fd",
+          "category": "使用说明"
+        },
+        {
+          "path": "冥王龙.txt",
+          "bytes": 978,
+          "sha256": "013814ebc357ad3b9fe08c96ea5b9f04e62f52ff7138fa33fb8104ed85f4c692",
+          "category": "定点与游走"
+        }
+      ],
+      "readme": "# 冥王龙\n\n珍钻复刻 · **0.0.2 测试版** · 定点与游走\n\n## 安装与使用\n\n本包只安装 `冥王龙.txt`、必需资源与来源说明，可独立更新。安装位置：`珍钻复刻/冥王龙/`。本脚本不使用图像标签，无需安装其他脚本的标签。\n\n脚本保持原始 .txt 文件名和正文，兼容原版伊机控。运行前请阅读脚本注释，核对游戏版本、运行起点、按键及画面尺寸；安装不会自动运行。\n\n## 旧目录迁移\n\n如果曾使用 `BDSP/` 大包，安装预览会列出本包需要迁移的脚本与标签。默认保留个人修改，原文件留作备份；自动流程的旧脚本路径改为本包路径。未安装本包前，原有文件继续使用。\n\n## 来源与许可证\n\n来源：[auto-bdsp-rng](https://github.com/XiaoyuBook/auto-bdsp-rng)，修订 `494793ed467cd1a2ef376d5886d0add5924b620f`。脚本文本与已发布 0.0.1 包逐字节一致。详见 LICENSE.md。测试阶段使用 0.0.x，正式上线后再使用 1.0.0。\n",
+      "archive": "packages/bdsp-giratina/0.0.2.zip",
+      "bytes": 2985,
+      "sha256": "a76ed18dfb256e9d74a0a12e28bd542480359bc696e865fbb9ff73222358cd84"
+    },
+    {
+      "schemaVersion": 1,
+      "id": "bdsp-mesprit",
+      "name": "红圣菇",
+      "version": "0.0.2",
+      "minimumAppVersion": "0.1.0",
+      "installFolder": "珍钻复刻/红圣菇",
+      "game": "BDSP",
+      "authors": [
+        "XiaoyuBook",
+        "原版项目贡献者"
+      ],
+      "description": "测试版：珍钻复刻红圣菇脚本，可单独安装和更新。含 4 个必需图像标签。",
+      "instructions": "在脚本库中查看已安装文件，并在自动流程中选择对应脚本。使用前请核对游戏版本、画面尺寸、运行起点及按键设置。",
+      "updatedAt": "2026-09-26",
+      "legacyPaths": {
+        "红圣菇.txt": "BDSP/红圣菇.txt",
+        "ImgLabel/喷雾消失了.IL": "BDSP/ImgLabel/喷雾消失了.IL",
+        "ImgLabel/宝可表.IL": "BDSP/ImgLabel/宝可表.IL",
+        "ImgLabel/艾姆利多在202路.IL": "BDSP/ImgLabel/艾姆利多在202路.IL",
+        "ImgLabel/艾姆利多在水域.IL": "BDSP/ImgLabel/艾姆利多在水域.IL"
+      },
+      "source": {
+        "repository": "https://github.com/XiaoyuBook/auto-bdsp-rng",
+        "revision": "494793ed467cd1a2ef376d5886d0add5924b620f",
+        "adaptedFrom": "https://github.com/XiaoyuBook/auto-poke-rng/tree/5a10dea/scripts/BDSP"
+      },
+      "license": "GPL-3.0-or-later",
+      "files": [
+        {
+          "path": "ImgLabel/喷雾消失了.IL",
+          "bytes": 12510,
+          "sha256": "46f57ef48fb9ed1c2e8033eb4f2a097c49fd27ea1e4f6dd9806061e35c4d82ed",
+          "category": "图像标签"
+        },
+        {
+          "path": "ImgLabel/宝可表.IL",
+          "bytes": 10031,
+          "sha256": "5f57eb0f85d7674127ffa4732b938b244aeb638be7006c6a9cb3c239795e6f8d",
+          "category": "图像标签"
+        },
+        {
+          "path": "ImgLabel/艾姆利多在202路.IL",
+          "bytes": 2850,
+          "sha256": "8715b77d2c42afd5e38a80819bacaff0494e83e4182ac2368d7e7a95e95eef3a",
+          "category": "图像标签"
+        },
+        {
+          "path": "ImgLabel/艾姆利多在水域.IL",
+          "bytes": 3154,
+          "sha256": "a11fac2b5b8c42a5a9cccec7d80ed348ff9f06d43edb6f1e2bfabb738700bd72",
+          "category": "图像标签"
+        },
+        {
+          "path": "LICENSE.md",
+          "bytes": 234,
+          "sha256": "45669c033b08b03fe29c74ea2376cd4bab100d7f4d24f86e8edfa1c7f2a373f2",
+          "category": "使用说明"
+        },
+        {
+          "path": "README.md",
+          "bytes": 1536,
+          "sha256": "0a71949bdb72c90e08fabf2193a72a0ae89c1ee30dc9b98e5f9093bd60851db7",
+          "category": "使用说明"
+        },
+        {
+          "path": "红圣菇.txt",
+          "bytes": 6650,
+          "sha256": "44772fa6526bf2af7c62329c6b0987a36c14308c423a5273c928e1d03349ea24",
+          "category": "定点与游走"
+        }
+      ],
+      "readme": "# 红圣菇\n\n珍钻复刻 · **0.0.2 测试版** · 定点与游走\n\n## 安装与使用\n\n本包只安装 `红圣菇.txt`、必需资源与来源说明，可独立更新。安装位置：`珍钻复刻/红圣菇/`。标签位于脚本旁的 `ImgLabel/`，共 4 个：喷雾消失了、宝可表、艾姆利多在202路、艾姆利多在水域。使用前按自己的画面核对标签。\n\n脚本保持原始 .txt 文件名和正文，兼容原版伊机控。运行前请阅读脚本注释，核对游戏版本、运行起点、按键及画面尺寸；安装不会自动运行。\n\n### 原脚本起始说明\n\n> 1．进出一次祝庆市pc,背包准备好黄金喷雾（喷雾要在物品的第一个位置）\n> 2．一只会瞬间移动的宝可梦和一只发光属性的宝可梦（同步凯西和海星），这两只濒死放在队首（凯西在前），一只等级在(40，49]之间的宝可梦在第三位\n> 3.  有需要请修改撞帧FUNC中内容，其余内容请轻易不要动。\n\n## 旧目录迁移\n\n如果曾使用 `BDSP/` 大包，安装预览会列出本包需要迁移的脚本与标签。默认保留个人修改，原文件留作备份；自动流程的旧脚本路径改为本包路径。未安装本包前，原有文件继续使用。\n\n## 来源与许可证\n\n来源：[auto-bdsp-rng](https://github.com/XiaoyuBook/auto-bdsp-rng)，修订 `494793ed467cd1a2ef376d5886d0add5924b620f`。脚本文本与已发布 0.0.1 包逐字节一致。详见 LICENSE.md。测试阶段使用 0.0.x，正式上线后再使用 1.0.0。\n",
+      "archive": "packages/bdsp-mesprit/0.0.2.zip",
+      "bytes": 15370,
+      "sha256": "1f4e0e76be0195c60b33e09b6fc420fb3c39b63fa765a8345b06e84015303c36"
+    },
+    {
+      "schemaVersion": 1,
+      "id": "bdsp-name",
+      "name": "取名",
+      "version": "0.0.2",
+      "minimumAppVersion": "0.1.0",
+      "installFolder": "珍钻复刻/取名",
+      "game": "BDSP",
+      "authors": [
+        "XiaoyuBook",
+        "原版项目贡献者"
+      ],
+      "description": "测试版：珍钻复刻取名脚本，可单独安装和更新。无需图像标签。",
+      "instructions": "在脚本库中查看已安装文件，并在自动流程中选择对应脚本。使用前请核对游戏版本、画面尺寸、运行起点及按键设置。",
+      "updatedAt": "2026-09-26",
+      "legacyPaths": {
+        "取名.txt": "BDSP/取名.txt"
+      },
+      "source": {
+        "repository": "https://github.com/XiaoyuBook/auto-bdsp-rng",
+        "revision": "494793ed467cd1a2ef376d5886d0add5924b620f",
+        "adaptedFrom": "https://github.com/XiaoyuBook/auto-poke-rng/tree/5a10dea/scripts/BDSP"
+      },
+      "license": "GPL-3.0-or-later",
+      "files": [
+        {
+          "path": "LICENSE.md",
+          "bytes": 234,
+          "sha256": "45669c033b08b03fe29c74ea2376cd4bab100d7f4d24f86e8edfa1c7f2a373f2",
+          "category": "使用说明"
+        },
+        {
+          "path": "README.md",
+          "bytes": 1009,
+          "sha256": "df1e8a4210a2b081d51e60359de189f4ad5838611135f88860dfa38fb08da567",
+          "category": "使用说明"
+        },
+        {
+          "path": "取名.txt",
+          "bytes": 742,
+          "sha256": "ed5f7dfb9cf6b7140bb8f816a7dd497e1e7fc6f8c027df583faa54fad9e7f8aa",
+          "category": "辅助工具"
+        }
+      ],
+      "readme": "# 取名\n\n珍钻复刻 · **0.0.2 测试版** · 辅助工具\n\n## 安装与使用\n\n本包只安装 `取名.txt`、必需资源与来源说明，可独立更新。安装位置：`珍钻复刻/取名/`。本脚本不使用图像标签，无需安装其他脚本的标签。\n\n脚本保持原始 .txt 文件名和正文，兼容原版伊机控。运行前请阅读脚本注释，核对游戏版本、运行起点、按键及画面尺寸；安装不会自动运行。\n\n## 旧目录迁移\n\n如果曾使用 `BDSP/` 大包，安装预览会列出本包需要迁移的脚本与标签。默认保留个人修改，原文件留作备份；自动流程的旧脚本路径改为本包路径。未安装本包前，原有文件继续使用。\n\n## 来源与许可证\n\n来源：[auto-bdsp-rng](https://github.com/XiaoyuBook/auto-bdsp-rng)，修订 `494793ed467cd1a2ef376d5886d0add5924b620f`。脚本文本与已发布 0.0.1 包逐字节一致。详见 LICENSE.md。测试阶段使用 0.0.x，正式上线后再使用 1.0.0。\n",
+      "archive": "packages/bdsp-name/0.0.2.zip",
+      "bytes": 3004,
+      "sha256": "30612e4172272c0e4b45effa666a48478bec824d12ab792d7d74b8d1845994f1"
+    },
+    {
+      "schemaVersion": 1,
+      "id": "bdsp-ocr-page",
+      "name": "文字识别翻页",
+      "version": "0.0.2",
+      "minimumAppVersion": "0.1.0",
+      "installFolder": "珍钻复刻/文字识别翻页",
+      "game": "BDSP",
+      "authors": [
+        "XiaoyuBook",
+        "原版项目贡献者"
+      ],
+      "description": "测试版：珍钻复刻文字识别翻页脚本，可单独安装和更新。无需图像标签。",
+      "instructions": "在脚本库中查看已安装文件，并在自动流程中选择对应脚本。使用前请核对游戏版本、画面尺寸、运行起点及按键设置。",
+      "updatedAt": "2026-09-26",
+      "legacyPaths": {
+        "OCR翻页.txt": "BDSP/OCR翻页.txt"
+      },
+      "source": {
+        "repository": "https://github.com/XiaoyuBook/auto-bdsp-rng",
+        "revision": "494793ed467cd1a2ef376d5886d0add5924b620f",
+        "adaptedFrom": "https://github.com/XiaoyuBook/auto-poke-rng/tree/5a10dea/scripts/BDSP"
+      },
+      "license": "GPL-3.0-or-later",
+      "files": [
+        {
+          "path": "LICENSE.md",
+          "bytes": 234,
+          "sha256": "45669c033b08b03fe29c74ea2376cd4bab100d7f4d24f86e8edfa1c7f2a373f2",
+          "category": "使用说明"
+        },
+        {
           "path": "OCR翻页.txt",
           "bytes": 74,
           "sha256": "2cd77ea298d7da642506ca844fb68e1b0e34d10ea04d2ab340d6df3b7ff6665e",
@@ -91,141 +586,652 @@
         },
         {
           "path": "README.md",
-          "bytes": 2220,
-          "sha256": "198abb8d51701af9a133234dd8c058390d4347a5ba117571fb83aae98b412783",
+          "bytes": 1129,
+          "sha256": "5c21bc16332ede96071e72b5fc3f80612428e127060045bd491493511efc060d",
+          "category": "使用说明"
+        }
+      ],
+      "readme": "# 文字识别翻页\n\n珍钻复刻 · **0.0.2 测试版** · 辅助工具\n\n## 安装与使用\n\n本包只安装 `OCR翻页.txt`、必需资源与来源说明，可独立更新。安装位置：`珍钻复刻/文字识别翻页/`。本脚本不使用图像标签，无需安装其他脚本的标签。\n\n脚本保持原始 .txt 文件名和正文，兼容原版伊机控。运行前请阅读脚本注释，核对游戏版本、运行起点、按键及画面尺寸；安装不会自动运行。\n\n### 原脚本起始说明\n\n> OCR 测试全部：训练家笔记页 → 能力页\n\n## 旧目录迁移\n\n如果曾使用 `BDSP/` 大包，安装预览会列出本包需要迁移的脚本与标签。默认保留个人修改，原文件留作备份；自动流程的旧脚本路径改为本包路径。未安装本包前，原有文件继续使用。\n\n## 来源与许可证\n\n来源：[auto-bdsp-rng](https://github.com/XiaoyuBook/auto-bdsp-rng)，修订 `494793ed467cd1a2ef376d5886d0add5924b620f`。本文件为 Auto Poke RNG 的文字识别翻页辅助脚本。详见 LICENSE.md。测试阶段使用 0.0.x，正式上线后再使用 1.0.0。\n",
+      "archive": "packages/bdsp-ocr-page/0.0.2.zip",
+      "bytes": 2930,
+      "sha256": "16826ef31d885185798bf63103655bec4a8c903ca99ab029496bc5c6adc8d7d9"
+    },
+    {
+      "schemaVersion": 1,
+      "id": "bdsp-pokedex-advance",
+      "name": "神奥图鉴过帧",
+      "version": "0.0.2",
+      "minimumAppVersion": "0.1.0",
+      "installFolder": "珍钻复刻/神奥图鉴过帧",
+      "game": "BDSP",
+      "authors": [
+        "XiaoyuBook",
+        "原版项目贡献者"
+      ],
+      "description": "测试版：珍钻复刻神奥图鉴过帧脚本，可单独安装和更新。无需图像标签。",
+      "instructions": "在脚本库中查看已安装文件，并在自动流程中选择对应脚本。使用前请核对游戏版本、画面尺寸、运行起点及按键设置。",
+      "updatedAt": "2026-09-26",
+      "legacyPaths": {
+        "神奥图鉴过帧.txt": "BDSP/神奥图鉴过帧.txt"
+      },
+      "source": {
+        "repository": "https://github.com/XiaoyuBook/auto-bdsp-rng",
+        "revision": "494793ed467cd1a2ef376d5886d0add5924b620f",
+        "adaptedFrom": "https://github.com/XiaoyuBook/auto-poke-rng/tree/5a10dea/scripts/BDSP"
+      },
+      "license": "GPL-3.0-or-later",
+      "files": [
+        {
+          "path": "LICENSE.md",
+          "bytes": 234,
+          "sha256": "45669c033b08b03fe29c74ea2376cd4bab100d7f4d24f86e8edfa1c7f2a373f2",
           "category": "使用说明"
         },
         {
-          "path": "bdsp过帧(优化）.txt",
-          "bytes": 3721,
-          "sha256": "5796b7027bc60291739d4d55e8007c2c722b01744d03b0412354588e6935f640",
-          "category": "推进与撞帧"
-        },
-        {
-          "path": "bdsp过帧.txt",
-          "bytes": 3208,
-          "sha256": "17ce6178ab4c4259bfca797d8066cf6720541b97bc803c011bcfd8783c0ff246",
-          "category": "推进与撞帧"
-        },
-        {
-          "path": "id测种.txt",
-          "bytes": 317,
-          "sha256": "764ec4cb58262a0f41dd59e0d64076745b430f1da2883308efdc3b9f7baad4c6",
-          "category": "测种与识别"
-        },
-        {
-          "path": "冥王龙.txt",
-          "bytes": 978,
-          "sha256": "013814ebc357ad3b9fe08c96ea5b9f04e62f52ff7138fa33fb8104ed85f4c692",
-          "category": "定点与游走"
-        },
-        {
-          "path": "取名.txt",
-          "bytes": 742,
-          "sha256": "ed5f7dfb9cf6b7140bb8f816a7dd497e1e7fc6f8c027df583faa54fad9e7f8aa",
-          "category": "辅助工具"
-        },
-        {
-          "path": "录屏.txt",
-          "bytes": 12,
-          "sha256": "1f896a51e08e5fe90d89c0fd2c5debeac29542fd1cc827c9eb8f7ca286eebb7a",
-          "category": "辅助工具"
-        },
-        {
-          "path": "御三家反查.txt",
-          "bytes": 1037,
-          "sha256": "da6a49f18b67a8aa918ed359888efebbc886416d9889c2bda0094498232ca8bd",
-          "category": "捕捉与反查"
-        },
-        {
-          "path": "御三家撞帧.txt",
-          "bytes": 746,
-          "sha256": "a140bc6e8360486cb909d57bc5fb0b5f077121b49c50e72849f990f30ac0eed5",
-          "category": "推进与撞帧"
-        },
-        {
-          "path": "御三家测种.txt",
-          "bytes": 776,
-          "sha256": "8841e8c629fab7937eec12e32a42f63a837256cdb3c41fdefa8ceda0e4d9aa97",
-          "category": "测种与识别"
-        },
-        {
-          "path": "捕捉反查脚本 游走.txt",
-          "bytes": 388,
-          "sha256": "612f61b72419e95c66130d152d569c9ee07394bd7bb2c4be034d104d1b799317",
-          "category": "捕捉与反查"
-        },
-        {
-          "path": "捕捉反查脚本.txt",
-          "bytes": 329,
-          "sha256": "7ed4c720c9562aa83b29b0960caef635bf457355b9733fca24679c04289bf20e",
-          "category": "捕捉与反查"
-        },
-        {
-          "path": "玫瑰公园.txt",
-          "bytes": 2195,
-          "sha256": "7b349bfc1f42286f1eac5b53eacb2bcd98575fc599326b05aa08f655afdbe9e9",
-          "category": "定点与游走"
-        },
-        {
-          "path": "玫瑰公园捕捉反查脚本.txt",
-          "bytes": 320,
-          "sha256": "df4fd28a4b86da2ebfc7ace2153d9e67c4d66a6c781fb11fca230ee13b2d3a4e",
-          "category": "捕捉与反查"
+          "path": "README.md",
+          "bytes": 1048,
+          "sha256": "a9f7295db434a2bff5c0f20156e23f715364e6dc410160b095c72a3fe72f2fef",
+          "category": "使用说明"
         },
         {
           "path": "神奥图鉴过帧.txt",
           "bytes": 2807,
           "sha256": "799292ede5bfa16dd1bd63d5364a29bd6ee18302db55aeb5818e84d1788a76db",
           "category": "推进与撞帧"
+        }
+      ],
+      "readme": "# 神奥图鉴过帧\n\n珍钻复刻 · **0.0.2 测试版** · 推进与撞帧\n\n## 安装与使用\n\n本包只安装 `神奥图鉴过帧.txt`、必需资源与来源说明，可独立更新。安装位置：`珍钻复刻/神奥图鉴过帧/`。本脚本不使用图像标签，无需安装其他脚本的标签。\n\n脚本保持原始 .txt 文件名和正文，兼容原版伊机控。运行前请阅读脚本注释，核对游戏版本、运行起点、按键及画面尺寸；安装不会自动运行。\n\n## 旧目录迁移\n\n如果曾使用 `BDSP/` 大包，安装预览会列出本包需要迁移的脚本与标签。默认保留个人修改，原文件留作备份；自动流程的旧脚本路径改为本包路径。未安装本包前，原有文件继续使用。\n\n## 来源与许可证\n\n来源：[auto-bdsp-rng](https://github.com/XiaoyuBook/auto-bdsp-rng)，修订 `494793ed467cd1a2ef376d5886d0add5924b620f`。脚本文本与已发布 0.0.1 包逐字节一致。详见 LICENSE.md。测试阶段使用 0.0.x，正式上线后再使用 1.0.0。\n",
+      "archive": "packages/bdsp-pokedex-advance/0.0.2.zip",
+      "bytes": 3816,
+      "sha256": "d966638529fef9fb8b85bbcc146d2e0509521639c172870da8f416c4144b973e"
+    },
+    {
+      "schemaVersion": 1,
+      "id": "bdsp-ramanas",
+      "name": "玫瑰公园",
+      "version": "0.0.2",
+      "minimumAppVersion": "0.1.0",
+      "installFolder": "珍钻复刻/玫瑰公园",
+      "game": "BDSP",
+      "authors": [
+        "XiaoyuBook",
+        "原版项目贡献者"
+      ],
+      "description": "测试版：珍钻复刻玫瑰公园脚本，可单独安装和更新。无需图像标签。",
+      "instructions": "在脚本库中查看已安装文件，并在自动流程中选择对应脚本。使用前请核对游戏版本、画面尺寸、运行起点及按键设置。",
+      "updatedAt": "2026-09-26",
+      "legacyPaths": {
+        "玫瑰公园.txt": "BDSP/玫瑰公园.txt"
+      },
+      "source": {
+        "repository": "https://github.com/XiaoyuBook/auto-bdsp-rng",
+        "revision": "494793ed467cd1a2ef376d5886d0add5924b620f",
+        "adaptedFrom": "https://github.com/XiaoyuBook/auto-poke-rng/tree/5a10dea/scripts/BDSP"
+      },
+      "license": "GPL-3.0-or-later",
+      "files": [
+        {
+          "path": "LICENSE.md",
+          "bytes": 234,
+          "sha256": "45669c033b08b03fe29c74ea2376cd4bab100d7f4d24f86e8edfa1c7f2a373f2",
+          "category": "使用说明"
         },
         {
-          "path": "红圣菇.txt",
-          "bytes": 6650,
-          "sha256": "44772fa6526bf2af7c62329c6b0987a36c14308c423a5273c928e1d03349ea24",
-          "category": "定点与游走"
+          "path": "README.md",
+          "bytes": 1030,
+          "sha256": "52f58470e6ba78bb91dc63e07bbabb4ffea28836025682e8075c07300196ddad",
+          "category": "使用说明"
         },
         {
-          "path": "美梦神.txt",
-          "bytes": 6625,
-          "sha256": "27e79927c1b82eeacbcdbcf21921b7000778c6f79bc0c66537069a5d0431c74e",
+          "path": "玫瑰公园.txt",
+          "bytes": 2195,
+          "sha256": "7b349bfc1f42286f1eac5b53eacb2bcd98575fc599326b05aa08f655afdbe9e9",
           "category": "定点与游走"
+        }
+      ],
+      "readme": "# 玫瑰公园\n\n珍钻复刻 · **0.0.2 测试版** · 定点与游走\n\n## 安装与使用\n\n本包只安装 `玫瑰公园.txt`、必需资源与来源说明，可独立更新。安装位置：`珍钻复刻/玫瑰公园/`。本脚本不使用图像标签，无需安装其他脚本的标签。\n\n脚本保持原始 .txt 文件名和正文，兼容原版伊机控。运行前请阅读脚本注释，核对游戏版本、运行起点、按键及画面尺寸；安装不会自动运行。\n\n## 旧目录迁移\n\n如果曾使用 `BDSP/` 大包，安装预览会列出本包需要迁移的脚本与标签。默认保留个人修改，原文件留作备份；自动流程的旧脚本路径改为本包路径。未安装本包前，原有文件继续使用。\n\n## 来源与许可证\n\n来源：[auto-bdsp-rng](https://github.com/XiaoyuBook/auto-bdsp-rng)，修订 `494793ed467cd1a2ef376d5886d0add5924b620f`。脚本文本与已发布 0.0.1 包逐字节一致。详见 LICENSE.md。测试阶段使用 0.0.x，正式上线后再使用 1.0.0。\n",
+      "archive": "packages/bdsp-ramanas/0.0.2.zip",
+      "bytes": 3188,
+      "sha256": "013868a3c7099811de19eabc89ba105f9943dd5bd8f29319145ce79b50cd518b"
+    },
+    {
+      "schemaVersion": 1,
+      "id": "bdsp-ramanas-reverse",
+      "name": "玫瑰公园捕捉反查",
+      "version": "0.0.2",
+      "minimumAppVersion": "0.1.0",
+      "installFolder": "珍钻复刻/玫瑰公园捕捉反查",
+      "game": "BDSP",
+      "authors": [
+        "XiaoyuBook",
+        "原版项目贡献者"
+      ],
+      "description": "测试版：珍钻复刻玫瑰公园捕捉反查脚本，可单独安装和更新。无需图像标签。",
+      "instructions": "在脚本库中查看已安装文件，并在自动流程中选择对应脚本。使用前请核对游戏版本、画面尺寸、运行起点及按键设置。",
+      "updatedAt": "2026-09-26",
+      "legacyPaths": {
+        "玫瑰公园捕捉反查脚本.txt": "BDSP/玫瑰公园捕捉反查脚本.txt"
+      },
+      "source": {
+        "repository": "https://github.com/XiaoyuBook/auto-bdsp-rng",
+        "revision": "494793ed467cd1a2ef376d5886d0add5924b620f",
+        "adaptedFrom": "https://github.com/XiaoyuBook/auto-poke-rng/tree/5a10dea/scripts/BDSP"
+      },
+      "license": "GPL-3.0-or-later",
+      "files": [
+        {
+          "path": "LICENSE.md",
+          "bytes": 234,
+          "sha256": "45669c033b08b03fe29c74ea2376cd4bab100d7f4d24f86e8edfa1c7f2a373f2",
+          "category": "使用说明"
+        },
+        {
+          "path": "README.md",
+          "bytes": 1072,
+          "sha256": "7c0594bd466bce5980dc19d834900d2ed02ad6c05300b47cb1cd407feefc1146",
+          "category": "使用说明"
+        },
+        {
+          "path": "玫瑰公园捕捉反查脚本.txt",
+          "bytes": 320,
+          "sha256": "df4fd28a4b86da2ebfc7ace2153d9e67c4d66a6c781fb11fca230ee13b2d3a4e",
+          "category": "捕捉与反查"
+        }
+      ],
+      "readme": "# 玫瑰公园捕捉反查\n\n珍钻复刻 · **0.0.2 测试版** · 捕捉与反查\n\n## 安装与使用\n\n本包只安装 `玫瑰公园捕捉反查脚本.txt`、必需资源与来源说明，可独立更新。安装位置：`珍钻复刻/玫瑰公园捕捉反查/`。本脚本不使用图像标签，无需安装其他脚本的标签。\n\n脚本保持原始 .txt 文件名和正文，兼容原版伊机控。运行前请阅读脚本注释，核对游戏版本、运行起点、按键及画面尺寸；安装不会自动运行。\n\n## 旧目录迁移\n\n如果曾使用 `BDSP/` 大包，安装预览会列出本包需要迁移的脚本与标签。默认保留个人修改，原文件留作备份；自动流程的旧脚本路径改为本包路径。未安装本包前，原有文件继续使用。\n\n## 来源与许可证\n\n来源：[auto-bdsp-rng](https://github.com/XiaoyuBook/auto-bdsp-rng)，修订 `494793ed467cd1a2ef376d5886d0add5924b620f`。脚本文本与已发布 0.0.1 包逐字节一致。详见 LICENSE.md。测试阶段使用 0.0.x，正式上线后再使用 1.0.0。\n",
+      "archive": "packages/bdsp-ramanas-reverse/0.0.2.zip",
+      "bytes": 2993,
+      "sha256": "bb98de9d2154b45e3054f8403b633929d043d8c292588e9116f72412a878761e"
+    },
+    {
+      "schemaVersion": 1,
+      "id": "bdsp-record",
+      "name": "录屏",
+      "version": "0.0.2",
+      "minimumAppVersion": "0.1.0",
+      "installFolder": "珍钻复刻/录屏",
+      "game": "BDSP",
+      "authors": [
+        "XiaoyuBook",
+        "原版项目贡献者"
+      ],
+      "description": "测试版：珍钻复刻录屏脚本，可单独安装和更新。无需图像标签。",
+      "instructions": "在脚本库中查看已安装文件，并在自动流程中选择对应脚本。使用前请核对游戏版本、画面尺寸、运行起点及按键设置。",
+      "updatedAt": "2026-09-26",
+      "legacyPaths": {
+        "录屏.txt": "BDSP/录屏.txt"
+      },
+      "source": {
+        "repository": "https://github.com/XiaoyuBook/auto-bdsp-rng",
+        "revision": "494793ed467cd1a2ef376d5886d0add5924b620f",
+        "adaptedFrom": "https://github.com/XiaoyuBook/auto-poke-rng/tree/5a10dea/scripts/BDSP"
+      },
+      "license": "GPL-3.0-or-later",
+      "files": [
+        {
+          "path": "LICENSE.md",
+          "bytes": 234,
+          "sha256": "45669c033b08b03fe29c74ea2376cd4bab100d7f4d24f86e8edfa1c7f2a373f2",
+          "category": "使用说明"
+        },
+        {
+          "path": "README.md",
+          "bytes": 1009,
+          "sha256": "05625c3434704e94711277dc590024b8b05c478a34f33036c465096ca368eab2",
+          "category": "使用说明"
+        },
+        {
+          "path": "录屏.txt",
+          "bytes": 12,
+          "sha256": "1f896a51e08e5fe90d89c0fd2c5debeac29542fd1cc827c9eb8f7ca286eebb7a",
+          "category": "辅助工具"
+        }
+      ],
+      "readme": "# 录屏\n\n珍钻复刻 · **0.0.2 测试版** · 辅助工具\n\n## 安装与使用\n\n本包只安装 `录屏.txt`、必需资源与来源说明，可独立更新。安装位置：`珍钻复刻/录屏/`。本脚本不使用图像标签，无需安装其他脚本的标签。\n\n脚本保持原始 .txt 文件名和正文，兼容原版伊机控。运行前请阅读脚本注释，核对游戏版本、运行起点、按键及画面尺寸；安装不会自动运行。\n\n## 旧目录迁移\n\n如果曾使用 `BDSP/` 大包，安装预览会列出本包需要迁移的脚本与标签。默认保留个人修改，原文件留作备份；自动流程的旧脚本路径改为本包路径。未安装本包前，原有文件继续使用。\n\n## 来源与许可证\n\n来源：[auto-bdsp-rng](https://github.com/XiaoyuBook/auto-bdsp-rng)，修订 `494793ed467cd1a2ef376d5886d0add5924b620f`。脚本文本与已发布 0.0.1 包逐字节一致。详见 LICENSE.md。测试阶段使用 0.0.x，正式上线后再使用 1.0.0。\n",
+      "archive": "packages/bdsp-record/0.0.2.zip",
+      "bytes": 2722,
+      "sha256": "122010e64e6a5098bbadcc685da97166392a625a61a3f02499a0a798083df8cc"
+    },
+    {
+      "schemaVersion": 1,
+      "id": "bdsp-reverse",
+      "name": "捕捉反查",
+      "version": "0.0.2",
+      "minimumAppVersion": "0.1.0",
+      "installFolder": "珍钻复刻/捕捉反查",
+      "game": "BDSP",
+      "authors": [
+        "XiaoyuBook",
+        "原版项目贡献者"
+      ],
+      "description": "测试版：珍钻复刻捕捉反查脚本，可单独安装和更新。无需图像标签。",
+      "instructions": "在脚本库中查看已安装文件，并在自动流程中选择对应脚本。使用前请核对游戏版本、画面尺寸、运行起点及按键设置。",
+      "updatedAt": "2026-09-26",
+      "legacyPaths": {
+        "捕捉反查脚本.txt": "BDSP/捕捉反查脚本.txt"
+      },
+      "source": {
+        "repository": "https://github.com/XiaoyuBook/auto-bdsp-rng",
+        "revision": "494793ed467cd1a2ef376d5886d0add5924b620f",
+        "adaptedFrom": "https://github.com/XiaoyuBook/auto-poke-rng/tree/5a10dea/scripts/BDSP"
+      },
+      "license": "GPL-3.0-or-later",
+      "files": [
+        {
+          "path": "LICENSE.md",
+          "bytes": 234,
+          "sha256": "45669c033b08b03fe29c74ea2376cd4bab100d7f4d24f86e8edfa1c7f2a373f2",
+          "category": "使用说明"
+        },
+        {
+          "path": "README.md",
+          "bytes": 1036,
+          "sha256": "100ba01888ebbff3d4e01db222d3ad03f18cc578d921cc6e82313300fbed6782",
+          "category": "使用说明"
+        },
+        {
+          "path": "捕捉反查脚本.txt",
+          "bytes": 329,
+          "sha256": "7ed4c720c9562aa83b29b0960caef635bf457355b9733fca24679c04289bf20e",
+          "category": "捕捉与反查"
+        }
+      ],
+      "readme": "# 捕捉反查\n\n珍钻复刻 · **0.0.2 测试版** · 捕捉与反查\n\n## 安装与使用\n\n本包只安装 `捕捉反查脚本.txt`、必需资源与来源说明，可独立更新。安装位置：`珍钻复刻/捕捉反查/`。本脚本不使用图像标签，无需安装其他脚本的标签。\n\n脚本保持原始 .txt 文件名和正文，兼容原版伊机控。运行前请阅读脚本注释，核对游戏版本、运行起点、按键及画面尺寸；安装不会自动运行。\n\n## 旧目录迁移\n\n如果曾使用 `BDSP/` 大包，安装预览会列出本包需要迁移的脚本与标签。默认保留个人修改，原文件留作备份；自动流程的旧脚本路径改为本包路径。未安装本包前，原有文件继续使用。\n\n## 来源与许可证\n\n来源：[auto-bdsp-rng](https://github.com/XiaoyuBook/auto-bdsp-rng)，修订 `494793ed467cd1a2ef376d5886d0add5924b620f`。脚本文本与已发布 0.0.1 包逐字节一致。详见 LICENSE.md。测试阶段使用 0.0.x，正式上线后再使用 1.0.0。\n",
+      "archive": "packages/bdsp-reverse/0.0.2.zip",
+      "bytes": 2943,
+      "sha256": "b231d4fe839131e2aed93389406ac9f5ebc9322a7e2fbb487a27d08f866a6299"
+    },
+    {
+      "schemaVersion": 1,
+      "id": "bdsp-roamer-reverse",
+      "name": "游走捕捉反查",
+      "version": "0.0.2",
+      "minimumAppVersion": "0.1.0",
+      "installFolder": "珍钻复刻/游走捕捉反查",
+      "game": "BDSP",
+      "authors": [
+        "XiaoyuBook",
+        "原版项目贡献者"
+      ],
+      "description": "测试版：珍钻复刻游走捕捉反查脚本，可单独安装和更新。无需图像标签。",
+      "instructions": "在脚本库中查看已安装文件，并在自动流程中选择对应脚本。使用前请核对游戏版本、画面尺寸、运行起点及按键设置。",
+      "updatedAt": "2026-09-26",
+      "legacyPaths": {
+        "捕捉反查脚本 游走.txt": "BDSP/捕捉反查脚本 游走.txt"
+      },
+      "source": {
+        "repository": "https://github.com/XiaoyuBook/auto-bdsp-rng",
+        "revision": "494793ed467cd1a2ef376d5886d0add5924b620f",
+        "adaptedFrom": "https://github.com/XiaoyuBook/auto-poke-rng/tree/5a10dea/scripts/BDSP"
+      },
+      "license": "GPL-3.0-or-later",
+      "files": [
+        {
+          "path": "LICENSE.md",
+          "bytes": 234,
+          "sha256": "45669c033b08b03fe29c74ea2376cd4bab100d7f4d24f86e8edfa1c7f2a373f2",
+          "category": "使用说明"
+        },
+        {
+          "path": "README.md",
+          "bytes": 1055,
+          "sha256": "278b9a9b14c826205f9e275554400aad358a34ee348931f4964754a357ed7e02",
+          "category": "使用说明"
+        },
+        {
+          "path": "捕捉反查脚本 游走.txt",
+          "bytes": 388,
+          "sha256": "612f61b72419e95c66130d152d569c9ee07394bd7bb2c4be034d104d1b799317",
+          "category": "捕捉与反查"
+        }
+      ],
+      "readme": "# 游走捕捉反查\n\n珍钻复刻 · **0.0.2 测试版** · 捕捉与反查\n\n## 安装与使用\n\n本包只安装 `捕捉反查脚本 游走.txt`、必需资源与来源说明，可独立更新。安装位置：`珍钻复刻/游走捕捉反查/`。本脚本不使用图像标签，无需安装其他脚本的标签。\n\n脚本保持原始 .txt 文件名和正文，兼容原版伊机控。运行前请阅读脚本注释，核对游戏版本、运行起点、按键及画面尺寸；安装不会自动运行。\n\n## 旧目录迁移\n\n如果曾使用 `BDSP/` 大包，安装预览会列出本包需要迁移的脚本与标签。默认保留个人修改，原文件留作备份；自动流程的旧脚本路径改为本包路径。未安装本包前，原有文件继续使用。\n\n## 来源与许可证\n\n来源：[auto-bdsp-rng](https://github.com/XiaoyuBook/auto-bdsp-rng)，修订 `494793ed467cd1a2ef376d5886d0add5924b620f`。脚本文本与已发布 0.0.1 包逐字节一致。详见 LICENSE.md。测试阶段使用 0.0.x，正式上线后再使用 1.0.0。\n",
+      "archive": "packages/bdsp-roamer-reverse/0.0.2.zip",
+      "bytes": 3032,
+      "sha256": "cd11fb1d31efa5730ec2d5226597e1d704e561e6ce0d123cedf1f28eb046941a"
+    },
+    {
+      "schemaVersion": 1,
+      "id": "bdsp-seed",
+      "name": "测种",
+      "version": "0.0.2",
+      "minimumAppVersion": "0.1.0",
+      "installFolder": "珍钻复刻/测种",
+      "game": "BDSP",
+      "authors": [
+        "XiaoyuBook",
+        "原版项目贡献者"
+      ],
+      "description": "测试版：珍钻复刻测种脚本，可单独安装和更新。无需图像标签。",
+      "instructions": "在脚本库中查看已安装文件，并在自动流程中选择对应脚本。使用前请核对游戏版本、画面尺寸、运行起点及按键设置。",
+      "updatedAt": "2026-09-26",
+      "legacyPaths": {
+        "BDSP测种.txt": "BDSP/BDSP测种.txt"
+      },
+      "source": {
+        "repository": "https://github.com/XiaoyuBook/auto-bdsp-rng",
+        "revision": "494793ed467cd1a2ef376d5886d0add5924b620f",
+        "adaptedFrom": "https://github.com/XiaoyuBook/auto-poke-rng/tree/5a10dea/scripts/BDSP"
+      },
+      "license": "GPL-3.0-or-later",
+      "files": [
+        {
+          "path": "BDSP测种.txt",
+          "bytes": 317,
+          "sha256": "0a6478a919f1a726479a9669efb8dea0aea0c51ed9f86640504d96f5fef37212",
+          "category": "测种与识别"
+        },
+        {
+          "path": "LICENSE.md",
+          "bytes": 234,
+          "sha256": "45669c033b08b03fe29c74ea2376cd4bab100d7f4d24f86e8edfa1c7f2a373f2",
+          "category": "使用说明"
+        },
+        {
+          "path": "README.md",
+          "bytes": 1016,
+          "sha256": "883e703b6fac4fea860a219a8254436b1d12e6d888472bd3b38d78c169f70df3",
+          "category": "使用说明"
+        }
+      ],
+      "readme": "# 测种\n\n珍钻复刻 · **0.0.2 测试版** · 测种与识别\n\n## 安装与使用\n\n本包只安装 `BDSP测种.txt`、必需资源与来源说明，可独立更新。安装位置：`珍钻复刻/测种/`。本脚本不使用图像标签，无需安装其他脚本的标签。\n\n脚本保持原始 .txt 文件名和正文，兼容原版伊机控。运行前请阅读脚本注释，核对游戏版本、运行起点、按键及画面尺寸；安装不会自动运行。\n\n## 旧目录迁移\n\n如果曾使用 `BDSP/` 大包，安装预览会列出本包需要迁移的脚本与标签。默认保留个人修改，原文件留作备份；自动流程的旧脚本路径改为本包路径。未安装本包前，原有文件继续使用。\n\n## 来源与许可证\n\n来源：[auto-bdsp-rng](https://github.com/XiaoyuBook/auto-bdsp-rng)，修订 `494793ed467cd1a2ef376d5886d0add5924b620f`。脚本文本与已发布 0.0.1 包逐字节一致。详见 LICENSE.md。测试阶段使用 0.0.x，正式上线后再使用 1.0.0。\n",
+      "archive": "packages/bdsp-seed/0.0.2.zip",
+      "bytes": 2882,
+      "sha256": "2ea71f0fdcc0d7e51fe78672d030f4b760cfa46fff25856cc3c1b094ff11a498"
+    },
+    {
+      "schemaVersion": 1,
+      "id": "bdsp-shaymin",
+      "name": "谢米",
+      "version": "0.0.2",
+      "minimumAppVersion": "0.1.0",
+      "installFolder": "珍钻复刻/谢米",
+      "game": "BDSP",
+      "authors": [
+        "XiaoyuBook",
+        "原版项目贡献者"
+      ],
+      "description": "测试版：珍钻复刻谢米脚本，可单独安装和更新。无需图像标签。",
+      "instructions": "在脚本库中查看已安装文件，并在自动流程中选择对应脚本。使用前请核对游戏版本、画面尺寸、运行起点及按键设置。",
+      "updatedAt": "2026-09-26",
+      "legacyPaths": {
+        "谢米.txt": "BDSP/谢米.txt"
+      },
+      "source": {
+        "repository": "https://github.com/XiaoyuBook/auto-bdsp-rng",
+        "revision": "494793ed467cd1a2ef376d5886d0add5924b620f",
+        "adaptedFrom": "https://github.com/XiaoyuBook/auto-poke-rng/tree/5a10dea/scripts/BDSP"
+      },
+      "license": "GPL-3.0-or-later",
+      "files": [
+        {
+          "path": "LICENSE.md",
+          "bytes": 234,
+          "sha256": "45669c033b08b03fe29c74ea2376cd4bab100d7f4d24f86e8edfa1c7f2a373f2",
+          "category": "使用说明"
+        },
+        {
+          "path": "README.md",
+          "bytes": 1130,
+          "sha256": "3890a2636907ffb8efd52ee084d135499220059225b1a5044a692ef30c957ec7",
+          "category": "使用说明"
         },
         {
           "path": "谢米.txt",
           "bytes": 407,
           "sha256": "c12360ff5e35239f41c0161c5771d84724d575434b87a8985759ce5e29378050",
           "category": "定点与游走"
-        },
-        {
-          "path": "达克莱伊.txt",
-          "bytes": 1166,
-          "sha256": "ff293f4f31d5c00daa884c5bbc28d2e856ee16e42b464665bf39e2a701e0f7d8",
-          "category": "定点与游走"
-        },
-        {
-          "path": "达克莱伊捕捉反查.txt",
-          "bytes": 363,
-          "sha256": "96d0f17e76c5d45ecdfe1627a8b896e7e4f2becfa343cb121a256ec47c61fdb3",
-          "category": "捕捉与反查"
-        },
-        {
-          "path": "达克莱伊过场.txt",
-          "bytes": 529,
-          "sha256": "f17245dde2a0d8212e3aa6488403d3c8e5af02f81cca090ed7d00c2e0ed308e5",
-          "category": "定点与游走"
-        },
-        {
-          "path": "阿尔宙斯.txt",
-          "bytes": 5077,
-          "sha256": "5b9f98fe74e36f7704eafe0b3b169418e38a382349a1ddbf3d52a466559a42d6",
-          "category": "定点与游走"
         }
       ],
-      "readme": "# 珍钻复刻官方脚本包\n\n当前为 **0.0.1 测试版**，用于验证脚本与自动流程；后续测试版本按 `0.0.x` 递增，正式上线时发布 `1.0.0`。\n\n适用于《宝可梦 晶灿钻石／明亮珍珠》。收录 24 个伊机控文本脚本和 7 个配套图像标签，按用途整理，原始脚本文件名和内容保持不变。\n\n## 开始使用\n\n1. 点击「预览安装」，核对文件变更后确认安装。\n2. 回到软件的脚本库，选择对应脚本；使用自动流程时，在任务参数中选择需要的测种、推进和撞帧脚本。\n3. 根据游戏语言、画面尺寸与当前进度，检查运行起点、按键和图像标签，再连接设备运行。\n\n## 脚本分类\n\n- **测种与识别**：普通测种、地下测种、御三家测种和训练家编号测种。\n- **推进与撞帧**：普通推进、优化推进、神奥图鉴推进和御三家撞帧。\n- **捕捉与反查**：定点、游走、御三家及特定宝可梦的捕捉反查。\n- **定点与游走**：阿尔宙斯、达克莱伊、湖之传说、玫瑰公园等相关流程。\n- **辅助工具**：取名、录屏和文字识别翻页。\n\n## 运行前的准备\n\n脚本按各自的游戏场景编写，并非在任何画面都能直接启动。先阅读所选脚本的注释，确认角色位置、菜单状态、按键时序和图像标签。不同版本独有的宝可梦及进度条件，以实际游戏为准。\n\n文字识别区域、眼睛模板、校准延迟和个人任务参数由软件单独保存，安装脚本包不会代替这些设置。\n\n## 更新与个人修改\n\n更新前会展示文件变更。默认保留自己修改过的脚本和标签；需要恢复仓库版本时，选择「备份后使用仓库版本」。已有目录会完整备份，备份位置会显示在安装结果与日志中。\n\n## 格式与来源\n\n脚本使用原版伊机控兼容的 `.txt` 格式。23 个脚本与冻结的原版逐字节一致，另一个是本项目的文字识别翻页辅助脚本。文件列表中的名称就是实际安装文件名。\n\n原始来源为 [原版项目](https://github.com/XiaoyuBook/auto-bdsp-rng)，本仓库遵循包内许可证，保留原作者与来源信息。\n",
-      "archive": "packages/bdsp-official/0.0.1.zip",
-      "bytes": 49748,
-      "sha256": "e3e3564fc57d9c03bb88a17f6fca1a6e84ed7f2858b9e51be2e7f42cda2884a8"
+      "readme": "# 谢米\n\n珍钻复刻 · **0.0.2 测试版** · 定点与游走\n\n## 安装与使用\n\n本包只安装 `谢米.txt`、必需资源与来源说明，可独立更新。安装位置：`珍钻复刻/谢米/`。本脚本不使用图像标签，无需安装其他脚本的标签。\n\n脚本保持原始 .txt 文件名和正文，兼容原版伊机控。运行前请阅读脚本注释，核对游戏版本、运行起点、按键及画面尺寸；安装不会自动运行。\n\n### 原脚本起始说明\n\n> 在谢米背后进入地下洞窟，进秘密基地墙边测帧，到闪帧运行脚本\n\n## 旧目录迁移\n\n如果曾使用 `BDSP/` 大包，安装预览会列出本包需要迁移的脚本与标签。默认保留个人修改，原文件留作备份；自动流程的旧脚本路径改为本包路径。未安装本包前，原有文件继续使用。\n\n## 来源与许可证\n\n来源：[auto-bdsp-rng](https://github.com/XiaoyuBook/auto-bdsp-rng)，修订 `494793ed467cd1a2ef376d5886d0add5924b620f`。脚本文本与已发布 0.0.1 包逐字节一致。详见 LICENSE.md。测试阶段使用 0.0.x，正式上线后再使用 1.0.0。\n",
+      "archive": "packages/bdsp-shaymin/0.0.2.zip",
+      "bytes": 3162,
+      "sha256": "4e3dab1685218b737b28b0f7ca2bd4f4778d9c11330255247b739571dde035e2"
+    },
+    {
+      "schemaVersion": 1,
+      "id": "bdsp-starter-hit",
+      "name": "御三家撞帧",
+      "version": "0.0.2",
+      "minimumAppVersion": "0.1.0",
+      "installFolder": "珍钻复刻/御三家撞帧",
+      "game": "BDSP",
+      "authors": [
+        "XiaoyuBook",
+        "原版项目贡献者"
+      ],
+      "description": "测试版：珍钻复刻御三家撞帧脚本，可单独安装和更新。无需图像标签。",
+      "instructions": "在脚本库中查看已安装文件，并在自动流程中选择对应脚本。使用前请核对游戏版本、画面尺寸、运行起点及按键设置。",
+      "updatedAt": "2026-09-26",
+      "legacyPaths": {
+        "御三家撞帧.txt": "BDSP/御三家撞帧.txt"
+      },
+      "source": {
+        "repository": "https://github.com/XiaoyuBook/auto-bdsp-rng",
+        "revision": "494793ed467cd1a2ef376d5886d0add5924b620f",
+        "adaptedFrom": "https://github.com/XiaoyuBook/auto-poke-rng/tree/5a10dea/scripts/BDSP"
+      },
+      "license": "GPL-3.0-or-later",
+      "files": [
+        {
+          "path": "LICENSE.md",
+          "bytes": 234,
+          "sha256": "45669c033b08b03fe29c74ea2376cd4bab100d7f4d24f86e8edfa1c7f2a373f2",
+          "category": "使用说明"
+        },
+        {
+          "path": "README.md",
+          "bytes": 1039,
+          "sha256": "8d7910daf0c69ced0712feefa46416082bd4f779cc75170fb6599922b01ab8ed",
+          "category": "使用说明"
+        },
+        {
+          "path": "御三家撞帧.txt",
+          "bytes": 746,
+          "sha256": "a140bc6e8360486cb909d57bc5fb0b5f077121b49c50e72849f990f30ac0eed5",
+          "category": "推进与撞帧"
+        }
+      ],
+      "readme": "# 御三家撞帧\n\n珍钻复刻 · **0.0.2 测试版** · 推进与撞帧\n\n## 安装与使用\n\n本包只安装 `御三家撞帧.txt`、必需资源与来源说明，可独立更新。安装位置：`珍钻复刻/御三家撞帧/`。本脚本不使用图像标签，无需安装其他脚本的标签。\n\n脚本保持原始 .txt 文件名和正文，兼容原版伊机控。运行前请阅读脚本注释，核对游戏版本、运行起点、按键及画面尺寸；安装不会自动运行。\n\n## 旧目录迁移\n\n如果曾使用 `BDSP/` 大包，安装预览会列出本包需要迁移的脚本与标签。默认保留个人修改，原文件留作备份；自动流程的旧脚本路径改为本包路径。未安装本包前，原有文件继续使用。\n\n## 来源与许可证\n\n来源：[auto-bdsp-rng](https://github.com/XiaoyuBook/auto-bdsp-rng)，修订 `494793ed467cd1a2ef376d5886d0add5924b620f`。脚本文本与已发布 0.0.1 包逐字节一致。详见 LICENSE.md。测试阶段使用 0.0.x，正式上线后再使用 1.0.0。\n",
+      "archive": "packages/bdsp-starter-hit/0.0.2.zip",
+      "bytes": 3119,
+      "sha256": "34bd8fec219bf7d58592d42cbec42e32b21eecee154ef33de56ff0249337e5ba"
+    },
+    {
+      "schemaVersion": 1,
+      "id": "bdsp-starter-reverse",
+      "name": "御三家反查",
+      "version": "0.0.2",
+      "minimumAppVersion": "0.1.0",
+      "installFolder": "珍钻复刻/御三家反查",
+      "game": "BDSP",
+      "authors": [
+        "XiaoyuBook",
+        "原版项目贡献者"
+      ],
+      "description": "测试版：珍钻复刻御三家反查脚本，可单独安装和更新。无需图像标签。",
+      "instructions": "在脚本库中查看已安装文件，并在自动流程中选择对应脚本。使用前请核对游戏版本、画面尺寸、运行起点及按键设置。",
+      "updatedAt": "2026-09-26",
+      "legacyPaths": {
+        "御三家反查.txt": "BDSP/御三家反查.txt"
+      },
+      "source": {
+        "repository": "https://github.com/XiaoyuBook/auto-bdsp-rng",
+        "revision": "494793ed467cd1a2ef376d5886d0add5924b620f",
+        "adaptedFrom": "https://github.com/XiaoyuBook/auto-poke-rng/tree/5a10dea/scripts/BDSP"
+      },
+      "license": "GPL-3.0-or-later",
+      "files": [
+        {
+          "path": "LICENSE.md",
+          "bytes": 234,
+          "sha256": "45669c033b08b03fe29c74ea2376cd4bab100d7f4d24f86e8edfa1c7f2a373f2",
+          "category": "使用说明"
+        },
+        {
+          "path": "README.md",
+          "bytes": 1039,
+          "sha256": "c306fcf0e70b1ff18ff6859e12a37e82635193ed3d46779319880a9ab3ec321b",
+          "category": "使用说明"
+        },
+        {
+          "path": "御三家反查.txt",
+          "bytes": 1037,
+          "sha256": "da6a49f18b67a8aa918ed359888efebbc886416d9889c2bda0094498232ca8bd",
+          "category": "捕捉与反查"
+        }
+      ],
+      "readme": "# 御三家反查\n\n珍钻复刻 · **0.0.2 测试版** · 捕捉与反查\n\n## 安装与使用\n\n本包只安装 `御三家反查.txt`、必需资源与来源说明，可独立更新。安装位置：`珍钻复刻/御三家反查/`。本脚本不使用图像标签，无需安装其他脚本的标签。\n\n脚本保持原始 .txt 文件名和正文，兼容原版伊机控。运行前请阅读脚本注释，核对游戏版本、运行起点、按键及画面尺寸；安装不会自动运行。\n\n## 旧目录迁移\n\n如果曾使用 `BDSP/` 大包，安装预览会列出本包需要迁移的脚本与标签。默认保留个人修改，原文件留作备份；自动流程的旧脚本路径改为本包路径。未安装本包前，原有文件继续使用。\n\n## 来源与许可证\n\n来源：[auto-bdsp-rng](https://github.com/XiaoyuBook/auto-bdsp-rng)，修订 `494793ed467cd1a2ef376d5886d0add5924b620f`。脚本文本与已发布 0.0.1 包逐字节一致。详见 LICENSE.md。测试阶段使用 0.0.x，正式上线后再使用 1.0.0。\n",
+      "archive": "packages/bdsp-starter-reverse/0.0.2.zip",
+      "bytes": 3019,
+      "sha256": "55a7ac2abdfc8c488f69ba74e9bd3891d064a163a988eff90f93ed36445cbfe4"
+    },
+    {
+      "schemaVersion": 1,
+      "id": "bdsp-starter-seed",
+      "name": "御三家测种",
+      "version": "0.0.2",
+      "minimumAppVersion": "0.1.0",
+      "installFolder": "珍钻复刻/御三家测种",
+      "game": "BDSP",
+      "authors": [
+        "XiaoyuBook",
+        "原版项目贡献者"
+      ],
+      "description": "测试版：珍钻复刻御三家测种脚本，可单独安装和更新。无需图像标签。",
+      "instructions": "在脚本库中查看已安装文件，并在自动流程中选择对应脚本。使用前请核对游戏版本、画面尺寸、运行起点及按键设置。",
+      "updatedAt": "2026-09-26",
+      "legacyPaths": {
+        "御三家测种.txt": "BDSP/御三家测种.txt"
+      },
+      "source": {
+        "repository": "https://github.com/XiaoyuBook/auto-bdsp-rng",
+        "revision": "494793ed467cd1a2ef376d5886d0add5924b620f",
+        "adaptedFrom": "https://github.com/XiaoyuBook/auto-poke-rng/tree/5a10dea/scripts/BDSP"
+      },
+      "license": "GPL-3.0-or-later",
+      "files": [
+        {
+          "path": "LICENSE.md",
+          "bytes": 234,
+          "sha256": "45669c033b08b03fe29c74ea2376cd4bab100d7f4d24f86e8edfa1c7f2a373f2",
+          "category": "使用说明"
+        },
+        {
+          "path": "README.md",
+          "bytes": 1039,
+          "sha256": "219d0e315577b609312d4213f0a74a8dabd5ac7e8ed971ff0d455893ec9ba728",
+          "category": "使用说明"
+        },
+        {
+          "path": "御三家测种.txt",
+          "bytes": 776,
+          "sha256": "8841e8c629fab7937eec12e32a42f63a837256cdb3c41fdefa8ceda0e4d9aa97",
+          "category": "测种与识别"
+        }
+      ],
+      "readme": "# 御三家测种\n\n珍钻复刻 · **0.0.2 测试版** · 测种与识别\n\n## 安装与使用\n\n本包只安装 `御三家测种.txt`、必需资源与来源说明，可独立更新。安装位置：`珍钻复刻/御三家测种/`。本脚本不使用图像标签，无需安装其他脚本的标签。\n\n脚本保持原始 .txt 文件名和正文，兼容原版伊机控。运行前请阅读脚本注释，核对游戏版本、运行起点、按键及画面尺寸；安装不会自动运行。\n\n## 旧目录迁移\n\n如果曾使用 `BDSP/` 大包，安装预览会列出本包需要迁移的脚本与标签。默认保留个人修改，原文件留作备份；自动流程的旧脚本路径改为本包路径。未安装本包前，原有文件继续使用。\n\n## 来源与许可证\n\n来源：[auto-bdsp-rng](https://github.com/XiaoyuBook/auto-bdsp-rng)，修订 `494793ed467cd1a2ef376d5886d0add5924b620f`。脚本文本与已发布 0.0.1 包逐字节一致。详见 LICENSE.md。测试阶段使用 0.0.x，正式上线后再使用 1.0.0。\n",
+      "archive": "packages/bdsp-starter-seed/0.0.2.zip",
+      "bytes": 2980,
+      "sha256": "54c4a2aaa11832a2a43723ead32016fe29171f3a6d495c38922bd484119a055b"
+    },
+    {
+      "schemaVersion": 1,
+      "id": "bdsp-tid-seed",
+      "name": "训练家编号测种",
+      "version": "0.0.2",
+      "minimumAppVersion": "0.1.0",
+      "installFolder": "珍钻复刻/训练家编号测种",
+      "game": "BDSP",
+      "authors": [
+        "XiaoyuBook",
+        "原版项目贡献者"
+      ],
+      "description": "测试版：珍钻复刻训练家编号测种脚本，可单独安装和更新。无需图像标签。",
+      "instructions": "在脚本库中查看已安装文件，并在自动流程中选择对应脚本。使用前请核对游戏版本、画面尺寸、运行起点及按键设置。",
+      "updatedAt": "2026-09-26",
+      "legacyPaths": {
+        "id测种.txt": "BDSP/id测种.txt"
+      },
+      "source": {
+        "repository": "https://github.com/XiaoyuBook/auto-bdsp-rng",
+        "revision": "494793ed467cd1a2ef376d5886d0add5924b620f",
+        "adaptedFrom": "https://github.com/XiaoyuBook/auto-poke-rng/tree/5a10dea/scripts/BDSP"
+      },
+      "license": "GPL-3.0-or-later",
+      "files": [
+        {
+          "path": "LICENSE.md",
+          "bytes": 234,
+          "sha256": "45669c033b08b03fe29c74ea2376cd4bab100d7f4d24f86e8edfa1c7f2a373f2",
+          "category": "使用说明"
+        },
+        {
+          "path": "README.md",
+          "bytes": 1044,
+          "sha256": "93d6b4a83ed173870a2693f017a78863f32c35e83ad6e84800f545f42b9e6e94",
+          "category": "使用说明"
+        },
+        {
+          "path": "id测种.txt",
+          "bytes": 317,
+          "sha256": "764ec4cb58262a0f41dd59e0d64076745b430f1da2883308efdc3b9f7baad4c6",
+          "category": "测种与识别"
+        }
+      ],
+      "readme": "# 训练家编号测种\n\n珍钻复刻 · **0.0.2 测试版** · 测种与识别\n\n## 安装与使用\n\n本包只安装 `id测种.txt`、必需资源与来源说明，可独立更新。安装位置：`珍钻复刻/训练家编号测种/`。本脚本不使用图像标签，无需安装其他脚本的标签。\n\n脚本保持原始 .txt 文件名和正文，兼容原版伊机控。运行前请阅读脚本注释，核对游戏版本、运行起点、按键及画面尺寸；安装不会自动运行。\n\n## 旧目录迁移\n\n如果曾使用 `BDSP/` 大包，安装预览会列出本包需要迁移的脚本与标签。默认保留个人修改，原文件留作备份；自动流程的旧脚本路径改为本包路径。未安装本包前，原有文件继续使用。\n\n## 来源与许可证\n\n来源：[auto-bdsp-rng](https://github.com/XiaoyuBook/auto-bdsp-rng)，修订 `494793ed467cd1a2ef376d5886d0add5924b620f`。脚本文本与已发布 0.0.1 包逐字节一致。详见 LICENSE.md。测试阶段使用 0.0.x，正式上线后再使用 1.0.0。\n",
+      "archive": "packages/bdsp-tid-seed/0.0.2.zip",
+      "bytes": 2972,
+      "sha256": "f3f9018055333ce6c2324adc2efd74ccf72b977810c69fb3d92f00769755825a"
+    },
+    {
+      "schemaVersion": 1,
+      "id": "bdsp-underground-seed",
+      "name": "地下测种",
+      "version": "0.0.2",
+      "minimumAppVersion": "0.1.0",
+      "installFolder": "珍钻复刻/地下测种",
+      "game": "BDSP",
+      "authors": [
+        "XiaoyuBook",
+        "原版项目贡献者"
+      ],
+      "description": "测试版：珍钻复刻地下测种脚本，可单独安装和更新。无需图像标签。",
+      "instructions": "在脚本库中查看已安装文件，并在自动流程中选择对应脚本。使用前请核对游戏版本、画面尺寸、运行起点及按键设置。",
+      "updatedAt": "2026-09-26",
+      "legacyPaths": {
+        "BDSP地下测种.txt": "BDSP/BDSP地下测种.txt"
+      },
+      "source": {
+        "repository": "https://github.com/XiaoyuBook/auto-bdsp-rng",
+        "revision": "494793ed467cd1a2ef376d5886d0add5924b620f",
+        "adaptedFrom": "https://github.com/XiaoyuBook/auto-poke-rng/tree/5a10dea/scripts/BDSP"
+      },
+      "license": "GPL-3.0-or-later",
+      "files": [
+        {
+          "path": "BDSP地下测种.txt",
+          "bytes": 270,
+          "sha256": "6f7d984e23e0ddbf20baa888903419a63b561aa8deedb2ee47788be26247cacb",
+          "category": "测种与识别"
+        },
+        {
+          "path": "LICENSE.md",
+          "bytes": 234,
+          "sha256": "45669c033b08b03fe29c74ea2376cd4bab100d7f4d24f86e8edfa1c7f2a373f2",
+          "category": "使用说明"
+        },
+        {
+          "path": "README.md",
+          "bytes": 1098,
+          "sha256": "adef87c44fd8ebdd61954c6368e48ab14f30f033c41b8587a0c4780987366b3b",
+          "category": "使用说明"
+        }
+      ],
+      "readme": "# 地下测种\n\n珍钻复刻 · **0.0.2 测试版** · 测种与识别\n\n## 安装与使用\n\n本包只安装 `BDSP地下测种.txt`、必需资源与来源说明，可独立更新。安装位置：`珍钻复刻/地下测种/`。本脚本不使用图像标签，无需安装其他脚本的标签。\n\n脚本保持原始 .txt 文件名和正文，兼容原版伊机控。运行前请阅读脚本注释，核对游戏版本、运行起点、按键及画面尺寸；安装不会自动运行。\n\n### 原脚本起始说明\n\n> 没找到体型帧就直接运行\n\n## 旧目录迁移\n\n如果曾使用 `BDSP/` 大包，安装预览会列出本包需要迁移的脚本与标签。默认保留个人修改，原文件留作备份；自动流程的旧脚本路径改为本包路径。未安装本包前，原有文件继续使用。\n\n## 来源与许可证\n\n来源：[auto-bdsp-rng](https://github.com/XiaoyuBook/auto-bdsp-rng)，修订 `494793ed467cd1a2ef376d5886d0add5924b620f`。脚本文本与已发布 0.0.1 包逐字节一致。详见 LICENSE.md。测试阶段使用 0.0.x，正式上线后再使用 1.0.0。\n",
+      "archive": "packages/bdsp-underground-seed/0.0.2.zip",
+      "bytes": 3004,
+      "sha256": "53ea65c03eafae3253d46f4dadd4513c2c21e50801561b0b40cdf0e27f60ba92"
     }
   ]
 }

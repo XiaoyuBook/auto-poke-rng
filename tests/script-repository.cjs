@@ -5,8 +5,8 @@ const path = require('node:path');
 const os = require('node:os');
 const { createHash } = require('node:crypto');
 const { zipSync } = require('fflate');
-const { createScriptRepository, registerScriptRepository, unpackArchive } = require('../electron/script-repository.cjs');
-const { createScriptGate, initializeUserScripts } = require('../electron/script-storage.cjs');
+const { createScriptRepository, registerScriptRepository, unpackArchive, validateCatalog } = require('../electron/script-repository.cjs');
+const { createScriptGate, initializeUserScripts, createScriptStorage } = require('../electron/script-storage.cjs');
 const { createScriptStore } = require('../electron/script-files.cjs');
 const { ScriptRunner } = require('../electron/script-runner.cjs');
 const { EventEmitter } = require('node:events');
@@ -120,6 +120,94 @@ test('installation transactions stay on the script disk instead of the profile d
   await f.install(pack('1.1.0').bytes);
   assert.equal((await createScriptStore(f.rootDirectory).list()).files.length, 1, 'transaction backups must not appear in the script library');
 });
+
+test('independent nested packages install, update and remain discoverable without overlapping ownership', async t => {
+  const f = await fixture(t);
+  const one = pack('0.0.2', { '测试.txt': 'A 1\n' }, { installFolder: '珍钻复刻/测种' });
+  const two = pack('0.0.2', { '测试.txt': 'B 1\n' }, { id: 'other', installFolder: '珍钻复刻/美梦神' });
+  await f.install(one.bytes); await f.install(two.bytes);
+  assert.equal((await f.service.state()).installed.length, 2);
+  await f.install(pack('0.0.3', { '测试.txt': 'X 1\n' }, { installFolder: '珍钻复刻/测种' }).bytes);
+  assert.equal(await fs.readFile(path.join(f.rootDirectory, '珍钻复刻/美梦神/测试.txt'), 'utf8'), 'B 1\n');
+  await assert.rejects(f.service.planArchive(pack('0.0.2', undefined, { installFolder: '珍钻复刻' }).bytes), /重叠|其他脚本包/);
+  await assert.rejects(f.service.planArchive(pack('0.0.2', undefined, { installFolder: '珍钻复刻/测种/子目录' }).bytes), /重叠|其他脚本包/);
+  const ancestor = { ...one.catalog.packages[0], installFolder: '珍钻复刻' };
+  assert.throws(() => validateCatalog({ schemaVersion: 1, packages: [ancestor, two.catalog.packages[0]] }), /重复|重叠/);
+});
+
+test('split packages migrate only declared old files, preserve personal labels and resolve old txt/rng paths', async t => {
+  const f = await fixture(t);
+  await f.write('测试.txt', 'B 2\n'); await f.write('ImgLabel/宝可表.IL', 'personal label'); await f.write('ImgLabel/无关.IL', 'unrelated');
+  const item = pack('0.0.2', undefined, { installFolder: '珍钻复刻/红圣菇', legacyPaths: { '测试.txt': 'BDSP/测试.txt', 'ImgLabel/宝可表.IL': 'BDSP/ImgLabel/宝可表.IL' } });
+  const plan = await f.service.planArchive(item.bytes);
+  assert.deepEqual(plan.conflicts.sort(), ['ImgLabel/宝可表.IL', '测试.txt'].sort());
+  assert.equal(plan.migrations.length, 2);
+  await f.service.apply({ token: plan.token, policy: 'keep' });
+  assert.equal(await fs.readFile(path.join(f.rootDirectory, '珍钻复刻/红圣菇/ImgLabel/宝可表.IL'), 'utf8'), 'personal label');
+  assert.equal(await f.read('ImgLabel/无关.IL'), 'unrelated');
+  assert.equal(await f.read('测试.txt'), 'B 2\n');
+  const runner = new ScriptRunner({ rootDirectory: f.rootDirectory });
+  for (const old of ['BDSP/测试.txt', 'BDSP/测试.rng']) assert.equal((await runner.resolveScript(old)).absolute, path.join(f.rootDirectory, '珍钻复刻/红圣菇/测试.txt'));
+  const listing = await createScriptStore(f.rootDirectory).list();
+  assert.deepEqual(listing.files.map(file => file.path), ['珍钻复刻/红圣菇/测试.txt']);
+  assert.equal(listing.aliases['BDSP/测试.txt'], '珍钻复刻/红圣菇/测试.txt');
+});
+
+test('splitting a managed package respects deliberately deleted old files', async t => {
+  const f = await fixture(t); await f.install(pack().bytes);
+  await fs.unlink(path.join(f.rootDirectory, 'BDSP/ImgLabel/宝可表.IL'));
+  const item = pack('0.0.2', undefined, { id: 'split', installFolder: '珍钻复刻/测种', legacyPaths: { '测试.txt': 'BDSP/测试.txt', 'ImgLabel/宝可表.IL': 'BDSP/ImgLabel/宝可表.IL' } });
+  const plan = await f.service.planArchive(item.bytes);
+  assert.deepEqual(plan.conflicts, ['ImgLabel/宝可表.IL']);
+  await f.service.apply({ token: plan.token, policy: 'keep' });
+  await assert.rejects(fs.stat(path.join(f.rootDirectory, '珍钻复刻/测种/ImgLabel/宝可表.IL')), { code: 'ENOENT' });
+});
+
+test('legacy changes after preview invalidate migration and replacing keeps the source backup', async t => {
+  const f = await fixture(t); await f.write('测试.txt', 'personal');
+  const item = pack('0.0.2', { '测试.txt': 'A 1\n' }, { installFolder: '珍钻复刻/测种', legacyPaths: { '测试.txt': 'BDSP/测试.txt' } });
+  let plan = await f.service.planArchive(item.bytes); await f.write('测试.txt', 'new personal');
+  await assert.rejects(f.service.apply({ token: plan.token, policy: 'keep' }), /旧目录.*变化/);
+  plan = await f.service.planArchive(item.bytes); await f.service.apply({ token: plan.token, policy: 'replace' });
+  assert.equal(await fs.readFile(path.join(f.rootDirectory, '珍钻复刻/测种/测试.txt'), 'utf8'), 'A 1\n');
+  assert.equal(await f.read('测试.txt'), 'new personal');
+});
+
+test('changing the script root invalidates old install previews and new installs use the new disk', async t => {
+  const f = await fixture(t), storage = await createScriptStorage({ userData: f.directory, gate: f.gate });
+  const service = createScriptRepository({ ...f.serviceOptions, rootDirectory: storage.getRoot });
+  const preview = await service.planArchive(pack().bytes);
+  const target = path.join(f.directory, 'custom'); await fs.mkdir(target);
+  await storage.migrate((await storage.prepare(target)).token);
+  await assert.rejects(service.apply({ token: preview.token, policy: 'keep' }), /过期/);
+  const next = await service.planArchive(pack().bytes); await service.apply({ token: next.token, policy: 'keep' });
+  assert.equal((await service.state()).rootPath, target);
+  await assert.rejects(f.read('测试.txt'), { code: 'ENOENT' });
+});
+
+test('nested parent junctions and package ownership changes after preview are rejected', async t => {
+  const f = await fixture(t), outside = path.join(f.directory, 'outside');
+  await fs.mkdir(outside); await fs.mkdir(f.rootDirectory);
+  await fs.symlink(outside, path.join(f.rootDirectory, '珍钻复刻'), 'junction');
+  const child = pack('0.0.2', undefined, { installFolder: '珍钻复刻/测种' });
+  await assert.rejects(f.service.planArchive(child.bytes), /链接/);
+  await fs.rmdir(path.join(f.rootDirectory, '珍钻复刻'));
+  const preview = await f.service.planArchive(child.bytes);
+  const other = createScriptRepository(f.serviceOptions);
+  const parent = await other.planArchive(pack('0.0.2', undefined, { id: 'parent', installFolder: '珍钻复刻' }).bytes);
+  await other.apply({ token: parent.token, policy: 'keep' });
+  await assert.rejects(f.service.apply({ token: preview.token, policy: 'keep' }), /重叠/);
+});
+
+test('interrupted nested installs restore from the same-disk journal', async t => {
+  const f = await fixture(t); await f.install(pack('0.0.2', undefined, { installFolder: '珍钻复刻/测种' }).bytes);
+  const directory = path.join(f.rootDirectory, '.rng-repository'), target = path.join(f.rootDirectory, '珍钻复刻/测种');
+  await fs.mkdir(path.join(directory, 'staging/pending'));
+  await fs.rename(target, path.join(directory, 'backups/pending'));
+  await fs.writeFile(path.join(directory, 'install-pending.json'), JSON.stringify({ folder: '珍钻复刻/测种', backup: 'pending', stage: 'pending', transaction: 'pending' }));
+  assert.equal((await createScriptRepository(f.serviceOptions).state()).installed.length, 1);
+  assert.equal(await fs.readFile(path.join(target, '测试.txt'), 'utf8'), 'A 1\n');
+});
 test('archive and version validation fail before creating installed files', async t => {
   const f = await fixture(t), input = pack();
   await assert.rejects(f.service.planArchive(pack('1.0.0', undefined, { minimumAppVersion: '99.0.0' }).bytes), /需要/);
@@ -142,7 +230,7 @@ test('fresh user profiles stay empty until a script package installation is conf
   assert.equal(await initializeUserScripts(f.directory), f.rootDirectory);
   assert.deepEqual(await fs.readdir(f.rootDirectory), []);
   const state = await f.service.state();
-  assert.equal(state.packages.length, 1);
+  assert.equal(state.packages.length, require('../resources/script-catalog.json').packages.length);
   assert.deepEqual(state.installed, []);
   await f.service.refresh();
   const preview = await f.service.prepare('demo');
@@ -269,8 +357,8 @@ test('bundled catalog makes first offline browsing possible without claiming a c
   const f = await fixture(t, { bundledCatalog }); f.offline();
   const initial = await f.service.state();
   assert.equal(initial.cached, false); assert.equal(initial.catalogSource, 'bundled');
-  assert.equal(initial.packages[0].name, '珍钻复刻官方脚本包');
-  assert.equal(initial.packages[0].files.filter(file => file.path.endsWith('.txt')).length, 24);
+  assert.equal(initial.packages[0].name, require('../resources/script-catalog.json').packages[0].name);
+  assert.equal(initial.packages.flatMap(item => item.files).filter(file => file.path.endsWith('.txt')).length, 24);
   await assert.rejects(f.service.refresh(), /无法连接/);
   assert.deepEqual((await f.service.state()).packages, initial.packages);
 });

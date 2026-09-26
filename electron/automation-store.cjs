@@ -52,6 +52,13 @@ class AutomationStore extends EventEmitter {
       next.config[kind][scope][key] = clone(value);
     } });
   }
+  migrateScriptPaths(aliases) {
+    const next = clone(this.data); let changed = false;
+    for (const kind of ['static', 'tid']) for (const [key, value] of Object.entries(next.config[kind].scripts)) {
+      if (typeof value === 'string' && aliases[value] && aliases[value] !== value) { next.config[kind].scripts[key] = aliases[value]; changed = true; }
+    }
+    if (changed) { this.persist(next); this.data = next; this.emit('change'); }
+  }
   saveOcr(rows) {
     if (!Array.isArray(rows) || rows.length !== 10) throw Error('需要十项 OCR 区域');
     const seen = new Set();

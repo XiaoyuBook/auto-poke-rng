@@ -3,6 +3,7 @@ const path = require('node:path');
 const { createHash, randomUUID } = require('node:crypto');
 const { unzipSync } = require('fflate');
 const { createScriptGate, assertDirectory } = require('./script-storage.cjs');
+const { safePath, packageFolder, overlaps, readOptional, packageFolders, scriptAliases } = require('./script-paths.cjs');
 
 const SOURCE = 'https://raw.githubusercontent.com/XiaoyuBook/auto-poke-rng-scripts/main/';
 const SOURCES = {
@@ -16,13 +17,13 @@ const version = value => typeof value === 'string' && value.length <= 50 && /^(0
 const compare = (a,b) => { const right = b.split('.').map(Number); for (const [i,n] of a.split('.').map(Number).entries()) { if (n !== right[i]) return n > right[i] ? 1 : -1; } return 0; };
 const digest = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
 const text = (value, limit) => typeof value === 'string' && value.length > 0 && value.length <= limit;
-function safePath(value) {
-  return text(value, 200) && value.split('/').every(part => part && part !== '.' && part !== '..' && !/[<>:"\\|?*\x00-\x1f]/.test(part) && !/[. ]$/.test(part) && !/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(part));
-}
 function validatePackage(item) {
   if (!item || item.schemaVersion !== 1 || typeof item.id !== 'string' || !/^[a-z][a-z0-9-]{0,63}$/.test(item.id) || !version(item.version) || !version(item.minimumAppVersion)
     || !text(item.name, 100) || !text(item.description, 3000) || !text(item.game, 50) || !Array.isArray(item.authors) || !item.authors.length || item.authors.length > 20 || item.authors.some(author => !text(author, 100))
-    || !safePath(item.installFolder) || item.installFolder.includes('/') || item.installFolder.startsWith('.') || (item.instructions != null && !text(item.instructions, 12000))) throw Error('脚本包描述无效。');
+    || !packageFolder(item.installFolder) || (item.instructions != null && !text(item.instructions, 12000))) throw Error('脚本包描述无效。');
+  if (item.legacyPaths != null && (typeof item.legacyPaths !== 'object' || Array.isArray(item.legacyPaths) || Object.keys(item.legacyPaths).length > MAX_FILES
+    || Object.entries(item.legacyPaths).some(([file, legacy]) => !packageFolder(file) || !packageFolder(legacy) || !/\.(txt|rng|il)$/i.test(file) || path.posix.extname(file).toLowerCase() !== path.posix.extname(legacy).toLowerCase()
+      || !item.files?.some(entry => entry.path === file) || overlaps(item.installFolder, legacy)))) throw Error('旧脚本迁移清单无效。');
   if (item.readme != null && !text(item.readme, 30000) || item.updatedAt != null && (typeof item.updatedAt !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(item.updatedAt))) throw Error('脚本包说明无效。');
   if (item.files != null) {
     if (!Array.isArray(item.files) || item.files.length > MAX_FILES) throw Error('脚本包文件清单无效。');
@@ -40,7 +41,7 @@ function validateCatalog(value) {
   const ids = new Set(), folders = new Set();
   for (const item of value.packages) {
     validatePackage(item);
-    if (ids.has(item.id) || folders.has(item.installFolder.toLowerCase()) || item.archive !== `packages/${item.id}/${item.version}.zip` || !digest(item.sha256) || !Number.isInteger(item.bytes) || item.bytes < 1 || item.bytes > MAX_ARCHIVE) throw Error('脚本仓库索引存在重复或无效的包。');
+    if (ids.has(item.id) || [...folders].some(folder => overlaps(folder, item.installFolder)) || item.archive !== `packages/${item.id}/${item.version}.zip` || !digest(item.sha256) || !Number.isInteger(item.bytes) || item.bytes < 1 || item.bytes > MAX_ARCHIVE) throw Error('脚本仓库索引存在重复、重叠或无效的包。');
     ids.add(item.id); folders.add(item.installFolder.toLowerCase());
   }
   return value;
@@ -148,8 +149,9 @@ function createFixedRepository({ rootDirectory, userData, appVersion, bundledCat
     const journal = path.join(directory, 'install-pending.json');
     if (!await exists(journal)) return;
     const record = JSON.parse(await fs.readFile(journal, 'utf8'));
-    if (![record.folder, record.stage, record.backup].every(name => safePath(name) && !name.includes('/') && !name.startsWith('.'))) throw Error('安装恢复记录无效，请检查脚本仓库备份。');
+    if (!packageFolder(record.folder) || ![record.stage, record.backup].every(name => packageFolder(name) && !name.includes('/'))) throw Error('安装恢复记录无效，请检查脚本仓库备份。');
     const target = path.join(rootDirectory, record.folder), backup = path.join(directory, 'backups', record.backup), stage = path.join(directory, 'staging', record.stage);
+    await assertDirectory(path.dirname(target)); await assertDirectory(path.dirname(backup)); await assertDirectory(path.dirname(stage));
     if (!await exists(target) && await exists(backup)) await fs.rename(backup, target);
     else if (await exists(target) && await exists(backup)) {
       const installed = installedInfo(await readTree(target));
@@ -216,10 +218,9 @@ function createFixedRepository({ rootDirectory, userData, appVersion, bundledCat
   async function state() {
     await ensureRoot();
     const index = await loadCatalog(), installed = [];
-    for (const entry of await fs.readdir(rootDirectory, { withFileTypes: true })) {
-      if (!entry.isDirectory() || entry.isSymbolicLink() || entry.name.startsWith('.')) continue;
-      try { await fs.access(path.join(rootDirectory, entry.name, META)); } catch (error) { if (error.code === 'ENOENT') continue; throw error; }
-      const files = await readTree(path.join(rootDirectory, entry.name)), info = installedInfo(files);
+    for (const folder of await packageFolders(rootDirectory)) {
+      const files = await readTree(path.join(rootDirectory, folder)), info = installedInfo(files);
+      if (info.manifest.installFolder !== folder) throw Error('已安装脚本包目录与记录不一致。');
       installed.push({ ...info.manifest, modified: Object.entries(info.hashes).some(([name,value]) => !files[name] || hash(files[name]) !== value) });
     }
     return { packages: index.packages, installed, rootPath: rootDirectory, source: SOURCES[channel].url, channel, sources: SOURCES, catalogSource, cached: ['cache', 'remote'].includes(catalogSource) };
@@ -250,13 +251,16 @@ function createFixedRepository({ rootDirectory, userData, appVersion, bundledCat
     if (expected && (manifest.id !== expected.id || manifest.version !== expected.version || manifest.installFolder !== expected.installFolder)) throw Error('脚本包与仓库索引不一致。');
     if (compare(manifest.minimumAppVersion, appVersion) > 0) throw Error(`此脚本包需要 Auto Poke RNG ${manifest.minimumAppVersion} 或更新版本。`);
     const target = path.join(rootDirectory, manifest.installFolder);
-    const current = await readTree(target), before = fingerprints(current), old = installedInfo(current);
+    await checkOwnership(manifest.installFolder);
+    const targetFiles = await readTree(target), old = installedInfo(targetFiles);
+    const legacy = old ? { files: {}, hashes: {}, revisions: {}, migrations: [] } : await readLegacy(manifest, targetFiles);
+    const current = { ...legacy.files, ...targetFiles }, before = fingerprints(current);
     checkPathCase([...Object.keys(current), ...Object.keys(pack.files)]);
     if (old && old.manifest.id !== manifest.id) throw Error('安装目录已由其他脚本包使用。');
     if (old && compare(old.manifest.version, manifest.version) > 0) throw Error('已安装版本更新，不允许降级覆盖。');
     const changes = [], conflicts = [];
     for (const [name,content] of Object.entries(pack.files)) {
-      const incoming = hash(content), previous = old?.hashes[name];
+      const incoming = hash(content), previous = old?.hashes[name] || legacy.hashes[name];
       if (before[name] === incoming) continue;
       changes.push({ path: name, action: before[name] ? 'update' : 'add' });
       if (before[name] !== previous) conflicts.push(name);
@@ -267,8 +271,38 @@ function createFixedRepository({ rootDirectory, userData, appVersion, bundledCat
       if (before[name] !== previous) conflicts.push(name);
     }
     const token = randomUUID();
-    plans.clear(); plans.set(token, { ...pack, before, target, changes, conflicts, expires: Date.now() + 5 * 60000 });
-    return { token, package: manifest, installedVersion: old?.manifest.version || null, changes, conflicts };
+    plans.clear(); plans.set(token, { ...pack, before: fingerprints(targetFiles), legacy, target, changes, conflicts, expires: Date.now() + 5 * 60000 });
+    return { token, package: manifest, installedVersion: old?.manifest.version || null, changes, conflicts, migrations: legacy.migrations };
+  }
+  async function checkOwnership(folder) {
+    // Validate even absent leaf paths, without following links in their ancestors.
+    await readOptional(rootDirectory, folder + '/' + META);
+    for (const installed of await packageFolders(rootDirectory)) if (installed !== folder && overlaps(installed, folder)) throw Error('安装目录与其他脚本包重叠。');
+  }
+  async function readLegacy(manifest, targetFiles) {
+    const files = Object.create(null), hashes = Object.create(null), revisions = Object.create(null), migrations = [];
+    for (const [file, source] of Object.entries(manifest.legacyPaths || {})) {
+      if (targetFiles[file]) continue;
+      let relative = source, bytes = await readOptional(rootDirectory, relative);
+      revisions[relative] = bytes ? hash(bytes) : null;
+      if (!bytes && /\.txt$/i.test(source)) {
+        relative = source.replace(/\.txt$/i, '.rng'); bytes = await readOptional(rootDirectory, relative);
+        revisions[relative] = bytes ? hash(bytes) : null;
+      }
+      let parent = path.posix.dirname(source);
+      while (parent !== '.') {
+        const metaPath = parent + '/' + META, metadata = await readOptional(rootDirectory, metaPath);
+        if (metadata) {
+          const previous = installedInfo({ [META]: metadata });
+          const baseline = previous.hashes[source.slice(parent.length + 1)];
+          if (baseline) { hashes[file] = baseline; revisions[metaPath] = hash(metadata); }
+          break;
+        }
+        parent = path.posix.dirname(parent);
+      }
+      if (bytes) { files[file] = bytes; migrations.push({ from: relative, to: manifest.installFolder + '/' + file }); }
+    }
+    return { files, hashes, revisions, migrations };
   }
   async function downloadPackage(id) {
     const index = await loadCatalog(), item = index.packages.find(pack => pack.id === id);
@@ -290,6 +324,7 @@ function createFixedRepository({ rootDirectory, userData, appVersion, bundledCat
     if (!plan || plan.expires < Date.now()) throw Error('安装预览已过期，请重新检查。');
     if (!['keep', 'replace'].includes(policy)) throw Error('请选择本地修改处理方式。');
     await ensureRoot();
+    await checkOwnership(plan.manifest.installFolder);
     const current = await readTree(plan.target);
     if (JSON.stringify(fingerprints(current)) !== JSON.stringify(plan.before)) throw Error('本地文件已变化，请重新预览后安装。');
     const stagingRoot = path.join(transactionDirectory, 'staging'), backupRoot = path.join(transactionDirectory, 'backups');
@@ -298,7 +333,7 @@ function createFixedRepository({ rootDirectory, userData, appVersion, bundledCat
     const backup = path.join(backupRoot, plan.manifest.id + '-' + Date.now() + '-' + randomUUID());
     let moved = false, committed = false;
     try {
-      const next = { ...current };
+      const next = { ...plan.legacy.files, ...current };
       for (const change of plan.changes) {
         if (policy === 'keep' && plan.conflicts.includes(change.path)) continue;
         if (change.action === 'remove') delete next[change.path]; else next[change.path] = plan.files[change.path];
@@ -310,6 +345,12 @@ function createFixedRepository({ rootDirectory, userData, appVersion, bundledCat
         await fs.mkdir(path.dirname(destination), { recursive: true }); await fs.writeFile(destination, content);
       }
       if (JSON.stringify(fingerprints(await readTree(plan.target))) !== JSON.stringify(plan.before)) throw Error('本地文件已变化，请重新预览后安装。');
+      for (const [relative, revision] of Object.entries(plan.legacy.revisions)) {
+        const bytes = await readOptional(rootDirectory, relative);
+        if ((bytes ? hash(bytes) : null) !== revision) throw Error('旧目录文件已变化，请重新预览迁移。');
+      }
+      await checkOwnership(plan.manifest.installFolder);
+      await fs.mkdir(path.dirname(plan.target), { recursive: true }); await assertDirectory(path.dirname(plan.target));
       await fs.writeFile(journalPath, JSON.stringify({ folder: plan.manifest.installFolder, stage: path.basename(stage), backup: path.basename(backup), transaction: token }), { flag: 'wx' });
       try { await rename(plan.target, backup); moved = true; } catch (error) { if (error.code !== 'ENOENT') throw error; }
       try { await rename(stage, plan.target); committed = true; }
@@ -329,11 +370,19 @@ function createFixedRepository({ rootDirectory, userData, appVersion, bundledCat
   return { state, refresh, setChannel, details, prepare, planArchive, apply };
 }
 
-function registerScriptRepository({ ipcMain, getMainWindow, dialog, storage, ...options }) {
+function registerScriptRepository({ ipcMain, getMainWindow, dialog, storage, migrateScriptPaths, ...options }) {
   // Chromium networking follows the desktop session's system proxy settings.
   const service = createScriptRepository({ ...options, fetch: options.fetch || require('./script-repository-network.cjs').fetchRepositoryResource });
+  const synchronize = async state => {
+    if (migrateScriptPaths) await migrateScriptPaths(await scriptAliases(state.rootPath));
+    return state;
+  };
   const actions = {
-    state: () => service.state(), refresh: () => service.refresh(), prepare: args => service.prepare(args?.id), apply: args => service.apply(args || {}),
+    state: async () => synchronize(await service.state()), refresh: async () => synchronize(await service.refresh()), prepare: args => service.prepare(args?.id), apply: async args => {
+      const result = await service.apply(args || {});
+      try { await synchronize(result.state); } catch (error) { result.warning = '脚本已安装，自动流程路径设置保存失败，请重新打开仓库重试：' + error.message; options.log?.(result.warning, 'warning'); }
+      return result;
+    },
     channel: args => service.setChannel(args?.channel), details: args => service.details(args?.id),
     'choose-directory': async () => {
       if (!storage) throw Error('当前版本不支持迁移脚本目录。');

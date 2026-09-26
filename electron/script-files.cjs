@@ -84,7 +84,10 @@ function createScriptStore(rootDirectory, { serialize: sharedSerialize } = {}) {
       }
     }
     await visit('');
-    return { rootPath, folders, files, warnings };
+    const aliases = await require('./script-paths.cjs').scriptAliases(rootPath);
+    // Migrated originals stay on disk as backups; editing them must not appear
+    // to affect the new script that execution now resolves to.
+    return { rootPath, folders, files: files.filter(file => !aliases[file.path]), aliases, warnings };
   }
 
   const create = ({ folder }) => serialize(async () => {

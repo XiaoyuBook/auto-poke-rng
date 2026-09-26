@@ -21,6 +21,7 @@ export function useScriptLibrary() {
     setBusy(true);
     try {
       const listing = await api.list();
+      setSelected(current => listing.aliases?.[current] || current);
       setRootPath(listing.rootPath);
       setFolders(listing.folders);
       setWarnings(listing.warnings);
