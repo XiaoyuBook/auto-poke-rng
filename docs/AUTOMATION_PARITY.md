@@ -116,7 +116,7 @@
 
 2026-09-25 迁移节点：原版业务包已迁入现有 Python 运行时；Electron 负责 IPC、启动快照、设备占用、取消与日志；React 已接入自动定点、自动 TID、OCR 设置、delay 策略和日志中心。运行测试仍校验冻结参考文件哈希，测试不会自动回退原版。
 
-已补充 `tests/automation-services.cjs`、`automation-worker.cjs`、`automation-integration.cjs`、`automation-script-cancellation.cjs`，共22项，覆盖 JSONL、预检、快照、delay 持久化、日志保留、设备断线、全局停止、迟到脚本拒绝、全部 OCR 顺序、传说组反查、判闪校准及所有附带脚本的实际编译。`runtime/tests/test_automation_*.py` 共13项，覆盖 PP-OCR 输出适配、真实原版状态机接线、搜索窗口、过场 noisy 模式、预热期双眨眼、捕获保活、反查重试、TID 停止诊断与校准。发现的基准值退回100、过场模式错误、预热双眨眼、迟到脚本、旧 TID 表格及轮次状态问题，均已补充回归再修复。
+已补充 `tests/automation-services.cjs`、`automation-worker.cjs`、`automation-integration.cjs`、`automation-script-cancellation.cjs`，覆盖 JSONL、预检、快照、delay 持久化、日志保留、设备断线、全局停止、迟到脚本拒绝、全部 OCR 顺序、传说组反查、判闪校准及冻结原版参考脚本的实际编译。主程序不再附带游戏脚本；官方完整包通过 `npm run test:scripts:package -- <ZIP 路径>` 独立校验和编译。`runtime/tests/test_automation_*.py` 覆盖 PP-OCR 输出适配、真实原版状态机接线、搜索窗口、过场 noisy 模式、预热期双眨眼、捕获保活、反查重试、TID 停止诊断与校准。发现的基准值退回100、过场模式错误、预热双眨眼、迟到脚本、旧 TID 表格及轮次状态问题，均已补充回归再修复。
 
 `tests/automation-ui.test.jsx` 的7项交互契约覆盖独立保存、只读检查、轮次关联和新运行解除筛选、OCR 失败/全部测试、TID 全表复制及重测清理；`tests/automation-electron.cjs` 使用真实 Electron、模拟视频和手柄、真实 ID worker 验证页面草稿、IPC、占用和释放、日志弹出/收回同步及截图。Electron 中的长时间自动流程事件使用模拟 worker，不能据此声称实际游戏捕获已通过。
 

@@ -5,9 +5,11 @@
 | 命令 | 内容 |
 | --- | --- |
 | `npm test` | Vitest 单元和组件测试 |
+| `npm run test:scripts:repository` | 空脚本库、旧文件迁移、脚本仓库下载与安装、文件保存和界面确认流程 |
+| `npm run test:scripts:package -- <ZIP 路径>` | 校验独立仓库的脚本包，在临时目录安装并逐个编译；不执行脚本，不写用户目录 |
 | `npm run test:automation:reference` | 固定旧版自动流程行为基线（不代表本项目已接入） |
 | `npm run test:automation` | 对本项目运行时执行同一批自动流程契约测试；未迁移时必须失败 |
-| `npm run test:automation:adapters` | JSONL worker、设备占用/停止竞态、配置与日志、原版脚本编译、捕获与 OCR 适配器；22 项 Node + 13 项 Python |
+| `npm run test:automation:adapters` | JSONL worker、设备占用/停止竞态、配置与日志、冻结原版脚本编译、捕获与 OCR 适配器 |
 | `npm run test:automation:electron` | 真实 Electron IPC、模拟视频/手柄、自动流程页面、参数保存、相关日志/浮窗同步、ID worker、OCR 设置；截图保存于 `node_modules/.tmp/automation-review/` |
 | `npm run test:devices:regression` | 公共伊机控、视频源、Python 帧读取及测试启动器的审查回归 |
 | `npm run test:runtime` | OCR 适配器单测、CTest 核心测试、脚本/设备 Node 集成测试，以及全部设备审查回归 |

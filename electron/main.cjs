@@ -57,6 +57,8 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
+  // scripts/ is no longer shipped. Preserve an existing local folder from
+  // older versions on first migration; otherwise create an empty user library.
   const rootDirectory = await initializeUserScripts(app.getPath('userData'), path.join(app.getAppPath(), 'scripts'));
   ipcMain.handle('app:metadata', () => ({ name: 'Auto Poke RNG', version: app.getVersion(), platform: process.platform }));
   panels = registerPanelWindows({ getMainWindow: () => mainWindow, loadWindow });

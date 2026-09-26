@@ -25,9 +25,12 @@ async function initializeUserScripts(userData, legacyRoot) {
   } catch (error) { if (error.code !== 'ENOENT') throw error; }
   const temporary = await fs.mkdtemp(path.join(userData, '.scripts-import-'));
   try {
-    // Copy the user's current files once, including local edits; later starts never reseed them.
-    let legacyExists = true;
-    try { await fs.lstat(legacyRoot); } catch (error) { if (error.code !== 'ENOENT') throw error; legacyExists = false; }
+    // New profiles start empty. Only an explicitly supplied existing legacy
+    // directory is migrated once; later starts never reseed user files.
+    let legacyExists = false;
+    if (legacyRoot) {
+      try { await fs.lstat(legacyRoot); legacyExists = true; } catch (error) { if (error.code !== 'ENOENT') throw error; }
+    }
     if (legacyExists) {
       await fs.cp(legacyRoot, temporary, { recursive: true, filter: async source => {
         if ((await fs.lstat(source)).isSymbolicLink()) throw Error('旧脚本目录包含链接，请移除链接后重试。');

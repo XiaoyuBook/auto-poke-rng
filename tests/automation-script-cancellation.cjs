@@ -2,6 +2,7 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const path=require('node:path');
 const fs=require('node:fs');
+const os=require('node:os');
 const {EventEmitter}=require('node:events');
 const {ScriptRunner}=require('../electron/script-runner.cjs');
 
@@ -47,21 +48,24 @@ test('C04: cancellation during script preflight cannot launch a late controller 
   const statusEntered=new Promise(resolve=>{entered=resolve;});
   const controller=new EventEmitter();
   controller.call=async method=>{if(method==='controller.status'){entered();return new Promise(resolve=>{acceptStatus=resolve;});}return {};};
-  const runner=new ScriptRunner({rootDirectory:path.resolve('scripts'),controller,emit:()=>{}});
-  t.after(()=>runner.stop());
-  const starting=runner.start({text:'A 1',path:'BDSP/OCR翻页.rng',shouldStop:()=>cancelled});
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'poke-script-cancellation-'));
+  fs.writeFileSync(path.join(root,'取消测试.txt'),'A 1\n');
+  const runner=new ScriptRunner({rootDirectory:root,controller,emit:()=>{}});
+  t.after(async()=>{await runner.stop();fs.rmSync(root,{recursive:true,force:true});});
+  const starting=runner.start({text:'A 1',path:'取消测试.txt',shouldStop:()=>cancelled});
   await statusEntered;cancelled=true;acceptStatus({status:'connected'});
   await assert.rejects(starting,/停止/);
   assert.equal(runner.current,null);
 });
 
-test('C02: every imported BDSP script compiles with this project’s existing engine',async()=>{
-  const runner=new ScriptRunner({rootDirectory:path.resolve('scripts')});
-  const files=fs.readdirSync('scripts/BDSP').filter(file=>file.endsWith('.txt'));
-  assert.equal(files.length,24);
-  assert.equal((await runner.resolveScript('BDSP/OCR翻页.rng')).absolute,path.resolve('scripts/BDSP/OCR翻页.txt'));
+test('C02: every frozen reference script compiles without a bundled user library',async()=>{
+  const root=path.resolve(__dirname,'../third_party/bdsp-automation-reference/script');
+  const runner=new ScriptRunner({rootDirectory:root});
+  const files=fs.readdirSync(root).filter(file=>file.endsWith('.txt'));
+  assert.equal(files.length,23);
+  assert.equal((await runner.resolveScript('BDSP测种.rng')).absolute,path.join(root,'BDSP测种.txt'));
   for(const file of files){
-    const result=await runner.validate({text:fs.readFileSync(path.join('scripts/BDSP',file),'utf8'),path:'BDSP/'+file});
+    const result=await runner.validate({text:fs.readFileSync(path.join(root,file),'utf8'),path:file});
     assert.equal(result.valid,true,`${file}: ${result.diagnostic?.message}`);
   }
 });

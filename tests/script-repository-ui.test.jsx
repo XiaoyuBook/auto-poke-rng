@@ -3,6 +3,7 @@ import React from 'react';
 import { beforeEach, afterEach, test, expect, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { ScriptRepositoryDialog } from '../src/components/ScriptRepositoryDialog';
+import { ScriptLibrary } from '../src/components/ScriptLibrary';
 beforeEach(() => {
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
   HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
@@ -17,6 +18,17 @@ function fixture({ cached = true, conflicts = [], installed = [] } = {}) {
   const onInstalled = vi.fn(async () => {}), close = vi.fn();
   return { api, onInstalled, close, state, plan, pack };
 }
+test('an empty local library opens the repository without inventing or installing scripts', async () => {
+  const f = fixture(), create = vi.fn(), refresh = vi.fn();
+  render(<ScriptLibrary game="bdsp" scripts={[]} folders={[]} rootPath="user/scripts" busy={false} loaded available error="" warnings={[]} select={vi.fn()} create={create} refresh={refresh} />);
+  fireEvent.click(screen.getByRole('button', { name: '浏览脚本仓库' }));
+  await screen.findByRole('button', { name: '预览安装' });
+  expect(f.api.prepare).not.toHaveBeenCalled();
+  expect(f.api.apply).not.toHaveBeenCalled();
+  expect(create).not.toHaveBeenCalled();
+  expect(refresh).not.toHaveBeenCalled();
+});
+
 test('browsing and preview do not install until confirmation, then refresh the local library', async () => {
   const f = fixture(); render(<ScriptRepositoryDialog {...f} hasUnsaved={false} />);
   fireEvent.click(await screen.findByRole('button', { name: '预览安装' }));

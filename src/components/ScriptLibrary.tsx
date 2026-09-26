@@ -112,7 +112,7 @@ export function ScriptLibrary(props: Props) {
       {renderFolder('', 0)}
       {!props.available && <div className="library-empty"><Folder size={22} /><p>请在桌面应用中打开项目脚本库</p></div>}
       {props.available && !props.loaded && props.busy && <div className="library-empty"><p>正在读取脚本库…</p></div>}
-      {props.loaded && !props.scripts.length && !folders.length && <div className="library-empty"><FolderOpen size={22} /><p>scripts 文件夹为空</p><span>添加文件夹和 .txt 脚本后刷新</span></div>}
+      {props.loaded && !props.scripts.length && !folders.length && <div className="library-empty"><FolderOpen size={22} /><p>还没有安装脚本</p><span>从脚本仓库安装，或新建自己的 .txt 脚本</span><button className="text-button" onClick={() => setRepositoryOpen(true)}>浏览脚本仓库</button></div>}
       {query && !filtered.length && <div className="library-empty"><p>没有匹配的脚本</p><button className="text-button" onClick={() => setSearch('')}>清除搜索</button></div>}
     </div>
     {props.warnings.length > 0 && <details className="library-warnings"><summary>{props.warnings.length} 项未能读取</summary>{props.warnings.map(warning => <p key={warning}>{warning}</p>)}</details>}

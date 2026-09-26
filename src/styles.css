@@ -471,6 +471,7 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .library-empty { padding: 34px 10px; text-align: center; color: var(--muted); font-size: 12px; }
 .library-empty p { margin: 10px 0; }
 .library-empty span { font-size: 11px; line-height: 1.8; }
+.library-empty .text-button { display: block; margin: 12px auto 0; color: var(--green); }
 .library-error { flex: 0 0 auto; max-height: 100px; overflow: auto; padding: 8px; margin-bottom: 8px; color: var(--yellow); font-size: 11px; line-height: 1.7; overflow-wrap: anywhere; }
 .library-warnings { flex: 0 0 auto; max-height: 100px; overflow: auto; font-size: 11px; line-height: 1.7; color: var(--yellow); overflow-wrap: anywhere; }
 .library-warnings summary { cursor: pointer; }

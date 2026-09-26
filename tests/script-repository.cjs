@@ -127,16 +127,46 @@ test('package directory symlinks are rejected without changing their target', as
   await assert.rejects(f.service.planArchive(pack().bytes), /不允许链接/);
   assert.equal(await fs.readFile(path.join(outside, '测试.txt'), 'utf8'), 'untouched');
 });
+test('fresh user profiles stay empty until a script package installation is confirmed', async t => {
+  const f = await fixture(t, { bundledCatalog: require('../resources/script-catalog.json') });
+  assert.equal(await initializeUserScripts(f.directory), f.rootDirectory);
+  assert.deepEqual(await fs.readdir(f.rootDirectory), []);
+  const state = await f.service.state();
+  assert.equal(state.packages.length, 1);
+  assert.deepEqual(state.installed, []);
+  await f.service.refresh();
+  const preview = await f.service.prepare('demo');
+  assert.deepEqual((await createScriptStore(f.rootDirectory).list()).files, []);
+  await f.service.apply({ token: preview.token, policy: 'keep' });
+  assert.equal((await createScriptStore(f.rootDirectory).list()).files.length, 1);
+});
+
+test('an absent legacy folder initializes empty and a later folder never seeds that profile', async t => {
+  const f = await fixture(t), legacy = path.join(f.directory, 'old-application', 'scripts');
+  await initializeUserScripts(f.directory, legacy);
+  assert.deepEqual(await fs.readdir(f.rootDirectory), []);
+  await fs.mkdir(legacy, { recursive: true }); await fs.writeFile(path.join(legacy, 'late.txt'), 'A 1');
+  await initializeUserScripts(f.directory, legacy);
+  assert.deepEqual(await fs.readdir(f.rootDirectory), []);
+});
+
 test('first-run migration copies local changes once and never rewrites the old library', async t => {
   const f = await fixture(t), legacy = path.join(f.directory, 'legacy');
   await fs.mkdir(path.join(legacy, 'BDSP'), { recursive: true }); await fs.writeFile(path.join(legacy, 'BDSP/local.txt'), 'personal');
+  await fs.mkdir(path.join(legacy, 'BDSP/ImgLabel')); await fs.writeFile(path.join(legacy, 'BDSP/ImgLabel/local.IL'), 'personal label');
   assert.equal(await initializeUserScripts(f.directory, legacy), f.rootDirectory);
   assert.equal(await f.read('local.txt'), 'personal');
+  assert.equal(await f.read('ImgLabel/local.IL'), 'personal label');
   await fs.writeFile(path.join(legacy, 'BDSP/local.txt'), 'new distribution');
   await initializeUserScripts(f.directory, legacy);
   assert.equal(await f.read('local.txt'), 'personal');
   await f.write('local.txt', 'edited');
   assert.equal(await fs.readFile(path.join(legacy, 'BDSP/local.txt'), 'utf8'), 'new distribution');
+  await fs.unlink(path.join(f.rootDirectory, 'BDSP/local.txt'));
+  await fs.unlink(path.join(f.rootDirectory, 'BDSP/ImgLabel/local.IL'));
+  await initializeUserScripts(f.directory, legacy);
+  await assert.rejects(f.read('local.txt'), { code: 'ENOENT' });
+  await assert.rejects(f.read('ImgLabel/local.IL'), { code: 'ENOENT' });
 });
 test('shared write gate queues saves and remains locked until all writes finish', async () => {
   const gate = createScriptGate(), trace = []; let release;
