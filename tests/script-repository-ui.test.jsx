@@ -75,7 +75,7 @@ test('unsaved scripts block directory migration', async () => {
 test('unsaved editor contents block installation and ZIP import uses the same preview', async () => {
   const f = fixture(); render(<ScriptRepositoryDialog {...f} hasUnsaved />);
   await screen.findByRole('button', { name: '预览安装' });
-  fireEvent.click(screen.getByRole('button', { name: '导入脚本包' }));
+  fireEvent.click(screen.getByRole('button', { name: '导入脚本 ZIP' }));
   const confirm = await screen.findByRole('button', { name: '确认安装' });
   expect(confirm.disabled).toBe(true); fireEvent.click(confirm);
   expect(f.api.apply).not.toHaveBeenCalled();
@@ -111,15 +111,15 @@ test('starts in the active game, uses Chinese names, and switches games without 
   expect(screen.getByRole('heading', { name: '珍钻复刻 官方脚本包' })).toBeTruthy();
   expect(screen.queryByRole('heading', { name: '火叶测种脚本包' })).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: '游戏分类：剑／盾' }));
-  expect(screen.getByText('这个游戏还没有脚本包')).toBeTruthy();
+  expect(screen.getByText('这个游戏还没有脚本')).toBeTruthy();
   expect(f.api.prepare).not.toHaveBeenCalled();
 });
 
-test('browses script categories and filters package files without preparing an installation', async () => {
+test('a category contains scripts and the file list shows resources without a duplicate license', async () => {
   const f = fixture();
   f.pack.id = 'bdsp-seed';
   f.state.categoryReadmes = { '测种脚本': '# 测种说明\n\n先核对画面。' };
-  f.pack.files = [{ path: '测种.txt', bytes: 4, category: '测种脚本' }, { path: 'ImgLabel/眼睛.IL', bytes: 4096, category: '图像标签' }];
+  f.pack.files = [{ path: '测种.txt', bytes: 4, category: '测种脚本' }, { path: 'ImgLabel/眼睛.IL', bytes: 4096, category: '图像标签' }, { path: 'LICENSE.md', bytes: 35000, category: '许可证' }];
   f.pack.readme = '## 开始使用\n\n先核对**游戏画面**。\n\n<script>alert(1)</script>\n\n[危险链接](javascript:alert(1))';
   render(<ScriptRepositoryDialog {...f} hasUnsaved={false} />);
   await screen.findByRole('heading', { name: '开始使用' });
@@ -127,20 +127,24 @@ test('browses script categories and filters package files without preparing an i
   expect(screen.getByText('危险链接').getAttribute('href')).toBe('');
   const category = screen.getByRole('button', { name: '脚本分类：测种脚本' });
   fireEvent.click(category);
-  expect(screen.getByRole('heading', { name: '测种说明' })).toBeTruthy();
+  expect(screen.getByRole('heading', { name: '分类说明' })).toBeTruthy();
   expect(screen.getByText('先核对画面。')).toBeTruthy();
+  expect(screen.getByRole('heading', { name: '分类中的脚本' })).toBeTruthy();
+  expect(screen.getAllByText('1 个脚本').length).toBeGreaterThan(0);
   const toggle = screen.getByRole('button', { name: '展开分类：测种脚本' });
   expect(toggle.getAttribute('aria-expanded')).toBe('true');
   fireEvent.click(toggle);
   expect(toggle.getAttribute('aria-expanded')).toBe('false');
   fireEvent.click(toggle);
-  fireEvent.click(screen.getByText('珍钻复刻 官方脚本包'));
+  fireEvent.click(within(document.querySelector('.repository-category-scripts')).getByRole('button', { name: /珍钻复刻 官方脚本包/ }));
   expect(screen.getByRole('heading', { name: '开始使用' })).toBeTruthy();
-  fireEvent.click(screen.getByRole('tab', { name: '文件列表（2）' }));
-  const panel = screen.getByRole('tabpanel', { name: '文件列表' });
+  fireEvent.click(screen.getByRole('tab', { name: '脚本与资源（2）' }));
+  const panel = screen.getByRole('tabpanel', { name: '脚本与资源' });
   expect(within(panel).getByText('测种.txt')).toBeTruthy();
   expect(within(panel).getByText('ImgLabel/眼睛.IL')).toBeTruthy();
-  fireEvent.click(within(panel).getByRole('button', { name: '文件分类：图像标签' }));
+  expect(within(panel).queryByText('LICENSE.md')).toBeNull();
+  expect(within(panel).queryByRole('button', { name: '文件类型：许可证' })).toBeNull();
+  fireEvent.click(within(panel).getByRole('button', { name: '文件类型：图像标签' }));
   expect(within(panel).queryByText('测种.txt')).toBeNull();
   expect(within(panel).getByText('ImgLabel/眼睛.IL')).toBeTruthy();
   expect(f.api.prepare).not.toHaveBeenCalled();
@@ -178,7 +182,7 @@ test('new-version filter excludes equal and older remote versions', async () => 
   render(<ScriptRepositoryDialog {...f} hasUnsaved={false} />);
   await screen.findByRole('button', { name: '预览更新' });
   fireEvent.click(screen.getByRole('button', { name: '有更新', exact: true }));
-  expect(screen.getByText('暂无可更新的脚本包')).toBeTruthy();
+  expect(screen.getByText('暂无可更新的脚本')).toBeTruthy();
 });
 
 test('repository settings switch public channels and preserve browsing after network failure', async () => {

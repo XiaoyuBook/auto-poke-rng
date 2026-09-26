@@ -108,7 +108,7 @@ app.whenReady().then(async () => {
   assert.ok(fs.readdirSync(backups).some(name => fs.readFileSync(path.join(backups, name, '测试.txt'), 'utf8') === 'B 2\n'));
 
   fs.writeFileSync(zipPath, pack('1.2.0', 'Y 1\n').bytes);
-  await click('导入脚本包');
+  await click('导入脚本 ZIP');
   await until(`document.querySelector('.repository-detail')?.textContent.includes('1.2.0')`, 'zip import preview');
   assert.equal(dialogs, 1);
   await js(`document.querySelectorAll('.repository-policy input')[1].click()`);
@@ -165,7 +165,7 @@ app.whenReady().then(async () => {
   assert.ok(automation.getState().logs.some(entry => entry.message.includes('已安装脚本包')));
   automation.store.save('static', 'scripts', { seed: 'BDSP/测试.rng' });
   fs.writeFileSync(zipPath, pack('0.0.2', 'Y 4\n', { id: 'bdsp-split', name: '独立测试包', installFolder: '珍钻复刻/测试', legacyPaths: { '测试.txt': 'BDSP/测试.txt', 'ImgLabel/示例.IL': 'BDSP/ImgLabel/示例.IL' } }).bytes);
-  await click('导入脚本包');
+  await click('导入脚本 ZIP');
   await until(`Boolean(document.querySelector('.repository-migrations'))`, 'split migration preview');
   await click('确认安装');
   await until(`document.querySelector('.repository-message[role="status"]')?.textContent.includes('安装完成')`, 'split installed');
@@ -180,12 +180,19 @@ app.whenReady().then(async () => {
   await until(`Array.from(document.querySelectorAll('.repository-package-select strong')).some(b => b.textContent === '红圣菇')`, 'official package listed');
   await js(`document.querySelector('[aria-label="脚本分类：撞帧脚本"]').click()`);
   await until(`document.querySelector('.repository-category-detail h2')?.textContent === '撞帧脚本'`, 'category README shown');
+  assert.equal(await js(`document.querySelectorAll('.repository-category-scripts button').length`), 9);
   await screenshot('repository-category.png');
+  await js(`Array.from(document.querySelectorAll('.repository-category-scripts button')).find(b => b.textContent.includes('阿尔宙斯')).click()`);
+  await until(`document.querySelector('.repository-detail h2')?.textContent === '阿尔宙斯'`, 'Arceus is one script in hit-frame category');
+  await js(`Array.from(document.querySelectorAll('[role="tab"]')).find(b => b.textContent.startsWith('脚本与资源')).click()`);
+  await until(`document.querySelectorAll('.repository-file-list tbody tr').length === 1`, 'Arceus has one installed script file');
+  assert.equal(await js(`document.querySelector('.repository-file-list').textContent.includes('LICENSE.md')`), false);
+  await screenshot('repository-arceus-files.png');
   await js(`Array.from(document.querySelectorAll('.repository-package-select')).find(b => b.querySelector('strong').textContent === '红圣菇').click()`);
   await until(`document.querySelector('.repository-detail h2')?.textContent === '红圣菇'`, 'official categorized catalog');
   await screenshot('repository.png');
-  await js(`Array.from(document.querySelectorAll('[role="tab"]')).find(b => b.textContent.startsWith('文件列表')).click()`);
-  await js(`document.querySelector('[aria-label="文件分类：图像标签"]').click()`);
+  await js(`Array.from(document.querySelectorAll('[role="tab"]')).find(b => b.textContent.startsWith('脚本与资源')).click()`);
+  await js(`document.querySelector('[aria-label="文件类型：图像标签"]').click()`);
   await until(`document.querySelectorAll('.repository-file-list tbody tr').length === 4`, 'category file list');
   await screenshot('repository-files.png');
   await click('仓库设置');

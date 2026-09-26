@@ -802,6 +802,15 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .repository-script-instructions { white-space: pre-line; }
 .repository-guide img { max-width: 100%; }
 .repository-guide blockquote { border-left: 3px solid #809b8b; padding-left: 15px; margin-left: 0; color: var(--secondary); }
+.repository-category-detail > h3 { margin: 24px 0 10px; font-size: 13px; }
+.repository-category-scripts { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; }
+.repository-category-scripts > button { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 12px; border: 1px solid #414945; border-radius: 7px; text-align: left; background: #ffffff05; }
+.repository-category-scripts > button:hover { border-color: #789985; background: #abc7b713; }
+.repository-category-scripts > button > svg:first-child { flex: 0 0 auto; color: #abc7b7; }
+.repository-category-scripts > button > svg:last-child { margin-left: auto; flex: 0 0 auto; color: var(--muted); }
+.repository-category-scripts > button > span { display: grid; gap: 4px; min-width: 0; }
+.repository-category-scripts strong { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; }
+.repository-category-scripts small { color: var(--muted); font-size: 10px; }
 .repository-requirement { border-top: 1px solid #333737; padding-top: 16px; margin-top: 24px; color: var(--muted); font-size: 11px; }
 .repository-file-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 20px; }
 .repository-file-filter > strong { flex: 1; font-size: 12px; overflow-wrap: anywhere; }
