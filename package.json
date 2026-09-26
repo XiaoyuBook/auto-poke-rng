@@ -6,7 +6,7 @@
   "description": "A desktop workspace for Pokémon RNG automation tools.",
   "main": "electron/main.cjs",
   "scripts": {
-    "test:scripts:repository": "node --test tests/script-repository.cjs && vitest run tests/script-repository-ui.test.jsx tests/script-files.test.js --maxWorkers=1",
+    "test:scripts:repository": "node --test tests/script-repository.cjs tests/script-storage.cjs && vitest run tests/script-repository-ui.test.jsx tests/script-files.test.js --maxWorkers=1",
     "test:scripts:package": "node tools/check-script-package.cjs",
     "test:automation:reference": "node tools/test-automation.cjs --reference",
     "test:automation": "node tools/test-automation.cjs",

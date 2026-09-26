@@ -8,7 +8,7 @@ const { registerDevices } = require('../electron/devices.cjs');
 const { registerPanelWindows } = require('../electron/panel-windows.cjs');
 const { registerScriptFiles } = require('../electron/script-files.cjs');
 const { registerScriptRepository } = require('../electron/script-repository.cjs');
-const { createScriptGate, initializeUserScripts } = require('../electron/script-storage.cjs');
+const { createScriptGate, createScriptStorage } = require('../electron/script-storage.cjs');
 const { registerAutomation } = require('../electron/automation.cjs');
 const { registerBlink } = require('../electron/blink-client.cjs');
 const { registerRng } = require('../electron/rng-client.cjs');
@@ -18,7 +18,7 @@ const root = path.resolve(__dirname, '..');
 const output = path.join(root, 'node_modules/.tmp/script-repository-review');
 fs.mkdirSync(output, { recursive: true });
 const fixture = fs.mkdtempSync(path.join(output, 'run-'));
-const scripts = path.join(fixture, 'profile', 'scripts');
+let scripts = path.join(fixture, 'profile', 'scripts');
 app.setPath('userData', path.join(fixture, 'profile'));
 app.disableHardwareAcceleration();
 app.on('window-all-closed', () => {});
@@ -34,7 +34,9 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 let devices, automation, blink, rng, notifications;
 const timer = setTimeout(() => { console.error('Script repository Electron test timed out'); app.exit(1); }, 45000);
 app.whenReady().then(async () => {
-  assert.equal(await initializeUserScripts(app.getPath('userData')), scripts);
+  const gate = createScriptGate(), logs = [];
+  const storage = await createScriptStorage({ userData: app.getPath('userData'), gate, isBusy: () => !!devices?.runner.current || !!automation?.isBusy() });
+  assert.equal(storage.getRoot(), scripts);
   assert.deepEqual(fs.readdirSync(scripts), [], 'fresh profiles have no bundled scripts');
   const main = new BrowserWindow({ show: false, width: 1440, height: 920, webPreferences: { preload: path.join(root, 'electron/preload.cjs'), contextIsolation: true, sandbox: true, backgroundThrottling: false } });
   const js = code => main.webContents.executeJavaScript(code, true).catch(error => { throw Error(code + '\n' + error.message); });
@@ -45,22 +47,22 @@ app.whenReady().then(async () => {
     await js(`${query}.click()`);
   };
   const screenshot = async name => { await delay(100); fs.writeFileSync(path.join(output, name), (await main.webContents.capturePage()).toPNG()); };
-  const gate = createScriptGate(), logs = [];
   let remote = pack('1.0.0', 'A 1\n'), dialogs = 0, offline = false;
   const zipPath = path.join(fixture, 'import.zip');
   const loadWindow = (window, query = {}) => window.loadFile(path.join(root, 'dist/index.html'), { query });
   ipcMain.handle('app:metadata', () => ({ name: 'Auto Poke RNG', version: '0.1.0', platform: 'win32' }));
-  registerPanelWindows({ getMainWindow: () => main, loadWindow });
-  registerScriptFiles({ getMainWindow: () => main, rootDirectory: scripts, serialize: gate.run });
-  devices = registerDevices({ ipcMain, getWindows: () => [main], rootDirectory: scripts, testMode: true, isScriptLibraryBusy: () => gate.busy });
+  const panels = registerPanelWindows({ getMainWindow: () => main, loadWindow });
+  registerScriptFiles({ getMainWindow: () => main, getLabelWindows: () => [panels.getVideoWindow()], rootDirectory: storage.getRoot, serialize: gate.run, isMigrating: () => storage.migrating });
+  devices = registerDevices({ ipcMain, getWindows: () => BrowserWindow.getAllWindows(), rootDirectory: storage.getRoot, testMode: true, isScriptLibraryBusy: () => gate.busy });
   blink = registerBlink({ ipcMain, getMainWindow: () => main, getVideo: () => devices.getState().video, isAutomationBusy: () => devices.isAutomationBusy() });
   rng = registerRng({ ipcMain, getMainWindow: () => main, isAutomationBusy: () => devices.isAutomationBusy() });
   automation = registerAutomation({ ipcMain, getMainWindow: () => main, getWindows: () => [main], devices, rng, blink, userData: app.getPath('userData') });
   notifications = registerQQNotifications({ ipcMain, getMainWindow: () => main, safeStorage, nativeImage, userData: app.getPath('userData') });
-  registerScriptRepository({ ipcMain, getMainWindow: () => main, rootDirectory: scripts, userData: app.getPath('userData'), appVersion: '0.1.0', gate,
+  const moveTo = path.join(fixture, 'custom-scripts'); fs.mkdirSync(moveTo);
+  registerScriptRepository({ ipcMain, getMainWindow: () => main, rootDirectory: storage.getRoot, storage, userData: app.getPath('userData'), appVersion: '0.1.0', gate,
     isBusy: () => !!devices.runner.current || automation.isBusy(), log: message => { logs.push(message); automation.store.log(message, '系统', 'info'); },
     fetch: async url => { if (offline) throw new TypeError('fetch failed'); return new Response(url.endsWith('catalog.json') ? JSON.stringify(remote.catalog) : remote.bytes); },
-    dialog: { showOpenDialog: async () => { dialogs++; return { canceled: false, filePaths: [zipPath] }; } },
+    dialog: { showOpenDialog: async (_window, options) => { dialogs++; return { canceled: false, filePaths: [options.properties.includes('openDirectory') ? moveTo : zipPath] }; } },
   });
   await loadWindow(main);
   main.showInactive();
@@ -101,7 +103,7 @@ app.whenReady().then(async () => {
   await click('确认安装');
   await until(`document.querySelector('.repository-message[role="status"]')?.textContent.includes('保留 1 项本地修改')`, 'kept local edit');
   assert.equal(fs.readFileSync(path.join(scripts, 'BDSP/测试.txt'), 'utf8'), 'B 2\n');
-  const backups = path.join(app.getPath('userData'), 'script-repository/backups');
+  const backups = path.join(scripts, '.rng-repository/backups');
   assert.ok(fs.readdirSync(backups).some(name => fs.readFileSync(path.join(backups, name, '测试.txt'), 'utf8') === 'B 2\n'));
 
   fs.writeFileSync(zipPath, pack('1.2.0', 'Y 1\n').bytes);
@@ -112,6 +114,37 @@ app.whenReady().then(async () => {
   await click('确认安装');
   await until(`document.querySelector('.repository-message[role="status"]')?.textContent.includes('安装完成')`, 'zip installed');
   assert.equal(fs.readFileSync(path.join(scripts, 'BDSP/测试.txt'), 'utf8'), 'Y 1\n');
+
+  await click('仓库设置'); await click('更改脚本目录');
+  await until(`Boolean(document.querySelector('[aria-label="目录迁移预览"]'))`, 'migration preview ready');
+  assert.equal(storage.getRoot(), scripts);
+  await screenshot('repository-directory-preview.png');
+  await click('迁移并使用此目录');
+  await until(`document.querySelector('.repository-message[role="status"]')?.textContent.includes('脚本目录已迁移')`, 'migration completed');
+  const oldScripts = scripts; scripts = moveTo;
+  assert.equal((await js('window.desktop.scripts.list()')).rootPath, scripts);
+  assert.equal((await devices.runner.resolveScript('BDSP/测试.txt')).absolute, path.join(scripts, 'BDSP/测试.txt'));
+  await js(`(async () => { const file = (await window.desktop.scripts.list()).files[0]; await window.desktop.scripts.save({path:file.path,name:file.name,body:'Y 2\\n',expectedRevision:file.revision}); })()`);
+  assert.equal(fs.readFileSync(path.join(oldScripts, 'BDSP/测试.txt'), 'utf8'), 'Y 1\n');
+  assert.equal(fs.readFileSync(path.join(scripts, 'BDSP/测试.txt'), 'utf8'), 'Y 2\n');
+  const label = { folder: 'BDSP', name: '迁移后标签', searchMethod: 107, threshold: 95, imageBase64: '宝可梦', range: { x: 0, y: 0, width: 10, height: 10 }, target: { x: 0, y: 0, width: 10, height: 10 } };
+  await js(`window.desktop.scripts.labelSave(${JSON.stringify(label)})`);
+  assert.ok(fs.existsSync(path.join(scripts, 'BDSP/ImgLabel/迁移后标签.IL')));
+  assert.equal(fs.existsSync(path.join(oldScripts, 'BDSP/ImgLabel/迁移后标签.IL')), false);
+  await js(`window.desktop.panels.open('video')`);
+  const detached = panels.getVideoWindow();
+  const detachedLabel = await detached.webContents.executeJavaScript(`window.desktop.scripts.labelRead('BDSP', '迁移后标签')`);
+  assert.equal(detachedLabel.imageBase64, '宝可梦');
+  await detached.webContents.executeJavaScript(`window.desktop.scripts.labelSave(${JSON.stringify({ ...label, imageBase64: '分离窗口保存' })})`);
+  assert.equal((await js(`window.desktop.scripts.labelRead('BDSP', '迁移后标签')`)).imageBase64, '分离窗口保存');
+  detached.close();
+  remote = pack('1.3.0', 'Y 3\n'); await click('检查更新');
+  await until(`Array.from(document.querySelectorAll('.repository-package-select')).some(b => b.textContent.includes('1.3.0') && !b.disabled)`, 'new-root catalog loaded');
+  await js(`document.querySelector('.repository-package-select').click()`);
+  await click('预览更新'); await click('确认安装');
+  await until(`document.querySelector('.repository-message[role="status"]')?.textContent.includes('安装完成')`, 'updated at new root');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(scripts, 'BDSP/.rng-package.json'))).manifest.version, '1.3.0');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(oldScripts, 'BDSP/.rng-package.json'))).manifest.version, '1.2.0');
 
   // Hold the same gate used by installation and verify both public launch paths.
   let release;

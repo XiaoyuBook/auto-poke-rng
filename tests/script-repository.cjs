@@ -110,6 +110,16 @@ test('failed final rename restores original scripts and releases the write gate'
   assert.equal(await f.read('测试.txt'), 'A 1\n'); assert.equal(f.gate.busy, false);
   assert.equal((await f.service.state()).installed[0].version, '1.0.0');
 });
+
+test('installation transactions stay on the script disk instead of the profile disk', async t => {
+  const f = await fixture(t, { rename: async (from, to) => {
+    assert.ok(from.startsWith(f.rootDirectory + path.sep) && to.startsWith(f.rootDirectory + path.sep), 'cross-volume rename would fail with EXDEV');
+    await fs.rename(from, to);
+  } });
+  await f.install(pack().bytes);
+  await f.install(pack('1.1.0').bytes);
+  assert.equal((await createScriptStore(f.rootDirectory).list()).files.length, 1, 'transaction backups must not appear in the script library');
+});
 test('archive and version validation fail before creating installed files', async t => {
   const f = await fixture(t), input = pack();
   await assert.rejects(f.service.planArchive(pack('1.0.0', undefined, { minimumAppVersion: '99.0.0' }).bytes), /需要/);
@@ -180,6 +190,7 @@ test('restart restores a backup if interrupted between the two directory renames
   const stateDirectory = path.join(f.directory, 'script-repository');
   const backup = path.join(stateDirectory, 'backups/interrupted-backup');
   const stage = path.join(stateDirectory, 'staging/interrupted-stage');
+  await fs.mkdir(path.dirname(backup), { recursive: true });
   await fs.mkdir(stage, { recursive: true }); await fs.writeFile(path.join(stage, '测试.txt'), 'partial');
   await fs.rename(path.join(f.rootDirectory, 'BDSP'), backup);
   await fs.writeFile(path.join(stateDirectory, 'install-pending.json'), JSON.stringify({ folder: 'BDSP', stage: 'interrupted-stage', backup: 'interrupted-backup', transaction: 'interrupted' }));

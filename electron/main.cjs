@@ -7,7 +7,7 @@ const { registerQQNotifications } = require('./qq-notifications.cjs');
 const { registerRng } = require('./rng-client.cjs');
 const { registerBlink } = require('./blink-client.cjs');
 const { registerAutomation } = require('./automation.cjs');
-const { createScriptGate, initializeUserScripts } = require('./script-storage.cjs');
+const { createScriptGate, createScriptStorage } = require('./script-storage.cjs');
 const { registerScriptRepository } = require('./script-repository.cjs');
 const scriptGate = createScriptGate();
 
@@ -59,10 +59,12 @@ function createWindow() {
 app.whenReady().then(async () => {
   // scripts/ is no longer shipped. Preserve an existing local folder from
   // older versions on first migration; otherwise create an empty user library.
-  const rootDirectory = await initializeUserScripts(app.getPath('userData'), path.join(app.getAppPath(), 'scripts'));
+  const storage = await createScriptStorage({ userData: app.getPath('userData'), legacyRoot: path.join(app.getAppPath(), 'scripts'), gate: scriptGate,
+    isBusy: () => !!devices?.runner.current || !!automation?.isBusy() });
+  const rootDirectory = storage.getRoot;
   ipcMain.handle('app:metadata', () => ({ name: 'Auto Poke RNG', version: app.getVersion(), platform: process.platform }));
   panels = registerPanelWindows({ getMainWindow: () => mainWindow, loadWindow });
-  registerScriptFiles({ getMainWindow: () => mainWindow, getLabelWindows: () => [panels.getVideoWindow()], rootDirectory, serialize: scriptGate.run });
+  registerScriptFiles({ getMainWindow: () => mainWindow, getLabelWindows: () => [panels.getVideoWindow()], rootDirectory, serialize: scriptGate.run, isMigrating: () => storage.migrating });
   // The unpackaged GUI is the local development entry point. Keep mock
   // hardware available there even when a shell drops environment variables;
   // packaged production builds remain real-device only unless explicitly
@@ -73,7 +75,7 @@ app.whenReady().then(async () => {
   rng = registerRng({ ipcMain, getMainWindow: () => mainWindow, isAutomationBusy: () => devices.isAutomationBusy() });
   blink = registerBlink({ ipcMain, getMainWindow: () => mainWindow, getVideo: () => devices.getState().video, isAutomationBusy: () => devices.isAutomationBusy() });
   automation = registerAutomation({ ipcMain, getMainWindow: () => mainWindow, getWindows: () => BrowserWindow.getAllWindows(), devices, rng, blink, userData: app.getPath('userData') });
-  registerScriptRepository({ ipcMain, getMainWindow: () => mainWindow, dialog, rootDirectory, userData: app.getPath('userData'), appVersion: app.getVersion(), gate: scriptGate,
+  registerScriptRepository({ ipcMain, getMainWindow: () => mainWindow, dialog, storage, rootDirectory, userData: app.getPath('userData'), appVersion: app.getVersion(), gate: scriptGate,
     isBusy: () => !!devices.runner.current || automation.isBusy(), log: (message, level = 'info') => automation.store.log(message, '系统', level) });
   createWindow();
   app.on('activate', () => {

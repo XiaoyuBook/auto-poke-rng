@@ -13,6 +13,15 @@ const validLabelName = name => typeof name === 'string' && name.length > 0 && na
   && !/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(name);
 
 function createScriptStore(rootDirectory, { serialize: sharedSerialize } = {}) {
+  if (typeof rootDirectory === 'function') {
+    const run = sharedSerialize || (action => action());
+    return Object.fromEntries(['list', 'read', 'create', 'save', 'labelsList', 'labelRead', 'labelSave'].map(operation =>
+      [operation, payload => run(async () => {
+        const root = rootDirectory();
+        await require('./script-storage.cjs').assertDirectory(root);
+        return createScriptStore(root)[operation](payload);
+      })]));
+  }
   const rootPath = path.resolve(rootDirectory);
   let writes = Promise.resolve();
   const serialize = action => {
@@ -63,6 +72,7 @@ function createScriptStore(rootDirectory, { serialize: sharedSerialize } = {}) {
       const entries = await fs.readdir(directory, { withFileTypes: true });
       entries.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN', { numeric: true }));
       for (const entry of entries) {
+        if (entry.name === '.rng-repository') continue;
         const relative = folder ? folder + '/' + entry.name : entry.name;
         if (entry.isSymbolicLink()) { warnings.push('已跳过链接：' + relative); continue; }
         try {
@@ -219,7 +229,7 @@ function createScriptStore(rootDirectory, { serialize: sharedSerialize } = {}) {
   return { list, read, create, save, labelsList, labelRead, labelSave };
 }
 
-function registerScriptFiles({ getMainWindow, rootDirectory, getLabelWindows = () => [], serialize }) {
+function registerScriptFiles({ getMainWindow, rootDirectory, getLabelWindows = () => [], serialize, isMigrating = () => false }) {
   const { ipcMain } = require('electron');
   const store = createScriptStore(rootDirectory, { serialize });
   const handlers = { list: 'list', create: 'create', save: 'save', labelsList: 'labels-list', labelRead: 'label-read', labelSave: 'label-save' };
@@ -232,6 +242,7 @@ function registerScriptFiles({ getMainWindow, rootDirectory, getLabelWindows = (
       if (!mainSender && !labelSender) {
         throw new Error('Main window required');
       }
+      if (isMigrating()) throw Error('脚本目录正在迁移，请稍后重试。');
       return store[operation](payload);
     });
   }

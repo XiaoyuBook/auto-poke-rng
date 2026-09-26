@@ -39,12 +39,15 @@ export interface InstallPlan {
   token: string; package: RepositoryPackage; installedVersion: string | null;
   changes: { path: string; action: 'add' | 'update' | 'remove' }[]; conflicts: string[];
 }
+export interface DirectoryMigrationPlan { token: string; from: string; to: string; files: number; bytes: number }
 export interface ScriptRepositoryApi {
   getState: () => Promise<RepositoryState>;
   refresh: () => Promise<RepositoryState>;
   prepare: (id: string) => Promise<InstallPlan>;
   importZip: () => Promise<InstallPlan | null>;
   openDirectory?: () => Promise<void>;
+  chooseDirectory?: () => Promise<DirectoryMigrationPlan | null>;
+  migrateDirectory?: (token: string) => Promise<{ state: RepositoryState; rootPath: string; backupPath: string }>;
   setChannel?: (channel: 'github' | 'gitee') => Promise<RepositoryState>;
   details?: (id: string) => Promise<RepositoryPackage>;
   apply: (input: { token: string; policy: 'keep' | 'replace' }) => Promise<{ state: RepositoryState; kept: number; backupPath: string | null }>;

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ChevronRight, Download, ExternalLink, FileCode2, FileText, Folder, FolderOpen, Gamepad2, Image, Package, RefreshCw, Search, Settings2, Upload, WifiOff } from 'lucide-react';
 import Markdown from 'react-markdown';
 import { Dialog } from './Dialog';
-import { gameName, newerVersion, repositoryError, repositoryGame, repositoryGames, repositoryText, type InstallPlan, type RepositoryFile, type RepositoryPackage, type RepositoryState } from '../scriptRepository';
+import { gameName, newerVersion, repositoryError, repositoryGame, repositoryGames, repositoryText, type DirectoryMigrationPlan, type InstallPlan, type RepositoryFile, type RepositoryPackage, type RepositoryState } from '../scriptRepository';
 import type { GameId } from '../workspace';
 
 const categoryOf = (file: RepositoryFile) => file.category || (/\.il$/i.test(file.path) ? '图像标签' : /\.md$/i.test(file.path) ? '使用说明' : '脚本文件');
@@ -26,12 +26,15 @@ export function ScriptRepositoryDialog({ close, onInstalled, hasUnsaved, current
   const [details, setDetails] = useState<Record<string, RepositoryPackage>>({});
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [plan, setPlan] = useState<InstallPlan | null>(null);
+  const [migration, setMigration] = useState<DirectoryMigrationPlan | null>(null);
   const [policy, setPolicy] = useState<'keep' | 'replace'>('keep');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const pending = useRef(false), mounted = useRef(false);
   const detailScroll = useRef<HTMLDivElement>(null);
+  const migrationSection = useRef<HTMLElement>(null);
+  useEffect(() => { migrationSection.current?.scrollIntoView?.({ block: 'nearest' }); }, [migration?.token]);
   useEffect(() => { setGame(currentGame); setSelection({ id: '' }); setPlan(null); }, [currentGame]);
   useEffect(() => {
     let active = true;
@@ -90,6 +93,17 @@ export function ScriptRepositoryDialog({ close, onInstalled, hasUnsaved, current
     setNotice(`安装完成${result.kept ? `，保留 ${result.kept} 项本地修改` : ''}。${result.backupPath ? `原文件备份：${result.backupPath}` : ''}`);
     await onInstalled();
   });
+  const chooseDirectory = () => act(async () => {
+    if (hasUnsaved || !api?.chooseDirectory) return;
+    setPlan(null); setMigration(await api.chooseDirectory());
+  });
+  const migrateDirectory = () => act(async () => {
+    if (hasUnsaved || !migration || !api?.migrateDirectory) return;
+    const result = await api.migrateDirectory(migration.token);
+    setState(result.state); setMigration(null); setPlan(null);
+    setNotice(`脚本目录已迁移。原目录保留为备份：${result.backupPath}`);
+    await onInstalled();
+  });
   const source = state?.source || 'https://github.com/XiaoyuBook/auto-poke-rng-scripts';
   const sourceLabel = state?.channel === 'gitee' ? 'Gitee' : 'GitHub';
   const files = current?.files || [];
@@ -99,7 +113,7 @@ export function ScriptRepositoryDialog({ close, onInstalled, hasUnsaved, current
   return <Dialog title="脚本仓库" className="script-repository-dialog" close={() => { if (!pending.current) close(); }}>
     {!api && <p className="repository-message error" role="alert">请在桌面应用中使用脚本仓库。</p>}
     {error && <div className="repository-message error" role="alert"><WifiOff size={16} /><span>{error}</span><button className="text-button" disabled={busy} onClick={() => void refresh()}>重试</button><button className="text-button" disabled={busy} onClick={() => setSettings(true)}>切换渠道</button></div>}
-    {hasUnsaved && <p className="repository-message">有未保存的脚本，请先保存后再安装或更新。</p>}
+    {hasUnsaved && <p className="repository-message">有未保存的脚本，请先保存后再安装、更新或迁移目录。</p>}
     {notice && <p className="repository-message" role="status">{notice}</p>}
     <div className="repository-body" aria-busy={busy}>
       <nav className="repository-games" aria-label="游戏分类">
@@ -146,6 +160,9 @@ export function ScriptRepositoryDialog({ close, onInstalled, hasUnsaved, current
             <label>仓库地址<input aria-label="仓库地址" readOnly value={source} /></label>
             <div className="repository-settings-actions"><button className="button primary" disabled={!api || busy} onClick={() => void refresh()}><RefreshCw size={15} />更新仓库目录</button><button className="button" disabled={!api || busy} onClick={() => void importZip()}><Upload size={15} />手动导入</button></div>
             <h3>本地脚本</h3><p>安装后可以离线使用。更新会先备份已有目录，并让你选择是否保留个人修改。</p><code className="repository-local-path">{state?.rootPath || '正在读取脚本目录…'}</code>
+            <div className="repository-settings-actions"><button className="button" disabled={busy || hasUnsaved || !api?.chooseDirectory} onClick={() => void chooseDirectory()}><FolderOpen size={15} />更改脚本目录</button></div>
+            <p className="muted">可以选择其他磁盘上的空文件夹。迁移包含脚本、配套标签和安装记录，原目录保留为备份。</p>
+            {migration && <section ref={migrationSection} aria-label="目录迁移预览"><h3>确认迁移目录</h3><p>原目录</p><code className="repository-local-path">{migration.from}</code><p>新目录</p><code className="repository-local-path">{migration.to}</code><p>共 {migration.files} 个文件 · {fileSize(migration.bytes)}。校验完成后立即使用新目录。</p><div className="repository-settings-actions"><button className="button primary" disabled={busy || hasUnsaved} onClick={() => void migrateDirectory()}>迁移并使用此目录</button><button className="button" disabled={busy} onClick={() => setMigration(null)}>取消迁移</button></div></section>}
             <p className="muted">切换渠道只影响目录与下载来源，已有脚本和个人设置会继续保留。</p>
           </div> : plan ? <>
             <div className="repository-detail-heading"><span className="repository-game">{gameName(plan.package.game)}</span><h2>安装预览 · {repositoryText(plan.package.name)}</h2><p>{plan.installedVersion ? `版本 ${plan.installedVersion} → ` : '版本 '}{plan.package.version}</p></div>

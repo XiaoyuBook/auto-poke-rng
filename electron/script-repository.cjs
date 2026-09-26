@@ -2,7 +2,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const { createHash, randomUUID } = require('node:crypto');
 const { unzipSync } = require('fflate');
-const { createScriptGate } = require('./script-storage.cjs');
+const { createScriptGate, assertDirectory } = require('./script-storage.cjs');
 
 const SOURCE = 'https://raw.githubusercontent.com/XiaoyuBook/auto-poke-rng-scripts/main/';
 const SOURCES = {
@@ -115,7 +115,21 @@ function installedInfo(files) {
   return info;
 }
 
-function createScriptRepository({ rootDirectory, userData, appVersion, bundledCatalog = require('../resources/script-catalog.json'), gate = createScriptGate(), isBusy = () => false, fetch: download = globalThis.fetch, log = () => {}, rename = fs.rename }) {
+function createScriptRepository(options) {
+  const { rootDirectory, gate = createScriptGate() } = options;
+  if (typeof rootDirectory !== 'function') return createFixedRepository({ ...options, gate });
+  let currentRoot, service;
+  return Object.fromEntries(['state', 'refresh', 'setChannel', 'details', 'prepare', 'planArchive', 'apply'].map(method => [method, (...args) => gate.run(async () => {
+    const root = rootDirectory();
+    await assertDirectory(root);
+    if (currentRoot !== root) {
+      currentRoot = root;
+      service = createFixedRepository({ ...options, rootDirectory: root, gate: { run: action => action() } });
+    }
+    return service[method](...args);
+  })]));
+}
+function createFixedRepository({ rootDirectory, userData, appVersion, bundledCatalog = require('../resources/script-catalog.json'), gate = createScriptGate(), isBusy = () => false, fetch: download = globalThis.fetch, log = () => {}, rename = fs.rename }) {
   const stateDirectory = path.join(userData, 'script-repository');
   const settingsPath = path.join(stateDirectory, 'settings.json');
   let channel = 'github', settingsLoaded, catalogSource = 'empty', downloadedArchive;
@@ -124,29 +138,35 @@ function createScriptRepository({ rootDirectory, userData, appVersion, bundledCa
     try { const saved = JSON.parse(await fs.readFile(settingsPath, 'utf8')); if (Object.hasOwn(SOURCES, saved.channel)) channel = saved.channel; }
     catch (error) { if (error.code !== 'ENOENT') log('仓库渠道设置无法读取，已使用默认渠道。', 'warning'); }
   })();
-  const journalPath = path.join(stateDirectory, 'install-pending.json');
+  const transactionDirectory = path.join(rootDirectory, '.rng-repository');
+  const journalPath = path.join(transactionDirectory, 'install-pending.json');
   let catalog = null;
   let recovery;
   const plans = new Map();
   const exists = async file => { try { await fs.lstat(file); return true; } catch (error) { if (error.code === 'ENOENT') return false; throw error; } };
-  async function recoverInstall() {
-    if (!await exists(journalPath)) return;
-    const record = JSON.parse(await fs.readFile(journalPath, 'utf8'));
+  async function recoverInstall(directory) {
+    const journal = path.join(directory, 'install-pending.json');
+    if (!await exists(journal)) return;
+    const record = JSON.parse(await fs.readFile(journal, 'utf8'));
     if (![record.folder, record.stage, record.backup].every(name => safePath(name) && !name.includes('/') && !name.startsWith('.'))) throw Error('安装恢复记录无效，请检查脚本仓库备份。');
-    const target = path.join(rootDirectory, record.folder), backup = path.join(stateDirectory, 'backups', record.backup), stage = path.join(stateDirectory, 'staging', record.stage);
+    const target = path.join(rootDirectory, record.folder), backup = path.join(directory, 'backups', record.backup), stage = path.join(directory, 'staging', record.stage);
     if (!await exists(target) && await exists(backup)) await fs.rename(backup, target);
     else if (await exists(target) && await exists(backup)) {
       const installed = installedInfo(await readTree(target));
       if (installed?.transaction !== record.transaction) throw Error('安装恢复发现文件冲突，已保留原文件和备份。');
     }
     await fs.rm(stage, { recursive: true, force: true });
-    await fs.rm(journalPath);
+    await fs.rm(journal);
     log('已恢复上次中断的脚本包安装。');
   }
   const ensureRoot = async () => {
     await fs.mkdir(rootDirectory, { recursive: true }); const info = await fs.lstat(rootDirectory);
     if (info.isSymbolicLink() || !info.isDirectory()) throw Error('用户脚本目录无效。');
-    recovery ||= recoverInstall(); await recovery;
+    await assertDirectory(rootDirectory);
+    for (const directory of [transactionDirectory, path.join(transactionDirectory, 'backups'), path.join(transactionDirectory, 'staging')]) {
+      await fs.mkdir(directory, { recursive: true }); await assertDirectory(directory);
+    }
+    recovery ||= (async () => { await recoverInstall(stateDirectory); await recoverInstall(transactionDirectory); })(); await recovery;
   };
   async function fetchBytes(relative, maximum) {
     await loadSettings();
@@ -197,7 +217,7 @@ function createScriptRepository({ rootDirectory, userData, appVersion, bundledCa
     await ensureRoot();
     const index = await loadCatalog(), installed = [];
     for (const entry of await fs.readdir(rootDirectory, { withFileTypes: true })) {
-      if (!entry.isDirectory() || entry.isSymbolicLink()) continue;
+      if (!entry.isDirectory() || entry.isSymbolicLink() || entry.name.startsWith('.')) continue;
       try { await fs.access(path.join(rootDirectory, entry.name, META)); } catch (error) { if (error.code === 'ENOENT') continue; throw error; }
       const files = await readTree(path.join(rootDirectory, entry.name)), info = installedInfo(files);
       installed.push({ ...info.manifest, modified: Object.entries(info.hashes).some(([name,value]) => !files[name] || hash(files[name]) !== value) });
@@ -272,7 +292,7 @@ function createScriptRepository({ rootDirectory, userData, appVersion, bundledCa
     await ensureRoot();
     const current = await readTree(plan.target);
     if (JSON.stringify(fingerprints(current)) !== JSON.stringify(plan.before)) throw Error('本地文件已变化，请重新预览后安装。');
-    const stagingRoot = path.join(stateDirectory, 'staging'), backupRoot = path.join(stateDirectory, 'backups');
+    const stagingRoot = path.join(transactionDirectory, 'staging'), backupRoot = path.join(transactionDirectory, 'backups');
     await fs.mkdir(stagingRoot, { recursive: true }); await fs.mkdir(backupRoot, { recursive: true });
     const stage = await fs.mkdtemp(path.join(stagingRoot, plan.manifest.id + '-'));
     const backup = path.join(backupRoot, plan.manifest.id + '-' + Date.now() + '-' + randomUUID());
@@ -309,15 +329,27 @@ function createScriptRepository({ rootDirectory, userData, appVersion, bundledCa
   return { state, refresh, setChannel, details, prepare, planArchive, apply };
 }
 
-function registerScriptRepository({ ipcMain, getMainWindow, dialog, ...options }) {
+function registerScriptRepository({ ipcMain, getMainWindow, dialog, storage, ...options }) {
   // Chromium networking follows the desktop session's system proxy settings.
   const service = createScriptRepository({ ...options, fetch: options.fetch || require('./script-repository-network.cjs').fetchRepositoryResource });
   const actions = {
     state: () => service.state(), refresh: () => service.refresh(), prepare: args => service.prepare(args?.id), apply: args => service.apply(args || {}),
     channel: args => service.setChannel(args?.channel), details: args => service.details(args?.id),
+    'choose-directory': async () => {
+      if (!storage) throw Error('当前版本不支持迁移脚本目录。');
+      await service.state(); // Recover any interrupted install before copying its library.
+      const selected = await dialog.showOpenDialog(getMainWindow(), { title: '选择新的空脚本目录', defaultPath: storage.getRoot(), properties: ['openDirectory', 'createDirectory'] });
+      return selected.canceled ? null : storage.prepare(selected.filePaths[0]);
+    },
+    'migrate-directory': async args => {
+      if (!storage) throw Error('当前版本不支持迁移脚本目录。');
+      const result = await storage.migrate(args?.token);
+      options.log?.(`脚本目录已迁移至 ${result.rootPath}；原目录备份：${result.backupPath}。`);
+      return { ...result, state: await service.state() };
+    },
     'open-directory': async () => {
       await service.state();
-      const error = await (options.openPath || require('electron').shell.openPath)(path.resolve(options.rootDirectory));
+      const error = await (options.openPath || require('electron').shell.openPath)(path.resolve(typeof options.rootDirectory === 'function' ? options.rootDirectory() : options.rootDirectory));
       if (error) throw Error('无法打开脚本目录，请在文件管理器中查看。');
     },
     import: async () => {

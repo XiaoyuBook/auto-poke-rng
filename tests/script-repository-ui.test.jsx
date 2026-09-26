@@ -47,6 +47,31 @@ test('conflicts default to preserving edits and replacement requires choosing it
   fireEvent.click(screen.getByRole('button', { name: '确认安装' }));
   await waitFor(() => expect(f.api.apply).toHaveBeenCalledWith({ token: 'plan', policy: 'replace' }));
 });
+
+test('directory migration requires a preview and refreshes the library after confirmation', async () => {
+  const f = fixture();
+  f.api.chooseDirectory = vi.fn(async () => ({ token: 'move', from: 'user/scripts', to: 'E:/scripts', files: 5, bytes: 12000 }));
+  f.api.migrateDirectory = vi.fn(async () => ({ state: { ...f.state, rootPath: 'E:/scripts' }, backupPath: 'user/scripts' }));
+  render(<ScriptRepositoryDialog {...f} hasUnsaved={false} />);
+  fireEvent.click(await screen.findByRole('button', { name: '仓库设置' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: '更改脚本目录' }).disabled).toBe(false));
+  fireEvent.click(screen.getByRole('button', { name: '更改脚本目录' }));
+  await screen.findByRole('region', { name: '目录迁移预览' });
+  expect(f.api.migrateDirectory).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: '迁移并使用此目录' }));
+  await waitFor(() => expect(f.onInstalled).toHaveBeenCalledOnce());
+  expect(f.api.migrateDirectory).toHaveBeenCalledWith('move');
+  expect(screen.getByRole('status').textContent).toContain('原目录保留为备份');
+  expect(screen.getByText('E:/scripts')).toBeTruthy();
+});
+
+test('unsaved scripts block directory migration', async () => {
+  const f = fixture(); f.api.chooseDirectory = vi.fn();
+  render(<ScriptRepositoryDialog {...f} hasUnsaved />);
+  await screen.findByRole('button', { name: '预览安装' });
+  fireEvent.click(screen.getByRole('button', { name: '仓库设置' }));
+  expect(screen.getByRole('button', { name: '更改脚本目录' }).disabled).toBe(true);
+});
 test('unsaved editor contents block installation and ZIP import uses the same preview', async () => {
   const f = fixture(); render(<ScriptRepositoryDialog {...f} hasUnsaved />);
   await screen.findByRole('button', { name: '预览安装' });

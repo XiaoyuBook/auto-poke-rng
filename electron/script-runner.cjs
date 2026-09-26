@@ -11,7 +11,7 @@ class ScriptRunner {
   }
   async resolveScript(relative) {
     if (typeof relative !== 'string' || !relative || relative.includes('\\') || relative.includes(':') || relative.split('/').some(part => !part || part === '..' || part === '.') || !/\.(txt|rng)$/i.test(relative)) throw new Error('脚本路径无效。');
-    const root = path.resolve(this.rootDirectory);
+    const root = path.resolve(typeof this.rootDirectory === 'function' ? this.rootDirectory() : this.rootDirectory);
     let resolved = relative, absolute = path.resolve(root, resolved);
     if (!absolute.startsWith(root + path.sep)) throw new Error('脚本必须位于脚本目录内。');
     const fs = require('node:fs/promises');
