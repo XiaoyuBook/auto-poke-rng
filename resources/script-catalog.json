@@ -13,7 +13,7 @@
       "schemaVersion": 1,
       "id": "bdsp-advance",
       "name": "过帧",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "minimumAppVersion": "0.1.0",
       "installFolder": "珍钻复刻/过帧",
       "game": "BDSP",
@@ -42,20 +42,20 @@
         },
         {
           "path": "LICENSE.md",
-          "bytes": 36076,
-          "sha256": "59fc2d5c3a44bab263834653dddbc6b358d662dfdcb84eeb991a6a694700facc",
+          "bytes": 36080,
+          "sha256": "4ca20de4abcb4d68e2e136f24253a1c86e83571d3ff610465875487501ce4d71",
           "category": "许可证"
         }
       ],
-      "archive": "packages/bdsp-advance/0.0.3.zip",
+      "archive": "packages/bdsp-advance/0.0.4.zip",
       "bytes": 15163,
-      "sha256": "4d7dbb0606843526f3ab3617c6d0dd08031aa0db002bbed78a140c1fae0d1ed7"
+      "sha256": "bd4525efae5c75f8b5eff98b8cd2e43240b8cb0bfa3a3b423eca4763a2a0c3e9"
     },
     {
       "schemaVersion": 1,
       "id": "bdsp-advance-optimized",
       "name": "过帧优化",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "minimumAppVersion": "0.1.0",
       "installFolder": "珍钻复刻/过帧优化",
       "game": "BDSP",
@@ -84,20 +84,20 @@
         },
         {
           "path": "LICENSE.md",
-          "bytes": 36076,
-          "sha256": "59fc2d5c3a44bab263834653dddbc6b358d662dfdcb84eeb991a6a694700facc",
+          "bytes": 36080,
+          "sha256": "4ca20de4abcb4d68e2e136f24253a1c86e83571d3ff610465875487501ce4d71",
           "category": "许可证"
         }
       ],
-      "archive": "packages/bdsp-advance-optimized/0.0.3.zip",
-      "bytes": 15325,
-      "sha256": "4c6963fefc6a54059dba2a89ea4440d6ace7acebb1951b70e6bd422936c306fb"
+      "archive": "packages/bdsp-advance-optimized/0.0.4.zip",
+      "bytes": 15327,
+      "sha256": "bf62e8490830b236300994ba93b45f924820472eb880c8aff7238d281ec6ac29"
     },
     {
       "schemaVersion": 1,
       "id": "bdsp-arceus",
       "name": "阿尔宙斯",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "minimumAppVersion": "0.1.0",
       "installFolder": "珍钻复刻/阿尔宙斯",
       "game": "BDSP",
@@ -126,20 +126,20 @@
         },
         {
           "path": "LICENSE.md",
-          "bytes": 36076,
-          "sha256": "59fc2d5c3a44bab263834653dddbc6b358d662dfdcb84eeb991a6a694700facc",
+          "bytes": 36080,
+          "sha256": "4ca20de4abcb4d68e2e136f24253a1c86e83571d3ff610465875487501ce4d71",
           "category": "许可证"
         }
       ],
-      "archive": "packages/bdsp-arceus/0.0.3.zip",
-      "bytes": 14835,
-      "sha256": "75a27fd7ca00120425b44a6990cc68dce7126ab73097a4c02377d9989274ecb6"
+      "archive": "packages/bdsp-arceus/0.0.4.zip",
+      "bytes": 14834,
+      "sha256": "2b7a49bd19dba90ed7925c665da651abeb548a57860f6f841b86b99b096e2225"
     },
     {
       "schemaVersion": 1,
       "id": "bdsp-cresselia",
       "name": "美梦神",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "minimumAppVersion": "0.1.0",
       "installFolder": "珍钻复刻/美梦神",
       "game": "BDSP",
@@ -196,20 +196,20 @@
         },
         {
           "path": "LICENSE.md",
-          "bytes": 36076,
-          "sha256": "59fc2d5c3a44bab263834653dddbc6b358d662dfdcb84eeb991a6a694700facc",
+          "bytes": 36080,
+          "sha256": "4ca20de4abcb4d68e2e136f24253a1c86e83571d3ff610465875487501ce4d71",
           "category": "许可证"
         }
       ],
-      "archive": "packages/bdsp-cresselia/0.0.3.zip",
-      "bytes": 26306,
-      "sha256": "f44247b8e3cb573d70c415c90a8e264faf5d97e7d436411a68fbb01c966a060d"
+      "archive": "packages/bdsp-cresselia/0.0.4.zip",
+      "bytes": 26310,
+      "sha256": "47b15e91fdf88316dba5f7a69fa94da0a66e9666526e52ce4297987ea33497fa"
     },
     {
       "schemaVersion": 1,
       "id": "bdsp-darkrai",
       "name": "达克莱伊",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "minimumAppVersion": "0.1.0",
       "installFolder": "珍钻复刻/达克莱伊",
       "game": "BDSP",
@@ -238,20 +238,20 @@
         },
         {
           "path": "LICENSE.md",
-          "bytes": 36076,
-          "sha256": "59fc2d5c3a44bab263834653dddbc6b358d662dfdcb84eeb991a6a694700facc",
+          "bytes": 36080,
+          "sha256": "4ca20de4abcb4d68e2e136f24253a1c86e83571d3ff610465875487501ce4d71",
           "category": "许可证"
         }
       ],
-      "archive": "packages/bdsp-darkrai/0.0.3.zip",
-      "bytes": 14311,
-      "sha256": "99b3eb533bdb74d1bed3bb0e4a60b1fce1fd72b6dfaa208175147334087d9f82"
+      "archive": "packages/bdsp-darkrai/0.0.4.zip",
+      "bytes": 14314,
+      "sha256": "5c9b402973017d0beeefe12480c697bd549b537e48e30174dd64f34711a13f24"
     },
     {
       "schemaVersion": 1,
       "id": "bdsp-darkrai-cutscene",
       "name": "达克莱伊过场",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "minimumAppVersion": "0.1.0",
       "installFolder": "珍钻复刻/达克莱伊过场",
       "game": "BDSP",
@@ -280,20 +280,20 @@
         },
         {
           "path": "LICENSE.md",
-          "bytes": 36076,
-          "sha256": "59fc2d5c3a44bab263834653dddbc6b358d662dfdcb84eeb991a6a694700facc",
+          "bytes": 36080,
+          "sha256": "4ca20de4abcb4d68e2e136f24253a1c86e83571d3ff610465875487501ce4d71",
           "category": "许可证"
         }
       ],
-      "archive": "packages/bdsp-darkrai-cutscene/0.0.3.zip",
-      "bytes": 14242,
-      "sha256": "b633bc612a8ad2a5b46c8620231fe502efc7cb64421b4128fc165544a0bedc82"
+      "archive": "packages/bdsp-darkrai-cutscene/0.0.4.zip",
+      "bytes": 14237,
+      "sha256": "7db5b747e5c9b96c623407cba50c1b082f53162c2473465112bad5216fd880a0"
     },
     {
       "schemaVersion": 1,
       "id": "bdsp-darkrai-reverse",
       "name": "达克莱伊捕捉反查",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "minimumAppVersion": "0.1.0",
       "installFolder": "珍钻复刻/达克莱伊捕捉反查",
       "game": "BDSP",
@@ -322,20 +322,20 @@
         },
         {
           "path": "LICENSE.md",
-          "bytes": 36076,
-          "sha256": "59fc2d5c3a44bab263834653dddbc6b358d662dfdcb84eeb991a6a694700facc",
+          "bytes": 36080,
+          "sha256": "4ca20de4abcb4d68e2e136f24253a1c86e83571d3ff610465875487501ce4d71",
           "category": "许可证"
         }
       ],
-      "archive": "packages/bdsp-darkrai-reverse/0.0.3.zip",
-      "bytes": 14297,
-      "sha256": "a9db5ab55845fb345592d76bb3acbb2ca493d09e68544b46440747e7a31d04ee"
+      "archive": "packages/bdsp-darkrai-reverse/0.0.4.zip",
+      "bytes": 14301,
+      "sha256": "faa35b28664573fae58b5f4cf8622513912aa04fc2444ca578d7f9362ef898b5"
     },
     {
       "schemaVersion": 1,
       "id": "bdsp-giratina",
       "name": "冥王龙",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "minimumAppVersion": "0.1.0",
       "installFolder": "珍钻复刻/冥王龙",
       "game": "BDSP",
@@ -364,20 +364,20 @@
         },
         {
           "path": "LICENSE.md",
-          "bytes": 36076,
-          "sha256": "59fc2d5c3a44bab263834653dddbc6b358d662dfdcb84eeb991a6a694700facc",
+          "bytes": 36080,
+          "sha256": "4ca20de4abcb4d68e2e136f24253a1c86e83571d3ff610465875487501ce4d71",
           "category": "许可证"
         }
       ],
-      "archive": "packages/bdsp-giratina/0.0.3.zip",
+      "archive": "packages/bdsp-giratina/0.0.4.zip",
       "bytes": 14287,
-      "sha256": "251cb3eeef4f7ad4f69cf63a3e26d6a78250ecec6f079311f888c7bea0ed0585"
+      "sha256": "43bd597245488fd250bfb6a62c6dc58d206cc3bb1834ca116eff65df5455671b"
     },
     {
       "schemaVersion": 1,
       "id": "bdsp-mesprit",
       "name": "红圣菇",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "minimumAppVersion": "0.1.0",
       "installFolder": "珍钻复刻/红圣菇",
       "game": "BDSP",
@@ -434,20 +434,20 @@
         },
         {
           "path": "LICENSE.md",
-          "bytes": 36076,
-          "sha256": "59fc2d5c3a44bab263834653dddbc6b358d662dfdcb84eeb991a6a694700facc",
+          "bytes": 36080,
+          "sha256": "4ca20de4abcb4d68e2e136f24253a1c86e83571d3ff610465875487501ce4d71",
           "category": "许可证"
         }
       ],
-      "archive": "packages/bdsp-mesprit/0.0.3.zip",
+      "archive": "packages/bdsp-mesprit/0.0.4.zip",
       "bytes": 26342,
-      "sha256": "459efdd048751dd9ae92de539665d9262db32cb8e42aa3b1b3db9c52b14125b4"
+      "sha256": "c49ee16a5784886aa6f8c79e952da0c323db6108eb64fb154d37ea5161c9ae7f"
     },
     {
       "schemaVersion": 1,
       "id": "bdsp-name",
       "name": "取名",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "minimumAppVersion": "0.1.0",
       "installFolder": "珍钻复刻/取名",
       "game": "BDSP",
@@ -476,20 +476,20 @@
         },
         {
           "path": "LICENSE.md",
-          "bytes": 36076,
-          "sha256": "59fc2d5c3a44bab263834653dddbc6b358d662dfdcb84eeb991a6a694700facc",
+          "bytes": 36080,
+          "sha256": "4ca20de4abcb4d68e2e136f24253a1c86e83571d3ff610465875487501ce4d71",
           "category": "许可证"
         }
       ],
-      "archive": "packages/bdsp-name/0.0.3.zip",
-      "bytes": 14320,
-      "sha256": "8c87e7a71d1cf11e2b0eb0efe3bc50522a6c2decd95720d74b25f1f5c95065b3"
+      "archive": "packages/bdsp-name/0.0.4.zip",
+      "bytes": 14319,
+      "sha256": "6e22c80d94f83e3d6132737c6050ccf913d46895be6661632ab5d32391e06104"
     },
     {
       "schemaVersion": 1,
       "id": "bdsp-pokedex-advance",
       "name": "神奥图鉴过帧",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "minimumAppVersion": "0.1.0",
       "installFolder": "珍钻复刻/神奥图鉴过帧",
       "game": "BDSP",
@@ -518,20 +518,20 @@
         },
         {
           "path": "LICENSE.md",
-          "bytes": 36076,
-          "sha256": "59fc2d5c3a44bab263834653dddbc6b358d662dfdcb84eeb991a6a694700facc",
+          "bytes": 36080,
+          "sha256": "4ca20de4abcb4d68e2e136f24253a1c86e83571d3ff610465875487501ce4d71",
           "category": "许可证"
         }
       ],
-      "archive": "packages/bdsp-pokedex-advance/0.0.3.zip",
+      "archive": "packages/bdsp-pokedex-advance/0.0.4.zip",
       "bytes": 15103,
-      "sha256": "4d484281b76abb87a91d0d7c11fa6a72c473fd9345d52e0755b2a70e823faf44"
+      "sha256": "2ec7c9ab781f73fc837841ec2d7a4420292b6a27baa167cffadf69aa189383d6"
     },
     {
       "schemaVersion": 1,
       "id": "bdsp-ramanas",
       "name": "玫瑰公园",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "minimumAppVersion": "0.1.0",
       "installFolder": "珍钻复刻/玫瑰公园",
       "game": "BDSP",
@@ -560,20 +560,20 @@
         },
         {
           "path": "LICENSE.md",
-          "bytes": 36076,
-          "sha256": "59fc2d5c3a44bab263834653dddbc6b358d662dfdcb84eeb991a6a694700facc",
+          "bytes": 36080,
+          "sha256": "4ca20de4abcb4d68e2e136f24253a1c86e83571d3ff610465875487501ce4d71",
           "category": "许可证"
         }
       ],
-      "archive": "packages/bdsp-ramanas/0.0.3.zip",
-      "bytes": 14487,
-      "sha256": "2e82fe33b6f1bc7ca6bc54a6315499c6a1bf52c1ff9d96e1856a68d6a0aea171"
+      "archive": "packages/bdsp-ramanas/0.0.4.zip",
+      "bytes": 14488,
+      "sha256": "ed2dce0bc2a83e90e60ebe6705b5fb1bb3016fed105e23f06fbd14ac26c92b4b"
     },
     {
       "schemaVersion": 1,
       "id": "bdsp-ramanas-reverse",
       "name": "玫瑰公园捕捉反查",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "minimumAppVersion": "0.1.0",
       "installFolder": "珍钻复刻/玫瑰公园捕捉反查",
       "game": "BDSP",
@@ -602,20 +602,20 @@
         },
         {
           "path": "LICENSE.md",
-          "bytes": 36076,
-          "sha256": "59fc2d5c3a44bab263834653dddbc6b358d662dfdcb84eeb991a6a694700facc",
+          "bytes": 36080,
+          "sha256": "4ca20de4abcb4d68e2e136f24253a1c86e83571d3ff610465875487501ce4d71",
           "category": "许可证"
         }
       ],
-      "archive": "packages/bdsp-ramanas-reverse/0.0.3.zip",
+      "archive": "packages/bdsp-ramanas-reverse/0.0.4.zip",
       "bytes": 14284,
-      "sha256": "2f4e84d91d9e09daaacbbd100b50d0d9ce347a2c71b1747895d5ab50316e1172"
+      "sha256": "376825495aaa557792e35bd17f63f3f7255cf75feb2116a061f70e7671f18974"
     },
     {
       "schemaVersion": 1,
       "id": "bdsp-reverse",
       "name": "捕捉反查",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "minimumAppVersion": "0.1.0",
       "installFolder": "珍钻复刻/捕捉反查",
       "game": "BDSP",
@@ -644,20 +644,20 @@
         },
         {
           "path": "LICENSE.md",
-          "bytes": 36076,
-          "sha256": "59fc2d5c3a44bab263834653dddbc6b358d662dfdcb84eeb991a6a694700facc",
+          "bytes": 36080,
+          "sha256": "4ca20de4abcb4d68e2e136f24253a1c86e83571d3ff610465875487501ce4d71",
           "category": "许可证"
         }
       ],
-      "archive": "packages/bdsp-reverse/0.0.3.zip",
-      "bytes": 14250,
-      "sha256": "bbd5f323bacd53bab6fc4cd98ec104ba3612a3dd5c84862027067f111ee25dd4"
+      "archive": "packages/bdsp-reverse/0.0.4.zip",
+      "bytes": 14258,
+      "sha256": "352a5a5f84608c10f8d36b5e9edcdbdeecbc2b437a7f19a6801a994a762a1f88"
     },
     {
       "schemaVersion": 1,
       "id": "bdsp-roamer-reverse",
       "name": "游走捕捉反查",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "minimumAppVersion": "0.1.0",
       "installFolder": "珍钻复刻/游走捕捉反查",
       "game": "BDSP",
@@ -686,20 +686,20 @@
         },
         {
           "path": "LICENSE.md",
-          "bytes": 36076,
-          "sha256": "59fc2d5c3a44bab263834653dddbc6b358d662dfdcb84eeb991a6a694700facc",
+          "bytes": 36080,
+          "sha256": "4ca20de4abcb4d68e2e136f24253a1c86e83571d3ff610465875487501ce4d71",
           "category": "许可证"
         }
       ],
-      "archive": "packages/bdsp-roamer-reverse/0.0.3.zip",
-      "bytes": 14329,
-      "sha256": "2031d78341f7870b698d3b8cb9b2a08bd066f8857986a3202688476cdada7f92"
+      "archive": "packages/bdsp-roamer-reverse/0.0.4.zip",
+      "bytes": 14331,
+      "sha256": "6d3a7be8bab21a2bb9b62b6dee309e2edd80b6dabedf7c19c1afa604d2099d09"
     },
     {
       "schemaVersion": 1,
       "id": "bdsp-seed",
       "name": "测种",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "minimumAppVersion": "0.1.0",
       "installFolder": "珍钻复刻/测种",
       "game": "BDSP",
@@ -728,20 +728,20 @@
         },
         {
           "path": "LICENSE.md",
-          "bytes": 36076,
-          "sha256": "59fc2d5c3a44bab263834653dddbc6b358d662dfdcb84eeb991a6a694700facc",
+          "bytes": 36080,
+          "sha256": "4ca20de4abcb4d68e2e136f24253a1c86e83571d3ff610465875487501ce4d71",
           "category": "许可证"
         }
       ],
-      "archive": "packages/bdsp-seed/0.0.3.zip",
+      "archive": "packages/bdsp-seed/0.0.4.zip",
       "bytes": 14189,
-      "sha256": "199193b34c6b1978cb2d3a6ac7676aa4602eeec3c5fb40df91b3f73cbfdb2bdf"
+      "sha256": "0c9d52be8b0bb6c674f66b7b573b26a4b97dfd8375f68a96fc7f79d95c6ed4d5"
     },
     {
       "schemaVersion": 1,
       "id": "bdsp-shaymin",
       "name": "谢米",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "minimumAppVersion": "0.1.0",
       "installFolder": "珍钻复刻/谢米",
       "game": "BDSP",
@@ -770,20 +770,20 @@
         },
         {
           "path": "LICENSE.md",
-          "bytes": 36076,
-          "sha256": "59fc2d5c3a44bab263834653dddbc6b358d662dfdcb84eeb991a6a694700facc",
+          "bytes": 36080,
+          "sha256": "4ca20de4abcb4d68e2e136f24253a1c86e83571d3ff610465875487501ce4d71",
           "category": "许可证"
         }
       ],
-      "archive": "packages/bdsp-shaymin/0.0.3.zip",
-      "bytes": 14407,
-      "sha256": "569275b1aef54ef4048ed5c53337e381e8b504743bc828748afd86406df3ee89"
+      "archive": "packages/bdsp-shaymin/0.0.4.zip",
+      "bytes": 14405,
+      "sha256": "967205785d1e5ca729abb2fb79c44797780e7f2dc2481b460c055e2dbed32f36"
     },
     {
       "schemaVersion": 1,
       "id": "bdsp-starter-hit",
       "name": "御三家撞帧",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "minimumAppVersion": "0.1.0",
       "installFolder": "珍钻复刻/御三家撞帧",
       "game": "BDSP",
@@ -812,20 +812,20 @@
         },
         {
           "path": "LICENSE.md",
-          "bytes": 36076,
-          "sha256": "59fc2d5c3a44bab263834653dddbc6b358d662dfdcb84eeb991a6a694700facc",
+          "bytes": 36080,
+          "sha256": "4ca20de4abcb4d68e2e136f24253a1c86e83571d3ff610465875487501ce4d71",
           "category": "许可证"
         }
       ],
-      "archive": "packages/bdsp-starter-hit/0.0.3.zip",
-      "bytes": 14417,
-      "sha256": "24add3599ae1dbd7e43c86faa4796560f72c77eeaacf575898780a5bf9903bb3"
+      "archive": "packages/bdsp-starter-hit/0.0.4.zip",
+      "bytes": 14418,
+      "sha256": "9e15ee2a07abaea4cbebf408fb63eec8edf52e425ac7846830b5427d1ad707c2"
     },
     {
       "schemaVersion": 1,
       "id": "bdsp-starter-reverse",
       "name": "御三家反查",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "minimumAppVersion": "0.1.0",
       "installFolder": "珍钻复刻/御三家反查",
       "game": "BDSP",
@@ -854,20 +854,20 @@
         },
         {
           "path": "LICENSE.md",
-          "bytes": 36076,
-          "sha256": "59fc2d5c3a44bab263834653dddbc6b358d662dfdcb84eeb991a6a694700facc",
+          "bytes": 36080,
+          "sha256": "4ca20de4abcb4d68e2e136f24253a1c86e83571d3ff610465875487501ce4d71",
           "category": "许可证"
         }
       ],
-      "archive": "packages/bdsp-starter-reverse/0.0.3.zip",
-      "bytes": 14322,
-      "sha256": "3317979536c6b4db6af9feeacd58223eb634c1f46a6fa88283032fd7218cdebe"
+      "archive": "packages/bdsp-starter-reverse/0.0.4.zip",
+      "bytes": 14320,
+      "sha256": "e7c62b1adab2feaa97334af680cfe8126300d02f67b108115beb72844e9f07bd"
     },
     {
       "schemaVersion": 1,
       "id": "bdsp-starter-seed",
       "name": "御三家测种",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "minimumAppVersion": "0.1.0",
       "installFolder": "珍钻复刻/御三家测种",
       "game": "BDSP",
@@ -896,20 +896,20 @@
         },
         {
           "path": "LICENSE.md",
-          "bytes": 36076,
-          "sha256": "59fc2d5c3a44bab263834653dddbc6b358d662dfdcb84eeb991a6a694700facc",
+          "bytes": 36080,
+          "sha256": "4ca20de4abcb4d68e2e136f24253a1c86e83571d3ff610465875487501ce4d71",
           "category": "许可证"
         }
       ],
-      "archive": "packages/bdsp-starter-seed/0.0.3.zip",
+      "archive": "packages/bdsp-starter-seed/0.0.4.zip",
       "bytes": 14279,
-      "sha256": "b8ecb1ac00f9327928a04732252fc2e95d4ba06a5a2bf109563572eefeb2372c"
+      "sha256": "caa41f3c0dc96dba42c829301486541d333d7bd331b058a32e7ab20bd3195bc3"
     },
     {
       "schemaVersion": 1,
       "id": "bdsp-tid-seed",
       "name": "训练家编号测种",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "minimumAppVersion": "0.1.0",
       "installFolder": "珍钻复刻/训练家编号测种",
       "game": "BDSP",
@@ -938,20 +938,20 @@
         },
         {
           "path": "LICENSE.md",
-          "bytes": 36076,
-          "sha256": "59fc2d5c3a44bab263834653dddbc6b358d662dfdcb84eeb991a6a694700facc",
+          "bytes": 36080,
+          "sha256": "4ca20de4abcb4d68e2e136f24253a1c86e83571d3ff610465875487501ce4d71",
           "category": "许可证"
         }
       ],
-      "archive": "packages/bdsp-tid-seed/0.0.3.zip",
-      "bytes": 14264,
-      "sha256": "10a55bdd3a5220adf92f66366036c725c3759ee0a12dd81cf71d591cbd5cb91b"
+      "archive": "packages/bdsp-tid-seed/0.0.4.zip",
+      "bytes": 14271,
+      "sha256": "5392c97322d4d5894ad08a72759ea0344c0df5f2e163ece691ba9209c68d384f"
     },
     {
       "schemaVersion": 1,
       "id": "bdsp-underground-seed",
       "name": "地下测种",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "minimumAppVersion": "0.1.0",
       "installFolder": "珍钻复刻/地下测种",
       "game": "BDSP",
@@ -980,14 +980,14 @@
         },
         {
           "path": "LICENSE.md",
-          "bytes": 36076,
-          "sha256": "59fc2d5c3a44bab263834653dddbc6b358d662dfdcb84eeb991a6a694700facc",
+          "bytes": 36080,
+          "sha256": "4ca20de4abcb4d68e2e136f24253a1c86e83571d3ff610465875487501ce4d71",
           "category": "许可证"
         }
       ],
-      "archive": "packages/bdsp-underground-seed/0.0.3.zip",
-      "bytes": 14275,
-      "sha256": "a5cccc8199e743dd16e0be9cc5c1224c9890d8361e55fe63623b22c1f2ada868"
+      "archive": "packages/bdsp-underground-seed/0.0.4.zip",
+      "bytes": 14274,
+      "sha256": "049d08f2b2c823a0bf274a0537e241237e5eaca4bb065241d80396de06749ea8"
     }
   ]
 }
