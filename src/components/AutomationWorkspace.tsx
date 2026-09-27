@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Play, Square, ListChecks, FileClock, Plus, MoreHorizontal, Pencil, Trash2, ChevronsRight } from 'lucide-react';
+import { Play, Square, ListChecks, FileClock, Plus, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { automationBusy, downloadText, useAutomation, type AutomationConfig, type AutomationKind, type AutomationParameters, type DelayConfig, type IdResults, type Readiness, type TargetFilter } from '../automation';
 import type { BlinkConfig } from '../blink';
 import type { BdspProfile } from '../bdspProfile';
@@ -87,7 +87,7 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
   const openDelay=()=>{setDelay(structuredClone(profileDelay?.config||{strategy:'fixed',baseline_delay:p.fixed_delay,multi_candidate_policy:'ignore',window_size:5,ewma_alpha:.5,dense_interval_width:2}));setDelayOpen(value=>!value);};
   const filter=p.filters?.[filterIndex]||p.filters?.[0];
   const changeFilter=(values:Partial<TargetFilter>)=>update({filters:p.filters.map((item,index)=>index===filterIndex?{...item,...values}:item)});
-  const saveTargetSettings=async()=>{setError('');setNotice('');setPending(true);try{await api.save({kind,scope:'parameters',values:p});setNotice('任务参数已保存');setTargetSettingsOpen(false);}catch(reason){setError(reason instanceof Error?reason.message:String(reason));}finally{setPending(false);}};
+  const saveTargetSettings=async()=>{setError('');setNotice('');setPending(true);try{await api.save({kind,scope:'parameters',values:p});setNotice('目标设置已保存');setTargetSettingsOpen(false);}catch(reason){setError(reason instanceof Error?reason.message:String(reason));}finally{setPending(false);}};
   const idRows=(ids?.id_states||[]).map((row,index)=>({...row,index}));
   const visibleIds=onlyTargets?idRows.filter(row=>p.target_display_tids.includes(row.display_tid)):idRows;
   const page=Math.min(idPage,Math.max(0,Math.ceil(visibleIds.length/50)-1));
@@ -101,10 +101,10 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
             <div className="automation-target-identity"><span>当前目标</span><strong>{target.species}</strong><small>图鉴 #{String(target.speciesId).padStart(3,'0')} · {getCategoryLabel(target.category)} · {target.level} 级{target.roamer?' · 游走':''}</small></div>
           </div>}
         </div>
-        <details open><summary>目标筛选 · {p.filters.length} 组</summary><div className="automation-toolbar">
-          {p.filters.map((_,i)=><button key={i} aria-pressed={filterIndex===i} onClick={()=>setFilterIndex(i)}>目标 {i+1}</button>)}
-          <button disabled={p.filters.length>=20} onClick={()=>{update({filters:[...p.filters,structuredClone(filter)]});setFilterIndex(p.filters.length);}}>添加目标</button>
-          <button disabled={p.filters.length===1} onClick={()=>{update({filters:p.filters.filter((_,i)=>i!==filterIndex)});setFilterIndex(0);}}>移除目标</button></div>
+        <details open><summary>筛选条件 · {p.filters.length} 组</summary><div className="automation-toolbar">
+          {p.filters.map((_,i)=><button key={i} aria-pressed={filterIndex===i} onClick={()=>setFilterIndex(i)}>条件 {i+1}</button>)}
+          <button disabled={p.filters.length>=20} onClick={()=>{update({filters:[...p.filters,structuredClone(filter)]});setFilterIndex(p.filters.length);}}>添加条件</button>
+          <button disabled={p.filters.length===1} onClick={()=>{update({filters:p.filters.filter((_,i)=>i!==filterIndex)});setFilterIndex(0);}}>移除条件</button></div>
           <div className="automation-fields"><label>异色<select value={filter.shiny} onChange={event=>changeFilter({shiny:Number(event.target.value)})}><option value={255}>任意</option><option value={3}>异色</option><option value={1}>Star</option><option value={2}>Square</option><option value={0}>非异色</option></select></label>
             <label>特性<select value={filter.ability} onChange={event=>changeFilter({ability:Number(event.target.value)})}><option value={255}>任意</option><option value={0}>0</option><option value={1}>1</option><option value={2}>隐藏</option></select></label>
             <label>性别<select value={filter.gender} onChange={event=>changeFilter({gender:Number(event.target.value)})}><option value={255}>任意</option><option value={0}>雄性</option><option value={1}>雌性</option><option value={2}>无性别</option></select></label></div>
@@ -113,9 +113,16 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
             <div className="automation-fields">{(['heightMin','heightMax','weightMin','weightMax'] as const).map((key,i)=><label key={key}>{['身高下限','身高上限','体重下限','体重上限'][i]}<input type="number" min={0} max={255} value={filter[key]} onChange={event=>changeFilter({[key]:Number(event.target.value)})}/></label>)}</div></details>
         </details>
   </>:null;
+  const runDetails=<>
+    <dl className="automation-metrics"><div><dt>轮次 / 阶段</dt><dd>{progress?.loop_index||0} / {progress?.phase||'等待开始'}</dd></div><div><dt>当前 Adv</dt><dd>{progress?.current_advances??'—'}</dd></div><div><dt>目标 Adv</dt><dd>{progress?.raw_target_advances??progress?.target_advances??'—'}</dd></div><div><dt>启动 Adv</dt><dd>{progress?.trigger_advances??'—'}</dd></div><div><dt>剩余 Adv</dt><dd>{progress?.remaining_to_trigger??'—'}</dd></div><div><dt>本轮 delay</dt><dd>{snapshot.state.kind===kind?snapshot.state.roundDelay??p.delay??'—':'—'}</dd></div></dl>
+    <p className="mono">{progress?.seed_text||'尚未捕获 Seed'}</p>
+    {snapshot.state.kind===kind&&snapshot.state.capture&&<p>眨眼捕获 {snapshot.state.capture.captured} / {snapshot.state.capture.target}</p>}
+    {!!progress?.wait_target_wall&&busy&&<p className="automation-countdown">距取名启动 · 预计 {Math.max(0,progress.wait_target_wall-now/1000).toFixed(1)} 秒</p>}
+    <p>{progress?.last_script_path}</p>
+  </>;
   return <section className={'automation-workspace'+(isStatic?' automation-workspace-with-groups':'')} aria-label={isStatic?'自动定点工作区':'自动TID工作区'}>
     {isStatic&&<aside className="automation-group-sidebar" aria-label="配置组">
-      <button type="button" className="automation-group-peek" aria-label="展开配置组" title="将鼠标移入以展开配置组"><ChevronsRight size={15}/><span>配置组</span></button>
+      <button type="button" className="automation-group-peek" aria-label="展开配置组" title="将鼠标移入以展开配置组"/>
       <div className="automation-group-panel">
       <div className="automation-group-header"><h2>配置组</h2><button type="button" aria-label="新建自动流程配置" title="新建配置" disabled={busy||pending} onClick={()=>{setGroupName('');setGroupEditor({mode:'create'});}}><Plus size={16}/></button></div>
       <p className="automation-group-hint">一项配置对应一套完整流程</p>
@@ -139,15 +146,16 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
     </div>
     {(error||notice)&&<p role={error?'alert':'status'} className={error?'panel-error':'automation-notice'}>{error||notice}</p>}
     <div className={'automation-overview'+(isStatic?'':' automation-overview-single')}>
-      {isStatic&&<button type="button" className="automation-target-card" aria-label="设置目标宝可梦与筛选条件" aria-haspopup="dialog" onClick={()=>setTargetSettingsOpen(true)}>
+      {isStatic&&<button type="button" className="automation-target-card" aria-label="选择目标宝可梦与设置筛选条件" aria-haspopup="dialog" onClick={()=>setTargetSettingsOpen(true)}>
         {target&&<span className="automation-target-art"><img src={targetSprites[`../assets/bdsp-targets/${target.speciesId}.png`]} alt="" /></span>}
-        <span className="automation-target-identity"><span>当前目标</span><strong>{target?.species||'未选择目标'}</strong><small>{target?`${getCategoryLabel(target.category)} · ${target.level} 级${target.roamer?' · 游走':''}`:''} · {p.filters.length} 组筛选</small></span>
-        <span className="automation-target-action">设置</span>
+        <span className="automation-target-identity"><span>当前目标</span><strong>{target?.species||'未选择目标'}</strong><small>{target?`${getCategoryLabel(target.category)} · ${target.level} 级${target.roamer?' · 游走':''}`:''} · {p.filters.length} 组筛选条件</small></span>
+        <span className="automation-target-action">目标设置</span>
       </button>}
       <section className="automation-status-card" data-status={ownState?.status||(busy?'running':'idle')} aria-label="自动流程状态">
         <div className="automation-status-heading"><span>当前流程状态</span><span className="automation-status-label">{statusLabel}</span></div>
         <strong role="status">{statusMessage}</strong>
         <dl><div><dt>阶段</dt><dd>{progress?.phase||'—'}</dd></div><div><dt>轮次</dt><dd>{progress?.loop_index||'—'}</dd></div><div><dt>当前 Adv</dt><dd>{progress?.current_advances??'—'}</dd></div></dl>
+        {isStatic&&<details className="automation-status-details"><summary>查看运行详情</summary><div className="automation-status-details-content">{runDetails}</div></details>}
       </section>
     </div>
     {readiness&&<section className="automation-card" aria-label="开始前准备"><h3>开始前准备</h3>{readiness.checks.map(item=><p key={item.label} className={item.ok?'':'panel-error'}>{item.ok?'✓':'!'} {item.label}：<span>{item.detail}</span></p>)}</section>}
@@ -170,7 +178,6 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
         <button disabled={busy||pending} onClick={()=>void perform(async()=>{setIds(await api.tidPreview({seed:blinkConfig.seed,frame_threshold:p.frame_threshold}));setIdPage(0);})}>使用当前 Seed 生成 ID 数据</button>
       </>}
       </div></details>
-    {isStatic&&<details className="automation-card automation-flow-section"><summary>目标筛选<span>闪光、个体值、性格与特性 · {p.filters.length} 组</span></summary><div className="automation-flow-section-body"><p className="muted">为当前目标设置命中条件，点击下方按钮打开完整筛选器。</p><button type="button" onClick={()=>setTargetSettingsOpen(true)}>设置目标筛选</button></div></details>}
     {isStatic&&<details className="automation-card automation-flow-section"><summary>自动策略<span>测种、过帧、校正与 delay</span></summary><div className="automation-flow-section-body"><div className="automation-fields">
           {numeric('最大等待帧数','max_wait_frames')}{numeric('校正帧数上限','reseed_threshold_frames',0,1000000)}{numeric('普通校正最大尝试','reidentify_max_attempts',1,100)}
           <label>校正失败处理<select value={p.reidentify_failure_policy} onChange={event=>update({reidentify_failure_policy:event.target.value as AutomationParameters['reidentify_failure_policy']})}><option value="next_round">进入下一轮</option><option value="recapture_seed">先完整重测 Seed</option></select></label>
@@ -199,11 +206,7 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
     <details className="automation-card automation-flow-section"><summary>任务脚本<span>测种、过帧、撞闪等阶段脚本</span></summary><div className="automation-flow-section-body"><p className="muted">{scriptDirty?'脚本选择未保存':'脚本选择已保存'} · 使用脚本库中的 .txt 文件</p>
       {Object.entries(config.scripts).map(([key,value])=><label className="automation-script-field" key={key}>{scriptLabels[key]||key}<select aria-label={scriptLabels[key]||key} value={value} onFocus={refreshScripts} onChange={event=>setConfig({...config,scripts:{...config.scripts,[key]:event.target.value}})}><option value="">未选择</option>{value&&!files.some(file=>file.path===value)&&<option value={value}>{value}（文件不可用）</option>}{files.map(file=><option key={file.path} value={file.path}>{file.path}</option>)}</select></label>)}
       <div className="automation-toolbar"><button disabled={pending} onClick={()=>void perform(()=>api.save({kind,scope:'scripts',values:config.scripts}),'脚本选择已保存')}>保存脚本选择</button><button onClick={refreshScripts}>刷新脚本</button></div></div></details>
-      <details className="automation-card automation-flow-section"><summary>运行详情<span>当前轮次、帧数与 Seed</span></summary><div className="automation-flow-section-body"><dl className="automation-metrics"><div><dt>轮次 / 阶段</dt><dd>{progress?.loop_index||0} / {progress?.phase||'等待开始'}</dd></div><div><dt>当前 Adv</dt><dd>{progress?.current_advances??'—'}</dd></div><div><dt>目标 Adv</dt><dd>{progress?.raw_target_advances??progress?.target_advances??'—'}</dd></div><div><dt>启动 Adv</dt><dd>{progress?.trigger_advances??'—'}</dd></div><div><dt>剩余 Adv</dt><dd>{progress?.remaining_to_trigger??'—'}</dd></div><div><dt>本轮 delay</dt><dd>{snapshot.state.kind===kind?snapshot.state.roundDelay??p.delay??'—':'—'}</dd></div></dl>
-        <p className="mono">{progress?.seed_text||'尚未捕获 Seed'}</p>
-        {snapshot.state.kind===kind&&snapshot.state.capture&&<p>眨眼捕获 {snapshot.state.capture.captured} / {snapshot.state.capture.target}</p>}
-        {!!progress?.wait_target_wall&&busy&&<p className="automation-countdown">距取名启动 · 预计 {Math.max(0,progress.wait_target_wall-now/1000).toFixed(1)} 秒</p>}
-        <p>{progress?.last_script_path}</p></div></details></div>
+      {!isStatic&&<details className="automation-card automation-flow-section"><summary>运行详情<span>当前轮次、帧数与 Seed</span></summary><div className="automation-flow-section-body">{runDetails}</div></details>}</div>
     {isStatic?<CandidateTable rows={round?.candidates||[]} selected={round?.selected} sources={round?.sources}/>:<section className="automation-table" aria-label="ID 数据"><div className="automation-toolbar">
       <button aria-pressed={!onlyTargets} onClick={()=>{setOnlyTargets(false);setIdPage(0);}}>全部 TID · {idRows.length}</button><button aria-pressed={onlyTargets} onClick={()=>{setOnlyTargets(true);setIdPage(0);}}>仅目标 TID · {idRows.filter(row=>p.target_display_tids.includes(row.display_tid)).length}</button>
       <button onClick={()=>{const index=visibleIds.findIndex(row=>p.target_display_tids.includes(row.display_tid));if(index>=0){setIdPage(Math.floor(index/50));setSelectedId(visibleIds[index].advances);}}}>定位目标</button>
@@ -213,12 +216,12 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
       <div className="automation-toolbar"><button disabled={!page} onClick={()=>setIdPage(page-1)}>上一页</button><span>{page+1} / {Math.max(1,Math.ceil(visibleIds.length/50))}</span><button disabled={(page+1)*50>=visibleIds.length} onClick={()=>setIdPage(page+1)}>下一页</button></div>
     </section>}
     </div>
-    {isStatic&&targetSettingsOpen&&<Dialog title="目标设置" close={()=>setTargetSettingsOpen(false)} className="automation-target-dialog">
+    {isStatic&&targetSettingsOpen&&<Dialog title="目标与筛选条件" close={()=>setTargetSettingsOpen(false)} className="automation-target-dialog">
       <div className="automation-target-dialog-body">{renderTargetEditor()}{error&&<p className="panel-error" role="alert">{error}</p>}</div>
-      <div className="automation-target-dialog-actions"><span className="muted">{paramDirty?'任务参数未保存':'任务参数已保存'}</span><button type="button" onClick={()=>setTargetSettingsOpen(false)}>返回流程</button><button type="button" className="button primary" disabled={pending} onClick={()=>void saveTargetSettings()}>保存任务参数并返回</button></div>
+      <div className="automation-target-dialog-actions"><span className="muted">{paramDirty?'配置未保存':'配置已保存'}</span><button type="button" onClick={()=>setTargetSettingsOpen(false)}>返回流程</button><button type="button" className="button primary" disabled={pending} onClick={()=>void saveTargetSettings()}>保存目标设置并返回</button></div>
     </Dialog>}
     {isStatic&&groupEditor&&<Dialog title={groupEditor.mode==='create'?'新建自动流程配置':'重命名自动流程配置'} close={()=>setGroupEditor(null)} className="automation-group-dialog">
-      <form onSubmit={event=>{event.preventDefault();void submitGroup();}}><label>配置名称<input autoFocus maxLength={40} value={groupName} onChange={event=>setGroupName(event.target.value)} placeholder="例如：骑拉帝纳定点" /></label><p>这套配置包含目标筛选、任务参数、自动策略和任务脚本。</p><div className="automation-group-dialog-actions"><button type="button" onClick={()=>setGroupEditor(null)}>取消</button><button type="submit" className="button primary" disabled={!groupName.trim()||pending}>{groupEditor.mode==='create'?'创建配置':'保存名称'}</button></div></form>
+      <form onSubmit={event=>{event.preventDefault();void submitGroup();}}><label>配置名称<input autoFocus maxLength={40} value={groupName} onChange={event=>setGroupName(event.target.value)} placeholder="例如：骑拉帝纳定点" /></label><p>这套配置包含目标与筛选条件、任务参数、自动策略和任务脚本。</p><div className="automation-group-dialog-actions"><button type="button" onClick={()=>setGroupEditor(null)}>取消</button><button type="submit" className="button primary" disabled={!groupName.trim()||pending}>{groupEditor.mode==='create'?'创建配置':'保存名称'}</button></div></form>
     </Dialog>}
     {isStatic&&groupDeleteId&&<Dialog title="删除自动流程配置" close={()=>setGroupDeleteId(null)} className="automation-group-dialog"><div className="automation-group-delete"><p>删除“{groups.find(group=>group.id===groupDeleteId)?.name}”及其保存的参数和脚本？</p><div className="automation-group-dialog-actions"><button type="button" onClick={()=>setGroupDeleteId(null)}>取消</button><button type="button" className="button danger" disabled={pending} onClick={()=>void deleteGroup()}>删除配置</button></div></div></Dialog>}
   </section>;
