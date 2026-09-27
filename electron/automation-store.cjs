@@ -81,6 +81,7 @@ class AutomationStore extends EventEmitter {
       next.config[kind][scope][key] = clone(value);
     } if (kind === 'static') {
       if(scope==='parameters' && Object.hasOwn(values,'fixed_delay') && next.config.static.delayConfig.strategy==='fixed') next.config.static.delayConfig.baseline_delay=values.fixed_delay;
+      next.config.static.features=normalizeFeatures(next.config.static);
       next.staticGroups.items.find(item => item.id === next.staticGroups.activeId).config = clone(next.config.static);
     } });
   }

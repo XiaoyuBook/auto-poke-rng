@@ -25,31 +25,56 @@ test('new workflows start with only required groups and keep independent delay s
   assert.equal(store.data.config.static.delayConfig.strategy, 'median');
 });
 
-test('disabled and removed groups preserve drafts but cannot enter the runtime projection', () => {
+test('optional groups derive activation from their settings and ignore removed drafts', () => {
   const config = defaults().static;
   config.features.reverse = { added: true, enabled: false };
-  config.features.exit = { added: true, enabled: false };
+  config.features.exit = { added: false, enabled: true };
   config.features.sync = { added: true, enabled: false };
-  config.features.escape = { added: true, enabled: true };
+  config.features.escape = { added: true, enabled: false };
   Object.assign(config.scripts, { reverse: 'missing/reverse.txt', exit: 'missing/exit.txt', escape: 'BDSP/escape.txt', record: 'missing/record.txt' });
   Object.assign(config.parameters, { auto_reverse: true, escape_continue: false, exit_blink_name: 'missing', sync_mode: 2, sync_nature: '爽朗', lead: 3, initial_advances: 400, offset: 20 });
-  config.parameters.reverse_lookup_window = null;
   config.parameters.reseeding_threshold = null;
   const effective = projectStaticConfig(config);
-  assert.equal(effective.parameters.auto_reverse, false);
+  assert.equal(effective.parameters.auto_reverse, true);
   assert.equal(effective.parameters.escape_continue, true);
   assert.equal(effective.parameters.shiny_threshold_seconds, 4);
   assert.equal(effective.parameters.exit_blink_name, '');
   assert.equal(effective.parameters.reverse_lookup_window, 500);
   assert.equal(effective.parameters.reseeding_threshold, 500000);
-  assert.equal(effective.parameters.sync_mode, 0);
-  assert.equal(effective.parameters.lead, 255);
+  assert.equal(effective.parameters.sync_mode, 2);
+  assert.equal(effective.parameters.lead, 3);
   assert.equal(Object.hasOwn(effective.parameters, 'initial_advances'), false);
   assert.equal(Object.hasOwn(effective.parameters, 'offset'), false);
-  assert.equal(effective.scripts.reverse, '');
+  assert.equal(effective.scripts.reverse, 'missing/reverse.txt');
   assert.equal(effective.scripts.exit, '');
   assert.equal(Object.hasOwn(effective.scripts, 'record'), false);
   assert.equal(config.scripts.reverse, 'missing/reverse.txt');
+  assert.equal(effective.features.reverse.enabled,true);
+  assert.equal(effective.features.exit.enabled,false);
+  assert.equal(effective.features.sync.enabled,true);
+  assert.equal(effective.features.escape.enabled,true);
+});
+
+test('an added reverse group without a script does not enter the runtime projection', () => {
+  const config=defaults().static;
+  config.features.reverse={added:true,enabled:true};
+  config.parameters.auto_reverse=true;
+  const effective=projectStaticConfig(config);
+  assert.equal(effective.features.reverse.enabled,false);
+  assert.equal(effective.parameters.auto_reverse,false);
+  assert.equal(effective.scripts.reverse,'');
+});
+
+test('saving a reverse script updates derived activation', () => {
+  const store=new AutomationStore(directory());
+  const draft=structuredClone(store.snapshot().config.static);
+  draft.features.reverse={added:true,enabled:false};
+  store.saveStaticConfig(draft,store.data.staticGroups.activeId);
+  assert.equal(store.snapshot().config.static.features.reverse.enabled,false);
+  store.save('static','scripts',{reverse:'BDSP/reverse.txt'});
+  assert.equal(store.snapshot().config.static.features.reverse.enabled,true);
+  store.save('static','scripts',{reverse:''});
+  assert.equal(store.snapshot().config.static.features.reverse.enabled,false);
 });
 
 test('recording switch is independent of the required shiny threshold', () => {
@@ -66,7 +91,7 @@ test('version 1 migrates every workflow once without inferring groups from defau
   const legacy = defaults();
   const first = structuredClone(legacy.static), second = structuredClone(legacy.static);
   delete first.features; delete first.delayConfig; delete second.features; delete second.delayConfig;
-  first.parameters.target = 'Giratina'; first.parameters.auto_reverse = true; first.parameters.fixed_delay = 121;
+  first.parameters.target = 'Giratina'; first.parameters.auto_reverse = true; first.parameters.fixed_delay = 121; first.scripts.reverse = 'BDSP/reverse.txt';
   second.parameters.target = 'Turtwig'; second.parameters.shiny_threshold_seconds = null;
   second.scripts.reverse = 'draft/reverse.txt'; second.parameters.fixed_delay = 444;
   const saved = { version: 1, config: { ...legacy, static: first }, profiles: { 487: { config: { ...defaults().static.delayConfig, strategy: 'median', baseline_delay: 999 }, samples: [{ candidates: [120], round_number: 1, observed_at: '2026-01-01T00:00:00.000Z', excluded: false }], next_round_number: 2 } }, staticGroups: { activeId: 'b', items: [{ id: 'a', name: 'A', config: first }, { id: 'b', name: 'B', config: second }] } };

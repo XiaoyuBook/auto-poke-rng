@@ -60,10 +60,10 @@ test('shiny detection is required independently of reverse lookup',async t=>{
   assert.equal(result.ready,false);
   assert.match(result.checks.find(item=>item.label==='任务参数').detail,/判闪阈值/);
 });
-test('disabled optional scripts and missing exit blink are ignored by check and start',async t=>{
+test('removed optional scripts and missing exit blink are ignored by check and start',async t=>{
   const f=fixture(t);
-  f.input.config.features.exit={added:true,enabled:false};
-  f.input.config.features.reverse={added:true,enabled:false};
+  f.input.config.features.exit={added:false,enabled:false};
+  f.input.config.features.reverse={added:false,enabled:false};
   f.input.config.scripts.exit='missing/exit.rng';
   f.input.config.scripts.reverse='missing/reverse.rng';
   f.input.config.parameters.exit_blink_name='missing blink';

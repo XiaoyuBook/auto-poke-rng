@@ -17,11 +17,17 @@ function legacyFeatures(config) {
 }
 
 function normalizeFeatures(config) {
-  const fallback = legacyFeatures(config);
-  if (!config.features) return fallback;
+  const source = config.features || legacyFeatures(config);
+  const p = config.parameters || {}, scripts = config.scripts || {};
+  const configured = {
+    reverse: !!scripts.reverse,
+    exit: !!scripts.exit,
+    sync: p.sync_mode > 0 || p.lead !== 255,
+    escape: !!scripts.escape,
+  };
   return Object.fromEntries(featureKeys.map(key => [key, {
-    added: !!config.features[key]?.added,
-    enabled: !!config.features[key]?.added && !!config.features[key]?.enabled,
+    added: !!source[key]?.added,
+    enabled: !!source[key]?.added && !!configured[key],
   }]));
 }
 

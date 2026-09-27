@@ -64,17 +64,19 @@ app.whenReady().then(async()=>{
   await js(`document.querySelectorAll('.automation-add-option input')[0].click();document.querySelectorAll('.automation-add-option input')[1].click();`);
   await clickText('添加（2）');await until(`document.querySelectorAll('.automation-group-select').length===5`,'multi-add');
   assert.equal(await js(`Boolean(document.querySelector('[aria-label="自动反查"] [aria-label="反查脚本"]'))`),true);
+  assert.equal(await js(`Boolean(document.querySelector('[aria-label="自动反查"] [aria-label="启用自动反查"]'))`),false);
+  assert.equal(await js(`(()=>{const script=document.querySelector('[aria-label="反查脚本"]').getBoundingClientRect();const window=document.querySelector('[aria-label="反查窗口（帧）"]').getBoundingClientRect();return Math.abs(script.top-window.top)<2&&Math.abs(script.bottom-window.bottom)<2;})()`),true,'reverse script and window fields align');
   assert.equal(await js(`Boolean(document.querySelector('[aria-label="自动反查"] [aria-label="判闪阈值"]'))`),false);
   assert.equal(await js(`Boolean(document.querySelector('[aria-label="自动反查"] button').textContent.includes('校准闪光判定'))`),false);
   assert.equal(await js(`Boolean(document.querySelector('[aria-label="过场"] [aria-label="过场脚本"]'))`),true);
-  await clickAria('启用自动反查');await until(`document.querySelector('[aria-label="自动反查"]')?.textContent.includes('已停用')`,'disabled');
+  assert.equal(await js(`document.querySelector('[aria-label="自动反查"]').textContent.includes('待配置')`),true);
   await clickAria('移除过场');await until(`document.querySelectorAll('.automation-group-select').length===4`,'removed');
   await clickText('撤销');await until(`document.querySelectorAll('.automation-group-select').length===5`,'undo');await shot('static-features-wide.png');
   await js(`document.getElementById('automation-section-exit').scrollIntoView({block:'center'})`);await shot('static-optional-card.png');
   await clickText('保存配置');await until(`document.querySelector('.automation-save-status')?.textContent==='已保存'`,'saved');
   const id=automation.getState().staticGroups.activeId;
   assert.equal(automation.getState().staticGroups.items.find(item=>item.id===id).config.features.reverse.enabled,false);
-  assert.equal(automation.getState().staticGroups.items.find(item=>item.id===id).config.features.exit.enabled,true);
+  assert.equal(automation.getState().staticGroups.items.find(item=>item.id===id).config.features.exit.enabled,false);
   await js(`(()=>{const select=document.querySelector('[aria-label="流程配置"]');select.value='default';select.dispatchEvent(new Event('change',{bubbles:true}));})()`);
   await until(`document.querySelector('[aria-label="流程配置"]')?.value==='default'&&document.querySelectorAll('.automation-group-select').length===3`,'default restored');
   await js(`(()=>{const select=document.querySelector('[aria-label="流程配置"]');select.value=${JSON.stringify(id)};select.dispatchEvent(new Event('change',{bubbles:true}));})()`);
@@ -98,7 +100,7 @@ app.whenReady().then(async()=>{
   await until(`document.querySelector('[aria-label="流程配置"]')?.selectedOptions[0]?.textContent==='骑拉帝纳闪光'`,'renamed');
   await clickAria('删除流程配置');await until(`Boolean(document.querySelector('.automation-group-delete'))`,'delete dialog');
   await clickText('删除配置');await until(`document.querySelector('[aria-label="流程配置"]')?.options.length===1`,'deleted');
-  console.log('PASS: flow manager, multi-add, disable/remove/undo, full save, responsive screenshots');
+  console.log('PASS: flow manager, multi-add, inferred activation, remove/undo, aligned fields, full save, responsive screenshots');
 }).catch(error=>{console.error(error);process.exitCode=1;}).finally(async()=>{
   clearTimeout(timer);await automation?.close();notifications?.close();
   await Promise.allSettled([devices?.close(),blink?.close(),rng?.close()]);app.exit(process.exitCode||0);

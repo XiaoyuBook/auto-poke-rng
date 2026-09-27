@@ -30,8 +30,9 @@ test('C01: one save persists the complete static draft',async()=>{
   expect(api.start).not.toHaveBeenCalled();
   expect(api.save).toHaveBeenCalledTimes(1);
 });
-test('optional groups are added together, disabled, removed and restored',async()=>{
+test('optional groups become active when configured and can be removed and restored',async()=>{
   fixture();
+  window.desktop.scripts.list.mockResolvedValue({files:[{path:'BDSP/reverse.txt'}],folders:[],warnings:[]});
   render(<AutomationWorkspace kind="static" profile={defaultBdspProfile} blinkConfig={newBlinkConfig()} blinkConfigs={[]} openLogs={()=>{}} />);
   fireEvent.click(await screen.findByRole('button',{name:'添加配置组'}));
   fireEvent.click(screen.getByRole('checkbox',{name:/自动反查/}));
@@ -39,8 +40,12 @@ test('optional groups are added together, disabled, removed and restored',async(
   fireEvent.click(screen.getByRole('button',{name:'添加（2）'}));
   expect(screen.getByRole('region',{name:'自动反查'})).toBeTruthy();
   expect(screen.getByRole('region',{name:'过场'})).toBeTruthy();
-  fireEvent.click(screen.getByRole('checkbox',{name:'启用自动反查'}));
-  expect(screen.getByRole('region',{name:'自动反查'}).textContent).toContain('已停用');
+  expect(screen.queryByRole('checkbox',{name:'启用自动反查'})).toBeNull();
+  expect(screen.getByRole('region',{name:'自动反查'}).textContent).toContain('待配置');
+  fireEvent.focus(screen.getByLabelText('反查脚本'));
+  await waitFor(()=>expect(screen.getByLabelText('反查脚本').querySelector('option[value="BDSP/reverse.txt"]')).toBeTruthy());
+  fireEvent.change(screen.getByLabelText('反查脚本'),{target:{value:'BDSP/reverse.txt'}});
+  expect(screen.getByRole('region',{name:'自动反查'}).textContent).toContain('已配置');
   fireEvent.click(screen.getByRole('button',{name:'移除自动反查'}));
   expect(screen.queryByRole('region',{name:'自动反查'})).toBeNull();
   fireEvent.click(screen.getByRole('button',{name:'撤销'}));

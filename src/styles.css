@@ -171,6 +171,7 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .automation-target-identity > strong { overflow: hidden; color: var(--text); font-size: 16px; font-weight: 600; line-height: 1.3; text-overflow: ellipsis; white-space: nowrap; }
 .automation-target-identity > small { color: var(--secondary); font-size: 11px; line-height: 1.4; }
 .automation-script-field { margin: 10px 0; }
+.automation-fields > .automation-script-field { margin: 0; }
 .automation-ivs { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; }
 .automation-ivs label { font-size: 11px; text-align: center; }
 .automation-ivs input { margin-top: 5px; padding: 6px 3px !important; }
@@ -1483,14 +1484,12 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .automation-field-error { display: block; margin-top: 3px; color: var(--danger, #e7a09d); font-size: 11px; }
 .automation-static-sections { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .automation-feature-card { padding: 0; overflow: hidden; background: #202525; }
-.automation-feature-card.is-disabled { opacity: .74; }
 .automation-feature-heading { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 13px; border-bottom: 1px solid var(--line); }
 .automation-feature-heading > strong { font-size: 13px; }
 .automation-feature-heading .automation-feature-status { margin-right: auto; color: var(--muted); font-size: 11px; }
 .automation-workspace .automation-feature-title { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; border: 0; background: none; text-align: left; font-size: 13px; }
 .automation-feature-title svg.is-closed { transform: rotate(-90deg); }
 .automation-feature-title .automation-feature-status { margin-left: 8px; }
-.automation-feature-toggle { display: flex; align-items: center; gap: 5px; white-space: nowrap; font-size: 12px; }
 .automation-feature-body { min-width: 0; margin: 0; padding: 12px 14px 14px; border: 0; }
 .automation-feature-body fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
 .automation-feature-body .automation-fields { margin: 0; }
