@@ -1475,3 +1475,21 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* Auto-hide the configuration rail without moving the selected flow. */
+.automation-workspace.automation-workspace-with-groups { display: grid; grid-template-columns: 32px minmax(0, 1fr); align-items: start; gap: 14px; position: relative; }
+.automation-workspace.automation-workspace-with-groups .automation-group-sidebar { position: sticky; top: 0; z-index: 5; display: block; width: 32px; min-height: min(740px, calc(100dvh - 136px)); padding: 0; overflow: hidden; border-color: #3c4244; box-shadow: 0 8px 24px #0003; transition: width 180ms ease 140ms, box-shadow 180ms ease; }
+.automation-workspace.automation-workspace-with-groups .automation-group-sidebar:hover,
+.automation-workspace.automation-workspace-with-groups .automation-group-sidebar:has(:focus-visible) { width: 180px; box-shadow: 8px 12px 30px #0008; transition-delay: 0ms; }
+.automation-workspace.automation-workspace-with-groups button.automation-group-peek { position: absolute; inset: 0 auto 0 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; width: 31px; height: 100%; padding: 8px 0; border: 0; border-radius: 0; background: #272c2d; color: var(--secondary); font-size: 11px; transition: opacity 100ms ease 90ms; }
+.automation-group-peek span { writing-mode: vertical-rl; letter-spacing: 3px; }
+.automation-workspace-with-groups .automation-group-sidebar:hover .automation-group-peek,
+.automation-workspace-with-groups .automation-group-sidebar:has(:focus-visible) .automation-group-peek { opacity: 0; pointer-events: none; transition-delay: 0ms; }
+.automation-group-panel { width: 180px; min-height: inherit; padding: 16px 10px; opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 100ms ease, visibility 0s linear 100ms; }
+.automation-workspace-with-groups .automation-group-sidebar:hover .automation-group-panel,
+.automation-workspace-with-groups .automation-group-sidebar:has(:focus-visible) .automation-group-panel { opacity: 1; visibility: visible; pointer-events: auto; transition-delay: 90ms, 0ms; }
+.automation-workspace-with-groups .automation-group-list { display: flex; flex-direction: column; flex-wrap: nowrap; overflow: visible; padding: 0; }
+.automation-workspace-with-groups .automation-group-row { flex: 0 0 auto; }
+@media (max-width: 850px) {
+  .automation-workspace.automation-workspace-with-groups .automation-group-sidebar { min-height: min(620px, calc(100dvh - 136px)); }
+}

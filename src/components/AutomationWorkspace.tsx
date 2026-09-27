@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Play, Square, ListChecks, FileClock, Plus, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { Play, Square, ListChecks, FileClock, Plus, MoreHorizontal, Pencil, Trash2, ChevronsRight } from 'lucide-react';
 import { automationBusy, downloadText, useAutomation, type AutomationConfig, type AutomationKind, type AutomationParameters, type DelayConfig, type IdResults, type Readiness, type TargetFilter } from '../automation';
 import type { BlinkConfig } from '../blink';
 import type { BdspProfile } from '../bdspProfile';
@@ -115,6 +115,8 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
   </>:null;
   return <section className={'automation-workspace'+(isStatic?' automation-workspace-with-groups':'')} aria-label={isStatic?'自动定点工作区':'自动TID工作区'}>
     {isStatic&&<aside className="automation-group-sidebar" aria-label="配置组">
+      <button type="button" className="automation-group-peek" aria-label="展开配置组" title="将鼠标移入以展开配置组"><ChevronsRight size={15}/><span>配置组</span></button>
+      <div className="automation-group-panel">
       <div className="automation-group-header"><h2>配置组</h2><button type="button" aria-label="新建自动流程配置" title="新建配置" disabled={busy||pending} onClick={()=>{setGroupName('');setGroupEditor({mode:'create'});}}><Plus size={16}/></button></div>
       <p className="automation-group-hint">一项配置对应一套完整流程</p>
       <div className="automation-group-list">{groups.map(group=>{
@@ -125,6 +127,7 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
           {groupMenuId===group.id&&<div className="automation-group-menu"><button type="button" onClick={()=>{setGroupName(group.name);setGroupEditor({mode:'rename',id:group.id});setGroupMenuId(null);}}><Pencil size={13}/>重命名</button><button type="button" disabled={groups.length===1} onClick={()=>{setGroupDeleteId(group.id);setGroupMenuId(null);}}><Trash2 size={13}/>删除配置</button></div>}
         </div>;
       })}</div>
+      </div>
     </aside>}
     <div className="automation-flow-content">
     <header className="automation-heading"><h2>{isStatic?activeGroup?.name||'自动定点乱数':'自动 TID 乱数'}</h2><p>{isStatic?'当前选中的完整自动流程配置':'小卡比兽测种、Display TID 搜索与自动取名'}</p></header>

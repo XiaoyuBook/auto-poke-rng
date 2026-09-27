@@ -61,6 +61,14 @@ app.whenReady().then(async () => {
   await js(`document.querySelectorAll('.automation-group-select')[1].click()`);
   await until(`document.querySelector('.automation-target-card strong')?.textContent === '骑拉帝纳'`, 'second group restored');
   await delay(100);
+  const dock = await js(`(() => { const rect=document.querySelector('.automation-group-sidebar').getBoundingClientRect(); return {x:rect.x,y:rect.y}; })()`);
+  const targetX = await js(`document.querySelector('.automation-target-card').getBoundingClientRect().x`);
+  main.webContents.sendInputEvent({ type: 'mouseMove', x: Math.round(dock.x + 14), y: Math.round(dock.y + 110) });
+  await until(`document.querySelector('.automation-group-sidebar').getBoundingClientRect().width >= 175`, 'configuration hover expansion');
+  assert.equal(await js(`Math.abs(document.querySelector('.automation-target-card').getBoundingClientRect().x - ${targetX}) < 1`), true, 'expansion does not move flow content');
+  fs.writeFileSync(path.join(output, 'groups-expanded.png'), (await main.webContents.capturePage()).toPNG());
+  main.webContents.sendInputEvent({ type: 'mouseMove', x: Math.round(dock.x + 250), y: Math.round(dock.y + 110) });
+  await until(`document.querySelector('.automation-group-sidebar').getBoundingClientRect().width <= 35`, 'configuration hover collapse');
   fs.writeFileSync(path.join(output, 'groups-wide.png'), (await main.webContents.capturePage()).toPNG());
   main.setSize(1060, 760);
   await delay(200);
