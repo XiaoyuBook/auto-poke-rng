@@ -48,6 +48,17 @@ app.whenReady().then(async()=>{
   assert.equal(await js(`Boolean(document.querySelector('[aria-label="初始帧"]')||document.querySelector('[aria-label="Offset"]'))`),false);
   assert.equal(await js(`(()=>{const workspace=document.querySelector('[aria-label="自动定点工作区"]').getBoundingClientRect();const top=document.querySelector('.automation-workspace-top').getBoundingClientRect();const overview=document.querySelector('.automation-overview').getBoundingClientRect();const sidebar=document.querySelector('.automation-group-sidebar').getBoundingClientRect();return Math.abs(top.left-workspace.left)<2&&Math.abs(top.right-workspace.right)<2&&overview.bottom<=sidebar.top+1;})()`),true,'target and status span above the configuration sidebar');
   await shot('static-default-wide.png');
+  await clickText('delay 策略与样本 · 固定 delay');
+  await until(`Boolean(document.querySelector('[aria-label="delay 策略与样本"]'))`,'delay settings');
+  assert.equal(await js(`Array.from(document.querySelectorAll('[aria-label="delay 策略与样本"] label')).some(label=>label.textContent==='有效轮次窗口')`),false);
+  assert.equal(await js(`document.querySelector('[aria-label="delay 策略与样本"]').textContent.includes('上一页')`),false);
+  await js(`document.querySelector('[aria-label="delay 策略与样本"]').scrollIntoView({block:'center'})`);await shot('static-delay-fixed.png');
+  await js(`(()=>{const select=document.querySelector('[aria-label="delay 策略与样本"] select');select.value='ema';select.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+  await until(`Array.from(document.querySelectorAll('[aria-label="delay 策略与样本"] label')).some(label=>label.textContent==='平滑权重')`,'EMA settings');
+  assert.equal(await js(`Array.from(document.querySelectorAll('[aria-label="delay 策略与样本"] label')).some(label=>label.textContent==='密集区间跨度')`),false);
+  await shot('static-delay-ema.png');
+  await js(`(()=>{const select=document.querySelector('[aria-label="delay 策略与样本"] select');select.value='fixed';select.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+  await clickText('delay 策略与样本 · 固定 delay');
   await js(`document.getElementById('automation-section-shiny').scrollIntoView({block:'center'})`);await shot('static-shiny-settings.png');
   await clickAria('自动录像');await clickText('保存配置');
   await until(`document.querySelector('.automation-save-status')?.textContent==='已保存'`,'recording disabled');
@@ -95,6 +106,10 @@ app.whenReady().then(async()=>{
   await until(`!document.querySelector('.automation-add-dialog')`,'Escape closes dialog');
   main.setSize(800,700);await delay(250);
   assert.equal(await js(`document.documentElement.scrollWidth<=document.documentElement.clientWidth+1`),true,'800px overflow');await shot('static-features-800x700.png');
+  await clickText('delay 策略与样本 · 固定 delay');
+  await js(`document.querySelector('[aria-label="delay 策略与样本"]').scrollIntoView({block:'center'})`);
+  assert.equal(await js(`document.documentElement.scrollWidth<=document.documentElement.clientWidth+1`),true,'compact delay settings overflow');
+  await shot('static-delay-800x700.png');
   await clickAria('重命名流程配置');await until(`Boolean(document.querySelector('.automation-group-dialog input'))`,'rename dialog');
   await setInput('.automation-group-dialog input','骑拉帝纳闪光');await clickText('保存名称');
   await until(`document.querySelector('[aria-label="流程配置"]')?.selectedOptions[0]?.textContent==='骑拉帝纳闪光'`,'renamed');

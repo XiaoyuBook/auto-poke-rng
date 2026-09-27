@@ -30,6 +30,29 @@ test('C01: one save persists the complete static draft',async()=>{
   expect(api.start).not.toHaveBeenCalled();
   expect(api.save).toHaveBeenCalledTimes(1);
 });
+test('delay and recovery settings show only controls used by the chosen strategy',async()=>{
+  fixture();
+  render(<AutomationWorkspace kind="static" profile={defaultBdspProfile} blinkConfig={newBlinkConfig()} blinkConfigs={[]} openLogs={()=>{}} />);
+  fireEvent.click(await screen.findByRole('button',{name:'delay 策略与样本 · 固定 delay'}));
+  expect(screen.queryByLabelText('多候选策略')).toBeNull();
+  expect(screen.queryByLabelText('有效轮次窗口')).toBeNull();
+  expect(screen.queryByRole('button',{name:'上一页'})).toBeNull();
+  expect(screen.getByText('历史样本 · 0 条')).toBeTruthy();
+  fireEvent.change(screen.getByLabelText('策略'),{target:{value:'last'}});
+  expect(screen.queryByLabelText('多候选策略')).toBeNull();
+  fireEvent.change(screen.getByLabelText('策略'),{target:{value:'mode'}});
+  expect(screen.getByLabelText('多候选策略')).toBeTruthy();
+  expect(screen.getByLabelText('有效轮次窗口')).toBeTruthy();
+  expect(screen.queryByLabelText('平滑权重')).toBeNull();
+  fireEvent.change(screen.getByLabelText('策略'),{target:{value:'ema'}});
+  expect(screen.getByLabelText('平滑权重')).toBeTruthy();
+  fireEvent.change(screen.getByLabelText('策略'),{target:{value:'dense_interval'}});
+  expect(screen.getByLabelText('密集区间跨度')).toBeTruthy();
+  fireEvent.click(screen.getByText('校正与补救 · 高级设置'));
+  expect(screen.queryByLabelText('补救测种最大尝试')).toBeNull();
+  fireEvent.change(screen.getByLabelText('校正失败处理'),{target:{value:'recapture_seed'}});
+  expect(screen.getByLabelText('补救测种最大尝试')).toBeTruthy();
+});
 test('static workflow uses its selected default blink config and lets exit inherit it',async()=>{
   const {api,snapshot}=fixture();
   api.save.mockImplementation(async ({values})=>{snapshot.config.static=structuredClone(values);return snapshot;});

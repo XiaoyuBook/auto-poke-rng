@@ -1497,6 +1497,9 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .automation-feature-body p { margin: 0 0 10px; }
 .automation-advanced { margin-top: 12px; }
 .automation-advanced summary { cursor: pointer; }
+.automation-delay-samples { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.automation-delay-samples summary { cursor: pointer; color: var(--secondary); font-size: 12px; }
+.automation-delay-samples p { margin: 10px 0 0; }
 .automation-add-dialog { width: min(460px, calc(100vw - 32px)); }
 .automation-add-options { display: flex; flex-direction: column; max-height: min(55vh, 400px); overflow: auto; padding: 12px 18px; }
 .automation-add-option { display: flex; align-items: center; gap: 12px; padding: 10px 4px; border-bottom: 1px solid var(--line-soft); cursor: pointer; }
