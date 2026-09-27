@@ -42,6 +42,7 @@ app.whenReady().then(async()=>{
   assert.equal(await js(`Boolean(document.querySelector('[aria-label="撞帧脚本"]'))`),true);
   assert.equal(await js(`Boolean(document.querySelector('[aria-label="闪光判定"] [aria-label="判闪阈值"]'))`),true);
   assert.equal(await js(`Boolean(document.querySelector('[aria-label="闪光判定"] [aria-label="出闪时录像"]'))`),true);
+  assert.equal(await js(`document.querySelector('[aria-label="闪光判定"]').textContent.includes('CAPTURE 5000')`),false);
   assert.equal(await js(`Boolean(document.querySelector('[aria-label="初始帧"]')||document.querySelector('[aria-label="Offset"]'))`),false);
   assert.equal(await js(`(()=>{const workspace=document.querySelector('[aria-label="自动定点工作区"]').getBoundingClientRect();const top=document.querySelector('.automation-workspace-top').getBoundingClientRect();const overview=document.querySelector('.automation-overview').getBoundingClientRect();const sidebar=document.querySelector('.automation-group-sidebar').getBoundingClientRect();return Math.abs(top.left-workspace.left)<2&&Math.abs(top.right-workspace.right)<2&&overview.bottom<=sidebar.top+1;})()`),true,'target and status span above the configuration sidebar');
   await shot('static-default-wide.png');
