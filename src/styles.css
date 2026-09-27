@@ -1490,6 +1490,8 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .automation-feature-heading { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 13px; border-bottom: 1px solid var(--line); }
 .automation-feature-heading > strong { font-size: 13px; }
 .automation-feature-heading .automation-feature-status { margin-right: auto; color: var(--muted); font-size: 11px; }
+.automation-workspace button.automation-script-refresh { display: grid; place-items: center; flex: none; width: 29px; height: 29px; padding: 0; color: var(--secondary); }
+.automation-workspace button.automation-script-refresh:not(:disabled):hover { color: var(--text); border-color: var(--accent); }
 .automation-workspace .automation-feature-title { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; border: 0; background: none; text-align: left; font-size: 13px; }
 .automation-feature-title svg.is-closed { transform: rotate(-90deg); }
 .automation-feature-title .automation-feature-status { margin-left: 8px; }
