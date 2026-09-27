@@ -32,7 +32,7 @@ function startWorker(config, { event = () => {}, request = async () => { throw E
         void (async()=>{try{if(stopped)throw Error('自动流程已停止');const value=await request(message.method,message.params);if(!stopped)send({id:message.id,result:value});}
           catch(error){send({id:message.id,error:error.message});}})();
       }else if(message.event==='done')finish({status:stopped?'stopped':message.status,message:message.message,result});
-      else if(message.event==='result'){result=message.result;finish({status:'completed',result});}
+      else if(message.event==='result'){result=message.result;finish({status:stopped?'stopped':'completed',result});}
       else if(!stopped||message.event==='log')event(message);
     }
   });

@@ -9,23 +9,54 @@ import { OcrWorkspace } from '../src/components/OcrWorkspace';
 import { defaultBdspProfile } from '../src/bdspProfile';
 import { newBlinkConfig } from '../src/blink';
 const { defaults } = createRequire(import.meta.url)('../electron/automation-store.cjs');
+HTMLDialogElement.prototype.showModal ||= function(){this.open=true;};
+HTMLDialogElement.prototype.close ||= function(){this.open=false;};
 afterEach(()=>{cleanup();delete window.desktop;localStorage.clear();});
 function fixture(){
-  const snapshot={config:defaults(),profiles:{},logs:[],runs:[],logging:true,error:'',state:{status:'idle',revision:0,progress:null,message:'等待开始'}};
+  const config=defaults();
+  const snapshot={config,staticGroups:{activeId:'default',items:[{id:'default',name:'默认流程',config:structuredClone(config.static)}]},profiles:{},logs:[],runs:[],logging:true,error:'',state:{status:'idle',revision:0,progress:null,message:'等待开始'}};
   const api={getState:vi.fn(async()=>snapshot),onState:vi.fn(()=>()=>{}),save:vi.fn(async()=>snapshot),check:vi.fn(async()=>({ready:false,checks:[{label:'视频源',ok:false,detail:'请先连接'}]})),start:vi.fn(),stop:vi.fn(),clearLogs:vi.fn(),setLogging:vi.fn()};
   window.desktop={automation:api,scripts:{list:vi.fn(async()=>({files:[],folders:[],warnings:[]}))}};
   return {snapshot,api};
 }
-test('C01: task and script saving remain separate',async()=>{
+test('C01: one save persists the complete static draft',async()=>{
   const {api}=fixture();
   render(<AutomationWorkspace kind="static" profile={defaultBdspProfile} blinkConfig={newBlinkConfig()} blinkConfigs={[]} openLogs={()=>{}} />);
-  await screen.findByRole('button',{name:'保存任务参数'});
+  await screen.findByRole('button',{name:'保存配置'});
+  fireEvent.click(screen.getByRole('button',{name:'delay 策略与样本 · 固定 delay'}));
   fireEvent.change(screen.getByLabelText('基准 delay'),{target:{value:'1452'}});
-  fireEvent.click(screen.getByRole('button',{name:'保存任务参数'}));
-  await waitFor(()=>expect(api.save).toHaveBeenCalledWith(expect.objectContaining({scope:'parameters',values:expect.objectContaining({fixed_delay:1452})})));
+  fireEvent.click(screen.getByRole('button',{name:'保存配置'}));
+  await waitFor(()=>expect(api.save).toHaveBeenCalledWith(expect.objectContaining({scope:'config',expectedId:'default',values:expect.objectContaining({delayConfig:expect.objectContaining({baseline_delay:1452})})})));
   expect(api.start).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole('button',{name:'保存脚本选择'}));
-  await waitFor(()=>expect(api.save).toHaveBeenCalledWith(expect.objectContaining({scope:'scripts'})));
+  expect(api.save).toHaveBeenCalledTimes(1);
+});
+test('optional groups are added together, disabled, removed and restored',async()=>{
+  fixture();
+  render(<AutomationWorkspace kind="static" profile={defaultBdspProfile} blinkConfig={newBlinkConfig()} blinkConfigs={[]} openLogs={()=>{}} />);
+  fireEvent.click(await screen.findByRole('button',{name:'添加配置组'}));
+  fireEvent.click(screen.getByRole('checkbox',{name:/自动反查/}));
+  fireEvent.click(screen.getByRole('checkbox',{name:/过场/}));
+  fireEvent.click(screen.getByRole('button',{name:'添加（2）'}));
+  expect(screen.getByRole('region',{name:'自动反查'})).toBeTruthy();
+  expect(screen.getByRole('region',{name:'过场'})).toBeTruthy();
+  fireEvent.click(screen.getByRole('checkbox',{name:'启用自动反查'}));
+  expect(screen.getByRole('region',{name:'自动反查'}).textContent).toContain('已停用');
+  fireEvent.click(screen.getByRole('button',{name:'移除自动反查'}));
+  expect(screen.queryByRole('region',{name:'自动反查'})).toBeNull();
+  fireEvent.click(screen.getByRole('button',{name:'撤销'}));
+  expect(screen.getByRole('region',{name:'自动反查'})).toBeTruthy();
+});
+test('failed complete save preserves the current draft and prevents a workflow switch',async()=>{
+  const {api,snapshot}=fixture();
+  snapshot.staticGroups.items.push({id:'second',name:'第二套',config:structuredClone(snapshot.config.static)});
+  api.save.mockRejectedValueOnce(Error('磁盘写入失败'));
+  api.manageStaticGroup=vi.fn();
+  render(<AutomationWorkspace kind="static" profile={defaultBdspProfile} blinkConfig={newBlinkConfig()} blinkConfigs={[]} openLogs={()=>{}} />);
+  fireEvent.change(await screen.findByLabelText('搜索范围'),{target:{value:'700'}});
+  fireEvent.change(screen.getByLabelText('流程配置'),{target:{value:'second'}});
+  await screen.findByText('磁盘写入失败');
+  expect(api.manageStaticGroup).not.toHaveBeenCalled();
+  expect(screen.getByLabelText('搜索范围').value).toBe('700');
 });
 test('C02: preparation is read only and exposes failed checks',async()=>{
   const {api}=fixture();

@@ -16,7 +16,9 @@ export type AutomationParameters = {
   sync_mode: number; sync_nature: string; exit_blink_name: string; frame_threshold: number; delay: number; target_display_tids: number[];
 };
 export type AutomationConfig = { parameters: AutomationParameters; scripts: Record<string, string> };
-export type AutomationConfigGroup = { id: string; name: string; config: AutomationConfig };
+export type StaticFeatureKey = 'reverse' | 'exit' | 'sync' | 'escape' | 'shiny' | 'record';
+export type StaticAutomationConfig = AutomationConfig & { features: Record<StaticFeatureKey, { added: boolean; enabled: boolean }>; delayConfig: DelayConfig };
+export type AutomationConfigGroup = { id: string; name: string; config: StaticAutomationConfig };
 export type DelayConfig = { strategy: string; baseline_delay: number; multi_candidate_policy: string; window_size: number; ewma_alpha: number; dense_interval_width: number };
 export type DelayProfile = { config: DelayConfig; samples: { candidates: number[]; round_number: number; observed_at: string; excluded: boolean }[]; next_round_number: number };
 export type IdRow = { advances: number; tid: number; sid: number; tsv: number; display_tid: number };
@@ -31,7 +33,7 @@ export type AutomationRound = { number: number; seed?: string; outcome: string; 
   interval?: number; trigger?: number; usedDelay?: number; actualDelays?: number[]; reverse?: Candidate[]; events: { event: string; args: unknown[] }[] };
 export type AutomationRun = { id: string; kind: AutomationKind; startedAt: string; endedAt?: string; status: string; message?: string; rounds: AutomationRound[] };
 export type AutomationSnapshot = {
-  config: { static: AutomationConfig; tid: AutomationConfig; ocr: OcrRegionRow[] }; profiles: Record<string, DelayProfile>;
+  config: { static: StaticAutomationConfig; tid: AutomationConfig; ocr: OcrRegionRow[] }; profiles: Record<string, DelayProfile>;
   staticGroups: { activeId: string; items: AutomationConfigGroup[] };
   logs: LogEntry[]; runs: AutomationRun[]; logging: boolean; error: string;
   state: { revision: number; status: string; kind: AutomationKind | null; runId: string | null; message: string; progress: AutomationProgress | null;
@@ -45,7 +47,7 @@ export interface AutomationApi {
   check(input: AutomationInput): Promise<Readiness>;
   start(input: AutomationInput): Promise<AutomationSnapshot>;
   stop(): Promise<void>;
-  save(input: { kind: AutomationKind; scope: 'parameters' | 'scripts'; values: AutomationParameters | Record<string, string> }): Promise<AutomationSnapshot>;
+  save(input: { kind: AutomationKind; scope: 'parameters' | 'scripts' | 'config'; values: AutomationParameters | Record<string, string> | StaticAutomationConfig; expectedId?: string }): Promise<AutomationSnapshot>;
   manageStaticGroup(input: { action: 'create' | 'select' | 'rename' | 'delete'; id?: string; name?: string }): Promise<AutomationSnapshot>;
   saveOcr(rows: OcrRegionRow[]): Promise<AutomationSnapshot>;
   defaultOcr(): Promise<OcrRegionRow[]>;

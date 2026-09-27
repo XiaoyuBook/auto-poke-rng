@@ -2,6 +2,7 @@ const path = require('node:path');
 const fs = require('node:fs/promises');
 const { randomUUID } = require('node:crypto');
 const { AutomationStore, defaultFilter, defaults } = require('./automation-store.cjs');
+const { projectStaticConfig } = require('./automation-config.cjs');
 const { startWorker } = require('./automation-worker.cjs');
 const { validateConfig: validateBlink } = require('./blink-client.cjs');
 const data = require('../src/generated/bdsp-data.json');
@@ -110,7 +111,13 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
     return bytes.toString('base64');
   });
   const ocrRequest=async(params,rows=store.data.config.ocr)=>devices.ocr.read(params.imageBase64||await image(),'',{...params,regions:Object.fromEntries(rows.map(row=>[row.id,['x','y','width','height'].map(key=>row.rect[key])]))});
+  const effectiveInput=input=>{
+    if(input?.kind!=='static')return input;
+    const config=projectStaticConfig(input.config);
+    return {...input,config,exitBlink:config.features.exit.enabled?input.exitBlink:undefined};
+  };
   const checks=async input=>{
+    input=effectiveInput(input);
     const checks=[];let scripts={},target;
     const add=async(label,action)=>{try{await action();checks.push({label,ok:true,detail:'已就绪'});}catch(error){checks.push({label,ok:false,detail:error.message});}};
     const {kind,config,profile}=input||{};
@@ -119,7 +126,7 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
       if(target&&target.version!=='BDSP'&&target.version!==profile.version)throw Error('该目标不属于当前存档版本');});
     await add('视频源',()=>{if(devices.getState().video.status!=='connected')throw Error('请先连接视频源');});
     await add('伊机控',()=>{if(devices.getState().controller.status!=='connected')throw Error('请先连接伊机控');if(devices.runner.current)throw Error('已有手动脚本正在运行');});
-    await add('眼睛模板与校正配置',()=>{validateBlink({...input.blink,mode:kind==='tid'?'munchlax':config?.parameters?.start==='reidentify'?'reidentify':'recover'},devices.getState().video);if(input.exitBlink)validateBlink({...input.exitBlink,mode:'recover'},devices.getState().video);
+    await add('眼睛模板与校正配置',()=>{validateBlink({...input.blink,mode:kind==='tid'?'munchlax':config?.parameters?.start==='reidentify'?'reidentify':'recover'},devices.getState().video);if(config?.parameters?.exit_blink_name&&input.exitBlink)validateBlink({...input.exitBlink,mode:'recover'},devices.getState().video);
       if(config?.parameters?.exit_blink_name&&!input.exitBlink)throw Error('所选过场测种配置已不可用，请重新选择');
       if(['starting','preview','capturing','solving','tracking','countdown','timeline','stopping'].includes(blink.getState().status))throw Error('请先停止手动眨眼捕获/推进');});
     await add('脚本配置与语法',async()=>{
@@ -127,7 +134,12 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
       const required=kind==='tid'?['name']:['advance','hit'];
       if(config.parameters.start==='script'||config.parameters.loop_mode!=='single')required.push('seed');
       if(config.parameters.auto_reverse)required.push('reverse');if(config.parameters.escape_continue)required.push('escape');
-      for(const key of required)if(!config.scripts[key])throw Error(`请选择 ${key} 脚本`);
+      if(kind==='static'&&config.features?.exit?.enabled)required.push('exit');
+      if(kind==='static'&&config.features?.record?.enabled)required.push('record');
+      if(kind==='static'&&config.features?.shiny?.enabled&&!config.parameters.shiny_threshold_seconds)throw Error('判闪配置组需要设置判闪阈值');
+      if(kind==='static'&&config.features?.record?.enabled&&!config.parameters.shiny_threshold_seconds)throw Error('录像配置组需要设置判闪阈值');
+      const scriptNames={seed:'测种',advance:'过帧',hit:'撞帧',reverse:'反查',exit:'过场',escape:'逃跑',record:'录像',name:'取名'};
+      for(const key of required)if(!config.scripts[key])throw Error(`请选择${scriptNames[key]||key}脚本`);
       for(const [key,relative] of Object.entries(config.scripts)){
         if(!relative)continue;
         const {absolute}=await devices.runner.resolveScript(relative);
@@ -154,7 +166,7 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
   devices.events.on('stop-automation',emergencyStop);
   const start=async input=>{
     if(active||auxiliary||rng.isBusy())throw Error('已有任务正在运行');
-    input=structuredClone(input);
+    input=effectiveInput(structuredClone(input));
     const run={id:randomUUID(),kind:input.kind,round:0,stopped:false,scripts:{},worker:null};active=run;
     update({status:'starting',kind:input.kind,runId:run.id,progress:null,capture:null,seed:null,roundDelay:null,message:'检查运行条件…'});
     try{
@@ -162,10 +174,7 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
       checkStopped(run);
       const result=await checks(input);checkStopped(run);
       if(!result.ready)throw Error(result.checks.filter(item=>!item.ok).map(item=>`${item.label}：${item.detail}`).join('\n'));
-      store.change(next=>{
-        next.config[input.kind]=structuredClone(input.config);
-        if(input.kind==='static')store.profile(next,result.target.speciesId).config.baseline_delay=input.config.parameters.fixed_delay;
-      });
+      if(input.kind==='tid')store.change(next=>{next.config.tid=structuredClone(input.config);});
       run.input=structuredClone(input);run.target=result.target;run.ocr=structuredClone(store.data.config.ocr);
       for(const selected of Object.values(result.scripts))run.scripts[selected.path]=selected;
       if(input.config.parameters.shiny_threshold_seconds||input.config.parameters.auto_reverse||input.config.parameters.loop_mode!=='single')await devices.ocr.start();
@@ -179,7 +188,7 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
         if(method==='ocr')return ocrRequest(params,run.ocr);
         if(method==='delay_profile'){
           const profile=store.data.profiles[run.target.speciesId];
-          return structuredClone(profile||{config:{strategy:'fixed',baseline_delay:input.config.parameters.fixed_delay,multi_candidate_policy:'ignore',window_size:5,ewma_alpha:.5,dense_interval_width:2},samples:[]});
+          return {config:structuredClone(run.input.config.delayConfig),samples:structuredClone(profile?.samples||[])};
         }
         if(method==='delay_record'){store.recordDelay(run.target.speciesId,params.candidates);return null;}
         if(method==='search'){
@@ -238,7 +247,7 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
   handle('state',snapshot,false);
   handle('check',async input=>{if(active||auxiliary)throw Error('已有流程正在运行');const {ready,checks:items}=await checks(input);return {ready,checks:items};});
   handle('start',start);handle('stop',()=>stop());
-  handle('save',({kind,scope,values})=>store.save(kind,scope,values));
+  handle('save',({kind,scope,values,expectedId})=>{if(scope==='config'&&kind==='static'){validateParameters('static',projectStaticConfig(values).parameters);return store.saveStaticConfig(values,expectedId);}return store.save(kind,scope,values);});
   handle('static-group',input=>{store.manageStaticGroup(input);return snapshot();});
   handle('ocr-save',rows=>store.saveOcr(rows));handle('ocr-defaults',()=>defaults().ocr);
   handle('delay',({species,action,config,number,excluded})=>action==='save'?store.saveDelay(species,config):action==='clear'?store.clearDelay(species):store.excludeDelay(species,number,excluded));

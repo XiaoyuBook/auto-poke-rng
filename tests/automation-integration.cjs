@@ -39,8 +39,25 @@ test('C02: preparation compiles but does not save, press, warm up, or claim devi
   assert.equal((await f.invoke('check',f.input)).ready,true);assert.deepEqual(f.trace,[]);
   assert.equal(f.automation.getState().config.static.parameters.fixed_delay,100);
 });
+test('disabled optional scripts and missing exit blink are ignored by check and start',async t=>{
+  const f=fixture(t);
+  f.input.config.features.exit={added:true,enabled:false};
+  f.input.config.features.reverse={added:true,enabled:false};
+  f.input.config.scripts.exit='missing/exit.rng';
+  f.input.config.scripts.reverse='missing/reverse.rng';
+  f.input.config.parameters.exit_blink_name='missing blink';
+  f.input.config.parameters.auto_reverse=true;
+  f.input.config.parameters.reseeding_threshold=null;
+  f.input.config.parameters.reverse_lookup_window=null;
+  assert.equal((await f.invoke('check',f.input)).ready,true);
+  await f.invoke('start',f.input);
+  assert.equal(f.workerConfig().parameters.auto_reverse,false);
+  assert.equal(f.workerConfig().parameters.exit_blink_name,'');
+  assert.equal(f.workerConfig().scripts.exit,undefined);
+  assert.equal(f.workerConfig().scripts.reverse,undefined);
+});
 test('C01/D04: run snapshots parameters and OCR; newly recorded samples retain the chosen baseline',async t=>{
-  const f=fixture(t);f.input.config.parameters.fixed_delay=1442;
+  const f=fixture(t);f.input.config.parameters.fixed_delay=1442;f.input.config.delayConfig.baseline_delay=1442;
   await f.invoke('start',f.input);
   f.input.config.parameters.target='Piplup';f.input.config.parameters.fixed_delay=999;
   const request=f.callbacks().request;
@@ -178,6 +195,7 @@ test('reverse preserves the forward lead for ordinary and sync candidates in eve
     await t.test(`mode=${mode}, configured lead=${configuredLead}, source=${source}`,async t=>{
       const f=fixture(t),calls=[];
       Object.assign(f.input.config.parameters,{sync_mode:mode,sync_nature:natures[7],lead:configuredLead,max_advances:20,reverse_lookup_window:10});
+      f.input.config.features.sync={added:true,enabled:true};
       f.input.config.parameters.filters[0].shiny=255;
       f.rng.generate=async input=>{calls.push(input);return client.call('static.generate',input);};
       await f.invoke('start',f.input);

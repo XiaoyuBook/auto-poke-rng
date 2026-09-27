@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const { EventEmitter } = require('node:events');
+const { defaultFeatures, defaultDelay, normalizeFeatures } = require('./automation-config.cjs');
 
 const defaultFilter = () => ({ skip: false, shiny: 3, ability: 255, gender: 255, ivMin: [0,0,0,0,0,0], ivMax: [31,31,31,31,31,31], natures: Array(25).fill(true), heightMin: 0, heightMax: 255, weightMin: 0, weightMax: 255 });
 const regions = [
@@ -16,7 +17,7 @@ const defaults = () => ({
     reidentify_failure_policy: 'next_round', reidentify_seed_max_attempts: 1, reseeding_threshold: 500000,
     auto_reverse: false, escape_continue: false, reverse_lookup_window: 500, shiny_threshold_seconds: 4,
     sync_mode: 0, sync_nature: '', exit_blink_name: '', loop_mode: 'single', loop_count: 1, start: 'script' },
-    scripts: { seed: '', advance: '', hit: '', exit: '', reverse: '', escape: '', record: '' } },
+    scripts: { seed: '', advance: '', hit: '', exit: '', reverse: '', escape: '', record: '' }, features: defaultFeatures(), delayConfig: defaultDelay(100) },
   tid: { parameters: { frame_threshold: 300, delay: 0, target_display_tids: [], loop_mode: 'single', loop_count: 1, start: 'script' }, scripts: { seed: '', name: '' } },
   ocr: regions.map(([id,label,x,y,width,height]) => ({ id, label, rect: { x,y,width,height } })),
 });
@@ -25,11 +26,11 @@ const clone = value => structuredClone(value);
 class AutomationStore extends EventEmitter {
   constructor(directory, { now = () => new Date() } = {}) {
     super(); this.directory = directory; this.now = now; this.logs = []; this.runs = []; this.error = '';
-    this.data = { version: 1, config: defaults(), profiles: {}, logging: true, staticGroups: null };
+    this.data = { version: 2, config: defaults(), profiles: {}, logging: true, staticGroups: null };
     const file = path.join(directory, 'automation.json');
     try {
       const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
-      if (saved.version !== 1) throw Error('自动流程配置版本不支持');
+      if (![1, 2].includes(saved.version)) throw Error('自动流程配置版本不支持');
       for (const kind of ['static','tid']) for (const scope of ['parameters','scripts']) Object.assign(this.data.config[kind][scope], saved.config?.[kind]?.[scope]);
       if (Array.isArray(saved.config?.ocr) && saved.config.ocr.length === 10) this.data.config.ocr = saved.config.ocr;
       this.data.profiles = saved.profiles || {}; this.data.logging = saved.logging !== false;
@@ -37,6 +38,20 @@ class AutomationStore extends EventEmitter {
         typeof item.id === 'string' && typeof item.name === 'string' && item.config?.parameters && item.config?.scripts)) {
         this.data.staticGroups = clone(saved.staticGroups);
       }
+      const migrate = config => {
+        const base = defaults().static;
+        config.parameters = { ...base.parameters, ...config.parameters };
+        config.scripts = { ...base.scripts, ...config.scripts };
+        config.features = normalizeFeatures(saved.version === 1 ? { ...config, features: undefined } : config);
+        const species = require('../src/generated/bdsp-data.json').targets.find(item => item.speciesKey === config.parameters.target)?.speciesId;
+        const historical = species && this.data.profiles[species]?.config;
+        config.delayConfig = { ...defaultDelay(config.parameters.fixed_delay), ...(config.delayConfig || historical || {}) };
+        // The old fixed delay was the actual fallback in a run even when a species profile existed.
+        if (saved.version === 1 && config.delayConfig.strategy === 'fixed') config.delayConfig.baseline_delay = config.parameters.fixed_delay;
+      };
+      if (this.data.staticGroups) this.data.staticGroups.items.forEach(item => migrate(item.config));
+      else migrate(this.data.config.static);
+      this.data.version = 2;
     } catch (error) { if (error.code !== 'ENOENT') this.error = `无法加载自动流程配置，原文件保留：${error.message}`; }
     if (!this.data.staticGroups) this.data.staticGroups = { activeId: 'default', items: [{ id: 'default', name: '默认流程', config: clone(this.data.config.static) }] };
     const active = this.data.staticGroups.items.find(item => item.id === this.data.staticGroups.activeId) || this.data.staticGroups.items[0];
@@ -58,7 +73,23 @@ class AutomationStore extends EventEmitter {
     return this.change(next => { for (const [key,value] of Object.entries(values)) {
       if (!Object.hasOwn(next.config[kind][scope], key)) throw Error(`未知配置：${key}`);
       next.config[kind][scope][key] = clone(value);
-    } if (kind === 'static') next.staticGroups.items.find(item => item.id === next.staticGroups.activeId).config = clone(next.config.static); });
+    } if (kind === 'static') {
+      if(scope==='parameters' && Object.hasOwn(values,'fixed_delay') && next.config.static.delayConfig.strategy==='fixed') next.config.static.delayConfig.baseline_delay=values.fixed_delay;
+      next.staticGroups.items.find(item => item.id === next.staticGroups.activeId).config = clone(next.config.static);
+    } });
+  }
+  saveStaticConfig(config, expectedId) {
+    if (!config?.parameters || !config?.scripts || !config?.features || !config?.delayConfig) throw Error('流程配置不完整');
+    if (JSON.stringify(config).length > 100000) throw Error('自动流程配置过大');
+    this.validateDelay(config.delayConfig);
+    return this.change(next => {
+      if (next.staticGroups.activeId !== expectedId) throw Error('当前流程已切换，请重新保存');
+      const baseline = defaults().static;
+      for (const scope of ['parameters', 'scripts']) for (const key of Object.keys(config[scope])) if (!Object.hasOwn(baseline[scope], key)) throw Error(`未知配置：${key}`);
+      next.config.static = { parameters: { ...baseline.parameters, ...clone(config.parameters) }, scripts: { ...baseline.scripts, ...clone(config.scripts) }, features: normalizeFeatures(config), delayConfig: clone(config.delayConfig) };
+      next.config.static.parameters.fixed_delay = next.config.static.delayConfig.baseline_delay;
+      next.staticGroups.items.find(item => item.id === expectedId).config = clone(next.config.static);
+    });
   }
   manageStaticGroup({ action, id, name } = {}) {
     if (!['create', 'select', 'rename', 'delete'].includes(action)) throw Error('配置组操作无效');
@@ -70,7 +101,7 @@ class AutomationStore extends EventEmitter {
       if (action !== 'create' && !entry) throw Error('配置不存在');
       if (['create', 'rename'].includes(action) && groups.items.some(item => item.name === title && item.id !== id)) throw Error('配置名称已存在');
       if (action === 'create') {
-        const created = { id: randomUUID(), name: title, config: clone(next.config.static) };
+        const created = { id: randomUUID(), name: title, config: clone(defaults().static) };
         groups.items.push(created); groups.activeId = created.id;
         next.config.static = clone(created.config);
       } else if (action === 'select') {
@@ -111,12 +142,15 @@ class AutomationStore extends EventEmitter {
     return data.profiles[species] ||= { config: { strategy: 'fixed', baseline_delay: 100, multi_candidate_policy: 'ignore', window_size: 5, ewma_alpha: 0.5, dense_interval_width: 2 }, samples: [], next_round_number: 1 };
   }
   saveDelay(species, config) {
+    this.validateDelay(config);
+    return this.change(next => { this.profile(next, species).config = clone(config); });
+  }
+  validateDelay(config) {
     if (!['fixed','last','mode','median','mean','ema','trimmed_mean','dense_interval'].includes(config.strategy)
       || !['ignore','weighted'].includes(config.multi_candidate_policy)
       || !Number.isInteger(config.baseline_delay) || config.baseline_delay < 0 || config.baseline_delay > 1000000000
       || !Number.isInteger(config.window_size) || config.window_size < 1 || config.window_size > 10000
       || !(config.ewma_alpha > 0 && config.ewma_alpha <= 1) || !Number.isInteger(config.dense_interval_width) || config.dense_interval_width < 0) throw Error('delay 策略参数无效');
-    return this.change(next => { this.profile(next, species).config = clone(config); });
   }
   recordDelay(species, candidates) {
     const normalized = [...new Set(candidates.filter(value => Number.isInteger(value) && value >= 0))].sort((a,b) => a-b);
