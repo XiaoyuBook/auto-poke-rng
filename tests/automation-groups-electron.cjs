@@ -42,6 +42,8 @@ app.whenReady().then(async()=>{
   assert.equal(await js(`Boolean(document.querySelector('[aria-label="撞帧脚本"]'))`),true);
   assert.equal(await js(`Boolean(document.querySelector('[aria-label="闪光判定"] [aria-label="判闪阈值"]'))`),true);
   assert.equal(await js(`Boolean(document.querySelector('[aria-label="闪光判定"] [aria-label="出闪时录像"]'))`),true);
+  assert.equal(await js(`document.querySelector('[aria-label="出闪时录像"]').getAttribute('aria-pressed')`),'true');
+  assert.equal(await js(`(()=>{const calibrate=Array.from(document.querySelectorAll('[aria-label="闪光判定"] button')).find(button=>button.textContent==='校准闪光判定').getBoundingClientRect();const record=document.querySelector('[aria-label="出闪时录像"]').getBoundingClientRect();return record.left>=calibrate.right&&Math.abs(record.bottom-calibrate.bottom)<2;})()`),true,'recording toggle is to the right of calibration');
   assert.equal(await js(`document.querySelector('[aria-label="闪光判定"]').textContent.includes('CAPTURE 5000')`),false);
   assert.equal(await js(`Boolean(document.querySelector('[aria-label="初始帧"]')||document.querySelector('[aria-label="Offset"]'))`),false);
   assert.equal(await js(`(()=>{const workspace=document.querySelector('[aria-label="自动定点工作区"]').getBoundingClientRect();const top=document.querySelector('.automation-workspace-top').getBoundingClientRect();const overview=document.querySelector('.automation-overview').getBoundingClientRect();const sidebar=document.querySelector('.automation-group-sidebar').getBoundingClientRect();return Math.abs(top.left-workspace.left)<2&&Math.abs(top.right-workspace.right)<2&&overview.bottom<=sidebar.top+1;})()`),true,'target and status span above the configuration sidebar');
@@ -50,6 +52,7 @@ app.whenReady().then(async()=>{
   await clickAria('出闪时录像');await clickText('保存配置');
   await until(`document.querySelector('.automation-save-status')?.textContent==='已保存'`,'recording disabled');
   assert.equal(automation.getState().config.static.parameters.record_shiny,false);
+  assert.equal(await js(`document.querySelector('[aria-label="出闪时录像"]').getAttribute('aria-pressed')`),'false');
   await clickAria('出闪时录像');await clickText('保存配置');
   await until(`document.querySelector('.automation-save-status')?.textContent==='已保存'`,'recording restored');
   assert.equal(automation.getState().config.static.parameters.record_shiny,true);
@@ -78,6 +81,7 @@ app.whenReady().then(async()=>{
   await until(`document.querySelector('[aria-label="流程配置"]')?.value===${JSON.stringify(id)}&&document.querySelectorAll('.automation-group-select').length===5`,'custom restored');
   main.setSize(1100,680);await delay(250);
   assert.equal(await js(`document.documentElement.scrollWidth<=document.documentElement.clientWidth+1`),true,'1100px overflow');
+  assert.equal(await js(`(()=>{const calibrate=Array.from(document.querySelectorAll('[aria-label="闪光判定"] button')).find(button=>button.textContent==='校准闪光判定').getBoundingClientRect();const record=document.querySelector('[aria-label="出闪时录像"]').getBoundingClientRect();return record.left>=calibrate.right&&Math.abs(record.bottom-calibrate.bottom)<2;})()`),true,'compact recording toggle stays beside calibration');
   assert.equal(await js(`document.querySelector('.automation-overview').getBoundingClientRect().bottom<=document.querySelector('.automation-group-sidebar').getBoundingClientRect().top+1`),true,'compact overview remains above configuration groups');
   assert.equal(await js(`document.querySelector('.workspace-right-rail').getBoundingClientRect().top>=document.querySelector('.workspace-primary').getBoundingClientRect().bottom-1`),true,'video and log rail');
   await shot('static-features-1100x680.png');
