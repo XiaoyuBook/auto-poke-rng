@@ -148,6 +148,8 @@ test('optional groups become active when configured and can be removed and resto
   await waitFor(()=>expect(screen.getByLabelText('反查脚本').querySelector('option[value="BDSP/reverse.txt"]')).toBeTruthy());
   fireEvent.change(screen.getByLabelText('反查脚本'),{target:{value:'BDSP/reverse.txt'}});
   expect(screen.getByRole('region',{name:'自动反查'}).textContent).toContain('已配置');
+  expect(screen.getByRole('button',{name:'移除自动反查'}).closest('aside').getAttribute('aria-label')).toBe('配置组');
+  expect(screen.getByRole('region',{name:'自动反查'}).querySelector('[aria-label="移除自动反查"]')).toBeNull();
   fireEvent.click(screen.getByRole('button',{name:'移除自动反查'}));
   expect(screen.queryByRole('region',{name:'自动反查'})).toBeNull();
   fireEvent.click(screen.getByRole('button',{name:'撤销'}));

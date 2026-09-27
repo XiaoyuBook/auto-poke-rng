@@ -95,6 +95,7 @@ app.whenReady().then(async()=>{
   assert.equal(await js(`Boolean(document.querySelector('[aria-label="自动反查"] button').textContent.includes('校准闪光判定'))`),false);
   assert.equal(await js(`Boolean(document.querySelector('[aria-label="过场"] [aria-label="过场脚本"]'))`),true);
   assert.equal(await js(`document.querySelector('[aria-label="过场测种配置"] option[value=""]')?.textContent===document.querySelector('[aria-label="默认测种配置"] option:checked')?.textContent`),true,'post-exit inherited config shows its name');
+  assert.equal(await js(`(()=>{const remove=document.querySelector('[aria-label="移除过场"]');const sidebar=document.querySelector('.automation-group-sidebar');return sidebar.contains(remove)&&!document.querySelector('[aria-label="过场"]').contains(remove)&&getComputedStyle(remove).color==='rgb(212, 129, 129)'&&remove.querySelector('svg.lucide-trash-2')!==null;})()`),true,'optional group removal is a red trash icon in the sidebar');
   assert.equal(await js(`document.querySelector('[aria-label="自动反查"]').textContent.includes('待配置')`),true);
   await clickAria('移除过场');await until(`document.querySelectorAll('.automation-group-select').length===4`,'removed');
   await clickText('撤销');await until(`document.querySelectorAll('.automation-group-select').length===5`,'undo');await shot('static-features-wide.png');
@@ -121,6 +122,9 @@ app.whenReady().then(async()=>{
   await until(`!document.querySelector('.automation-add-dialog')`,'Escape closes dialog');
   main.setSize(800,700);await delay(250);
   assert.equal(await js(`document.documentElement.scrollWidth<=document.documentElement.clientWidth+1`),true,'800px overflow');await shot('static-features-800x700.png');
+  await js(`document.querySelector('[aria-label="移除自动反查"]').scrollIntoView({block:'center',inline:'center'})`);
+  assert.equal(await js(`(()=>{const button=document.querySelector('[aria-label="移除自动反查"]').getBoundingClientRect();const sidebar=document.querySelector('.automation-group-sidebar').getBoundingClientRect();return button.left>=sidebar.left&&button.right<=sidebar.right;})()`),true,'compact trash icon stays inside sidebar');
+  await shot('static-sidebar-800x700.png');
   await clickDelay();await until(`Boolean(document.querySelector('.automation-delay-dialog[open]'))`,'compact delay dialog');
   assert.equal(await js(`(()=>{const rect=document.querySelector('.automation-delay-dialog').getBoundingClientRect();return rect.top>=0&&rect.bottom<=innerHeight&&rect.left>=0&&rect.right<=innerWidth;})()`),true,'compact delay dialog fits viewport');
   assert.equal(await js(`document.documentElement.scrollWidth<=document.documentElement.clientWidth+1`),true,'compact delay dialog overflow');

@@ -229,10 +229,14 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .automation-group-header h2 { font-size: 14px; font-weight: 600; }
 .automation-workspace.automation-workspace-with-groups .automation-group-header button { display: grid; place-items: center; width: 27px; height: 27px; padding: 0; background: #303636; }
 .automation-group-list { display: flex; flex-direction: column; gap: 5px; margin-top: 12px; }
+.automation-group-item { position: relative; min-width: 0; }
 .automation-workspace.automation-workspace-with-groups button.automation-group-select { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; width: 100%; padding: 10px; border: 0; border-radius: 6px; background: transparent; text-align: left; }
+.automation-workspace.automation-workspace-with-groups button.automation-group-select.has-remove { padding-right: 38px; }
 .automation-workspace.automation-workspace-with-groups button.automation-group-select.is-active { background: #303a3d; box-shadow: inset 3px 0 var(--accent); }
 .automation-group-select strong { width: 100%; overflow: hidden; font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .automation-group-select small { width: 100%; overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.automation-workspace.automation-workspace-with-groups button.automation-group-remove { position: absolute; top: 50%; right: 6px; display: grid; place-items: center; width: 29px; height: 29px; padding: 0; border: 0; border-radius: 5px; background: transparent; color: var(--red); transform: translateY(-50%); }
+.automation-workspace.automation-workspace-with-groups button.automation-group-remove:not(:disabled):hover { background: color-mix(in srgb, var(--red) 15%, transparent); }
 .automation-group-dialog form, .automation-group-delete { display: flex; flex-direction: column; gap: 12px; padding: 20px; }
 .automation-group-dialog label { display: flex; flex-direction: column; gap: 6px; color: var(--secondary); }
 .automation-group-dialog input { width: 100%; padding: 8px 9px; border: 1px solid var(--line); border-radius: 5px; background: #151918; }
@@ -255,7 +259,7 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
   .automation-workspace-with-groups { display: flex; flex-direction: column; gap: 14px; }
   .automation-group-sidebar { position: static; width: 100%; min-height: 0; padding: 10px; }
   .automation-group-list { flex-direction: row; overflow-x: auto; padding-bottom: 2px; }
-  .automation-workspace.automation-workspace-with-groups button.automation-group-select { flex: 0 0 145px; width: 145px; }
+  .automation-group-item { flex: 0 0 145px; width: 145px; }
   .automation-flow-content { width: 100%; padding-right: 0; }
 }
 @container (max-width: 420px) {
@@ -1552,4 +1556,4 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .automation-add-dialog .automation-group-dialog-actions { margin: 0; padding: 12px 18px; border-top: 1px solid var(--line); }
 .automation-undo { position: fixed; z-index: 10; bottom: 20px; left: 50%; display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 7px; background: #252c2c; box-shadow: 0 12px 24px #0008; transform: translateX(-50%); }
 @container (max-width: 680px) { .automation-workspace-with-groups { display: flex; flex-direction: column; } .automation-group-sidebar { position: static; width: 100%; } .automation-group-list { flex-direction: row; overflow-x: auto; } .automation-flow-manager { width: 100%; } .automation-workspace .automation-flow-manager select { width: min(220px, 40vw); } }
-@media (max-width: 900px) { .automation-workspace-with-groups { display: flex; flex-direction: column; gap: 10px; } .automation-group-sidebar { position: static; width: 100%; } .automation-group-list { flex-direction: row; overflow-x: auto; } .automation-workspace.automation-workspace-with-groups button.automation-group-select { flex: 0 0 145px; width: 145px; } .automation-flow-content { width: 100%; padding-right: 0; } }
+@media (max-width: 900px) { .automation-workspace-with-groups { display: flex; flex-direction: column; gap: 10px; } .automation-group-sidebar { position: static; width: 100%; } .automation-group-list { flex-direction: row; overflow-x: auto; } .automation-group-item { flex: 0 0 145px; width: 145px; } .automation-flow-content { width: 100%; padding-right: 0; } }
