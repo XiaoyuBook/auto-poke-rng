@@ -37,6 +37,7 @@ test('static workflow uses its selected default blink config and lets exit inher
   const saved={...newBlinkConfig(),name:'定点测种'};
   const exit={...newBlinkConfig(),name:'过场后测种'};
   render(<AutomationWorkspace kind="static" profile={defaultBdspProfile} blinkConfig={current} blinkConfigs={[saved,exit]} openLogs={()=>{}} />);
+  expect((await screen.findByLabelText('默认测种配置')).querySelector('option[value=""]').textContent).toBe(current.name);
   fireEvent.change(await screen.findByLabelText('默认测种配置'),{target:{value:saved.name}});
   fireEvent.click(screen.getByRole('button',{name:'开始前检查'}));
   await waitFor(()=>expect(api.check).toHaveBeenCalledWith(expect.objectContaining({blink:saved,exitBlink:undefined})));
