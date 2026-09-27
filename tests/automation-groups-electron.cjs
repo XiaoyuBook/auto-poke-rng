@@ -20,7 +20,7 @@ app.whenReady().then(async()=>{
   const js=code=>main.webContents.executeJavaScript(code,true);
   const until=async(code,label)=>{for(let i=0;i<180;i++){if(await js(code))return;await delay(30);}throw Error(label);};
   const clickAria=name=>js(`document.querySelector('[aria-label=${JSON.stringify(name)}]').click()`);
-  const clickText=label=>js(`Array.from(document.querySelectorAll('button')).find(button=>button.textContent.trim()===${JSON.stringify(label)}&&button.getClientRects().length)?.click()`);
+  const clickText=label=>js(`Array.from(document.querySelectorAll('button, summary')).find(element=>element.textContent.trim()===${JSON.stringify(label)}&&element.getClientRects().length)?.click()`);
   const setInput=(selector,value)=>js(`(()=>{const input=document.querySelector(${JSON.stringify(selector)});Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,${JSON.stringify(value)});input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
   const shot=async name=>{await delay(100);fs.writeFileSync(path.join(output,name),(await main.webContents.capturePage()).toPNG());};
   ipcMain.handle('app:metadata',()=>({name:'Auto Poke RNG',version:'test',platform:'win32'}));
@@ -49,6 +49,8 @@ app.whenReady().then(async()=>{
   assert.equal(await js(`Boolean(document.querySelector('[aria-label="初始帧"]')||document.querySelector('[aria-label="Offset"]'))`),false);
   assert.equal(await js(`(()=>{const workspace=document.querySelector('[aria-label="自动定点工作区"]').getBoundingClientRect();const top=document.querySelector('.automation-workspace-top').getBoundingClientRect();const overview=document.querySelector('.automation-overview').getBoundingClientRect();const sidebar=document.querySelector('.automation-group-sidebar').getBoundingClientRect();return Math.abs(top.left-workspace.left)<2&&Math.abs(top.right-workspace.right)<2&&overview.bottom<=sidebar.top+1;})()`),true,'target and status span above the configuration sidebar');
   await shot('static-default-wide.png');
+  assert.equal(await js(`(()=>{const sections=document.querySelectorAll('#automation-section-base > fieldset > details.automation-subsection');return sections.length===2&&Array.from(sections).every(section=>!section.open);})()`),true,'delay and recovery use matching collapsed sections');
+  await js(`document.querySelector('#automation-section-base > fieldset > details.automation-subsection').scrollIntoView({block:'center'})`);await shot('static-subsections-closed.png');
   await clickText('delay 策略与样本 · 固定 delay');
   await until(`Boolean(document.querySelector('[aria-label="delay 策略与样本"]'))`,'delay settings');
   assert.equal(await js(`Array.from(document.querySelectorAll('[aria-label="delay 策略与样本"] label')).some(label=>label.textContent==='有效轮次窗口')`),false);

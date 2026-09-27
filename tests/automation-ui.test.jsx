@@ -23,7 +23,7 @@ test('C01: one save persists the complete static draft',async()=>{
   const {api}=fixture();
   render(<AutomationWorkspace kind="static" profile={defaultBdspProfile} blinkConfig={newBlinkConfig()} blinkConfigs={[]} openLogs={()=>{}} />);
   await screen.findByRole('button',{name:'保存配置'});
-  fireEvent.click(screen.getByRole('button',{name:'delay 策略与样本 · 固定 delay'}));
+  fireEvent.click(screen.getByText('delay 策略与样本 · 固定 delay'));
   fireEvent.change(screen.getByLabelText('基准 delay'),{target:{value:'1452'}});
   fireEvent.click(screen.getByRole('button',{name:'保存配置'}));
   await waitFor(()=>expect(api.save).toHaveBeenCalledWith(expect.objectContaining({scope:'config',expectedId:'default',values:expect.objectContaining({delayConfig:expect.objectContaining({baseline_delay:1452})})})));
@@ -33,7 +33,11 @@ test('C01: one save persists the complete static draft',async()=>{
 test('delay and recovery settings show only controls used by the chosen strategy',async()=>{
   fixture();
   render(<AutomationWorkspace kind="static" profile={defaultBdspProfile} blinkConfig={newBlinkConfig()} blinkConfigs={[]} openLogs={()=>{}} />);
-  fireEvent.click(await screen.findByRole('button',{name:'delay 策略与样本 · 固定 delay'}));
+  const delaySummary=await screen.findByText('delay 策略与样本 · 固定 delay');
+  const recoverySummary=screen.getByText('校正与补救 · 高级设置');
+  expect(delaySummary.tagName).toBe('SUMMARY');
+  expect(recoverySummary.closest('details').className).toBe(delaySummary.closest('details').className);
+  fireEvent.click(delaySummary);
   expect(screen.queryByLabelText('多候选策略')).toBeNull();
   expect(screen.queryByLabelText('有效轮次窗口')).toBeNull();
   expect(screen.queryByRole('button',{name:'上一页'})).toBeNull();
