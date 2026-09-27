@@ -8,24 +8,23 @@ export const delayStrategyLabels: Record<string, string> = {
 };
 
 const strategyHelp: Record<string, string> = {
-  fixed: '每轮直接使用固定 delay，不参与样本计算。',
-  last: '使用最近一次有效样本；多候选轮次不作为确定的实际 delay。',
+  last: '使用最近一次单候选反查结果；多候选轮次会跳过。',
   mode: '从有效样本中选择权重最高的 delay。',
   median: '根据有效样本的中位数估计下轮 delay。',
   mean: '对窗口内的有效样本计算平均值。',
   ema: '以基准值为起点，新样本按权重逐轮更新估计。',
   trimmed_mean: '对样本两端作截尾处理；不足五轮时按平均值计算。',
-  dense_interval: '从样本较密集的区间估计 delay。',
+  dense_interval: '在样本最密集的 delay 区间内取中位数。',
 };
 
 const sampleStatusLabels: Record<string, string> = {
-  used: '参与计算', excluded: '已排除', empty: '无有效候选', fixed_strategy: '固定策略未使用',
+  used: '参与计算', excluded: '已排除', empty: '无有效候选', fixed_strategy: '当前策略不使用样本',
   ambiguous: '多候选已忽略', outside_window: '窗口外',
 };
 
 export function delayConfigError(config: DelayConfig): string | null {
   if (!Object.hasOwn(delayStrategyLabels, config.strategy)) return '请选择计算策略';
-  if (!Number.isInteger(config.baseline_delay) || config.baseline_delay < 0 || config.baseline_delay > 1_000_000_000) return '固定或基准 delay 需要 0–1000000000 帧';
+  if (!Number.isInteger(config.baseline_delay) || config.baseline_delay < 0 || config.baseline_delay > 1_000_000_000) return '请输入 0–1,000,000,000 帧的整数';
   if (!['ignore', 'weighted'].includes(config.multi_candidate_policy)) return '请选择多候选处理方式';
   if (!Number.isInteger(config.window_size) || config.window_size < 1 || config.window_size > 10_000) return '有效样本窗口需要 1–10000 轮';
   if (!(config.ewma_alpha > 0 && config.ewma_alpha <= 1)) return '新样本权重需要大于 0 且不超过 1';
@@ -118,11 +117,11 @@ export function DelayConfigDialog({ config, samples, species, flowName, scopeKey
         <div className="automation-delay-dialog-fields">
           <label>计算策略<select aria-label="计算策略" autoFocus disabled={locked} value={draft.strategy} onChange={event => change({ strategy: event.target.value })}>{Object.entries(delayStrategyLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           {number('baseline_delay', draft.strategy === 'fixed' ? '固定 delay' : '基准 delay', 0, 1_000_000_000)}
-          {statistical && <>{number('window_size', '有效样本窗口', 1, 10_000)}<label>多候选处理<select aria-label="多候选处理" disabled={locked} value={draft.multi_candidate_policy} onChange={event => change({ multi_candidate_policy: event.target.value })}><option value="ignore">忽略该轮</option><option value="weighted">每轮总权重为 1</option></select></label></>}
+          {statistical && <>{number('window_size', '有效样本窗口', 1, 10_000)}<label>多候选处理<select aria-label="多候选处理" disabled={locked} value={draft.multi_candidate_policy} onChange={event => change({ multi_candidate_policy: event.target.value })}><option value="ignore">忽略多候选轮次</option><option value="weighted">按权重计入（每轮总权重为 1）</option></select></label></>}
           {draft.strategy === 'ema' && number('ewma_alpha', '新样本权重', 0.001, 1, 0.01)}
           {draft.strategy === 'dense_interval' && number('dense_interval_width', '密集区间跨度', 0)}
         </div>
-        <p className="muted automation-delay-help">{strategyHelp[draft.strategy]}</p>
+        {strategyHelp[draft.strategy] && <p className="muted automation-delay-help">{strategyHelp[draft.strategy]}</p>}
         <div className="automation-delay-preview" aria-live="polite"><span>{draft.strategy === 'fixed' ? '每轮使用' : '下轮预计'}</span>
           <strong>{invalid || preview.status !== 'ready' ? '—' : preview.result!.value} <small>帧</small></strong>
           <p>{invalid ? invalid : preview.status === 'ready' ? delayPreviewReason(preview.result!, draft.strategy) : preview.status === 'error' ? preview.error : '正在计算…'}</p>
@@ -135,10 +134,10 @@ export function DelayConfigDialog({ config, samples, species, flowName, scopeKey
           {samples.length > 10 && <div className="automation-delay-sample-pager"><button type="button" disabled={pageIndex === 0} onClick={() => setPage(pageIndex - 1)}>上一页</button><span>{pageIndex + 1} / {Math.ceil(samples.length / 10)}</span><button type="button" disabled={(pageIndex + 1) * 10 >= samples.length} onClick={() => setPage(pageIndex + 1)}>下一页</button></div>}
           {confirmClear ? <div className="automation-delay-clear-confirm"><p>清空{species}的全部样本？这会影响使用该宝可梦的所有流程。</p><button type="button" disabled={locked || sampleBusy} onClick={() => void runSampleAction(async () => { await onClear(); setConfirmClear(false); })}>确认清空</button><button type="button" onClick={() => setConfirmClear(false)}>保留样本</button></div> : <button type="button" className="automation-delay-clear" disabled={locked || sampleBusy} onClick={() => setConfirmClear(true)}>清空共享样本</button>}
         </> : <p className="automation-delay-empty">暂无历史样本。获得有效反查结果后会显示在这里。</p>}
-        <p className="muted automation-delay-sample-note">样本按宝可梦在所有流程间共享；策略设置仅属于当前流程。排除、恢复和清空样本会立即生效。</p>
+        <p className="muted automation-delay-sample-note">样本由该宝可梦的所有流程共享；策略只属于当前流程。样本操作会立即生效。</p>
         {sampleError && <p role="alert" className="panel-error">{sampleError}</p>}
       </div>
     </div>
-    <div className="automation-delay-dialog-actions"><span>应用后纳入当前流程，由“保存配置”统一保存。</span><div><button type="button" onClick={onClose}>取消</button><button type="button" className="button primary" disabled={locked || !!invalid} onClick={() => onApply(structuredClone(draft))}>应用</button></div></div>
+    <div className="automation-delay-dialog-actions"><span>应用后更新当前流程草稿；可点击“保存配置”立即保存。</span><div><button type="button" onClick={onClose}>取消</button><button type="button" className="button primary" disabled={locked || !!invalid} onClick={() => onApply(structuredClone(draft))}>应用</button></div></div>
   </Dialog>;
 }

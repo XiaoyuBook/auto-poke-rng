@@ -74,7 +74,7 @@ test('invalid delay draft cannot be applied and does not retain the previous est
   await waitFor(()=>expect(screen.getByRole('dialog',{name:'delay 策略'}).querySelector('.automation-delay-preview p').textContent).toBe('固定值 · 每轮使用'));
   fireEvent.change(screen.getByLabelText('固定 delay'),{target:{value:''}});
   expect(screen.getByRole('button',{name:'应用'}).disabled).toBe(true);
-  expect(screen.getByText('固定或基准 delay 需要 0–1000000000 帧')).toBeTruthy();
+  expect(screen.getByText('请输入 0–1,000,000,000 帧的整数')).toBeTruthy();
 });
 test('shared delay samples change immediately and clearing names the cross-flow impact',async()=>{
   const {api,snapshot}=fixture();

@@ -1443,7 +1443,7 @@ class AutoRngRunner:
                     recording = f"，录像失败：{exc}"
             self._set_progress(
                 AutoRngPhase.COMPLETED,
-                f"{attempt_label} 疑似出闪，间隔 {interval_text}{recording}，已停止自动流程",
+                f"{attempt_label} 出闪，间隔 {interval_text}{recording}，已停止自动流程",
                 loop_index=self._completed_loops,
                 last_script_path=path,
             )
