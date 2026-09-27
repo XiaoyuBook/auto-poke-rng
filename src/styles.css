@@ -123,7 +123,7 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .automation-workspace { display: flex; flex-direction: column; gap: 14px; min-width: 0; padding: 2px 4px 24px; }
 .automation-heading h2 { margin: 0; font-size: 17px; }
 .automation-heading p, .automation-card p { color: var(--secondary); line-height: 1.6; }
-.automation-overview { display: grid; grid-template-columns: minmax(240px, .85fr) minmax(0, 1.15fr); align-items: start; gap: 12px; min-width: 0; }
+.automation-overview { display: grid; grid-template-columns: minmax(240px, .85fr) minmax(0, 1.15fr); align-items: stretch; gap: 12px; min-width: 0; }
 .automation-overview-single { grid-template-columns: minmax(0, 1fr); }
 .automation-workspace .automation-target-card { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 118px; padding: 9px; border: 1px solid #424956; border-radius: 8px; background: #20262b; text-align: left; }
 .automation-workspace .automation-target-card:hover, .automation-workspace .automation-target-card:focus-visible { border-color: var(--accent); background: #262d36; }
