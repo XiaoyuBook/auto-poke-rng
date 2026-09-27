@@ -13,7 +13,7 @@ export type AutomationParameters = {
   fixed_delay: number; max_wait_frames: number; reseed_threshold_frames: number; reidentify_max_attempts: number;
   reidentify_failure_policy: 'next_round' | 'recapture_seed'; reidentify_seed_max_attempts: number; reseeding_threshold: number;
   auto_reverse: boolean; escape_continue: boolean; reverse_lookup_window: number; shiny_threshold_seconds: number | null; record_shiny: boolean;
-  sync_mode: number; sync_nature: string; exit_blink_name: string; frame_threshold: number; delay: number; target_display_tids: number[];
+  sync_mode: number; sync_nature: string; blink_name: string; exit_blink_name: string; frame_threshold: number; delay: number; target_display_tids: number[];
 };
 export type AutomationConfig = { parameters: AutomationParameters; scripts: Record<string, string> };
 export type StaticFeatureKey = 'reverse' | 'exit' | 'sync' | 'escape';

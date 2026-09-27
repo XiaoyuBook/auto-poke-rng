@@ -14,14 +14,17 @@ test('new workflows start with only required groups and keep independent delay s
   const draft = structuredClone(store.data.config.static);
   draft.features.reverse = { added: true, enabled: true };
   draft.scripts.reverse = 'BDSP/reverse.txt';
+  draft.parameters.blink_name = '草苗龟测种';
   draft.delayConfig.strategy = 'median';
   store.saveStaticConfig(draft, first);
   store.manageStaticGroup({ action: 'create', name: '另一套' });
   assert.equal(store.data.config.static.features.reverse.added, false);
   assert.equal(store.data.config.static.scripts.reverse, '');
+  assert.equal(store.data.config.static.parameters.blink_name, '');
   assert.equal(store.data.config.static.delayConfig.strategy, 'fixed');
   store.manageStaticGroup({ action: 'select', id: first });
   assert.equal(store.data.config.static.scripts.reverse, 'BDSP/reverse.txt');
+  assert.equal(store.data.config.static.parameters.blink_name, '草苗龟测种');
   assert.equal(store.data.config.static.delayConfig.strategy, 'median');
 });
 

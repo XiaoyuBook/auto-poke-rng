@@ -16,7 +16,7 @@ const defaults = () => ({
     fixed_delay: 100, max_wait_frames: 300, reseed_threshold_frames: 900000, reidentify_max_attempts: 2,
     reidentify_failure_policy: 'next_round', reidentify_seed_max_attempts: 1, reseeding_threshold: 500000,
     auto_reverse: false, escape_continue: false, reverse_lookup_window: 500, shiny_threshold_seconds: 4, record_shiny: true,
-    sync_mode: 0, sync_nature: '', exit_blink_name: '', loop_mode: 'single', loop_count: 1, start: 'script' },
+    sync_mode: 0, sync_nature: '', blink_name: '', exit_blink_name: '', loop_mode: 'single', loop_count: 1, start: 'script' },
     scripts: { seed: '', advance: '', hit: '', exit: '', reverse: '', escape: '' }, features: defaultFeatures(), delayConfig: defaultDelay(100) },
   tid: { parameters: { frame_threshold: 300, delay: 0, target_display_tids: [], loop_mode: 'single', loop_count: 1, start: 'script' }, scripts: { seed: '', name: '' } },
   ocr: regions.map(([id,label,x,y,width,height]) => ({ id, label, rect: { x,y,width,height } })),

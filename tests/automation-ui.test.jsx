@@ -30,6 +30,31 @@ test('C01: one save persists the complete static draft',async()=>{
   expect(api.start).not.toHaveBeenCalled();
   expect(api.save).toHaveBeenCalledTimes(1);
 });
+test('static workflow uses its selected default blink config and lets exit inherit it',async()=>{
+  const {api,snapshot}=fixture();
+  api.save.mockImplementation(async ({values})=>{snapshot.config.static=structuredClone(values);return snapshot;});
+  const current={...newBlinkConfig(),name:'当前配置'};
+  const saved={...newBlinkConfig(),name:'定点测种'};
+  const exit={...newBlinkConfig(),name:'过场后测种'};
+  render(<AutomationWorkspace kind="static" profile={defaultBdspProfile} blinkConfig={current} blinkConfigs={[saved,exit]} openLogs={()=>{}} />);
+  fireEvent.change(await screen.findByLabelText('默认测种配置'),{target:{value:saved.name}});
+  fireEvent.click(screen.getByRole('button',{name:'开始前检查'}));
+  await waitFor(()=>expect(api.check).toHaveBeenCalledWith(expect.objectContaining({blink:saved,exitBlink:undefined})));
+  fireEvent.click(screen.getByRole('button',{name:'添加配置组'}));
+  fireEvent.click(screen.getByRole('checkbox',{name:/过场/}));
+  fireEvent.click(screen.getByRole('button',{name:'添加（1）'}));
+  fireEvent.change(screen.getByLabelText('过场测种配置'),{target:{value:exit.name}});
+  fireEvent.click(screen.getByRole('button',{name:'开始前检查'}));
+  await waitFor(()=>expect(api.check).toHaveBeenLastCalledWith(expect.objectContaining({blink:saved,exitBlink:exit})));
+});
+test('a deleted default blink config stops the workflow instead of silently using the current one',async()=>{
+  const {api,snapshot}=fixture();
+  snapshot.config.static.parameters.blink_name='已删除';
+  render(<AutomationWorkspace kind="static" profile={defaultBdspProfile} blinkConfig={newBlinkConfig()} blinkConfigs={[]} openLogs={()=>{}} />);
+  fireEvent.click(await screen.findByRole('button',{name:'开始前检查'}));
+  await screen.findByText('所选默认测种配置已不可用，请重新选择');
+  expect(api.check).not.toHaveBeenCalled();
+});
 test('optional groups become active when configured and can be removed and restored',async()=>{
   fixture();
   window.desktop.scripts.list.mockResolvedValue({files:[{path:'BDSP/reverse.txt'}],folders:[],warnings:[]});
