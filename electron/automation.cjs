@@ -10,7 +10,7 @@ const reverseGroups = [['Articuno','Zapdos','Moltres'],['Raikou','Entei','Suicun
 
 function validateParameters(kind, parameters) {
   const limits=kind==='tid'?{frame_threshold:[0,250000],delay:[0,1000000000],loop_count:[1,1000000]}:
-    {initial_advances:[0,10000000],max_advances:[0,1000000000],offset:[0,1000000],fixed_delay:[0,1000000000],max_wait_frames:[0,1000000],
+    {max_advances:[0,1000000000],fixed_delay:[0,1000000000],max_wait_frames:[0,1000000],
       reseed_threshold_frames:[0,1000000],reidentify_max_attempts:[1,100],reidentify_seed_max_attempts:[1,100],reseeding_threshold:[0,1000000000],reverse_lookup_window:[0,10000],loop_count:[1,1000000],sync_mode:[0,2]};
   for(const [key,[low,high]]of Object.entries(limits))if(!Number.isInteger(parameters[key])||parameters[key]<low||parameters[key]>high)throw Error(`${key} 需要在 ${low}–${high} 之间`);
   if(!['single','count','infinite'].includes(parameters.loop_mode)||!(kind==='tid'?['script','capture']:['script','capture','reidentify']).includes(parameters.start))throw Error('运行模式无效');
@@ -19,7 +19,8 @@ function validateParameters(kind, parameters) {
   }else{
     if(!data.targets.some(target=>target.speciesKey===parameters.target))throw Error('目标宝可梦无效');
     if(!['next_round','recapture_seed'].includes(parameters.reidentify_failure_policy))throw Error('校正失败策略无效');
-    if(parameters.shiny_threshold_seconds!==null&&(!Number.isFinite(parameters.shiny_threshold_seconds)||parameters.shiny_threshold_seconds<=0||parameters.shiny_threshold_seconds>300))throw Error('判闪阈值应大于0且不超过300秒');
+    if(!Number.isFinite(parameters.shiny_threshold_seconds)||parameters.shiny_threshold_seconds<=0||parameters.shiny_threshold_seconds>300)throw Error('请设置大于0且不超过300秒的判闪阈值');
+    if(typeof parameters.record_shiny!=='boolean')throw Error('录像开关无效');
     if(!Number.isInteger(parameters.lead)||![...Array(27).keys(),255].includes(parameters.lead))throw Error('队首参数无效');
     if(parameters.sync_mode>0&&!data.natures.includes(parameters.sync_nature))throw Error('请设置同步性格');
     if(!Array.isArray(parameters.filters)||!parameters.filters.length||parameters.filters.length>20)throw Error('需要1–20组目标筛选条件');
@@ -135,10 +136,7 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
       if(config.parameters.start==='script'||config.parameters.loop_mode!=='single')required.push('seed');
       if(config.parameters.auto_reverse)required.push('reverse');if(config.parameters.escape_continue)required.push('escape');
       if(kind==='static'&&config.features?.exit?.enabled)required.push('exit');
-      if(kind==='static'&&config.features?.record?.enabled)required.push('record');
-      if(kind==='static'&&config.features?.shiny?.enabled&&!config.parameters.shiny_threshold_seconds)throw Error('判闪配置组需要设置判闪阈值');
-      if(kind==='static'&&config.features?.record?.enabled&&!config.parameters.shiny_threshold_seconds)throw Error('录像配置组需要设置判闪阈值');
-      const scriptNames={seed:'测种',advance:'过帧',hit:'撞帧',reverse:'反查',exit:'过场',escape:'逃跑',record:'录像',name:'取名'};
+      const scriptNames={seed:'测种',advance:'过帧',hit:'撞帧',reverse:'反查',exit:'过场',escape:'逃跑',name:'取名'};
       for(const key of required)if(!config.scripts[key])throw Error(`请选择${scriptNames[key]||key}脚本`);
       for(const [key,relative] of Object.entries(config.scripts)){
         if(!relative)continue;
@@ -193,7 +191,7 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
         if(method==='delay_record'){store.recordDelay(run.target.speciesId,params.candidates);return null;}
         if(method==='search'){
           const p=run.input.config.parameters;
-          let initial=p.initial_advances,max=p.max_advances,lead=params.lead??p.lead,filters=p.filters;
+          let initial=0,max=p.max_advances,lead=params.lead??p.lead,filters=p.filters;
           if(params.reverse){const center=params.reverse.target.raw_target_advances;initial=Math.max(0,center-p.reverse_lookup_window);max=center+p.reverse_lookup_window-initial;
             // With a sync strategy, the core generates ordinary candidates with Lead.NONE.
             // Without that strategy, its ordinary search uses the configured lead.
@@ -203,7 +201,7 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
           const targets=params.reverse?(reverseGroups.find(group=>group.includes(p.target))||[p.target]):[p.target];
           const generate=params.reverse?rng.generateReverse:rng.generate;
           for(const target of targets)for(const filter of filters){checkStopped(run);const values=await generate({seed0:params.seed.pair[0],seed1:params.seed.pair[1],target,profile:run.input.profile,lead,
-            initialAdvances:initial,maxAdvances:max,offset:p.offset,filter:{...filter,natures:params.nature==null?filter.natures:data.natures.map((_,i)=>i===params.nature)}});
+            initialAdvances:initial,maxAdvances:max,offset:0,filter:{...filter,natures:params.nature==null?filter.natures:data.natures.map((_,i)=>i===params.nature)}});
             checkStopped(run);
             for(const row of values)rows.set(`${target}:${row.advances}`,params.reverse?{...row,reverseSpecies:target}:row);}
           return [...rows.values()].sort((a,b)=>a.advances-b.advances);

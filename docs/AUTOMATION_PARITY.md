@@ -16,7 +16,7 @@
   → [过帧 → 普通校正或完整重测 → 再判断]
   → [预留过场帧 → 过场脚本 → 过场校正 → 重新搜索]
   → 最终实时校准 / 软件等待 / 动态调整脚本闪帧 → 撞闪
-  → 判闪 → 出闪录像并结束
+  → 判闪 → 出闪时按录像开关执行 CAPTURE 5000 并结束
           → 明确未闪且有后续候选：逃跑 → 校正 → 同轮续搜
           → 反查脚本 → 详情 OCR → 反查候选 → 保存 delay 样本
           → 本轮结束 → 按循环模式进入测种脚本或完成
@@ -41,7 +41,7 @@
 | S15 | 剩余大于脚本闪帧且在窗口内：等待完整剩余值；等于闪帧：最终校准；剩余 6..闪帧-1：动态改为剩余-1；≤5 放弃 | runner: remaining_equal / remaining_less / remaining_20 / remaining_6 / remaining_5 |
 | S16 | 最终校准使用 1.018 秒线性活帧和整数推进；已错过不撞闪；最终等待直接进入撞闪，不再次采集眨眼 | runner: recomputes_hit_start / final_wait / does_not_reidentify_again |
 | S17 | Timeline 使用 1.017 秒玩家事件和宝可梦随机眨眼事件；两段帧延迟及白屏延迟按原时序生效 | runner: timeline_counter / applies_delay_fields / timeline_mode |
-| S18 | 出闪优先停止循环并录像；明确未闪且有后续候选时逃跑优先于反查，仍为同一轮 | runner: stops_after_shiny / record_script / escape_continue_takes_priority |
+| S18 | 出闪优先停止循环；录像开关开启时执行 CAPTURE 5000。明确未闪且有后续候选时逃跑优先于反查，仍为同一轮 | runner: stops_after_shiny / record_shiny / escape_continue_takes_priority |
 | S19 | 无后续候选时按原规则反查/结束；逃跑失败不继续校正；停止后不得逃跑、测种、重试 | runner: escape_error / falls_back_to_reverse / stop_during_escape |
 
 ### 时序例子（必须保持）

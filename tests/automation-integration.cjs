@@ -39,6 +39,27 @@ test('C02: preparation compiles but does not save, press, warm up, or claim devi
   assert.equal((await f.invoke('check',f.input)).ready,true);assert.deepEqual(f.trace,[]);
   assert.equal(f.automation.getState().config.static.parameters.fixed_delay,100);
 });
+test('automatic search ignores legacy initial advance and Offset values',async t=>{
+  const f=fixture(t);
+  f.input.config.parameters.initial_advances=450;
+  f.input.config.parameters.offset=25;
+  f.input.config.scripts.record='missing/legacy-record.rng';
+  await f.invoke('start',f.input);
+  await f.callbacks().request('search',{seed:{pair:['1','2']}});
+  const search=f.trace.find(item=>item&&typeof item==='object'&&Object.hasOwn(item,'initialAdvances'));
+  assert.equal(search.initialAdvances,0);
+  assert.equal(search.offset,0);
+  assert.equal(Object.hasOwn(f.workerConfig().parameters,'initial_advances'),false);
+  assert.equal(Object.hasOwn(f.workerConfig().parameters,'offset'),false);
+  assert.equal(Object.hasOwn(f.workerConfig().scripts,'record'),false);
+});
+test('shiny detection is required independently of reverse lookup',async t=>{
+  const f=fixture(t);
+  f.input.config.parameters.shiny_threshold_seconds=null;
+  const result=await f.invoke('check',f.input);
+  assert.equal(result.ready,false);
+  assert.match(result.checks.find(item=>item.label==='任务参数').detail,/判闪阈值/);
+});
 test('disabled optional scripts and missing exit blink are ignored by check and start',async t=>{
   const f=fixture(t);
   f.input.config.features.exit={added:true,enabled:false};

@@ -1,4 +1,4 @@
-const featureKeys = ['reverse', 'exit', 'sync', 'escape', 'shiny', 'record'];
+const featureKeys = ['reverse', 'exit', 'sync', 'escape'];
 const defaultFeatures = () => Object.fromEntries(featureKeys.map(key => [key, { added: false, enabled: false }]));
 const defaultDelay = (baseline = 100) => ({ strategy: 'fixed', baseline_delay: baseline, multi_candidate_policy: 'ignore', window_size: 5, ewma_alpha: 0.5, dense_interval_width: 2 });
 
@@ -10,8 +10,6 @@ function legacyFeatures(config) {
     exit: !!scripts.exit,
     sync: !!p.sync_mode || p.lead !== 255,
     escape: !!p.escape_continue,
-    shiny: p.shiny_threshold_seconds != null && p.shiny_threshold_seconds > 0,
-    record: !!scripts.record,
   };
   for (const key of featureKeys) if (active[key]) features[key] = { added: true, enabled: true };
   if (!scripts.exit && p.exit_blink_name) features.exit = { added: true, enabled: false };
@@ -39,8 +37,9 @@ function projectStaticConfig(config) {
   if (!enabled('sync')) { p.sync_mode = 0; p.sync_nature = ''; p.lead = 255; }
   if (!enabled('escape')) { p.escape_continue = false; scripts.escape = ''; }
   else p.escape_continue = true;
-  if (!enabled('record')) scripts.record = '';
-  if (!['reverse', 'escape', 'shiny', 'record'].some(enabled)) p.shiny_threshold_seconds = null;
+  delete scripts.record;
+  delete p.initial_advances;
+  delete p.offset;
   return projected;
 }
 

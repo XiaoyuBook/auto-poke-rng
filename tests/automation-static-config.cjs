@@ -31,9 +31,8 @@ test('disabled and removed groups preserve drafts but cannot enter the runtime p
   config.features.exit = { added: true, enabled: false };
   config.features.sync = { added: true, enabled: false };
   config.features.escape = { added: true, enabled: true };
-  config.features.record = { added: false, enabled: false };
   Object.assign(config.scripts, { reverse: 'missing/reverse.txt', exit: 'missing/exit.txt', escape: 'BDSP/escape.txt', record: 'missing/record.txt' });
-  Object.assign(config.parameters, { auto_reverse: true, escape_continue: false, exit_blink_name: 'missing', sync_mode: 2, sync_nature: '爽朗', lead: 3 });
+  Object.assign(config.parameters, { auto_reverse: true, escape_continue: false, exit_blink_name: 'missing', sync_mode: 2, sync_nature: '爽朗', lead: 3, initial_advances: 400, offset: 20 });
   config.parameters.reverse_lookup_window = null;
   config.parameters.reseeding_threshold = null;
   const effective = projectStaticConfig(config);
@@ -45,19 +44,21 @@ test('disabled and removed groups preserve drafts but cannot enter the runtime p
   assert.equal(effective.parameters.reseeding_threshold, 500000);
   assert.equal(effective.parameters.sync_mode, 0);
   assert.equal(effective.parameters.lead, 255);
+  assert.equal(Object.hasOwn(effective.parameters, 'initial_advances'), false);
+  assert.equal(Object.hasOwn(effective.parameters, 'offset'), false);
   assert.equal(effective.scripts.reverse, '');
   assert.equal(effective.scripts.exit, '');
-  assert.equal(effective.scripts.record, '');
+  assert.equal(Object.hasOwn(effective.scripts, 'record'), false);
   assert.equal(config.scripts.reverse, 'missing/reverse.txt');
 });
 
-test('recording alone keeps the shared shiny threshold active', () => {
+test('recording switch is independent of the required shiny threshold', () => {
   const config=defaults().static;
-  config.features.record={added:true,enabled:true};
-  config.scripts.record='record.rng';
+  config.parameters.record_shiny=false;
   const effective=projectStaticConfig(config);
   assert.equal(effective.parameters.shiny_threshold_seconds,4);
-  assert.equal(effective.scripts.record,'record.rng');
+  assert.equal(effective.parameters.record_shiny,false);
+  assert.equal(Object.hasOwn(effective.scripts,'record'),false);
 });
 
 test('version 1 migrates every workflow once without inferring groups from default frame values', () => {
@@ -73,7 +74,9 @@ test('version 1 migrates every workflow once without inferring groups from defau
   const store = new AutomationStore(dir);
   assert.equal(store.data.staticGroups.activeId, 'b');
   assert.equal(store.data.staticGroups.items[0].config.features.reverse.enabled, true);
-  assert.equal(store.data.staticGroups.items[0].config.features.shiny.enabled, true, 'legacy default threshold kept its independent detection behavior');
+  assert.equal(store.data.staticGroups.items[0].config.parameters.shiny_threshold_seconds, 4, 'old workflows gain a required shiny threshold');
+  assert.equal(store.data.staticGroups.items[0].config.parameters.record_shiny, true, 'old automatic recording behavior is preserved');
+  assert.equal(store.data.staticGroups.items[1].config.parameters.shiny_threshold_seconds, 4);
   assert.equal(store.data.staticGroups.items[0].config.features.exit.added, false);
   assert.equal(store.data.staticGroups.items[0].config.delayConfig.strategy, 'median');
   assert.equal(store.data.staticGroups.items[1].config.features.reverse.added, false);
@@ -84,6 +87,24 @@ test('version 1 migrates every workflow once without inferring groups from defau
   const again = new AutomationStore(dir);
   assert.deepEqual(again.data.staticGroups, store.data.staticGroups);
   assert.equal(again.data.profiles[487].samples.length, 1);
+});
+
+test('version 2 migrates old recording scripts and hidden search fields', () => {
+  const dir=directory();
+  const legacy=defaults();
+  legacy.static.parameters.initial_advances=900;
+  legacy.static.parameters.offset=11;
+  legacy.static.parameters.shiny_threshold_seconds=null;
+  legacy.static.scripts.record='BDSP/old-record.txt';
+  legacy.static.features.record={added:true,enabled:true};
+  fs.writeFileSync(path.join(dir,'automation.json'),JSON.stringify({version:2,config:legacy}));
+  const config=new AutomationStore(dir).snapshot().config.static;
+  assert.equal(config.parameters.shiny_threshold_seconds,4);
+  assert.equal(config.parameters.record_shiny,true);
+  assert.equal(Object.hasOwn(config.parameters,'initial_advances'),false);
+  assert.equal(Object.hasOwn(config.parameters,'offset'),false);
+  assert.equal(Object.hasOwn(config.scripts,'record'),false);
+  assert.equal(Object.hasOwn(config.features,'record'),false);
 });
 
 test('a failed full save does not partially replace the active workflow', () => {

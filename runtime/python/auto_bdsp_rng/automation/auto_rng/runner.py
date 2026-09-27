@@ -1434,18 +1434,16 @@ class AutoRngRunner:
             self._locked_target = None
             self._history("cycle_result", True, result.interval_seconds, trigger, used_delay)
             self._cycle_started = False
-            # 判定出闪后执行可替换的录屏脚本。
-            try:
-                record_path = self.config.record_script_path
-                if record_path is not None and record_path.exists():
-                    self.services.run_script_text(record_path.read_text(encoding="utf-8"), record_path.name)
-                else:
-                    self.services.run_script_text("Capture 5000\n", "auto_capture")
-            except Exception:
-                pass
+            recording = ""
+            if self.config.record_shiny:
+                try:
+                    self.services.run_script_text("CAPTURE 5000\n", "auto_capture")
+                    recording = "，已录像"
+                except Exception as exc:
+                    recording = f"，录像失败：{exc}"
             self._set_progress(
                 AutoRngPhase.COMPLETED,
-                f"{attempt_label} 疑似出闪，间隔 {interval_text}，已录像并停止自动流程",
+                f"{attempt_label} 疑似出闪，间隔 {interval_text}{recording}，已停止自动流程",
                 loop_index=self._completed_loops,
                 last_script_path=path,
             )

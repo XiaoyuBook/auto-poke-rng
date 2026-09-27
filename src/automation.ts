@@ -9,14 +9,14 @@ export type OcrRegionRow = { id: string; label: string; rect: { x: number; y: nu
 export type TargetFilter = StaticGenerationRequest['filter'];
 export type AutomationParameters = {
   start: 'script' | 'capture' | 'reidentify'; loop_mode: 'single' | 'count' | 'infinite'; loop_count: number;
-  target: string; filters: TargetFilter[]; lead: number; initial_advances: number; max_advances: number; offset: number;
+  target: string; filters: TargetFilter[]; lead: number; max_advances: number;
   fixed_delay: number; max_wait_frames: number; reseed_threshold_frames: number; reidentify_max_attempts: number;
   reidentify_failure_policy: 'next_round' | 'recapture_seed'; reidentify_seed_max_attempts: number; reseeding_threshold: number;
-  auto_reverse: boolean; escape_continue: boolean; reverse_lookup_window: number; shiny_threshold_seconds: number | null;
+  auto_reverse: boolean; escape_continue: boolean; reverse_lookup_window: number; shiny_threshold_seconds: number | null; record_shiny: boolean;
   sync_mode: number; sync_nature: string; exit_blink_name: string; frame_threshold: number; delay: number; target_display_tids: number[];
 };
 export type AutomationConfig = { parameters: AutomationParameters; scripts: Record<string, string> };
-export type StaticFeatureKey = 'reverse' | 'exit' | 'sync' | 'escape' | 'shiny' | 'record';
+export type StaticFeatureKey = 'reverse' | 'exit' | 'sync' | 'escape';
 export type StaticAutomationConfig = AutomationConfig & { features: Record<StaticFeatureKey, { added: boolean; enabled: boolean }>; delayConfig: DelayConfig };
 export type AutomationConfigGroup = { id: string; name: string; config: StaticAutomationConfig };
 export type DelayConfig = { strategy: string; baseline_delay: number; multi_candidate_policy: string; window_size: number; ewma_alpha: number; dense_interval_width: number };

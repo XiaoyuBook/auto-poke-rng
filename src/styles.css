@@ -1494,6 +1494,9 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .automation-feature-body { min-width: 0; margin: 0; padding: 12px 14px 14px; border: 0; }
 .automation-feature-body fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
 .automation-feature-body .automation-fields { margin: 0; }
+.automation-shiny-fields > button { align-self: end; min-height: 34px; }
+.automation-fields > .automation-record-toggle { grid-column: 1 / -1; flex-direction: row; align-items: center; min-height: 24px; gap: 8px; }
+.automation-record-toggle input { width: auto; margin: 0; }
 .automation-feature-body p { margin: 0 0 10px; }
 .automation-advanced { margin-top: 12px; }
 .automation-advanced summary { cursor: pointer; }

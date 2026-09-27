@@ -69,7 +69,7 @@ app.whenReady().then(async()=>{
   await until(`document.querySelector('.live-video')?.naturalWidth===640`,'synthetic video');
   await js(`window.desktop.devices.controller.connect('mock')`);
   const input={kind:'static',config:automation.getState().config.static,profile:{version:'BD',tid:0,sid:0},blink:{sourceWidth:640,sourceHeight:480,eye:'data:image/png;base64,AQ==',roi:{x:0,y:0,width:20,height:20},threshold:.9,npc:0,noisy:false,seed:['1','2','3','4'],searchMin:0,searchMax:1000000}};
-  input.config.parameters.start='capture';input.config.parameters.shiny_threshold_seconds=null;
+  input.config.parameters.start='capture';
   input.config.scripts={...input.config.scripts,advance:'advance.rng',hit:'hit.rng'};
   await js(`window.desktop.automation.start(${JSON.stringify(input)})`);
   await until(`document.querySelector('[aria-label="自动定点工作区"]').textContent.includes('测试轮次就绪')`,'runtime state broadcast');

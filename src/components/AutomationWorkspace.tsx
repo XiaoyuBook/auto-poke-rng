@@ -9,9 +9,9 @@ import { LeadSelector } from './LeadSelector';
 import { CandidateTable } from './AutomationLogs';
 import { Dialog } from './Dialog';
 
-const scriptLabels:Record<string,string>={seed:'测种脚本',advance:'过帧脚本',hit:'撞帧脚本',exit:'过场脚本',reverse:'反查脚本',escape:'逃跑脚本',record:'录像脚本',name:'取名脚本'};
-const featureInfo:Record<StaticFeatureKey,{label:string;description:string}>={reverse:{label:'自动反查',description:'遭遇后反查目标帧与实际 delay'},exit:{label:'过场',description:'预留帧数并在过场后重新测种'},sync:{label:'同步策略',description:'配置队首及同步性格搜索'},escape:{label:'逃跑续搜',description:'未出闪时执行逃跑并继续搜索'},shiny:{label:'判闪',description:'独立开启遭遇后的闪光判定'},record:{label:'录像',description:'出闪时执行录像脚本'}};
-const featureOrder:StaticFeatureKey[]=['reverse','exit','sync','escape','shiny','record'];
+const scriptLabels:Record<string,string>={seed:'测种脚本',advance:'过帧脚本',hit:'撞帧脚本',exit:'过场脚本',reverse:'反查脚本',escape:'逃跑脚本',name:'取名脚本'};
+const featureInfo:Record<StaticFeatureKey,{label:string;description:string}>={reverse:{label:'自动反查',description:'未出闪时反查目标帧与实际 delay'},exit:{label:'过场',description:'预留帧数并在过场后重新测种'},sync:{label:'同步策略',description:'配置队首及同步性格搜索'},escape:{label:'逃跑续搜',description:'未出闪时执行逃跑并继续搜索'}};
+const featureOrder:StaticFeatureKey[]=['reverse','exit','sync','escape'];
 const strategyLabels:Record<string,string>={fixed:'固定 delay',last:'上次实际 delay',mode:'众数',median:'中位数',mean:'滚动平均',ema:'指数平滑',trimmed_mean:'截尾平均',dense_interval:'密集区间'};
 const statusLabels:Record<string,string>={idle:'待命',starting:'启动中',running:'运行中',stopping:'停止中',completed:'已完成',failed:'失败',stopped:'已停止'};
 const statNames=['HP','攻击','防御','特攻','特防','速度'];
@@ -139,12 +139,10 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
   const jumpTo=(id:string)=>{setFocusedFeature(id);setExpandedFeatures(current=>({...current,[id]:true}));requestAnimationFrame(()=>document.getElementById(`automation-section-${id}`)?.scrollIntoView({behavior:'smooth',block:'nearest'}));};
   const scriptField=(key:string)=><label className="automation-script-field" key={key}>{scriptLabels[key]}<select aria-label={scriptLabels[key]} disabled={busy||pending} value={config.scripts[key]||''} onFocus={refreshScripts} onChange={event=>setConfig(current=>current&&({...current,scripts:{...current.scripts,[key]:event.target.value}}))}><option value="">未选择</option>{config.scripts[key]&&!files.some(file=>file.path===config.scripts[key])&&<option value={config.scripts[key]}>{config.scripts[key]}（文件不可用）</option>}{files.map(file=><option key={file.path} value={file.path}>{file.path}</option>)}</select></label>;
   const thresholdEditor=<><label>判闪阈值（秒）<input aria-label="判闪阈值" type="number" min={0.001} max={300} step={.1} value={p.shiny_threshold_seconds??''} onChange={event=>update({shiny_threshold_seconds:event.target.value===''?null:Number(event.target.value)})}/></label><button type="button" disabled={busy||pending} onClick={()=>void perform(async()=>setCalibration(await api.calibrate(p.target)))}>校准闪光判定</button>{calibration&&<div className="automation-toolbar"><span>实测 {calibration.interval.toFixed(3)} 秒 · 建议 {calibration.suggested.toFixed(3)} 秒</span><button onClick={()=>{update({shiny_threshold_seconds:calibration.suggested});setCalibration(null);}}>采用建议阈值</button></div>}</>;
-  const thresholdOwner=staticConfig.features?.reverse?.added&&staticConfig.features.reverse.enabled?'reverse':staticConfig.features?.shiny?.added&&staticConfig.features.shiny.enabled?'shiny':staticConfig.features?.escape?.added&&staticConfig.features.escape.enabled?'escape':'record';
   const featureIssue=(key:StaticFeatureKey)=>{
     if(!staticConfig.features[key]?.enabled)return '';
-    if(['reverse','exit','escape','record'].includes(key)&&!config.scripts[key])return `请选择${scriptLabels[key]}`;
+    if(['reverse','exit','escape'].includes(key)&&!config.scripts[key])return `请选择${scriptLabels[key]}`;
     if(key==='sync'&&p.sync_mode>0&&!p.sync_nature)return '请选择同步性格';
-    if(['shiny','record'].includes(key)&&!p.shiny_threshold_seconds)return '请设置判闪阈值';
     return '';
   };
   const readinessTarget=(label:string,detail:string)=>{
@@ -153,14 +151,12 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
     if(detail.includes('过场'))return 'exit';
     if(detail.includes('同步')||detail.includes('队首'))return 'sync';
     if(detail.includes('逃跑'))return 'escape';
-    if(detail.includes('录像'))return 'record';
-    if(detail.includes('判闪'))return thresholdOwner;
+    if(detail.includes('判闪')||detail.includes('录像'))return 'shiny';
     return label.includes('脚本')?'scripts':'base';
   };
   const featureCard=(key:StaticFeatureKey)=>{
     const state=staticConfig.features[key];if(!state?.added)return null;
     const open=expandedFeatures[key]!==false;
-    const thresholdNeeded=['reverse','escape','shiny','record'].includes(key);
     return <section id={`automation-section-${key}`} key={key} className={'automation-card automation-feature-card'+(state.enabled?'':' is-disabled')} aria-label={featureInfo[key].label}>
       <div className="automation-feature-heading"><button type="button" className="automation-feature-title" aria-expanded={open} onClick={()=>setExpandedFeatures(current=>({...current,[key]:!open}))}><ChevronDown size={16} className={open?'':'is-closed'}/><strong>{featureInfo[key].label}</strong><span className="automation-feature-status">{state.enabled?(featureIssue(key)?'待配置':'已启用'):'已停用'}</span></button><label className="automation-feature-toggle"><input type="checkbox" aria-label={`启用${featureInfo[key].label}`} checked={state.enabled} disabled={busy||pending} onChange={event=>updateFeature(key,{enabled:event.target.checked})}/>启用</label><button type="button" aria-label={`移除${featureInfo[key].label}`} title={`移除${featureInfo[key].label}`} disabled={busy||pending} onClick={()=>{updateFeature(key,{added:false,enabled:false});setRemovedFeature(key);}}>移除</button></div>
       {open&&<div className="automation-feature-body"><p className="muted">{state.enabled?featureInfo[key].description:'已停用，设置保留；检查和运行会忽略此组。'}</p>{featureIssue(key)&&<p className="automation-field-error">{featureIssue(key)}</p>}<fieldset disabled={!state.enabled||busy||pending}><div className="automation-fields">
@@ -168,9 +164,7 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
         {key==='exit'&&<>{numeric('过场预留帧数','reseeding_threshold')}{scriptField('exit')}<label>过场测种配置<select value={p.exit_blink_name||''} onChange={event=>update({exit_blink_name:event.target.value})}><option value="">使用当前眨眼配置</option>{blinkConfigs.map(value=><option key={value.name}>{value.name}</option>)}</select></label></>}
         {key==='sync'&&<><div><span>队首特性</span><LeadSelector value={p.lead} onChange={lead=>update({lead})}/></div><label>同步模式<select value={p.sync_mode} onChange={event=>update({sync_mode:Number(event.target.value)})}><option value={0}>关闭动态同步</option><option value={1}>首位普通精灵</option><option value={2}>首位同步精灵</option></select></label>{p.sync_mode>0&&<label>同步性格<select value={p.sync_nature} onChange={event=>update({sync_nature:event.target.value})}><option value="">选择性格</option>{NATURES_ZH.map(value=><option key={value}>{value}</option>)}</select></label>}</>}
         {key==='escape'&&scriptField('escape')}
-        {key==='record'&&scriptField('record')}
-        {thresholdNeeded&&thresholdOwner===key&&thresholdEditor}
-      </div>{thresholdNeeded&&thresholdOwner!==key&&<p className="muted">共用判闪阈值：{p.shiny_threshold_seconds??'未设置'} 秒 <button type="button" onClick={()=>jumpTo(thresholdOwner)}>前往判闪设置</button></p>}</fieldset></div>}
+      </div></fieldset></div>}
     </section>;
   };
   const topContent = <>
@@ -203,7 +197,7 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
     {isStatic&&<aside className="automation-group-sidebar" aria-label="配置组">
       <div className="automation-group-panel">
       <div className="automation-group-header"><h2>配置组</h2><button type="button" aria-label="添加配置组" title="添加配置组" disabled={busy||pending} onClick={()=>{setSelectedFeatures([]);setAddFeaturesOpen(true);}}><Plus size={16}/></button></div>
-      <div className="automation-group-list">{[{id:'base',label:'基础设置',status:'必选'},{id:'scripts',label:'基础脚本',status:'必选'},...featureOrder.filter(key=>staticConfig.features?.[key]?.added).map(key=>({id:key,label:featureInfo[key].label,status:staticConfig.features[key].enabled?(featureIssue(key)?'待配置':'已启用'):'已停用'}))].map(item=><button type="button" key={item.id} className={'automation-group-select'+(focusedFeature===item.id?' is-active':'')} onClick={()=>jumpTo(item.id)}><strong>{item.label}</strong><small>{item.status}</small></button>)}</div>
+      <div className="automation-group-list">{[{id:'base',label:'基础设置',status:'必选'},{id:'scripts',label:'基础脚本',status:'必选'},{id:'shiny',label:'闪光判定',status:'必选'},...featureOrder.filter(key=>staticConfig.features?.[key]?.added).map(key=>({id:key,label:featureInfo[key].label,status:staticConfig.features[key].enabled?(featureIssue(key)?'待配置':'已启用'):'已停用'}))].map(item=><button type="button" key={item.id} className={'automation-group-select'+(focusedFeature===item.id?' is-active':'')} onClick={()=>jumpTo(item.id)}><strong>{item.label}</strong><small>{item.status}</small></button>)}</div>
       </div>
     </aside>}
     <div className="automation-flow-content">
@@ -213,7 +207,7 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
       <section id="automation-section-base" className="automation-card automation-feature-card" aria-label="基础设置"><div className="automation-feature-heading"><strong>基础设置</strong><span className="automation-feature-status">必选</span></div><fieldset disabled={busy||pending} className="automation-feature-body"><div className="automation-fields">
         <label>起点<select aria-label="流程起点" value={p.start} onChange={event=>update({start:event.target.value as AutomationParameters['start']})}><option value="script">从测种脚本开始</option><option value="capture">从捕获 Seed 开始</option><option value="reidentify">从当前 Seed 校正开始</option></select></label>
         <label>运行模式<select value={p.loop_mode} onChange={event=>update({loop_mode:event.target.value as AutomationParameters['loop_mode']})}><option value="single">单次</option><option value="count">循环 N 次</option><option value="infinite">无限循环</option></select></label>{p.loop_mode==='count'&&numeric('循环次数','loop_count',1,1000000)}
-        {numeric('初始帧','initial_advances')}{numeric('搜索范围','max_advances')}{numeric('Offset','offset')}{numeric('最大等待帧数','max_wait_frames')}
+        {numeric('搜索范围','max_advances')}{numeric('最大等待帧数','max_wait_frames')}
       </div><button type="button" onClick={openDelay}>delay 策略与样本 · {strategyLabels[staticConfig.delayConfig.strategy]||staticConfig.delayConfig.strategy}</button>
       {delayOpen&&<section className="automation-delay" aria-label="delay 策略与样本"><h4>{target?.species} · 本轮 {snapshot.state.roundDelay??'—'} / 下轮预计 {estimate??'—'} / 基准 {staticConfig.delayConfig.baseline_delay}</h4><div className="automation-fields">
         <label>策略<select value={staticConfig.delayConfig.strategy} onChange={event=>updateDelay({strategy:event.target.value})}>{Object.entries(strategyLabels).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
@@ -227,6 +221,7 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
       <details className="automation-advanced"><summary>校正与补救 · 高级设置</summary><div className="automation-fields">{numeric('校正帧数上限','reseed_threshold_frames',0,1000000)}{numeric('普通校正最大尝试','reidentify_max_attempts',1,100)}<label>校正失败处理<select value={p.reidentify_failure_policy} onChange={event=>update({reidentify_failure_policy:event.target.value as AutomationParameters['reidentify_failure_policy']})}><option value="next_round">进入下一轮</option><option value="recapture_seed">先完整重测 Seed</option></select></label>{numeric('补救测种最大尝试','reidentify_seed_max_attempts',1,100)}</div></details>
       </fieldset></section>
       <section id="automation-section-scripts" className="automation-card automation-feature-card" aria-label="基础脚本"><div className="automation-feature-heading"><strong>基础脚本</strong><span className="automation-feature-status">必选</span></div><fieldset disabled={busy||pending} className="automation-feature-body"><p className="muted">选择脚本库中的 .txt 文件；测种脚本按起点和循环模式检查。</p><div className="automation-fields">{['seed','hit','advance'].map(scriptField)}</div><button type="button" onClick={refreshScripts}>刷新脚本</button></fieldset></section>
+      <section id="automation-section-shiny" className="automation-card automation-feature-card" aria-label="闪光判定"><div className="automation-feature-heading"><strong>闪光判定</strong><span className="automation-feature-status">必选</span></div><fieldset disabled={busy||pending} className="automation-feature-body"><p className="muted">遭遇后通过画面识别判定是否出闪；该设置独立于自动反查。</p><div className="automation-fields automation-shiny-fields">{thresholdEditor}<label className="automation-record-toggle"><input type="checkbox" aria-label="出闪时录像" checked={p.record_shiny} onChange={event=>update({record_shiny:event.target.checked})}/>出闪时录像（CAPTURE 5000）</label></div></fieldset></section>
       {featureOrder.map(featureCard)}
     </div>}
     {!isStatic&&<div className="automation-config-grid">

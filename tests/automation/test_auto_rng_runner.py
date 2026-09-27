@@ -3089,15 +3089,14 @@ def test_runner_stops_after_hit_monitor_reports_shiny(tmp_path):
     assert "4.200" in runner.progress.log_message
 
 
-def test_runner_runs_record_script_after_shiny(tmp_path):
+@pytest.mark.parametrize("record_shiny", [True, False])
+def test_runner_records_shiny_only_when_enabled(tmp_path, record_shiny):
     seed_script = tmp_path / "BDSP测种.txt"
     advance_script = tmp_path / "bdsp过帧.txt"
     hit_script = tmp_path / "谢米.txt"
-    record_script = tmp_path / "录屏.txt"
     seed_script.write_text("A 100\n", encoding="utf-8")
     advance_script.write_text("_目标帧数 = 填写目标帧数\n", encoding="utf-8")
     hit_script.write_text("_闪帧 = 60\n", encoding="utf-8")
-    record_script.write_text("CAPTURE 7000\n", encoding="utf-8")
     scripts: list[tuple[str, str]] = []
     services = AutoRngServices(
         capture_seed=lambda: AutoRngSeedResult(seed="seed-1", current_advances=0, npc=0),
@@ -3116,7 +3115,7 @@ def test_runner_runs_record_script_after_shiny(tmp_path):
             seed_script_path=seed_script,
             advance_script_path=advance_script,
             hit_script_path=hit_script,
-            record_script_path=record_script,
+            record_shiny=record_shiny,
             fixed_delay=1200,
             max_wait_frames=300,
             shiny_threshold_seconds=3.5,
@@ -3126,7 +3125,7 @@ def test_runner_runs_record_script_after_shiny(tmp_path):
 
     runner.run(max_steps=7)
 
-    assert scripts[-1] == ("CAPTURE 7000\n", "录屏.txt")
+    assert (("CAPTURE 5000\n", "auto_capture") in scripts) is record_shiny
     assert runner.progress.phase == AutoRngPhase.COMPLETED
 
 

@@ -12,12 +12,12 @@ const regions = [
   ['shiny_dialog','判闪对话区域',6,895,1914,175], ['starter_battle','御三家战斗区域',1540,620,170,95],
 ];
 const defaults = () => ({
-  static: { parameters: { target: 'Turtwig', filters: [defaultFilter()], lead: 255, initial_advances: 0, max_advances: 100000, offset: 0,
+  static: { parameters: { target: 'Turtwig', filters: [defaultFilter()], lead: 255, max_advances: 100000,
     fixed_delay: 100, max_wait_frames: 300, reseed_threshold_frames: 900000, reidentify_max_attempts: 2,
     reidentify_failure_policy: 'next_round', reidentify_seed_max_attempts: 1, reseeding_threshold: 500000,
-    auto_reverse: false, escape_continue: false, reverse_lookup_window: 500, shiny_threshold_seconds: 4,
+    auto_reverse: false, escape_continue: false, reverse_lookup_window: 500, shiny_threshold_seconds: 4, record_shiny: true,
     sync_mode: 0, sync_nature: '', exit_blink_name: '', loop_mode: 'single', loop_count: 1, start: 'script' },
-    scripts: { seed: '', advance: '', hit: '', exit: '', reverse: '', escape: '', record: '' }, features: defaultFeatures(), delayConfig: defaultDelay(100) },
+    scripts: { seed: '', advance: '', hit: '', exit: '', reverse: '', escape: '' }, features: defaultFeatures(), delayConfig: defaultDelay(100) },
   tid: { parameters: { frame_threshold: 300, delay: 0, target_display_tids: [], loop_mode: 'single', loop_count: 1, start: 'script' }, scripts: { seed: '', name: '' } },
   ocr: regions.map(([id,label,x,y,width,height]) => ({ id, label, rect: { x,y,width,height } })),
 });
@@ -26,11 +26,11 @@ const clone = value => structuredClone(value);
 class AutomationStore extends EventEmitter {
   constructor(directory, { now = () => new Date() } = {}) {
     super(); this.directory = directory; this.now = now; this.logs = []; this.runs = []; this.error = '';
-    this.data = { version: 2, config: defaults(), profiles: {}, logging: true, staticGroups: null };
+    this.data = { version: 3, config: defaults(), profiles: {}, logging: true, staticGroups: null };
     const file = path.join(directory, 'automation.json');
     try {
       const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
-      if (![1, 2].includes(saved.version)) throw Error('自动流程配置版本不支持');
+      if (![1, 2, 3].includes(saved.version)) throw Error('自动流程配置版本不支持');
       for (const kind of ['static','tid']) for (const scope of ['parameters','scripts']) Object.assign(this.data.config[kind][scope], saved.config?.[kind]?.[scope]);
       if (Array.isArray(saved.config?.ocr) && saved.config.ocr.length === 10) this.data.config.ocr = saved.config.ocr;
       this.data.profiles = saved.profiles || {}; this.data.logging = saved.logging !== false;
@@ -41,7 +41,13 @@ class AutomationStore extends EventEmitter {
       const migrate = config => {
         const base = defaults().static;
         config.parameters = { ...base.parameters, ...config.parameters };
-        config.scripts = { ...base.scripts, ...config.scripts };
+        delete config.parameters.initial_advances;
+        delete config.parameters.offset;
+        if (saved.version < 3) {
+          if (!(config.parameters.shiny_threshold_seconds > 0)) config.parameters.shiny_threshold_seconds = base.parameters.shiny_threshold_seconds;
+          config.parameters.record_shiny = true;
+        }
+        config.scripts = Object.fromEntries(Object.keys(base.scripts).map(key => [key, config.scripts?.[key] || '']));
         config.features = normalizeFeatures(saved.version === 1 ? { ...config, features: undefined } : config);
         const species = require('../src/generated/bdsp-data.json').targets.find(item => item.speciesKey === config.parameters.target)?.speciesId;
         const historical = species && this.data.profiles[species]?.config;
@@ -51,7 +57,7 @@ class AutomationStore extends EventEmitter {
       };
       if (this.data.staticGroups) this.data.staticGroups.items.forEach(item => migrate(item.config));
       else migrate(this.data.config.static);
-      this.data.version = 2;
+      this.data.version = 3;
     } catch (error) { if (error.code !== 'ENOENT') this.error = `无法加载自动流程配置，原文件保留：${error.message}`; }
     if (!this.data.staticGroups) this.data.staticGroups = { activeId: 'default', items: [{ id: 'default', name: '默认流程', config: clone(this.data.config.static) }] };
     const active = this.data.staticGroups.items.find(item => item.id === this.data.staticGroups.activeId) || this.data.staticGroups.items[0];

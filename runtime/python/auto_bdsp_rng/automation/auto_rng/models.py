@@ -64,7 +64,6 @@ class AutoRngConfig:
     escape_script_path: Path | None = None
     exit_script_path: Path | None = None
     reverse_script_path: Path | None = None
-    record_script_path: Path | None = None
     seed_config_path: str = ""
     reidentify_config_path: str = ""
     auto_reverse: bool = False
@@ -94,6 +93,7 @@ class AutoRngConfig:
     start_phase: AutoRngPhase = AutoRngPhase.RUN_SEED_SCRIPT
     max_advances: int = 100_000
     shiny_threshold_seconds: float | None = None
+    record_shiny: bool = True
     debug_output: bool = False
 
 
