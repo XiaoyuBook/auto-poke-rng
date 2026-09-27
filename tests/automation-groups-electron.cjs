@@ -40,6 +40,7 @@ app.whenReady().then(async()=>{
   await until(`Boolean(document.querySelector('[aria-label="自动定点工作区"] .automation-group-sidebar'))`,'workspace');
   assert.equal(await js(`document.querySelectorAll('.automation-group-select').length`),2);
   assert.equal(await js(`Boolean(document.querySelector('[aria-label="撞帧脚本"]'))`),true);
+  assert.equal(await js(`(()=>{const workspace=document.querySelector('[aria-label="自动定点工作区"]').getBoundingClientRect();const top=document.querySelector('.automation-workspace-top').getBoundingClientRect();const overview=document.querySelector('.automation-overview').getBoundingClientRect();const sidebar=document.querySelector('.automation-group-sidebar').getBoundingClientRect();return Math.abs(top.left-workspace.left)<2&&Math.abs(top.right-workspace.right)<2&&overview.bottom<=sidebar.top+1;})()`),true,'target and status span above the configuration sidebar');
   await shot('static-default-wide.png');
   await clickAria('新建流程配置');await until(`Boolean(document.querySelector('.automation-group-dialog input'))`,'create dialog');
   await setInput('.automation-group-dialog input','骑拉帝纳定点');await clickText('创建');
@@ -64,6 +65,7 @@ app.whenReady().then(async()=>{
   await until(`document.querySelector('[aria-label="流程配置"]')?.value===${JSON.stringify(id)}&&document.querySelectorAll('.automation-group-select').length===4`,'custom restored');
   main.setSize(1100,680);await delay(250);
   assert.equal(await js(`document.documentElement.scrollWidth<=document.documentElement.clientWidth+1`),true,'1100px overflow');
+  assert.equal(await js(`document.querySelector('.automation-overview').getBoundingClientRect().bottom<=document.querySelector('.automation-group-sidebar').getBoundingClientRect().top+1`),true,'compact overview remains above configuration groups');
   assert.equal(await js(`document.querySelector('.workspace-right-rail').getBoundingClientRect().top>=document.querySelector('.workspace-primary').getBoundingClientRect().bottom-1`),true,'video and log rail');
   await shot('static-features-1100x680.png');
   await clickAria('添加配置组');await until(`Boolean(document.querySelector('.automation-add-dialog'))`,'compact modal');
