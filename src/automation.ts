@@ -21,6 +21,7 @@ export type StaticAutomationConfig = AutomationConfig & { features: Record<Stati
 export type AutomationConfigGroup = { id: string; name: string; config: StaticAutomationConfig };
 export type DelayConfig = { strategy: string; baseline_delay: number; multi_candidate_policy: string; window_size: number; ewma_alpha: number; dense_interval_width: number };
 export type DelayProfile = { config: DelayConfig; samples: { candidates: number[]; round_number: number; observed_at: string; excluded: boolean }[]; next_round_number: number };
+export type DelayPreview = { value: number; effective_strategy: string; valid_round_count: number; candidate_count: number; used_fallback: boolean; sample_statuses: string[]; used_round_numbers: number[] };
 export type IdRow = { advances: number; tid: number; sid: number; tsv: number; display_tid: number };
 export type IdResults = { id_states: IdRow[]; id_elapsed_seconds: (number | null)[]; seed_measured_wall_time?: number };
 export type AutomationProgress = Partial<IdResults> & {
@@ -53,7 +54,7 @@ export interface AutomationApi {
   defaultOcr(): Promise<OcrRegionRow[]>;
   ocr(input: { operation: string; field?: string }): Promise<{ text?: string; results?: Record<string, string> }>;
   delay(input: { species: number; action: 'save' | 'clear' | 'exclude'; config?: DelayConfig; number?: number; excluded?: boolean }): Promise<AutomationSnapshot>;
-  delayEstimate(profile: DelayProfile): Promise<number>;
+  delayEstimate(profile: DelayProfile): Promise<DelayPreview>;
   calibrate(target: string): Promise<{ interval: number; suggested: number }>;
   tidPreview(input: { seed: string[]; frame_threshold: number }): Promise<IdResults>;
   setLogging(value: boolean): Promise<AutomationSnapshot>;

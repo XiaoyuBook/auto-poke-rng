@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Play, Square, ListChecks, FileClock, Plus, Pencil, Trash2, ChevronDown } from 'lucide-react';
+import { Play, Square, ListChecks, FileClock, Plus, Pencil, Trash2, ChevronDown, SlidersHorizontal } from 'lucide-react';
 import { automationBusy, downloadText, useAutomation, type AutomationConfig, type AutomationKind, type AutomationParameters, type DelayConfig, type IdResults, type Readiness, type StaticAutomationConfig, type StaticFeatureKey, type TargetFilter } from '../automation';
 import type { BlinkConfig } from '../blink';
 import type { BdspProfile } from '../bdspProfile';
@@ -8,11 +8,11 @@ import { CATEGORY_OPTIONS, NATURES_ZH, STATIC_TARGETS, getCategoryLabel, getStat
 import { LeadSelector } from './LeadSelector';
 import { CandidateTable } from './AutomationLogs';
 import { Dialog } from './Dialog';
+import { DelayConfigDialog, delayPreviewReason, delayStrategyLabels, useDelayPreview } from './DelayConfigDialog';
 
 const scriptLabels:Record<string,string>={seed:'测种脚本',advance:'过帧脚本',hit:'撞帧脚本',exit:'过场脚本',reverse:'反查脚本',escape:'逃跑脚本',name:'取名脚本'};
 const featureInfo:Record<StaticFeatureKey,{label:string;description:string}>={reverse:{label:'自动反查',description:'未出闪时反查目标帧与实际 delay'},exit:{label:'过场',description:'预留帧数并在过场后重新测种'},sync:{label:'同步策略',description:'配置队首及同步性格搜索'},escape:{label:'逃跑续搜',description:'未出闪时执行逃跑并继续搜索'}};
 const featureOrder:StaticFeatureKey[]=['reverse','exit','sync','escape'];
-const strategyLabels:Record<string,string>={fixed:'固定 delay',last:'上次实际 delay',mode:'众数',median:'中位数',mean:'滚动平均',ema:'指数平滑',trimmed_mean:'截尾平均',dense_interval:'密集区间'};
 const statusLabels:Record<string,string>={idle:'待命',starting:'启动中',running:'运行中',stopping:'停止中',completed:'已完成',failed:'失败',stopped:'已停止'};
 const statNames=['HP','攻击','防御','特攻','特防','速度'];
 const targetSprites=import.meta.glob<string>('../assets/bdsp-targets/*.png',{eager:true,query:'?url',import:'default'});
@@ -24,25 +24,22 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
   const [groupEditor,setGroupEditor]=useState<{mode:'create'|'rename';id?:string}|null>(null),[groupName,setGroupName]=useState('');
   const [groupDeleteId,setGroupDeleteId]=useState<string|null>(null),[addFeaturesOpen,setAddFeaturesOpen]=useState(false),[selectedFeatures,setSelectedFeatures]=useState<StaticFeatureKey[]>([]),[focusedFeature,setFocusedFeature]=useState<string>('base'),[expandedFeatures,setExpandedFeatures]=useState<Record<string,boolean>>({}),[removedFeature,setRemovedFeature]=useState<StaticFeatureKey|null>(null);
   const [readiness,setReadiness]=useState<Readiness|null>(null),[pending,setPending]=useState(false),[filterIndex,setFilterIndex]=useState(0);
-  const [delayOpen,setDelayOpen]=useState(false),[samplePage,setSamplePage]=useState(0),[estimate,setEstimate]=useState<number|null>(null);
+  const [delayOpen,setDelayOpen]=useState(false);
   const [tidText,setTidText]=useState(''),[ids,setIds]=useState<IdResults|null>(null),[onlyTargets,setOnlyTargets]=useState(false),[idPage,setIdPage]=useState(0),[selectedId,setSelectedId]=useState<number|null>(null);
   const [now,setNow]=useState(Date.now());const initialized=useRef(false);
   const [calibration,setCalibration]=useState<{interval:number;suggested:number}|null>(null);
   const [saveFailed,setSaveFailed]=useState(false);
   const savingRef=useRef(false);
   const operationRef=useRef(false);
+  const delayTriggerRef=useRef<HTMLButtonElement>(null);
   useEffect(()=>{if(snapshot&&!initialized.current){initialized.current=true;setConfig(structuredClone(snapshot.config[kind]));}},[snapshot,kind]);
   const refreshScripts=()=>{void window.desktop?.scripts.list().then(value=>setFiles(value.files)).catch(error=>setError(error.message));};
   useEffect(()=>{if(api)refreshScripts();},[api]);
   const progress=snapshot?.state.kind===kind?snapshot.state.progress:null;
   useEffect(()=>{if(progress?.id_states){setIds({id_states:progress.id_states,id_elapsed_seconds:progress.id_elapsed_seconds||[],seed_measured_wall_time:progress.seed_measured_wall_time});if(!progress.id_states.length){setSelectedId(null);setIdPage(0);}}},[progress?.id_states,progress?.id_elapsed_seconds,progress?.seed_measured_wall_time]);
   const estimateSpecies=STATIC_TARGETS.find(item=>item.speciesKey===config?.parameters.target)?.speciesId;
-  const sampleKey=JSON.stringify(snapshot?.profiles[String(estimateSpecies)]?.samples||[]);
-  useEffect(()=>{
-    setEstimate(null);if(!delayOpen||!config||!('delayConfig' in config)||!api?.delayEstimate)return;
-    let alive=true;const timer=setTimeout(()=>{void api.delayEstimate({config:(config as StaticAutomationConfig).delayConfig,samples:JSON.parse(sampleKey),next_round_number:1}).then(value=>{if(alive)setEstimate(value);}).catch(()=>{});},200);
-    return()=>{alive=false;clearTimeout(timer);};
-  },[delayOpen,config,sampleKey,api]);
+  const previewSamples=snapshot?.profiles[String(estimateSpecies)]?.samples||[];
+  const delayPreview=useDelayPreview(kind==='static'&&config?(config as StaticAutomationConfig).delayConfig:null,previewSamples,`${snapshot?.staticGroups.activeId}:${estimateSpecies}`,api);
   useEffect(()=>{if(!progress?.wait_target_wall)return;const timer=setInterval(()=>setNow(Date.now()),100);return()=>clearInterval(timer);},[progress?.wait_target_wall]);
   if(!api||!snapshot||!config)return <section className="automation-workspace"><p role="status">{error||(!api?'请在桌面应用中使用自动流程。':'正在加载自动流程…')}</p></section>;
   const p=config.parameters,busy=automationBusy(snapshot.state),isStatic=kind==='static';
@@ -53,13 +50,12 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
   const statusMessage=ownState?.message||(busy?`${snapshot.state.kind==='tid'?'自动 TID':'自动定点'}：${snapshot.state.message}`:'等待开始');
   const target=STATIC_TARGETS.find(item=>item.speciesKey===p.target),species=target?.speciesId||387;
   const profileDelay=snapshot.profiles[String(species)];
-  const delayStrategy=isStatic?staticConfig.delayConfig.strategy:'fixed';
   const delaySamples=profileDelay?.samples||[];
-  const delaySamplePage=Math.min(samplePage,Math.max(0,Math.ceil(delaySamples.length/10)-1));
   const currentRun=snapshot.runs.find(item=>item.id===snapshot.state.runId&&item.kind===kind),round=currentRun?.rounds.at(-1);
   const update=(values:Partial<AutomationParameters>)=>{setReadiness(null);setSaveFailed(false);setConfig(current=>current&&({...current,parameters:{...current.parameters,...values}}));};
   const updateFeature=(key:StaticFeatureKey,added:boolean)=>{setReadiness(null);setSaveFailed(false);setConfig(current=>current&&({...current,features:{...(current as StaticAutomationConfig).features,[key]:{...(current as StaticAutomationConfig).features[key],added}}}));};
-  const updateDelay=(change:Partial<DelayConfig>)=>{setReadiness(null);setSaveFailed(false);setConfig(current=>current&&({...current,parameters:Object.hasOwn(change,'baseline_delay')?{...current.parameters,fixed_delay:change.baseline_delay!}:current.parameters,delayConfig:{...(current as StaticAutomationConfig).delayConfig,...change}}));};
+  const updateDelay=(draft:DelayConfig)=>{setReadiness(null);setSaveFailed(false);setConfig(current=>current&&({...current,parameters:{...current.parameters,fixed_delay:draft.baseline_delay},delayConfig:draft}));};
+  const closeDelay=()=>{setDelayOpen(false);requestAnimationFrame(()=>delayTriggerRef.current?.focus());};
   const perform=async(action:()=>Promise<unknown>,message='')=>{if(operationRef.current)return;operationRef.current=true;setError('');setNotice('');setPending(true);try{await action();if(message)setNotice(message);}catch(error){setError(error instanceof Error?error.message:String(error));}finally{operationRef.current=false;setPending(false);}};
   const input=()=>{
     const selectedBlink=p.blink_name?blinkConfigs.find(item=>item.name===p.blink_name):blinkConfig;
@@ -206,23 +202,14 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
     {!isStatic&&<header className="automation-heading"><div><h2>自动 TID 乱数</h2><p>小卡比兽测种、Display TID 搜索与自动取名</p></div></header>}
     {!isStatic&&topContent}
     {isStatic&&<div className="automation-static-sections">
-      <section id="automation-section-base" className="automation-card automation-feature-card" aria-label="基础设置"><div className="automation-feature-heading"><strong>基础设置</strong><span className="automation-feature-status">必选</span></div><fieldset disabled={busy||pending} className="automation-feature-body"><div className="automation-fields">
+      <section id="automation-section-base" className="automation-card automation-feature-card" aria-label="基础设置"><div className="automation-feature-heading"><strong>基础设置</strong><span className="automation-feature-status">必选</span></div><fieldset disabled={busy||pending} className="automation-feature-body"><div className="automation-fields automation-base-fields">
         <label>起点<select aria-label="流程起点" value={p.start} onChange={event=>update({start:event.target.value as AutomationParameters['start']})}><option value="script">从测种脚本开始</option><option value="capture">从捕获 Seed 开始</option><option value="reidentify">从当前 Seed 校正开始</option></select></label>
         <label>默认测种配置<select aria-label="默认测种配置" value={p.blink_name||''} onChange={event=>update({blink_name:event.target.value})}><option value="">{blinkConfig.name}</option>{p.blink_name&&!blinkConfigs.some(item=>item.name===p.blink_name)&&<option value={p.blink_name}>{p.blink_name}（配置不可用）</option>}{blinkConfigs.map(item=><option key={item.name} value={item.name}>{item.name}</option>)}</select></label>
         <label>运行模式<select value={p.loop_mode} onChange={event=>update({loop_mode:event.target.value as AutomationParameters['loop_mode']})}><option value="single">单次</option><option value="count">循环 N 次</option><option value="infinite">无限循环</option></select></label>{p.loop_mode==='count'&&numeric('循环次数','loop_count',1,1000000)}
-        {numeric('搜索范围','max_advances')}{numeric('最大等待帧数','max_wait_frames')}
-      </div><details className="automation-subsection" open={delayOpen}><summary onClick={event=>{event.preventDefault();setDelayOpen(value=>!value);}}>delay 策略与样本 · {strategyLabels[staticConfig.delayConfig.strategy]||staticConfig.delayConfig.strategy}</summary>
-      {delayOpen&&<section className="automation-delay" aria-label="delay 策略与样本"><h4>{target?.species} · {delayStrategy==='fixed'?`固定 delay ${staticConfig.delayConfig.baseline_delay}`:`下轮预计 ${estimate??'—'} / 基准 ${staticConfig.delayConfig.baseline_delay}`}{snapshot.state.kind===kind&&snapshot.state.roundDelay!=null?` · 本轮 ${snapshot.state.roundDelay}`:''}</h4><div className="automation-fields">
-        <label>策略<select value={staticConfig.delayConfig.strategy} onChange={event=>updateDelay({strategy:event.target.value})}>{Object.entries(strategyLabels).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
-        <label>基准 delay<input type="number" min={0} max={1000000000} aria-invalid={!Number.isInteger(staticConfig.delayConfig.baseline_delay)||staticConfig.delayConfig.baseline_delay<0||staticConfig.delayConfig.baseline_delay>1000000000} value={staticConfig.delayConfig.baseline_delay??''} onChange={event=>updateDelay({baseline_delay:event.target.value===''?null as unknown as number:Number(event.target.value)})}/>{(!Number.isInteger(staticConfig.delayConfig.baseline_delay)||staticConfig.delayConfig.baseline_delay<0||staticConfig.delayConfig.baseline_delay>1000000000)&&<small className="automation-field-error">请输入 0–1000000000 的整数</small>}</label>
-        {!['fixed','last'].includes(delayStrategy)&&<><label>多候选策略<select value={staticConfig.delayConfig.multi_candidate_policy} onChange={event=>updateDelay({multi_candidate_policy:event.target.value})}><option value="ignore">忽略多候选轮次</option><option value="weighted">每轮总权重为 1</option></select></label><label>有效轮次窗口<input type="number" min={1} max={10000} value={staticConfig.delayConfig.window_size??''} onChange={event=>updateDelay({window_size:event.target.value===''?null as unknown as number:Number(event.target.value)})}/></label></>}
-        {delayStrategy==='ema'&&<label>平滑权重<input type="number" min={0.01} max={1} step={.01} value={staticConfig.delayConfig.ewma_alpha??''} onChange={event=>updateDelay({ewma_alpha:event.target.value===''?null as unknown as number:Number(event.target.value)})}/></label>}
-        {delayStrategy==='dense_interval'&&<label>密集区间跨度<input type="number" min={0} step={1} value={staticConfig.delayConfig.dense_interval_width??''} onChange={event=>updateDelay({dense_interval_width:event.target.value===''?null as unknown as number:Number(event.target.value)})}/></label>}
-      </div><p className="muted">{delayStrategy==='fixed'?'固定策略直接使用基准 delay。':'没有可用样本时使用基准 delay。'}{snapshot.state.kind===kind&&snapshot.state.roundDelay!=null?' 本轮 delay 已确定，变动从下一轮生效。':''}</p>
-      <details className="automation-delay-samples"><summary>历史样本 · {delaySamples.length} 条</summary>{delaySamples.length?<><p className="muted">当前宝可梦的样本由所有流程共享。</p><button type="button" onClick={()=>void perform(()=>api.delay({species,action:'clear'}),'已清空该宝可梦在所有流程共享的样本')}>清空当前宝可梦共享样本</button>
-        {[...delaySamples].reverse().slice(delaySamplePage*10,delaySamplePage*10+10).map(sample=><div className="automation-toolbar" key={sample.round_number}><span style={{textDecoration:sample.excluded?'line-through':undefined}}>第 {sample.round_number} 轮 · {sample.candidates.join(' / ')} · {new Date(sample.observed_at).toLocaleString()}</span><button type="button" onClick={()=>void perform(()=>api.delay({species,action:'exclude',number:sample.round_number,excluded:!sample.excluded}))}>{sample.excluded?'恢复':'划除'}</button></div>)}
-        {delaySamples.length>10&&<div className="automation-toolbar"><button type="button" disabled={!delaySamplePage} onClick={()=>setSamplePage(delaySamplePage-1)}>上一页</button><span>{delaySamplePage+1} / {Math.ceil(delaySamples.length/10)}</span><button type="button" disabled={(delaySamplePage+1)*10>=delaySamples.length} onClick={()=>setSamplePage(delaySamplePage+1)}>下一页</button></div>}</>:<p className="muted">暂无历史样本</p>}</details>
-      </section>}</details>
+        {numeric('搜索范围','max_advances')}
+        <div className="automation-delay-field"><span>delay 策略</span><button ref={delayTriggerRef} type="button" className="automation-delay-trigger" aria-haspopup="dialog" aria-label={`设置 delay 策略：${delayStrategyLabels[staticConfig.delayConfig.strategy]||staticConfig.delayConfig.strategy}，预计 ${delayPreview.status==='ready'?delayPreview.result!.value:'待计算'} 帧`} onClick={()=>setDelayOpen(true)} title={delayStrategyLabels[staticConfig.delayConfig.strategy]||staticConfig.delayConfig.strategy}><span>{delayStrategyLabels[staticConfig.delayConfig.strategy]||staticConfig.delayConfig.strategy}</span><strong>{delayPreview.status==='ready'?delayPreview.result!.value:'—'} <small>帧</small></strong><SlidersHorizontal size={15} aria-hidden="true" /></button><small>{delayPreview.status==='ready'?delayPreviewReason(delayPreview.result!,staticConfig.delayConfig.strategy):delayPreview.status==='invalid'?'参数待补全':delayPreview.status==='error'?'预计值暂不可用':'下轮预计 · 计算中'}</small></div>
+        {numeric('最大等待帧数','max_wait_frames')}
+      </div>
       <details className="automation-subsection"><summary>校正与补救 · 高级设置</summary><div className="automation-fields">{numeric('校正帧数上限','reseed_threshold_frames',0,1000000)}{numeric('普通校正最大尝试','reidentify_max_attempts',1,100)}<label>校正失败处理<select value={p.reidentify_failure_policy} onChange={event=>update({reidentify_failure_policy:event.target.value as AutomationParameters['reidentify_failure_policy']})}><option value="next_round">进入下一轮</option><option value="recapture_seed">先完整重测 Seed</option></select></label>{p.reidentify_failure_policy==='recapture_seed'&&numeric('补救测种最大尝试','reidentify_seed_max_attempts',1,100)}</div></details>
       </fieldset></section>
       <section id="automation-section-scripts" className="automation-card automation-feature-card" aria-label="基础脚本"><div className="automation-feature-heading"><strong>基础脚本</strong><span className="automation-feature-status">必选</span></div><fieldset disabled={busy||pending} className="automation-feature-body"><p className="muted">选择脚本库中的 .txt 文件；测种脚本按起点和循环模式检查。</p><div className="automation-fields">{['seed','hit','advance'].map(scriptField)}</div><button type="button" onClick={refreshScripts}>刷新脚本</button></fieldset></section>
@@ -260,6 +247,7 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
       <div className="automation-target-dialog-body">{renderTargetEditor()}{error&&<p className="panel-error" role="alert">{error}</p>}</div>
       <div className="automation-target-dialog-actions"><span className="muted">{dirty?'配置未保存':'配置已保存'}</span><button type="button" className="button primary" onClick={saveTargetSettings}>完成设置</button></div>
     </Dialog>}
+    {isStatic&&delayOpen&&<DelayConfigDialog key={`${snapshot.staticGroups.activeId}:${species}`} config={staticConfig.delayConfig} samples={delaySamples} species={target?.species||'当前宝可梦'} flowName={activeGroup?.name||'当前流程'} scopeKey={`${snapshot.staticGroups.activeId}:${species}`} api={api} runningDelay={ownState?.roundDelay} locked={busy||pending} onClose={closeDelay} onApply={draft=>{updateDelay(draft);closeDelay();}} onExclude={async(roundNumber,excluded)=>{const next=await api.delay({species,action:'exclude',number:roundNumber,excluded});setSnapshot(next);}} onClear={async()=>{const next=await api.delay({species,action:'clear'});setSnapshot(next);}} />}
     {isStatic&&removedFeature&&<div className="automation-undo" role="status">已移除{featureInfo[removedFeature].label}<button type="button" onClick={()=>{updateFeature(removedFeature,true);jumpTo(removedFeature);setRemovedFeature(null);}}>撤销</button><button type="button" aria-label="关闭撤销提示" onClick={()=>setRemovedFeature(null)}>×</button></div>}
     {isStatic&&addFeaturesOpen&&<Dialog title="选择添加的配置组（可多选）" close={()=>setAddFeaturesOpen(false)} className="automation-add-dialog"><div className="automation-add-options">{featureOrder.map(key=><label key={key} className="automation-add-option"><input type="checkbox" checked={selectedFeatures.includes(key)} disabled={!!staticConfig.features[key].added} onChange={event=>setSelectedFeatures(current=>event.target.checked?[...current,key]:current.filter(value=>value!==key))}/><span><strong>{featureInfo[key].label}</strong><small>{featureInfo[key].description}</small></span>{staticConfig.features[key].added&&<em>已添加</em>}</label>)}{featureOrder.every(key=>staticConfig.features[key].added)&&<p className="muted">所有可选配置组均已添加。</p>}</div><div className="automation-group-dialog-actions"><button type="button" onClick={()=>setAddFeaturesOpen(false)}>取消</button><button type="button" className="button primary" disabled={!selectedFeatures.length} onClick={()=>{for(const key of selectedFeatures)updateFeature(key,true);const first=selectedFeatures[0];setAddFeaturesOpen(false);setSelectedFeatures([]);if(first)setTimeout(()=>jumpTo(first),0);}}>添加（{selectedFeatures.length}）</button></div></Dialog>}
     {isStatic&&groupEditor&&<Dialog title={groupEditor.mode==='create'?'新建流程配置':'重命名流程配置'} close={()=>setGroupEditor(null)} className="automation-group-dialog">

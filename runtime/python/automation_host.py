@@ -17,7 +17,7 @@ from types import SimpleNamespace
 
 from auto_bdsp_rng.automation.auto_rng.models import AutoRngConfig, AutoRngPhase, AutoRngSeedResult, ShinyCheckResult
 from auto_bdsp_rng.automation.auto_rng.runner import AutoRngRunner, AutoRngServices
-from auto_bdsp_rng.automation.auto_rng.delay_strategy import DelayStrategyConfig, DelaySampleRound, calculate_delay
+from auto_bdsp_rng.automation.auto_rng.delay_strategy import DelayStrategyConfig, DelaySampleRound, calculate_delay, estimate_delay, evaluate_delay_samples
 from auto_bdsp_rng.automation.auto_rng.scripts import validate_auto_scripts
 from auto_bdsp_rng.automation.auto_tid_rng import AutoTidRngConfig, AutoTidRngPhase, AutoTidSeedResult, AutoTidRngRunner, AutoTidRngServices, predict_tid_elapsed_seconds
 from auto_bdsp_rng.gen8_id import generate_ids
@@ -365,8 +365,19 @@ class Session:
             self.calibrate()
             return
         if c.get('command') == 'delay-estimate':
-            value = calculate_delay(DelayStrategyConfig(**c['profile']['config']),[DelaySampleRound(**sample) for sample in c['profile']['samples']])
-            self.emit(event='result',result=value); return
+            config = DelayStrategyConfig(**c['profile']['config'])
+            samples = [DelaySampleRound(**sample) for sample in c['profile']['samples']]
+            estimate = estimate_delay(config, samples)
+            evaluations = evaluate_delay_samples(config, samples)
+            self.emit(event='result', result={
+                'value': estimate.value,
+                'effective_strategy': estimate.effective_strategy.value,
+                'valid_round_count': estimate.valid_round_count,
+                'candidate_count': estimate.candidate_count,
+                'used_fallback': estimate.used_fallback,
+                'sample_statuses': [item.status.value for item in evaluations],
+                'used_round_numbers': [item.sample.round_number for item in evaluations if item.in_window],
+            }); return
         if c.get('command') == 'tid-preview':
             seed=SeedState32.from_hex_words(c['seed'])
             states=generate_ids(seed.to_seed_pair64(),max_advances=c['frame_threshold']+1)

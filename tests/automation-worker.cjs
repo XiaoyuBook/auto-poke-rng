@@ -33,7 +33,10 @@ test('T02: real JSONL worker generates inclusive ID range and fixed elapsed timi
 test('D01: real worker estimates weighted delay without loading hardware',async()=>{
   const worker=startWorker({command:'delay-estimate',profile:{config:{strategy:'mean',baseline_delay:100,multi_candidate_policy:'weighted',window_size:5},samples:[{candidates:[100,102]},{candidates:[104]}]}});
   const result=await worker.done;
-  assert.equal(result.status,'completed',result.message);assert.equal(result.result,103);
+  assert.equal(result.status,'completed',result.message);
+  assert.equal(result.result.value,103);
+  assert.equal(result.result.valid_round_count,2);
+  assert.deepEqual(result.result.sample_statuses,['used','used']);
 });
 test('C04: worker cancellation resolves stopped and accepts no follow-up commands',async()=>{
   const worker=startWorker({command:'tid-preview',seed:['12345678','9ABCDEF0','11111111','22222222'],frame_threshold:250000});
