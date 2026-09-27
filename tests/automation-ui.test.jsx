@@ -116,6 +116,10 @@ test('static workflow uses its selected default blink config and lets exit inher
   fireEvent.click(screen.getByRole('button',{name:'添加配置组'}));
   fireEvent.click(screen.getByRole('checkbox',{name:/过场/}));
   fireEvent.click(screen.getByRole('button',{name:'添加（1）'}));
+  expect(screen.getByLabelText('过场测种配置').querySelector('option[value=""]').textContent).toBe(saved.name);
+  fireEvent.change(screen.getByLabelText('默认测种配置'),{target:{value:''}});
+  expect(screen.getByLabelText('过场测种配置').querySelector('option[value=""]').textContent).toBe(current.name);
+  fireEvent.change(screen.getByLabelText('默认测种配置'),{target:{value:saved.name}});
   fireEvent.change(screen.getByLabelText('过场测种配置'),{target:{value:exit.name}});
   fireEvent.click(screen.getByRole('button',{name:'开始前检查'}));
   await waitFor(()=>expect(api.check).toHaveBeenLastCalledWith(expect.objectContaining({blink:saved,exitBlink:exit})));

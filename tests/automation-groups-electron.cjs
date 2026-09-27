@@ -94,6 +94,7 @@ app.whenReady().then(async()=>{
   assert.equal(await js(`Boolean(document.querySelector('[aria-label="自动反查"] [aria-label="判闪阈值"]'))`),false);
   assert.equal(await js(`Boolean(document.querySelector('[aria-label="自动反查"] button').textContent.includes('校准闪光判定'))`),false);
   assert.equal(await js(`Boolean(document.querySelector('[aria-label="过场"] [aria-label="过场脚本"]'))`),true);
+  assert.equal(await js(`document.querySelector('[aria-label="过场测种配置"] option[value=""]')?.textContent===document.querySelector('[aria-label="默认测种配置"] option:checked')?.textContent`),true,'post-exit inherited config shows its name');
   assert.equal(await js(`document.querySelector('[aria-label="自动反查"]').textContent.includes('待配置')`),true);
   await clickAria('移除过场');await until(`document.querySelectorAll('.automation-group-select').length===4`,'removed');
   await clickText('撤销');await until(`document.querySelectorAll('.automation-group-select').length===5`,'undo');await shot('static-features-wide.png');
