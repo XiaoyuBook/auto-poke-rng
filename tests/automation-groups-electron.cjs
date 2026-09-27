@@ -16,7 +16,7 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 let devices,blink,rng,automation,notifications;
 const timer=setTimeout(()=>{console.error('Automation groups test timed out');app.exit(1);},45000);
 app.whenReady().then(async()=>{
-  const main=new BrowserWindow({width:1500,height:940,show:false,webPreferences:{preload:path.join(root,'electron/preload.cjs'),contextIsolation:true,sandbox:true,backgroundThrottling:false}});
+  const main=new BrowserWindow({width:1500,height:940,show:false,webPreferences:{preload:path.join(root,'electron/preload.cjs'),contextIsolation:true,sandbox:true,backgroundThrottling:false,offscreen:true}});
   const js=code=>main.webContents.executeJavaScript(code,true);
   const until=async(code,label)=>{for(let i=0;i<180;i++){if(await js(code))return;await delay(30);}throw Error(label);};
   const clickAria=name=>js(`document.querySelector('[aria-label=${JSON.stringify(name)}]').click()`);
@@ -31,7 +31,8 @@ app.whenReady().then(async()=>{
   blink=registerBlink({ipcMain,getMainWindow:()=>main,getVideo:()=>devices.getState().video,isAutomationBusy:()=>devices.isAutomationBusy()});
   notifications=registerQQNotifications({ipcMain,getMainWindow:()=>main,safeStorage,nativeImage,userData});
   automation=registerAutomation({ipcMain,getMainWindow:()=>main,getWindows:()=>BrowserWindow.getAllWindows(),devices,rng,blink,userData});
-  await main.loadFile(path.join(root,'dist/index.html'));main.showInactive();
+  await main.loadFile(path.join(root,'dist/index.html'));
+  assert.equal(main.isVisible(),false,'visual validation must stay offscreen');
   await until(`Boolean(document.querySelector('[aria-label^="切换游戏"]'))`,'app ready');
   await js(`document.querySelector('[aria-label^="切换游戏"]').click()`);
   await until(`Boolean(document.querySelector('[role=menuitemradio]'))`,'game picker');
