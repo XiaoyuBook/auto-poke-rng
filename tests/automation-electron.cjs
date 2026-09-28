@@ -52,20 +52,22 @@ app.whenReady().then(async()=>{
   await js(`document.querySelector('[aria-label^="切换游戏"]').click()`);
   await until(`Boolean(document.querySelector('[role=menuitemradio]'))`,'game picker');
   await js(`Array.from(document.querySelectorAll('[role=menuitemradio]')).find(x=>x.textContent.includes('珍钻复刻')).click()`);
-  await click('自动定点');
+  await click('自动流程');
   await until(`Boolean(document.querySelector('[aria-label="自动定点工作区"] .automation-static-sections'))`,'automation page');
+  assert.equal(await js(`document.querySelectorAll('nav[aria-label="工作区"] button').length`),6,'one automation sidebar entry');
+  assert.equal(await js(`document.querySelector('#automation-tab-static').getAttribute('aria-selected')`),'true');
   const ready=await js(`(async()=>window.desktop.automation.check({kind:'static',config:(await window.desktop.automation.getState()).config.static,blink:{},profile:{version:'BD',tid:0,sid:0}}))()`);
   assert.equal(ready.ready,false);assert.equal(automation.getState().runs.length,0);
   await js(`document.querySelector('.automation-delay-trigger').click()`);
   await until(`Boolean(document.querySelector('.automation-delay-dialog'))`,'delay settings');
   await js(`(()=>{const input=document.querySelector('[aria-label="固定 delay"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'1442');input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
   await click('应用');
+  await click('自动 TID');await click('自动定点');
+  await js(`document.querySelector('.automation-delay-trigger').click()`);
+  assert.equal(await js(`document.querySelector('[aria-label="固定 delay"]')?.value`),'1442','unsaved draft survives tab switch');
+  await click('取消');
   await click('保存配置');
   await until(`document.querySelector('.automation-save-status')?.textContent==='已保存'`,'parameter save');
-  await click('自动TID');await click('自动定点');
-  await js(`document.querySelector('.automation-delay-trigger').click()`);
-  assert.equal(await js(`document.querySelector('[aria-label="固定 delay"]')?.value`),'1442');
-  await click('取消');
   await screenshot('automatic-static.png');
   // Device integration stays on synthetic video and the mock controller.
   await js(`window.desktop.devices.video.connect({deviceId:'synthetic',backend:'msmf',width:640,height:480,fps:60})`);
@@ -77,6 +79,13 @@ app.whenReady().then(async()=>{
   await js(`window.desktop.automation.start(${JSON.stringify(input)})`);
   await until(`document.querySelector('.automation-flow-copy strong')?.textContent==='等待启动撞帧脚本'`,'runtime phase broadcast');
   assert.equal(await js(`document.querySelector('[data-node="wait"]')?.dataset.state`),'current','real phase maps to wait node');
+  await click('自动 TID');
+  assert.equal(await js(`document.querySelector('.automation-hub-running-notice')?.textContent.includes('自动定点正在运行')`),true,'inactive tab names running flow');
+  assert.equal(await js(`document.querySelector('#automation-panel-tid .automation-run-toolbar button:nth-child(1)').disabled`),true,'other flow cannot start');
+  assert.equal(await js(`document.querySelector('#automation-panel-tid .automation-run-toolbar button:nth-child(2)').disabled`),true,'other flow cannot stop active flow');
+  await screenshot('automatic-tid-other-running.png');
+  await click('返回运行页');
+  assert.equal(await js(`document.querySelector('#automation-tab-static').getAttribute('aria-selected')`),'true');
   assert.equal(await js(`window.desktop.devices.controller.press('A').then(()=>false,()=>true)`),true,'manual input blocked');
   await click('查看相关日志');
   await until(`document.querySelector('.floating-panel')?.textContent.includes('自动流程测试日志') || document.querySelector('.automation-log-center')?.textContent.includes('自动流程测试日志')`,'related logs');
@@ -93,7 +102,7 @@ app.whenReady().then(async()=>{
   await detached.webContents.executeJavaScript(`void window.desktop.panels.dock();true`);
   await delay(100);
   await js(`document.querySelector('[aria-label="关闭日志中心"]')?.click()`);
-  await click('自动TID');
+  await click('自动 TID');
   const ids=await js(`window.desktop.automation.tidPreview({seed:['40000000','00000000','40000000','00000000'],frame_threshold:4})`);
   assert.deepEqual(ids.id_states.map(row=>row.advances),[0,1,2,3,4]);
   await screenshot('automatic-tid.png');
@@ -102,7 +111,7 @@ app.whenReady().then(async()=>{
   assert.equal(await js(`document.querySelectorAll('.ocr-table tbody tr').length`),10);
   await screenshot('ocr-settings.png');
   assert.ok(fs.readdirSync(path.join(app.getPath('userData'),'logs')).length,'daily disk log exists after clearing');
-  console.log('PASS: automation navigation, saved drafts, real IPC, input exclusion, related/detached logs, stop, ID worker and OCR settings');
+  console.log('PASS: combined automation tabs, saved drafts, cross-tab running guard, real IPC, input exclusion, related/detached logs, stop, ID worker and OCR settings');
 }).catch(error=>{console.error(error);process.exitCode=1;}).finally(async()=>{
   clearTimeout(timer);await automation?.close();notifications?.close();await Promise.allSettled([devices?.close(),blink?.close(),rng?.close()]);app.exit(process.exitCode||0);
 });

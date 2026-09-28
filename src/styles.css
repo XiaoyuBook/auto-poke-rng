@@ -119,6 +119,17 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .workspace-primary { position: relative; width: 100%; height: 100%; min-width: 0; min-height: 0; overflow: hidden; container-type: inline-size; }
 .workspace-page { height: 100%; padding: 0; overflow: auto; }
 .workspace-page[hidden], .workspace-labels[hidden] { display: none; }
+.automation-hub { min-width: 0; }
+.automation-hub[hidden] { display: none; }
+.automation-hub-tabs { display: flex; gap: 3px; width: max-content; max-width: calc(100% - 8px); margin: 2px 4px 16px; padding: 3px; border: 1px solid var(--line); border-radius: 8px; background: #1b2225; }
+.automation-hub-tabs button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-width: 105px; padding: 8px 14px; border: 0; border-radius: 5px; background: transparent; color: var(--secondary); font-size: 13px; cursor: pointer; }
+.automation-hub-tabs button:hover { color: var(--text); background: #293134; }
+.automation-hub-tabs button[aria-selected="true"] { background: #344047; color: var(--text); box-shadow: 0 1px 3px #0004; }
+.automation-hub-tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.automation-hub-running-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+.automation-hub-running-notice { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 0 4px 14px; padding: 10px 12px; border: 1px solid #516459; border-radius: 7px; background: #243029; color: var(--text); font-size: 12px; }
+.automation-hub-running-notice button { padding: 4px 8px; border: 1px solid #617869; border-radius: 5px; background: #304237; color: var(--text); cursor: pointer; }
+.automation-hub-running-notice button:hover { background: #3b5243; }
 .automation-page[hidden] { display: none; }
 .automation-workspace { display: flex; flex-direction: column; gap: 14px; min-width: 0; padding: 2px 4px 24px; }
 .automation-heading h2 { margin: 0; font-size: 17px; }

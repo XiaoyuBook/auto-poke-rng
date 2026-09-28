@@ -39,7 +39,7 @@ app.whenReady().then(async()=>{
   await js(`document.querySelector('[aria-label^="切换游戏"]').click()`);
   await until(`Boolean(document.querySelector('[role=menuitemradio]'))`,'game picker');
   await js(`Array.from(document.querySelectorAll('[role=menuitemradio]')).find(item=>item.textContent.includes('珍钻复刻')).click()`);
-  await clickText('自动定点');
+  await clickText('自动流程');
   await until(`Boolean(document.querySelector('[aria-label="自动定点工作区"] .automation-group-sidebar'))`,'workspace');
   assert.equal(await js(`document.querySelectorAll('.automation-group-select').length`),3);
   assert.equal(await js(`Boolean(document.querySelector('[aria-label="撞帧脚本"]'))`),true);

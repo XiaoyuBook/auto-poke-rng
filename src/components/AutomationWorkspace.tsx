@@ -170,7 +170,7 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
   const topContent = <>
     <div className="automation-toolbar automation-run-toolbar">
       <button className="button primary" disabled={busy||pending} onClick={()=>void perform(async()=>{await saveDraft();await api.start(input());})}><Play size={14}/>开始</button>
-      <button className="button" disabled={!busy} onClick={()=>void api.stop().catch(reason=>setError(reason instanceof Error?reason.message:String(reason)))}><Square size={14}/>停止</button>
+      <button className="button" disabled={!ownState || !busy || ownState.status === 'stopping'} onClick={()=>void api.stop().catch(reason=>setError(reason instanceof Error?reason.message:String(reason)))}><Square size={14}/>停止</button>
       <button className="button" disabled={busy||pending} onClick={()=>void perform(async()=>{await saveDraft();setReadiness(await api.check(input()));})}><ListChecks size={14}/>开始前检查</button>
       <button className="button" onClick={openRelated}><FileClock size={14}/>查看相关日志</button>
       {isStatic&&<><span className="automation-save-status" role="status">{pending?'保存中':saveFailed?'保存失败':dirty?'未保存':'已保存'}</span><button type="button" disabled={busy||pending||!dirty} onClick={()=>void perform(saveDraft,'配置已保存')}>保存配置</button></>}

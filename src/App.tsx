@@ -21,7 +21,7 @@ import { ControllerOverlayApp } from './components/ControllerOverlayApp';
 import { KeyMappingDialog } from './components/KeyMappingDialog';
 import { OcrWorkspace } from './components/OcrWorkspace';
 import { AutomationWorkspace } from './components/AutomationWorkspace';
-import { automationBusy, useAutomation } from './automation';
+import { automationBusy, useAutomation, type AutomationKind } from './automation';
 import { StaticDataWorkspace } from './components/StaticDataWorkspace';
 import { BlinkWorkspace } from './components/BlinkWorkspace';
 import { BlinkVideoOverlay } from './components/BlinkVideoOverlay';
@@ -57,6 +57,9 @@ export default function App({ connections = initialConnections }: { connections?
   const actualConnections = window.desktop?.devices ? { video: devices.video.status, controller: devices.controller.status } : connections;
   const [page, setPage] = useState<Page>('脚本编辑');
   const [visitedPages, setVisitedPages] = useState<Set<Page>>(() => new Set(['脚本编辑']));
+  const [automationTab, setAutomationTab] = useState<AutomationKind>('static');
+  const [visitedAutomationTabs, setVisitedAutomationTabs] = useState<Set<AutomationKind>>(() => new Set(['static']));
+  const runningAutomationKind = automationBusy(automation.snapshot?.state) ? automation.snapshot?.state.kind : null;
   const [cursor, setCursor] = useState({ line: 1, column: 1 });
   const [game, setGame] = useState<GameId>('frlg');
   const [bdspProfile, setBdspProfile] = useBdspProfile();
@@ -300,10 +303,18 @@ export default function App({ connections = initialConnections }: { connections?
   };
 
   const navigateToPage = (next: Page) => {
-    if (['定点数据', '闪光反查区域', '眨眼捕获', '自动定点', '自动TID'].includes(next) && game !== 'bdsp') return;
+    if (['定点数据', '闪光反查区域', '眨眼捕获', '自动流程'].includes(next) && game !== 'bdsp') return;
     setPage(next);
     setVisitedPages(current => new Set(current).add(next));
     if (inlineLabelsOpen) setVideoLabelsOpen(false);
+  };
+  const selectAutomationTab = (kind: AutomationKind) => {
+    setAutomationTab(kind);
+    setVisitedAutomationTabs(current => new Set(current).add(kind));
+  };
+  const navigateToAutomation = (kind: AutomationKind) => {
+    selectAutomationTab(kind);
+    navigateToPage('自动流程');
   };
 
   const toggleVideoLabels = () => {
@@ -480,8 +491,9 @@ export default function App({ connections = initialConnections }: { connections?
     { label: '首页', keywords: 'home', icon: <Home size={16} />, run: () => navigateToPage('首页') },
     { label: '脚本编辑', keywords: 'script editor', icon: <TerminalSquare size={16} />, run: () => navigateToPage('脚本编辑') },
     ...(game === 'bdsp' ? [
-      { label: '自动定点', keywords: 'automation static', icon: <Dices size={16} />, run: () => navigateToPage('自动定点') },
-      { label: '自动TID', keywords: 'automation tid', icon: <Dices size={16} />, run: () => navigateToPage('自动TID') },
+      { label: '自动流程', keywords: 'automation', icon: <Dices size={16} />, run: () => navigateToPage('自动流程') },
+      { label: '自动定点', keywords: 'automation static', icon: <Dices size={16} />, run: () => navigateToAutomation('static') },
+      { label: '自动 TID', keywords: 'automation tid', icon: <Dices size={16} />, run: () => navigateToAutomation('tid') },
       { label: '定点数据', keywords: 'static pokemon pokefinder encounter', icon: <Dices size={16} />, run: () => navigateToPage('定点数据') },
       { label: '闪光反查区域', keywords: 'ocr recognition shiny roi', icon: <ScanText size={16} />, run: () => navigateToPage('闪光反查区域') },
       { label: '眨眼捕获', keywords: 'blink seed project xs', icon: <Eye size={16} />, run: () => navigateToPage('眨眼捕获') },
@@ -519,7 +531,7 @@ export default function App({ connections = initialConnections }: { connections?
                   <button key={item.id} role="menuitemradio" aria-checked={item.id === game} className={'game-option ' + (item.id === game ? 'selected' : '')}
                     onClick={() => {
                       setGame(item.id); setGameMenuOpen(false); gameButton.current?.focus();
-                      if (item.id !== 'bdsp' && ['定点数据', '闪光反查区域', '眨眼捕获', '自动定点', '自动TID'].includes(page)) setPage('首页');
+                      if (item.id !== 'bdsp' && ['定点数据', '闪光反查区域', '眨眼捕获', '自动流程'].includes(page)) setPage('首页');
                       if (item.id !== game) addLog('已切换查看：' + item.label + '。');
                     }}>
                     <span className="game-mark" style={{ background: item.color }} />
@@ -537,8 +549,7 @@ export default function App({ connections = initialConnections }: { connections?
           <NavItem label="首页" icon={<Home size={16} />} active={page === '首页'} onClick={() => navigateToPage('首页')} />
           <NavItem label="脚本编辑" icon={<TerminalSquare size={16} />} active={page === '脚本编辑'} onClick={() => navigateToPage('脚本编辑')} />
           {game === 'bdsp' && <NavItem label="定点数据" icon={<Dices size={16} />} active={page === '定点数据'} onClick={() => navigateToPage('定点数据')} />}
-          {game === 'bdsp' && <NavItem label="自动定点" icon={<Dices size={16} />} active={page === '自动定点'} onClick={() => navigateToPage('自动定点')} />}
-          {game === 'bdsp' && <NavItem label="自动TID" icon={<Dices size={16} />} active={page === '自动TID'} onClick={() => navigateToPage('自动TID')} />}
+          {game === 'bdsp' && <NavItem label="自动流程" icon={<Dices size={16} />} active={page === '自动流程'} onClick={() => navigateToPage('自动流程')} />}
           {game === 'bdsp' && <NavItem label="闪光反查区域" icon={<ScanText size={16} />} active={page === '闪光反查区域'} onClick={() => navigateToPage('闪光反查区域')} />}
           {game === 'bdsp' && <NavItem label="眨眼捕获" icon={<Eye size={16} />} active={page === '眨眼捕获'} onClick={() => navigateToPage('眨眼捕获')} />}
         </nav>
@@ -558,13 +569,13 @@ export default function App({ connections = initialConnections }: { connections?
           </IconButton>
           <h1>{page}</h1>
           <div className="topbar-actions">
-            {automationBusy(automation.snapshot?.state) && <button className="button" onClick={() => void automation.api?.stop()}>自动流程运行中 · 停止</button>}
+            {runningAutomationKind && <button className="button" disabled={automation.snapshot?.state.status === 'stopping'} onClick={() => void automation.api?.stop()}>{runningAutomationKind === 'tid' ? '自动 TID' : '自动定点'}运行中 · 停止</button>}
             <button className="search-trigger" title="快速查找 (Ctrl+K)" aria-label="快速查找" onClick={() => setPaletteOpen(true)}><Search size={15} /><kbd>Ctrl K</kbd></button>
             {!automationBusy(automation.snapshot?.state) && <span className="run-state"><span className={'status-dot ' + (run || recording || blink.busy ? 'success' : '')} />{run ? run.folder + (window.desktop?.devices ? ' · 运行中' : ' · 演示运行中') : recording ? '录制预览中' : blink.busy ? ['tracking', 'countdown', 'timeline'].includes(blink.state.status) ? `当前帧数 ${(blink.state.tracking?.advances ?? blink.state.result?.baselineAdvances)?.toLocaleString() ?? '—'}` : blink.state.mode === 'preview' ? '眨眼识别预览' : '眨眼捕获中' : '待命'}</span>}
           </div>
         </header>
 
-        <div className="workspace-content" data-labels-open={inlineLabelsOpen || undefined} data-automation-static={page === '自动定点' || undefined} style={{ '--video-width': `${videoWidth}px` } as CSSProperties}>
+        <div className="workspace-content" data-labels-open={inlineLabelsOpen || undefined} data-automation-static={page === '自动流程' && automationTab === 'static' || undefined} style={{ '--video-width': `${videoWidth}px` } as CSSProperties}>
           <div className="workspace-primary">
             <div className="workspace-page" hidden={inlineLabelsOpen}>
               {page === '脚本编辑' && <ScriptWorkspace scriptId={library.active?.path || ''} scriptName={library.active?.name || ''} script={script}
@@ -576,8 +587,24 @@ export default function App({ connections = initialConnections }: { connections?
                 progress={run?.progress} validation={validation} recording={recording} elapsed={elapsed} toggleRunning={toggleRunning} toggleRecording={toggleRecording} openModal={openModal}
                 virtualControllerOpen={virtualControllerOpen} toggleVirtualController={() => void toggleVirtualController()}
                 labelButton={<VideoLabelsButton variant="tool" expanded={panelWindows.videoLabelsOpen} toggle={toggleVideoLabels} />} />}
-              {visitedPages.has('自动定点') && <div className="automation-page" hidden={page !== '自动定点'}><AutomationWorkspace kind="static" profile={bdspProfile} blinkConfig={blink.config} blinkConfigs={blink.configs} openLogs={() => showPanel('logs')} /></div>}
-              {visitedPages.has('自动TID') && <div className="automation-page" hidden={page !== '自动TID'}><AutomationWorkspace kind="tid" profile={bdspProfile} blinkConfig={blink.config} blinkConfigs={blink.configs} openLogs={() => showPanel('logs')} /></div>}
+              {visitedPages.has('自动流程') && <div className="automation-hub" hidden={page !== '自动流程'}>
+                <div className="automation-hub-tabs" role="tablist" aria-label="自动流程类型" onKeyDown={event => {
+                  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+                  event.preventDefault();
+                  const next = event.key === 'Home' ? 'static' : event.key === 'End' ? 'tid' : automationTab === 'static' ? 'tid' : 'static';
+                  selectAutomationTab(next);
+                  event.currentTarget.querySelector<HTMLButtonElement>(`#automation-tab-${next}`)?.focus();
+                }}>
+                  <button type="button" role="tab" id="automation-tab-static" aria-controls="automation-panel-static" aria-selected={automationTab === 'static'} tabIndex={automationTab === 'static' ? 0 : -1} onClick={() => selectAutomationTab('static')}>自动定点{runningAutomationKind === 'static' && <span className="automation-hub-running-dot" aria-hidden="true" />}</button>
+                  <button type="button" role="tab" id="automation-tab-tid" aria-controls="automation-panel-tid" aria-selected={automationTab === 'tid'} tabIndex={automationTab === 'tid' ? 0 : -1} onClick={() => selectAutomationTab('tid')}>自动 TID{runningAutomationKind === 'tid' && <span className="automation-hub-running-dot" aria-hidden="true" />}</button>
+                </div>
+                {runningAutomationKind && runningAutomationKind !== automationTab && <div className="automation-hub-running-notice" role="status">
+                  <span>{runningAutomationKind === 'tid' ? '自动 TID' : '自动定点'}正在运行，此页暂不能启动。</span>
+                  <button type="button" onClick={() => selectAutomationTab(runningAutomationKind)}>返回运行页</button>
+                </div>}
+                {visitedAutomationTabs.has('static') && <div className="automation-page automation-hub-panel" id="automation-panel-static" role="tabpanel" aria-labelledby="automation-tab-static" hidden={automationTab !== 'static'}><AutomationWorkspace kind="static" profile={bdspProfile} blinkConfig={blink.config} blinkConfigs={blink.configs} openLogs={() => showPanel('logs')} /></div>}
+                {visitedAutomationTabs.has('tid') && <div className="automation-page automation-hub-panel" id="automation-panel-tid" role="tabpanel" aria-labelledby="automation-tab-tid" hidden={automationTab !== 'tid'}><AutomationWorkspace kind="tid" profile={bdspProfile} blinkConfig={blink.config} blinkConfigs={blink.configs} openLogs={() => showPanel('logs')} /></div>}
+              </div>}
               {visitedPages.has('闪光反查区域') && <div hidden={page !== '闪光反查区域'}><OcrWorkspace overlayTarget={page === '闪光反查区域' ? ocrOverlayHost : null} previewTarget={page === '闪光反查区域' ? ocrPreviewHost : null} /></div>}
               {page === '定点数据' && <StaticDataWorkspace profile={bdspProfile} onLog={message => addLog(message, '系统', 'success')} />}
               {page === '眨眼捕获' && <BlinkWorkspace blink={blink} video={devices.video} />}

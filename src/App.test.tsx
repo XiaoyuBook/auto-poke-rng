@@ -169,7 +169,7 @@ describe('workspace interactions', () => {
     expect(within(nav).getAllByRole('button').map(button => button.textContent)).toEqual(['首页', '脚本编辑']);
     expect(screen.queryByRole('button', { name: '定点数据' })).toBeNull();
     changeGame('珍钻复刻');
-    expect(within(nav).getAllByRole('button').map(button => button.textContent)).toEqual(['首页', '脚本编辑', '定点数据', '自动定点', '自动TID', '闪光反查区域', '眨眼捕获']);
+    expect(within(nav).getAllByRole('button').map(button => button.textContent)).toEqual(['首页', '脚本编辑', '定点数据', '自动流程', '闪光反查区域', '眨眼捕获']);
     fireEvent.click(screen.getByRole('button', { name: '首页' }));
     expect(screen.getByRole('region', { name: '存档信息' })).toBeTruthy();
     changeGame('火叶');
@@ -181,6 +181,19 @@ describe('workspace interactions', () => {
     expect(document.querySelector('.app-shell')?.getAttribute('data-collapsed')).toBe('true');
     fireEvent.click(screen.getByRole('button', { name: '展开侧栏' }));
     expect(document.querySelector('.app-shell')?.getAttribute('data-collapsed')).toBe('false');
+  });
+
+  it('keeps the selected automation tab when leaving and returning', async () => {
+    await openApp();
+    changeGame('珍钻复刻');
+    fireEvent.click(within(screen.getByRole('navigation', { name: '工作区' })).getByRole('button', { name: '自动流程' }));
+    const tabs = screen.getByRole('tablist', { name: '自动流程类型' });
+    expect(within(tabs).getByRole('tab', { name: '自动定点' }).getAttribute('aria-selected')).toBe('true');
+    fireEvent.click(within(tabs).getByRole('tab', { name: '自动 TID' }));
+    expect(within(tabs).getByRole('tab', { name: '自动 TID' }).getAttribute('aria-selected')).toBe('true');
+    fireEvent.click(screen.getByRole('button', { name: '首页' }));
+    fireEvent.click(within(screen.getByRole('navigation', { name: '工作区' })).getByRole('button', { name: '自动流程' }));
+    expect(within(tabs).getByRole('tab', { name: '自动 TID' }).getAttribute('aria-selected')).toBe('true');
   });
 
   it('opens OCR settings with a selectable ROI over the persistent video', async () => {
