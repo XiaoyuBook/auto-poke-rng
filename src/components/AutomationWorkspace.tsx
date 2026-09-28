@@ -9,6 +9,7 @@ import { LeadSelector } from './LeadSelector';
 import { CandidateTable } from './AutomationLogs';
 import { Dialog } from './Dialog';
 import { DelayConfigDialog, delayPreviewReason, delayStrategyLabels, useDelayPreview } from './DelayConfigDialog';
+import { StaticFlowStatusCard } from './StaticFlowStatusCard';
 
 const scriptLabels:Record<string,string>={seed:'测种脚本',advance:'过帧脚本',hit:'撞帧脚本',exit:'过场脚本',reverse:'反查脚本',escape:'逃跑脚本',name:'取名脚本'};
 const featureInfo:Record<StaticFeatureKey,{label:string;description:string}>={reverse:{label:'自动反查',description:'未出闪时执行反查；找到的 delay 候选会存入历史样本'},exit:{label:'过场',description:'在目标前预留帧数，执行过场脚本后校正 Seed'},sync:{label:'同步策略',description:'设置队首特性或同步模式后参与搜索'},escape:{label:'逃跑续搜',description:'未出闪且还有更晚候选时，执行逃跑脚本继续搜索'}};
@@ -180,12 +181,11 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
         <span className="automation-target-identity"><span>当前目标</span><strong>{target?.species||'未选择目标'}</strong><small>{target?`${getCategoryLabel(target.category)} · ${target.level} 级${target.roamer?' · 游走':''}`:''} · {p.filters.length} 组筛选条件</small></span>
         <span className="automation-target-action">目标设置</span>
       </button>}
-      <section className="automation-status-card" data-status={ownState?.status||(busy?'running':'idle')} aria-label="自动流程状态">
+      {isStatic?<StaticFlowStatusCard state={ownState} run={currentRun} activeFlowId={snapshot.staticGroups.activeId} otherBusy={busy&&!ownState} details={runDetails}/>:<section className="automation-status-card" data-status={ownState?.status||(busy?'running':'idle')} aria-label="自动流程状态">
         <div className="automation-status-heading"><span>当前流程状态</span><span className="automation-status-label">{statusLabel}</span></div>
         <strong role="status">{statusMessage}</strong>
         <dl><div><dt>阶段</dt><dd>{progress?.phase||'—'}</dd></div><div><dt>轮次</dt><dd>{progress?.loop_index||'—'}</dd></div><div><dt>当前 Adv</dt><dd>{progress?.current_advances??'—'}</dd></div></dl>
-        {isStatic&&<details className="automation-status-details"><summary>查看运行详情</summary><div className="automation-status-details-content">{runDetails}</div></details>}
-      </section>
+      </section>}
     </div>
     {readiness&&<section className="automation-card" aria-label="开始前准备"><h3>开始前准备</h3>{readiness.checks.map(item=><p key={item.label} className={item.ok?'':'panel-error'}>{item.ok?'✓':'!'} {item.label}：<span>{item.detail}</span>{isStatic&&!item.ok&&readinessTarget(item.label,item.detail)&&<button type="button" onClick={()=>jumpTo(readinessTarget(item.label,item.detail)!)}>定位设置</button>}</p>)}</section>}
   </>;

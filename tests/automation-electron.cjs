@@ -20,7 +20,7 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 let devices,blink,rng,automation,notifications;
 const timer=setTimeout(()=>{console.error('Automation Electron test timed out');app.exit(1);},55000);
 app.whenReady().then(async()=>{
-  const main=new BrowserWindow({width:1500,height:940,show:false,webPreferences:{preload:path.join(root,'electron/preload.cjs'),contextIsolation:true,sandbox:true,backgroundThrottling:false}});
+  const main=new BrowserWindow({width:1500,height:940,show:false,webPreferences:{preload:path.join(root,'electron/preload.cjs'),contextIsolation:true,sandbox:true,backgroundThrottling:false,offscreen:true}});
   const js=async code=>{try{return await main.webContents.executeJavaScript(code,true);}catch(error){throw Error(`${error.message}\nExpression: ${code}`);}};
   const until=async(code,name)=>{for(let i=0;i<180;i++){if(await js(code))return;await delay(30);}throw Error(name);};
   const click=text=>js(`Array.from(document.querySelectorAll('button')).find(x=>x.textContent===${JSON.stringify(text)}&&x.getClientRects().length).click()`);
@@ -47,7 +47,7 @@ app.whenReady().then(async()=>{
       return {done,send:()=>{},stop:async()=>resolve({status:'stopped',message:'用户停止'})};
     }});
   await loadWindow(main);
-  main.showInactive();
+  assert.equal(main.isVisible(),false,'integration validation stays offscreen');
   await until(`Boolean(document.querySelector('[aria-label^="切换游戏"]'))`,'app ready');
   await js(`document.querySelector('[aria-label^="切换游戏"]').click()`);
   await until(`Boolean(document.querySelector('[role=menuitemradio]'))`,'game picker');
@@ -56,13 +56,16 @@ app.whenReady().then(async()=>{
   await until(`Boolean(document.querySelector('[aria-label="自动定点工作区"] .automation-static-sections'))`,'automation page');
   const ready=await js(`(async()=>window.desktop.automation.check({kind:'static',config:(await window.desktop.automation.getState()).config.static,blink:{},profile:{version:'BD',tid:0,sid:0}}))()`);
   assert.equal(ready.ready,false);assert.equal(automation.getState().runs.length,0);
-  await js(`if(!Array.from(document.querySelectorAll('label')).some(x=>x.textContent.includes('基准 delay')))Array.from(document.querySelectorAll('button')).find(x=>x.textContent.includes('delay 策略与样本')).click()`);
-  await js(`(()=>{const input=Array.from(document.querySelectorAll('label')).find(x=>x.textContent.includes('基准 delay'))?.querySelector('input');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'1442');input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+  await js(`document.querySelector('.automation-delay-trigger').click()`);
+  await until(`Boolean(document.querySelector('.automation-delay-dialog'))`,'delay settings');
+  await js(`(()=>{const input=document.querySelector('[aria-label="固定 delay"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'1442');input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+  await click('应用');
   await click('保存配置');
   await until(`document.querySelector('.automation-save-status')?.textContent==='已保存'`,'parameter save');
   await click('自动TID');await click('自动定点');
-  await js(`if(!Array.from(document.querySelectorAll('label')).some(x=>x.textContent.includes('基准 delay')))Array.from(document.querySelectorAll('button')).find(x=>x.textContent.includes('delay 策略与样本')).click()`);
-  assert.equal(await js(`Array.from(document.querySelectorAll('label')).find(x=>x.textContent.includes('基准 delay'))?.querySelector('input')?.value`),'1442');
+  await js(`document.querySelector('.automation-delay-trigger').click()`);
+  assert.equal(await js(`document.querySelector('[aria-label="固定 delay"]')?.value`),'1442');
+  await click('取消');
   await screenshot('automatic-static.png');
   // Device integration stays on synthetic video and the mock controller.
   await js(`window.desktop.devices.video.connect({deviceId:'synthetic',backend:'msmf',width:640,height:480,fps:60})`);
@@ -72,7 +75,8 @@ app.whenReady().then(async()=>{
   input.config.parameters.start='capture';
   input.config.scripts={...input.config.scripts,advance:'advance.rng',hit:'hit.rng'};
   await js(`window.desktop.automation.start(${JSON.stringify(input)})`);
-  await until(`document.querySelector('[aria-label="自动定点工作区"]').textContent.includes('测试轮次就绪')`,'runtime state broadcast');
+  await until(`document.querySelector('.automation-flow-copy strong')?.textContent==='等待启动撞帧脚本'`,'runtime phase broadcast');
+  assert.equal(await js(`document.querySelector('[data-node="wait"]')?.dataset.state`),'current','real phase maps to wait node');
   assert.equal(await js(`window.desktop.devices.controller.press('A').then(()=>false,()=>true)`),true,'manual input blocked');
   await click('查看相关日志');
   await until(`document.querySelector('.floating-panel')?.textContent.includes('自动流程测试日志') || document.querySelector('.automation-log-center')?.textContent.includes('自动流程测试日志')`,'related logs');

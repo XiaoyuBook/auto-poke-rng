@@ -123,7 +123,7 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .automation-workspace { display: flex; flex-direction: column; gap: 14px; min-width: 0; padding: 2px 4px 24px; }
 .automation-heading h2 { margin: 0; font-size: 17px; }
 .automation-heading p, .automation-card p { color: var(--secondary); line-height: 1.6; }
-.automation-overview { display: grid; grid-template-columns: minmax(240px, .85fr) minmax(0, 1.15fr); align-items: stretch; gap: 12px; min-width: 0; }
+.automation-overview { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; gap: 12px; min-width: 0; }
 .automation-overview-single { grid-template-columns: minmax(0, 1fr); }
 .automation-workspace .automation-target-card { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 118px; padding: 9px; border: 1px solid #424956; border-radius: 8px; background: #20262b; text-align: left; }
 .automation-workspace .automation-target-card:hover, .automation-workspace .automation-target-card:focus-visible { border-color: var(--accent); background: #262d36; }
@@ -148,6 +148,64 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .automation-status-details summary { width: fit-content; color: var(--secondary); cursor: pointer; font-size: 11px; }
 .automation-status-details-content { display: grid; gap: 8px; padding-top: 10px; color: var(--secondary); font-size: 11px; overflow-wrap: anywhere; }
 .automation-status-details-content .automation-metrics { margin: 0; }
+.automation-flow-card { box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; min-width: 0; min-height: 263px; padding: 13px 17px 0; border: 1px solid #3b484f; border-radius: 9px; background: linear-gradient(145deg, #263137 0%, #20282d 48%, #1d2529 100%); color: var(--text); box-shadow: inset 0 1px 0 #e7f2ff08; }
+.automation-flow-header, .automation-flow-header-meta { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.automation-flow-header > strong { font-size: 13px; font-weight: 500; }
+.automation-flow-header-meta { justify-content: flex-end; color: var(--secondary); font-size: 11px; white-space: nowrap; }
+.automation-flow-status { display: inline-flex; align-items: center; gap: 6px; color: #bbcff8; }
+.automation-flow-status::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.automation-flow-card[data-status="completed"] .automation-flow-status { color: #a5cdb1; }
+.automation-flow-card[data-status="failed"] .automation-flow-status { color: #e5ae8a; }
+.automation-flow-card[data-status="idle"] .automation-flow-status, .automation-flow-card[data-status="stopped"] .automation-flow-status { color: var(--muted); }
+.automation-workspace button.automation-flow-detail-button { padding: 2px 5px; border: 0; background: transparent; color: var(--secondary); font-size: 11px; }
+.automation-workspace button.automation-flow-detail-button:hover { color: var(--text); }
+.automation-flow-owner { margin: 3px 0 0; color: #bbcff8; font-size: 11px; }
+.automation-flow-map { height: 148px; min-height: 148px; }
+.automation-flow-map svg { display: block; width: 100%; height: 148px; overflow: visible; }
+.automation-flow-edge { fill: none; stroke: #3b4a51; stroke-width: 1; }
+.automation-flow-route { fill: none; stroke: #8299c3; stroke-width: 1.35; opacity: .9; }
+.automation-flow-tail { fill: none; stroke-width: 2.6; stroke-linecap: round; }
+.automation-flow-travel-glow { fill: #9bb9ec; opacity: .16; }
+.automation-flow-travel-dot { fill: #f2f7ff; }
+.automation-flow-node .automation-flow-node-core { fill: #20282c; stroke: #63717a; stroke-width: 1.15; }
+.automation-flow-node .automation-flow-node-ring { fill: none; stroke: transparent; stroke-width: 1; }
+.automation-flow-node .automation-flow-node-glow, .automation-flow-node .automation-flow-node-beacon { opacity: 0; }
+.automation-flow-node .automation-flow-node-beacon { fill: #f5f8ff; }
+.automation-flow-node text { fill: #99a8af; font-size: 12px; text-anchor: middle; letter-spacing: .2px; }
+.automation-flow-node[data-state="current"] .automation-flow-node-core { stroke: #bbd1ff; }
+.automation-flow-node[data-state="current"] .automation-flow-node-ring { stroke: #99b9ed; opacity: .35; }
+.automation-flow-node[data-state="current"] .automation-flow-node-glow { opacity: .3; }
+.automation-flow-node[data-state="current"] .automation-flow-node-beacon { opacity: .7; }
+.automation-flow-node[data-state="current"] text { fill: #e2edff; font-weight: 500; }
+.automation-flow-node[data-state="next"] .automation-flow-node-core { fill: transparent; stroke: #bbcff8; stroke-width: 1.5; }
+.automation-flow-node[data-state="next"] text { fill: #bbcff8; }
+.automation-flow-node circle { transform-box: fill-box; transform-origin: center; }
+.automation-flow-card[data-running="true"] .automation-flow-node[data-state="current"] .automation-flow-node-core { animation: automation-flow-core 1.8s ease-in-out infinite; }
+.automation-flow-card[data-running="true"] .automation-flow-node[data-state="current"] .automation-flow-node-ring { animation: automation-flow-ring 1.8s cubic-bezier(.2,.5,.4,1) infinite; }
+.automation-flow-card[data-running="true"] .automation-flow-node[data-state="current"] .automation-flow-node-glow { animation: automation-flow-glow 1.8s ease-in-out infinite; }
+.automation-flow-card[data-running="true"] .automation-flow-node[data-state="current"] .automation-flow-node-beacon { animation: automation-flow-beacon 1.8s ease-in-out infinite; }
+.automation-flow-summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 68px; padding: 9px 0 12px; border-top: 1px solid #d5e4ff0b; }
+.automation-flow-copy { min-width: 0; }
+.automation-flow-copy > strong { display: block; color: var(--text); font-size: 14px; font-weight: 500; line-height: 1.4; }
+.automation-flow-copy p { margin: 4px 0 0; color: #99a8af; font-size: 11px; line-height: 1.4; }
+.automation-flow-metric { flex: none; text-align: right; }
+.automation-flow-metric > span { color: #99a8af; font-size: 11px; }
+.automation-flow-metric > div { display: flex; align-items: baseline; justify-content: flex-end; gap: 4px; }
+.automation-flow-metric strong { font-size: 20px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.automation-flow-metric small { color: #99a8af; font-size: 11px; }
+.dialog.automation-flow-detail-dialog { width: min(620px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); }
+.automation-flow-detail-content { max-height: calc(100dvh - 110px); overflow-y: auto; padding: 16px 20px 20px; }
+.automation-flow-detail-content > p { margin: 0 0 12px; color: var(--secondary); font-size: 12px; }
+.automation-flow-detail-content .automation-metrics { margin: 12px 0; }
+.automation-flow-trace { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 12px; }
+.automation-flow-trace ol { margin: 8px 0 0; padding-left: 20px; color: var(--secondary); }
+.automation-flow-trace li + li { margin-top: 4px; }
+@keyframes automation-flow-core { 0%,100% { opacity: .5; transform: scale(.9); } 48% { opacity: 1; transform: scale(1.05); } }
+@keyframes automation-flow-ring { 0% { opacity: .1; transform: scale(.86); } 25% { opacity: .5; } 100% { opacity: 0; transform: scale(1.58); } }
+@keyframes automation-flow-glow { 0%,100% { opacity: .1; transform: scale(.72); } 48% { opacity: .48; transform: scale(1.05); } }
+@keyframes automation-flow-beacon { 0%,100% { opacity: .3; } 48% { opacity: .95; } }
+@media (prefers-reduced-motion: reduce) { .automation-flow-node circle { animation: none !important; } }
+@container (max-width: 370px) { .automation-flow-card { padding: 12px 11px 0; } .automation-flow-header-meta { gap: 6px; } .automation-flow-node text { font-size: 11px; } .automation-flow-metric strong { font-size: 17px; } }
 .automation-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; padding: 8px 0; }
 .automation-toolbar h3 { margin: 0 auto 0 0; font-size: 14px; }
 .automation-toolbar > label { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; }

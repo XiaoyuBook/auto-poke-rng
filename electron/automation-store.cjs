@@ -185,7 +185,7 @@ class AutomationStore extends EventEmitter {
     this.emit('log', row); return row;
   }
   clearLogs() { this.logs = []; this.emit('change'); }
-  beginRun(id, kind) { this.runs.unshift({ id, kind, startedAt: this.now().toISOString(), status: 'running', rounds: [] }); this.emit('change'); }
+  beginRun(id, kind, context = null) { this.runs.unshift({ id, kind, context: context ? clone(context) : null, startedAt: this.now().toISOString(), status: 'running', rounds: [] }); this.emit('change'); }
   history(id, event, args) {
     const run = this.runs.find(item => item.id === id); if (!run) return;
     if (event === 'cycle_start') run.rounds.push({ number: args[0], outcome: '运行中', candidates: [], events: [] });

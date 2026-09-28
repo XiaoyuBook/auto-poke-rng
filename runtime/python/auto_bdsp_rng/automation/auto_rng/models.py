@@ -143,6 +143,13 @@ class ShinyCheckResult:
 class AutoRngProgress:
     phase: AutoRngPhase = AutoRngPhase.IDLE
     loop_index: int = 0
+    activity_id: int = 0
+    activity_kind: str = ""
+    attempt_index: int = 0
+    requested_advances: int | None = None
+    planned_next_phase: AutoRngPhase | None = None
+    result_kind: str | None = None
+    recording_status: str | None = None
     seed_text: str = ""
     locked_target: AutoRngTarget | None = None
     raw_target_advances: int | None = None

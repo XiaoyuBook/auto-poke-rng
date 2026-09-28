@@ -167,6 +167,8 @@ class Session:
             config['noisy'] = True
         config['seed'] = [f'{word:08X}' for word in previous.seed.words] if previous else config['seed']
         count = 64 if tid else 20 if exit_scene or (previous and config['noisy']) else 7 if previous else 40
+        capture_id = uuid4().hex
+        self.emit(event='capture',captureId=capture_id,stage='start',captured=0,target=count)
         eye = decode_eye(config['eye'])
         detector, gray_before, last_timestamp = None, None, None
         last_progress, last_frame_at, milestones = 0, time.monotonic(), set()
@@ -197,7 +199,7 @@ class Session:
                 discard_warmup(detector, started, timestamp)
                 done = len(detector.intervals)
                 if time.monotonic() - last_progress >= .1:
-                    self.emit(event='capture', captured=done,target=count,score=score,location=location)
+                    self.emit(event='capture',captureId=capture_id,stage='capturing',captured=done,target=count,score=score,location=location)
                     last_progress = time.monotonic()
                 if done and done % 10 == 0 and done < count and done not in milestones:
                     milestones.add(done)
@@ -205,6 +207,7 @@ class Session:
                     self.emit(event='keepalive')
                 if detector.done:
                     break
+        self.emit(event='capture',captureId=capture_id,stage='solving',captured=count,target=count)
         hint = getattr(previous,'expected_advances_hint',None)
         windows = reidentify_windows(config['noisy'], hint, self.config['parameters'].get('max_advances', 100000), exit_scene=exit_scene)
         result = None
@@ -234,6 +237,7 @@ class Session:
         else:
             seed = AutoRngSeedResult(state,0,config['npc'],' '.join(state.to_seed_pair64().format_seeds()),now)
         self.emit(event='seed',seed=serialize(seed))
+        self.emit(event='capture',captureId=capture_id,stage='complete',captured=count,target=count)
         return seed
 
     def search(self, seed, lead=None, nature=None, reverse=None):
@@ -266,9 +270,11 @@ class Session:
             except BaseException as error:
                 errors.append(error)
             finally:
+                self.emit(event='shiny',scriptId=script_id,kind='script',status='done' if not errors else 'failed')
                 done.set()
         thread = threading.Thread(target=script,daemon=True)
         started = None if roamer else time.monotonic()
+        self.emit(event='shiny',scriptId=script_id,kind='script',status='running')
         thread.start()
         def check_script():
             self.check()
@@ -295,11 +301,20 @@ class Session:
                 second_read_text=(lambda image:self.ocr(image,field='starter_battle')['text']) if starter else None,
                 should_stop=lambda:self.cancel.is_set() or bool(errors),sleep=self.sleep,
                 script_done=done,grace_seconds=30,hard_timeout_seconds=300,
-                event_callback=lambda event:self.log(f'判闪 {event.event} · {event.keyword or ""} · {event.interval_seconds or event.elapsed_seconds:.3f}s'))
+                event_callback=lambda event:(
+                    self.emit(event='shiny',scriptId=script_id,kind='observation',
+                              stage=event.event,keyword=event.keyword,
+                              intervalSeconds=event.interval_seconds),
+                    self.log(f'判闪 {event.event} · {event.keyword or ""} · {event.interval_seconds or event.elapsed_seconds:.3f}s')
+                ))
             result = ShinyCheckResult(timing.interval_seconds>=threshold,timing.interval_seconds)
         except DialogKeywordTimeoutError:
             result = ShinyCheckResult(False)
             self.log('判闪关键词超时，结果未知')
+            self.emit(event='shiny',scriptId=script_id,kind='observation',stage='unknown')
+        self.emit(event='shiny',scriptId=script_id,kind='result',
+                  status='unknown' if result.interval_seconds is None else 'shiny' if result.is_shiny else 'not_shiny',
+                  intervalSeconds=result.interval_seconds)
         if result.interval_seconds is not None and not result.is_shiny:
             # A definite miss cancels only this hit script; OCR timeout remains
             # unknown and follows the original wait-for-script behavior.
@@ -315,11 +330,14 @@ class Session:
     def reverse(self,seed,target):
         from auto_bdsp_rng.automation.auto_rng.pokemon_info_ocr import compute_characteristic
         path = self.runner.config.reverse_script_path
+        self.emit(event='activity',kind='reverse',stage='script')
         self.run_script(path.read_text(),path.name); self.sleep(1)
+        self.emit(event='activity',kind='reverse',stage='notes_ocr')
         notes = self.ocr(self.frame(),'notes')
         if notes.get('characteristic_match_failed'):
             self.log('个性匹配失败：ROI与全图均未命中，按性格和能力值反查')
         self.run_script('RIGHT 100\nWAIT 2000\n','反查翻页')
+        self.emit(event='activity',kind='reverse',stage='matching')
         rows = self.search(seed,reverse={'target':serialize(target),'nature':notes.get('nature')})
         labels = ['HP','攻击','防御','特攻','特防','速度']
         matches = []
@@ -335,6 +353,7 @@ class Session:
         delay = target.used_delay if target.used_delay is not None else self.runner.config.fixed_delay
         delays = sorted({row.advances-target.raw_target_advances+delay for row in matches if row.advances-target.raw_target_advances+delay>=0})
         self.emit(event='history',name='reverse_result',args=serialize([matches,delays]))
+        self.emit(event='activity',kind='reverse',stage='complete')
         self.log(f'反查完成：{len(matches)} 个候选；实际 delay：{delays or "未匹配"}')
         return delays
 

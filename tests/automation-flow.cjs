@@ -1,0 +1,32 @@
+const assert = require('node:assert/strict');
+const { createFlow, advanceFlow, isStaleFlowProgress } = require('../electron/automation-flow.cjs');
+
+const context = { flowId: 'flow-a', flowName: '骑拉帝纳', target: '骑拉帝纳', loopMode: 'count', loopCount: 10, maxAdvances: 100000, start: 'script' };
+const progress = (phase, activity_id, loop_index = 3, extra = {}) => ({ phase, activity_id, loop_index, attempt_index: 1, ...extra });
+let flow = createFlow('run-1', context);
+flow = advanceFlow(flow, progress('校正位置', 1));
+flow = advanceFlow(flow, progress('决策过帧', 2));
+assert.equal(flow.node, 'calibrate', 'the internal decision must not be displayed as a search');
+flow = advanceFlow(flow, progress('等待触发', 3, 3, { planned_next_phase: '运行撞闪脚本' }));
+assert.deepEqual([flow.transition.from, flow.transition.to, flow.nextNode], ['calibrate', 'wait', 'hit']);
+assert.equal(flow.roundIndex, 3);
+
+flow = advanceFlow(flow, progress('运行撞闪脚本', 4));
+flow = advanceFlow(flow, progress('运行逃跑脚本', 5, 3, { planned_next_phase: '校正位置', attempt_index: 2 }));
+flow = advanceFlow(flow, progress('校正位置', 6, 3, { attempt_index: 2 }));
+flow = advanceFlow(flow, progress('决策过帧', 7, 3, { attempt_index: 2 }));
+flow = advanceFlow(flow, progress('运行过帧脚本', 8, 3, { planned_next_phase: '捕获Seed', attempt_index: 2 }));
+assert.deepEqual([flow.transition.from, flow.transition.to, flow.nextNode], ['calibrate', 'advance', 'seed']);
+flow = advanceFlow(flow, progress('捕获Seed', 9, 3, { attempt_index: 2 }));
+assert.deepEqual([flow.transition.from, flow.transition.to, flow.roundIndex], ['advance', 'seed', 3]);
+assert.equal(flow.attemptIndex, 2, 'same-round recovery does not increment the round');
+assert.equal(isStaleFlowProgress(flow, progress('搜索目标', 8, 3)), true);
+assert.equal(advanceFlow(flow, progress('搜索目标', 8, 3)), flow, 'stale activity cannot replace a newer node');
+flow = advanceFlow(flow, progress('搜索目标', 10, 3));
+assert.equal(flow.node, 'search');
+flow = advanceFlow(flow, progress('运行测种脚本', 11, 3));
+flow = advanceFlow(flow, progress('捕获Seed', 12, 4));
+assert.equal(flow.roundIndex, 4, 'only a real new round changes the counter');
+assert.deepEqual(flow.trace.map(item => item.node), ['seed'], 'new round starts a new trace');
+assert.equal(flow.context.flowName, '骑拉帝纳', 'flow identity stays bound to its run');
+console.log('PASS: direct calibration branch, return paths, round isolation, stale events, flow identity');

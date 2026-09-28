@@ -1817,6 +1817,7 @@ def test_runner_runs_advance_script_then_reidentifies_when_request_is_within_thr
     hit_script.write_text("_闪帧 = 60\n", encoding="utf-8")
     scripts: list[tuple[str, str]] = []
     calls: list[str] = []
+    progress_events = []
     services = AutoRngServices(
         capture_seed=lambda: AutoRngSeedResult(seed="seed-1", current_advances=0),
         search_candidates=lambda _seed: [FakeState(1000)],
@@ -1833,6 +1834,7 @@ def test_runner_runs_advance_script_then_reidentifies_when_request_is_within_thr
             max_wait_frames=300,
         ),
         services=services,
+        progress_callback=progress_events.append,
     )
 
     runner.run(max_steps=6)
@@ -1841,6 +1843,10 @@ def test_runner_runs_advance_script_then_reidentifies_when_request_is_within_thr
     assert calls == ["reidentify"]
     assert runner.progress.phase == AutoRngPhase.DECIDE_ADVANCE
     assert runner.progress.current_advances == 600
+    assert any(item.phase == AutoRngPhase.RUN_ADVANCE_SCRIPT
+               and item.requested_advances == 840
+               and item.planned_next_phase == AutoRngPhase.REIDENTIFY
+               for item in progress_events)
 
 
 def test_runner_can_start_from_reidentify_with_current_seed(tmp_path):

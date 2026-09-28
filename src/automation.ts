@@ -27,18 +27,30 @@ export type IdResults = { id_states: IdRow[]; id_elapsed_seconds: (number | null
 export type AutomationProgress = Partial<IdResults> & {
   phase: string; loop_index: number; seed_text: string; current_advances?: number; raw_target_advances?: number; target_advances?: number;
   trigger_advances?: number; remaining_to_trigger?: number; fixed_delay?: number; log_message: string; last_script_path?: string;
+  activity_id?: number; activity_kind?: string; attempt_index?: number; requested_advances?: number | null;
+  planned_next_phase?: string | null; result_kind?: string | null; recording_status?: string | null;
   wait_target_wall?: number | null;
+};
+export type FlowNode = 'seed' | 'search' | 'advance' | 'calibrate' | 'wait' | 'hit' | 'result';
+export type AutomationFlow = {
+  runId: string; context: { flowId: string; flowName: string; target: string; loopMode: string; loopCount: number; maxAdvances: number; start: string };
+  node: FlowNode | null; nextNode: FlowNode | null; phase: string | null; roundIndex: number; attemptIndex: number; activityId: number;
+  transitionSeq: number; transition: { seq: number; from: FlowNode; to: FlowNode; roundIndex: number; at: number } | null;
+  trace: { seq: number; node: FlowNode; phase: string; roundIndex: number; attemptIndex: number; activityId: number }[];
 };
 export type Candidate = Omit<NativeStaticResult, 'pid' | 'ec'> & { pid: string | number; ec: string | number };
 export type AutomationRound = { number: number; seed?: string; outcome: string; candidates: Candidate[]; selected?: number; sources?: string[];
   interval?: number; trigger?: number; usedDelay?: number; actualDelays?: number[]; reverse?: Candidate[]; events: { event: string; args: unknown[] }[] };
-export type AutomationRun = { id: string; kind: AutomationKind; startedAt: string; endedAt?: string; status: string; message?: string; rounds: AutomationRound[] };
+export type AutomationRun = { id: string; kind: AutomationKind; context?: AutomationFlow['context'] | null; startedAt: string; endedAt?: string; status: string; message?: string; rounds: AutomationRound[] };
 export type AutomationSnapshot = {
   config: { static: StaticAutomationConfig; tid: AutomationConfig; ocr: OcrRegionRow[] }; profiles: Record<string, DelayProfile>;
   staticGroups: { activeId: string; items: AutomationConfigGroup[] };
   logs: LogEntry[]; runs: AutomationRun[]; logging: boolean; error: string;
   state: { revision: number; status: string; kind: AutomationKind | null; runId: string | null; message: string; progress: AutomationProgress | null;
-    capture?: { captured: number; target: number } | null; roundDelay?: number; seed?: { seed: { words: string[]; pair: string[] } } };
+    capture?: { captureId?: string; stage?: string; activityId?: number; captured: number; target: number } | null;
+    shiny?: { scriptId?: string; scriptStatus?: string; stage?: string; keyword?: string; intervalSeconds?: number; result?: string } | null;
+    activity?: { kind: string; stage: string; activityId: number } | null;
+    flow?: AutomationFlow | null; roundDelay?: number; seed?: { seed: { words: string[]; pair: string[] } } };
 };
 export type AutomationInput = { kind: AutomationKind; config: AutomationConfig; blink: BlinkConfig; exitBlink?: BlinkConfig; profile: BdspProfile; calibrate?: boolean };
 export type Readiness = { ready: boolean; checks: { label: string; ok: boolean; detail: string }[] };

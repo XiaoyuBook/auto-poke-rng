@@ -4,6 +4,7 @@ const { randomUUID } = require('node:crypto');
 const { AutomationStore, defaultFilter, defaults } = require('./automation-store.cjs');
 const { projectStaticConfig } = require('./automation-config.cjs');
 const { startWorker } = require('./automation-worker.cjs');
+const { createFlow, advanceFlow, isStaleFlowProgress } = require('./automation-flow.cjs');
 const { validateConfig: validateBlink } = require('./blink-client.cjs');
 const data = require('../src/generated/bdsp-data.json');
 const reverseGroups = [['Articuno','Zapdos','Moltres'],['Raikou','Entei','Suicune'],['Regirock','Regice','Registeel'],['Latias','Latios']];
@@ -35,7 +36,7 @@ function validateParameters(kind, parameters) {
 
 function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,userData,workerFactory=startWorker,captureImage}){
   const store=new AutomationStore(userData);let active=null, auxiliary=null, timer=null, closed=false;
-  let state={status:'idle',kind:null,runId:null,progress:null,capture:null,message:'等待开始',revision:0};
+  let state={status:'idle',kind:null,runId:null,progress:null,capture:null,shiny:null,activity:null,flow:null,message:'等待开始',revision:0};
   const snapshot=()=>({...store.snapshot(),state});
   const broadcast=()=>{
     clearTimeout(timer);timer=setTimeout(()=>{for(const window of getWindows())if(!window.isDestroyed()&&!window.webContents.isDestroyed())window.webContents.send('automation:state',snapshot());},40);
@@ -166,7 +167,15 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
     if(active||auxiliary||rng.isBusy())throw Error('已有任务正在运行');
     input=effectiveInput(structuredClone(input));
     const run={id:randomUUID(),kind:input.kind,round:0,stopped:false,scripts:{},worker:null};active=run;
-    update({status:'starting',kind:input.kind,runId:run.id,progress:null,capture:null,seed:null,roundDelay:null,message:'检查运行条件…'});
+    const group=store.data.staticGroups?.items.find(item=>item.id===store.data.staticGroups.activeId);
+    const target=data.targets.find(item=>item.speciesKey===input.config.parameters.target);
+    run.context=input.kind==='static'?{
+      flowId:group?.id||'',flowName:group?.name||'当前流程',target:target?.species||input.config.parameters.target,
+      loopMode:input.config.parameters.loop_mode,loopCount:input.config.parameters.loop_count,
+      maxAdvances:input.config.parameters.max_advances,start:input.config.parameters.start,
+    }:null;
+    update({status:'starting',kind:input.kind,runId:run.id,progress:null,capture:null,shiny:null,activity:null,
+      flow:run.context?createFlow(run.id,run.context):null,seed:null,roundDelay:null,message:'检查运行条件…'});
     try{
       await devices.claimAutomation(run.id);
       checkStopped(run);
@@ -176,7 +185,7 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
       run.input=structuredClone(input);run.target=result.target;run.ocr=structuredClone(store.data.config.ocr);
       for(const selected of Object.values(result.scripts))run.scripts[selected.path]=selected;
       if(input.config.parameters.shiny_threshold_seconds||input.config.parameters.auto_reverse||input.config.parameters.loop_mode!=='single')await devices.ocr.start();
-      checkStopped(run);store.beginRun(run.id,run.kind);
+      checkStopped(run);store.beginRun(run.id,run.kind,run.context);
       const source=input.kind==='tid'?'自动TID':'自动定点';
       const context=()=>({runId:run.id,round:run.round});
       const request=async(method,params)=>{
@@ -214,16 +223,38 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
           if(active===run&&message.event==='log'){store.log(message.message,source,'info',context());return;}
           if(run.stopped||active!==run)return;
           if(message.event==='progress'){
-            const progress=message.progress;run.round=progress.loop_index||run.round;
+            const progress=message.progress;
+            if(input.kind==='static'&&isStaleFlowProgress(state.flow,progress))return;
+            run.round=progress.loop_index||run.round;
             if(input.kind==='tid'){
               const record=store.runs.find(item=>item.id===run.id);
               if(run.round&&!record.rounds.some(item=>item.number===run.round))store.history(run.id,'cycle_start',[run.round]);
               if(progress.seed_text&&record.rounds.at(-1)?.seed!==progress.seed_text)store.history(run.id,'seed_captured',[progress.seed_text,progress.current_advances]);
             }
-            update({status:'running',progress:{...progress,wait_target_wall:progress.wait_target_at==null?null:message.wall+(progress.wait_target_at-message.clock)},message:progress.log_message||state.message});
+            const phaseChanged=progress.phase!==state.progress?.phase;
+            if(phaseChanged)run.captureId=null;
+            update({status:'running',
+              progress:{...progress,wait_target_wall:progress.wait_target_at==null?null:message.wall+(progress.wait_target_at-message.clock)},
+              flow:input.kind==='static'&&state.flow?.runId===run.id?advanceFlow(state.flow,progress):null,
+              capture:phaseChanged?null:state.capture,
+              shiny:phaseChanged&&progress.phase!=='运行撞闪脚本'?null:state.shiny,
+              activity:phaseChanged?null:state.activity,
+              message:progress.log_message||state.message});
           }else if(message.event==='history'){if(message.name==='cycle_start')run.round=message.args[0];store.history(run.id,message.name,message.args);}
           else if(message.event==='log')store.log(message.message,source,'info',context());
-          else if(message.event==='capture')update({capture:message});
+          else if(message.event==='capture'&&['捕获Seed','校正位置','运行过场脚本'].includes(state.progress?.phase)){
+            if(message.stage==='start')run.captureId=message.captureId;
+            if(run.captureId===message.captureId)update({capture:{...message,activityId:state.progress?.activity_id||0}});
+          }
+          else if(message.event==='shiny'&&state.progress?.phase==='运行撞闪脚本'){
+            if(message.kind==='script'&&message.status==='running')run.shinyScriptId=message.scriptId;
+            if(run.shinyScriptId&&message.scriptId!==run.shinyScriptId)return;
+            const previous=state.shiny?.scriptId===message.scriptId?state.shiny:{scriptId:message.scriptId};
+            update({shiny:{...previous,...(message.kind==='script'?{scriptStatus:message.status}:
+              message.kind==='observation'?{stage:message.stage,keyword:message.keyword,intervalSeconds:message.intervalSeconds}:
+              {result:message.status,intervalSeconds:message.intervalSeconds})}});
+          }
+          else if(message.event==='activity'&&message.kind==='reverse'&&state.progress?.phase==='反查个体')update({activity:{kind:message.kind,stage:message.stage,activityId:state.progress.activity_id}});
           else if(message.event==='seed')update({seed:message.seed});
           else if(message.event==='delay')update({roundDelay:message.value});
           else if(message.event==='keepalive'&&!devices.runner.current&&!run.keepalive){run.keepalive=devices.controller.sequence({actions:[{kind:'button',key:'L',down:true},{kind:'wait',duration_ms:50},{kind:'button',key:'L',down:false}]}).catch(error=>store.log('捕获保活失败：'+error.message,source,'warning',context())).finally(()=>{run.keepalive=null;});}
@@ -237,10 +268,12 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
         const message=run.stopReason||outcome.message||'自动流程已结束';
         store.finishRun(run.id,status,message);store.log(message,source,status==='failed'?'warning':status==='completed'?'success':'info',context());
         devices.releaseAutomation(run.id);if(active===run)active=null;
-        update({status,message,capture:null,progress:state.progress?{...state.progress,wait_target_wall:null}:null});
+        update({status,message,capture:null,activity:null,shiny:null,
+          flow:state.flow?.runId===run.id?{...state.flow,nextNode:null}:state.flow,
+          progress:state.progress?{...state.progress,wait_target_wall:null}:null});
       })();
       return snapshot();
-    }catch(error){const status=run.stopped?'stopped':'failed';store.finishRun(run.id,status,error.message);devices.releaseAutomation(run.id);if(active===run)active=null;update({status,message:error.message});throw error;}
+    }catch(error){const status=run.stopped?'stopped':'failed';store.finishRun(run.id,status,error.message);devices.releaseAutomation(run.id);if(active===run)active=null;update({status,message:error.message,flow:state.flow?.runId===run.id?{...state.flow,nextNode:null}:state.flow});throw error;}
   };
   handle('state',snapshot,false);
   handle('check',async input=>{if(active||auxiliary)throw Error('已有流程正在运行');const {ready,checks:items}=await checks(input);return {ready,checks:items};});
@@ -283,7 +316,7 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
     if(!species||video.status!=='connected'||!video.sharedMemory)throw Error('请选择宝可梦并连接视频源');
     const run={calibration:true,stopped:false};auxiliary=run;
     const rows=structuredClone(store.data.config.ocr);
-    update({status:'starting',kind:'static',runId:null,progress:null,capture:null,message:'准备判闪校准…'});
+    update({status:'starting',kind:'static',runId:null,progress:null,capture:null,shiny:null,activity:null,flow:null,message:'准备判闪校准…'});
     try{
       await devices.ocr.start();checkStopped(run);
       run.worker=workerFactory({command:'calibrate',species,video:{sharedMemory:video.sharedMemory}},
