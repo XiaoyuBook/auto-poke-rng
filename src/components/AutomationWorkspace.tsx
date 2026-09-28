@@ -177,9 +177,12 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
     {(error||notice)&&<p role={error?'alert':'status'} className={error?'panel-error':'automation-notice'}>{error||notice}</p>}
     <div className={'automation-overview'+(isStatic?'':' automation-overview-single')}>
       {isStatic&&<button type="button" className="automation-target-card" aria-label="选择目标宝可梦与设置筛选条件" aria-haspopup="dialog" disabled={busy||pending} onClick={()=>setTargetSettingsOpen(true)}>
-        {target&&<span className="automation-target-art"><img src={targetSprites[`../assets/bdsp-targets/${target.speciesId}.png`]} alt="" /></span>}
-        <span className="automation-target-identity"><span>当前目标</span><strong>{target?.species||'未选择目标'}</strong><small>{target?`${getCategoryLabel(target.category)} · ${target.level} 级${target.roamer?' · 游走':''}`:''} · {p.filters.length} 组筛选条件</small></span>
-        <span className="automation-target-action">目标设置</span>
+        <span className="automation-target-heading"><strong>当前目标</strong><span className="automation-target-action">目标设置</span></span>
+        <span className="automation-target-main">
+          {target&&<span className="automation-target-art"><img src={targetSprites[`../assets/bdsp-targets/${target.speciesId}.png`]} alt="" /></span>}
+          <span className="automation-target-identity"><strong>{target?.species||'未选择目标'}</strong>{target&&<small>{getCategoryLabel(target.category)} · {target.level} 级{target.roamer?' · 游走':''}</small>}</span>
+        </span>
+        <span className="automation-target-summary"><span>筛选条件</span><strong>{p.filters.length} 组</strong></span>
       </button>}
       {isStatic?<StaticFlowStatusCard state={ownState} run={currentRun} activeFlowId={snapshot.staticGroups.activeId} otherBusy={busy&&!ownState} details={runDetails}/>:<section className="automation-status-card" data-status={ownState?.status||(busy?'running':'idle')} aria-label="自动流程状态">
         <div className="automation-status-heading"><span>当前流程状态</span><span className="automation-status-label">{statusLabel}</span></div>

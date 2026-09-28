@@ -125,13 +125,21 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .automation-heading p, .automation-card p { color: var(--secondary); line-height: 1.6; }
 .automation-overview { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; gap: 12px; min-width: 0; }
 .automation-overview-single { grid-template-columns: minmax(0, 1fr); }
-.automation-workspace .automation-target-card { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 118px; padding: 9px; border: 1px solid #424956; border-radius: 8px; background: #20262b; text-align: left; }
-.automation-workspace .automation-target-card:hover, .automation-workspace .automation-target-card:focus-visible { border-color: var(--accent); background: #262d36; }
-.automation-target-card .automation-target-art { width: 68px; height: 68px; flex-basis: 68px; }
-.automation-target-card .automation-target-art img { max-width: 66px; max-height: 66px; }
-.automation-target-card .automation-target-identity { flex: 1; }
-.automation-target-card .automation-target-identity > strong { font-size: 15px; }
-.automation-target-action { align-self: flex-start; color: #adb8e8; font-size: 11px; white-space: nowrap; }
+.automation-workspace .automation-target-card { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-width: 0; min-height: 263px; padding: 13px 17px 0; border: 1px solid #424956; border-radius: 8px; background: #20262b; text-align: left; }
+.automation-workspace .automation-target-card:not(:disabled):hover, .automation-workspace .automation-target-card:focus-visible { border-color: var(--accent); background: #262d36; }
+.automation-workspace button.automation-target-card:disabled { opacity: 1; }
+.automation-target-heading, .automation-target-summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
+.automation-target-heading { color: var(--secondary); font-size: 13px; }
+.automation-target-heading strong { color: var(--text); font-weight: 500; }
+.automation-target-action { color: #adb8e8; font-size: 11px; white-space: nowrap; }
+.automation-target-card:disabled .automation-target-action { opacity: .5; }
+.automation-target-main { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.automation-workspace .automation-target-card .automation-target-art { width: 96px; height: 96px; flex: 0 0 96px; border-radius: 8px; }
+.automation-workspace .automation-target-card .automation-target-art img { max-width: 90px; max-height: 90px; }
+.automation-target-main .automation-target-identity > strong { font-size: 20px; }
+.automation-target-main .automation-target-identity > small { font-size: 12px; }
+.automation-target-summary { min-height: 68px; border-top: 1px solid #d5e4ff0b; color: var(--secondary); font-size: 11px; }
+.automation-target-summary strong { color: var(--text); font-size: 16px; font-weight: 500; }
 .automation-status-card { display: flex; flex-direction: column; justify-content: center; gap: 9px; min-width: 0; min-height: 118px; padding: 12px 16px; border: 1px solid var(--line); border-radius: 8px; background: #1b1f20; }
 .automation-status-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--secondary); font-size: 11px; }
 .automation-status-label { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
@@ -261,7 +269,13 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .persistent-logs .automation-records { grid-template-columns: 1fr; }
 .persistent-logs .automation-records aside { max-height: 120px; overflow: auto; }
 @container (max-width: 850px) { .automation-config-grid { grid-template-columns: minmax(0, 1fr); } }
-@container (max-width: 620px) { .automation-overview { grid-template-columns: minmax(0, 1fr); } }
+@container (max-width: 620px) {
+  .automation-overview { grid-template-columns: minmax(0, 1fr); }
+  .automation-workspace .automation-target-card { min-height: 190px; }
+  .automation-workspace .automation-target-card .automation-target-art { width: 76px; height: 76px; flex-basis: 76px; }
+  .automation-workspace .automation-target-card .automation-target-art img { max-width: 72px; max-height: 72px; }
+  .automation-target-summary { min-height: 48px; }
+}
 @media (max-width: 620px) { .automation-target-picker { grid-template-columns: minmax(0, 1fr); } }
 .dialog.automation-target-dialog { width: min(820px, calc(100vw - 40px)); max-height: calc(100dvh - 40px); }
 .dialog.automation-target-dialog[open] { display: flex; flex-direction: column; }
@@ -1529,6 +1543,10 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 }
 @media (max-width: 850px) {
   .workspace-content[data-automation-static="true"] .automation-overview { grid-template-columns: minmax(0, 1fr); }
+  .automation-workspace .automation-target-card { min-height: 190px; }
+  .automation-workspace .automation-target-card .automation-target-art { width: 76px; height: 76px; flex-basis: 76px; }
+  .automation-workspace .automation-target-card .automation-target-art img { max-width: 72px; max-height: 72px; }
+  .automation-target-summary { min-height: 48px; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
