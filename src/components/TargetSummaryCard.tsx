@@ -76,7 +76,7 @@ export function TargetSummaryCard({ target, sprite, filters, locked, onSettings 
       <div className="automation-target-identity"><strong>{target?.species || '未选择目标'}</strong>{target && <small>{getCategoryLabel(target.category)} · {target.level} 级{target.roamer ? ' · 游走' : ''}</small>}</div>
     </div>
     <div className="automation-target-conditions">
-      <div className="automation-target-conditions-heading"><span>目标条件 <b>{filters.length} 组</b></span><small>满足任意一组即可；同组条件同时满足</small></div>
+      <div className="automation-target-conditions-heading"><span>目标条件 <b>{filters.length} 组</b></span>{filters.length > 1 && <small>满足任意一组即可；同组条件同时满足</small>}</div>
       <ol className="automation-target-condition-list">{visible.map((filter, index) => <li key={index}>
         {filters.length > 1 && <span className="automation-target-condition-number">{String(index + 1).padStart(2, '0')}</span>}
         <div className="automation-target-condition-terms">{describeTargetFilter(filter).map((term, termIndex) => term.shiny

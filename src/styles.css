@@ -131,13 +131,13 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .automation-target-heading strong { color: var(--text); font-weight: 500; }
 .automation-workspace .automation-target-card button.automation-target-settings { display: inline-flex; align-items: center; gap: 5px; padding: 2px 0 2px 7px; border: 0; background: transparent; color: #bbcff8; font-size: 11px; white-space: nowrap; }
 .automation-workspace .automation-target-card button.automation-target-settings:hover:not(:disabled) { color: #eff5ff; }
-.automation-target-main { display: flex; align-items: center; gap: 15px; min-width: 0; min-height: 82px; margin: 7px 0 10px; }
-.automation-target-portrait { display: grid; place-items: center; flex: 0 0 82px; width: 82px; height: 78px; overflow: hidden; border-radius: 7px; background: radial-gradient(ellipse at center, #b4d5b712, #b4d5b700 70%); }
-.automation-target-portrait img { display: block; width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+.automation-target-main { display: flex; flex: 1; align-items: center; gap: 15px; min-width: 0; min-height: 104px; margin: 7px 0 10px; }
+.automation-target-portrait { position: relative; flex: 0 0 96px; width: 96px; height: 96px; overflow: hidden; border-radius: 7px; background: radial-gradient(ellipse at center, #b4d5b712, #b4d5b700 70%); }
+.automation-target-portrait img { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
 .automation-target-main .automation-target-identity { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .automation-target-main .automation-target-identity > strong { overflow: hidden; color: var(--text); font-size: 22px; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
 .automation-target-main .automation-target-identity > small { color: var(--secondary); font-size: 12px; }
-.automation-target-conditions { min-width: 0; margin-top: auto; padding-top: 10px; border-top: 1px solid #d5e4ff0b; }
+.automation-target-conditions { min-width: 0; padding-top: 10px; border-top: 1px solid #d5e4ff0b; }
 .automation-target-conditions-heading { color: var(--secondary); font-size: 11px; }
 .automation-target-conditions-heading b { margin-left: 4px; color: #c5d0d6; font-weight: 400; }
 .automation-target-conditions-heading small { color: #8f9ea6; font-size: 10px; text-align: right; }
