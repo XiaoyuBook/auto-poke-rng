@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Play, Square, ListChecks, FileClock, Plus, Pencil, Trash2, ChevronDown, SlidersHorizontal, RefreshCw } from 'lucide-react';
+import { Play, Square, ListChecks, FileClock, Plus, Pencil, Trash2, ChevronDown, SlidersHorizontal, RefreshCw, ArrowRightLeft } from 'lucide-react';
 import { automationBusy, downloadText, useAutomation, type AutomationConfig, type AutomationKind, type AutomationParameters, type DelayConfig, type IdResults, type Readiness, type StaticAutomationConfig, type StaticFeatureKey, type TargetFilter } from '../automation';
 import type { BlinkConfig } from '../blink';
 import type { BdspProfile } from '../bdspProfile';
@@ -44,7 +44,7 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
   const delayPreview=useDelayPreview(kind==='static'&&config?(config as StaticAutomationConfig).delayConfig:null,previewSamples,`${snapshot?.staticGroups.activeId}:${estimateSpecies}`,api);
   useEffect(()=>{if(!progress?.wait_target_wall)return;const timer=setInterval(()=>setNow(Date.now()),100);return()=>clearInterval(timer);},[progress?.wait_target_wall]);
   const isStatic=kind==='static',otherKind=isStatic?'tid':'static',otherLabel=isStatic?'自动 TID':'自动定点';
-  const headingSwitcher=<div className="automation-heading-switcher" role="group" aria-label="自动流程类型"><h2>{isStatic?'自动定点乱数':'自动 TID 乱数'}</h2><button type="button" aria-label={`切换到${otherLabel}`} onClick={onSwitchKind}>{otherLabel}{automationBusy(snapshot?.state)&&snapshot?.state.kind===otherKind&&<span className="automation-hub-running-dot" aria-hidden="true" />}</button></div>;
+  const headingSwitcher=<div className="automation-heading-switcher" role="group" aria-label="自动流程类型"><h2>{isStatic?'自动定点乱数':'自动 TID 乱数'}</h2><button type="button" onClick={onSwitchKind}><ArrowRightLeft size={14} aria-hidden="true" /><span>切换到{otherLabel}</span>{automationBusy(snapshot?.state)&&snapshot?.state.kind===otherKind&&<span className="automation-hub-running-dot" aria-hidden="true" />}</button></div>;
   if(!api||!snapshot||!config)return <section className="automation-workspace"><header className="automation-heading">{headingSwitcher}</header><p role="status">{error||(!api?'请在桌面应用中使用自动流程。':'正在加载自动流程…')}</p></section>;
   const p=config.parameters,busy=automationBusy(snapshot.state);
   const staticConfig=config as StaticAutomationConfig;

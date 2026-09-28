@@ -56,7 +56,8 @@ app.whenReady().then(async()=>{
   await until(`Boolean(document.querySelector('[aria-label="自动定点工作区"] .automation-static-sections'))`,'automation page');
   assert.equal(await js(`document.querySelectorAll('nav[aria-label="工作区"] button').length`),6,'one automation sidebar entry');
   assert.equal(await js(`document.querySelector('#automation-panel-static .automation-heading-switcher h2').textContent`),'自动定点乱数');
-  assert.equal(await js(`document.querySelector('#automation-panel-static .automation-heading-switcher button').textContent`),'自动 TID');
+  assert.equal(await js(`document.querySelector('#automation-panel-static .automation-heading-switcher button').textContent`),'切换到自动 TID');
+  assert.equal(await js(`Boolean(document.querySelector('#automation-panel-static .automation-heading-switcher button svg.lucide-arrow-right-left'))`),true,'switch action has an icon');
   assert.equal(await js(`(()=>{const heading=document.querySelector('#automation-panel-static .automation-heading-switcher h2').getBoundingClientRect();const switchButton=document.querySelector('#automation-panel-static .automation-heading-switcher button').getBoundingClientRect();return switchButton.left>=heading.right&&Math.abs(switchButton.top-heading.top)<12;})()`),true,'flow switch is beside the current heading');
   const ready=await js(`(async()=>window.desktop.automation.check({kind:'static',config:(await window.desktop.automation.getState()).config.static,blink:{},profile:{version:'BD',tid:0,sid:0}}))()`);
   assert.equal(ready.ready,false);assert.equal(automation.getState().runs.length,0);
@@ -64,10 +65,10 @@ app.whenReady().then(async()=>{
   await until(`Boolean(document.querySelector('.automation-delay-dialog'))`,'delay settings');
   await js(`(()=>{const input=document.querySelector('[aria-label="固定 delay"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'1442');input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
   await click('应用');
-  await click('自动 TID');
+  await click('切换到自动 TID');
   assert.equal(await js(`document.querySelector('#automation-panel-tid .automation-heading-switcher h2').textContent`),'自动 TID 乱数');
-  assert.equal(await js(`document.querySelector('#automation-panel-tid .automation-heading-switcher button').textContent`),'自动定点');
-  await click('自动定点');
+  assert.equal(await js(`document.querySelector('#automation-panel-tid .automation-heading-switcher button').textContent`),'切换到自动定点');
+  await click('切换到自动定点');
   await js(`document.querySelector('.automation-delay-trigger').click()`);
   assert.equal(await js(`document.querySelector('[aria-label="固定 delay"]')?.value`),'1442','unsaved draft survives tab switch');
   await click('取消');
@@ -84,7 +85,7 @@ app.whenReady().then(async()=>{
   await js(`window.desktop.automation.start(${JSON.stringify(input)})`);
   await until(`document.querySelector('.automation-flow-copy strong')?.textContent==='等待启动撞帧脚本'`,'runtime phase broadcast');
   assert.equal(await js(`document.querySelector('[data-node="wait"]')?.dataset.state`),'current','real phase maps to wait node');
-  await click('自动 TID');
+  await click('切换到自动 TID');
   assert.equal(await js(`document.querySelector('.automation-hub-running-notice')?.textContent.includes('自动定点正在运行')`),true,'inactive tab names running flow');
   assert.equal(await js(`document.querySelector('#automation-panel-tid .automation-run-toolbar button:nth-child(1)').disabled`),true,'other flow cannot start');
   assert.equal(await js(`document.querySelector('#automation-panel-tid .automation-run-toolbar button:nth-child(2)').disabled`),true,'other flow cannot stop active flow');
@@ -107,7 +108,7 @@ app.whenReady().then(async()=>{
   await detached.webContents.executeJavaScript(`void window.desktop.panels.dock();true`);
   await delay(100);
   await js(`document.querySelector('[aria-label="关闭日志中心"]')?.click()`);
-  await click('自动 TID');
+  await click('切换到自动 TID');
   const ids=await js(`window.desktop.automation.tidPreview({seed:['40000000','00000000','40000000','00000000'],frame_threshold:4})`);
   assert.deepEqual(ids.id_states.map(row=>row.advances),[0,1,2,3,4]);
   await screenshot('automatic-tid.png');
