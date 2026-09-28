@@ -591,12 +591,11 @@ export default function App({ connections = initialConnections }: { connections?
                 <div className="automation-hub-tabs" role="tablist" aria-label="自动流程类型" onKeyDown={event => {
                   if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
                   event.preventDefault();
-                  const next = event.key === 'Home' ? 'static' : event.key === 'End' ? 'tid' : automationTab === 'static' ? 'tid' : 'static';
+                  const next = event.key === 'Home' ? automationTab : automationTab === 'static' ? 'tid' : 'static';
                   selectAutomationTab(next);
                   event.currentTarget.querySelector<HTMLButtonElement>(`#automation-tab-${next}`)?.focus();
                 }}>
-                  <button type="button" role="tab" id="automation-tab-static" aria-controls="automation-panel-static" aria-selected={automationTab === 'static'} tabIndex={automationTab === 'static' ? 0 : -1} onClick={() => selectAutomationTab('static')}>自动定点{runningAutomationKind === 'static' && <span className="automation-hub-running-dot" aria-hidden="true" />}</button>
-                  <button type="button" role="tab" id="automation-tab-tid" aria-controls="automation-panel-tid" aria-selected={automationTab === 'tid'} tabIndex={automationTab === 'tid' ? 0 : -1} onClick={() => selectAutomationTab('tid')}>自动 TID{runningAutomationKind === 'tid' && <span className="automation-hub-running-dot" aria-hidden="true" />}</button>
+                  {([automationTab, automationTab === 'static' ? 'tid' : 'static'] as AutomationKind[]).map(kind => <button key={kind} type="button" role="tab" id={`automation-tab-${kind}`} aria-controls={`automation-panel-${kind}`} aria-selected={automationTab === kind} tabIndex={automationTab === kind ? 0 : -1} onClick={() => selectAutomationTab(kind)}>{kind === 'static' ? '自动定点' : '自动 TID'}{runningAutomationKind === kind && <span className="automation-hub-running-dot" aria-hidden="true" />}</button>)}
                 </div>
                 {runningAutomationKind && runningAutomationKind !== automationTab && <div className="automation-hub-running-notice" role="status">
                   <span>{runningAutomationKind === 'tid' ? '自动 TID' : '自动定点'}正在运行，此页暂不能启动。</span>

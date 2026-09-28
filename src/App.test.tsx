@@ -189,11 +189,15 @@ describe('workspace interactions', () => {
     fireEvent.click(within(screen.getByRole('navigation', { name: '工作区' })).getByRole('button', { name: '自动流程' }));
     const tabs = screen.getByRole('tablist', { name: '自动流程类型' });
     expect(within(tabs).getByRole('tab', { name: '自动定点' }).getAttribute('aria-selected')).toBe('true');
+    expect(within(tabs).getAllByRole('tab').map(tab => tab.textContent)).toEqual(['自动定点', '自动 TID']);
     fireEvent.click(within(tabs).getByRole('tab', { name: '自动 TID' }));
     expect(within(tabs).getByRole('tab', { name: '自动 TID' }).getAttribute('aria-selected')).toBe('true');
+    expect(within(tabs).getAllByRole('tab').map(tab => tab.textContent)).toEqual(['自动 TID', '自动定点']);
     fireEvent.click(screen.getByRole('button', { name: '首页' }));
     fireEvent.click(within(screen.getByRole('navigation', { name: '工作区' })).getByRole('button', { name: '自动流程' }));
     expect(within(tabs).getByRole('tab', { name: '自动 TID' }).getAttribute('aria-selected')).toBe('true');
+    fireEvent.click(within(tabs).getByRole('tab', { name: '自动定点' }));
+    expect(within(tabs).getAllByRole('tab').map(tab => tab.textContent)).toEqual(['自动定点', '自动 TID']);
   });
 
   it('opens OCR settings with a selectable ROI over the persistent video', async () => {

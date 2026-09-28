@@ -56,13 +56,16 @@ app.whenReady().then(async()=>{
   await until(`Boolean(document.querySelector('[aria-label="自动定点工作区"] .automation-static-sections'))`,'automation page');
   assert.equal(await js(`document.querySelectorAll('nav[aria-label="工作区"] button').length`),6,'one automation sidebar entry');
   assert.equal(await js(`document.querySelector('#automation-tab-static').getAttribute('aria-selected')`),'true');
+  assert.deepEqual(await js(`Array.from(document.querySelectorAll('.automation-hub-tabs button'),button=>button.textContent)`),['自动定点','自动 TID']);
   const ready=await js(`(async()=>window.desktop.automation.check({kind:'static',config:(await window.desktop.automation.getState()).config.static,blink:{},profile:{version:'BD',tid:0,sid:0}}))()`);
   assert.equal(ready.ready,false);assert.equal(automation.getState().runs.length,0);
   await js(`document.querySelector('.automation-delay-trigger').click()`);
   await until(`Boolean(document.querySelector('.automation-delay-dialog'))`,'delay settings');
   await js(`(()=>{const input=document.querySelector('[aria-label="固定 delay"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'1442');input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
   await click('应用');
-  await click('自动 TID');await click('自动定点');
+  await click('自动 TID');
+  assert.deepEqual(await js(`Array.from(document.querySelectorAll('.automation-hub-tabs button'),button=>button.textContent)`),['自动 TID','自动定点']);
+  await click('自动定点');
   await js(`document.querySelector('.automation-delay-trigger').click()`);
   assert.equal(await js(`document.querySelector('[aria-label="固定 delay"]')?.value`),'1442','unsaved draft survives tab switch');
   await click('取消');
