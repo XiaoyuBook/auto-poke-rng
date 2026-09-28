@@ -10,6 +10,7 @@ import { CandidateTable } from './AutomationLogs';
 import { Dialog } from './Dialog';
 import { DelayConfigDialog, delayPreviewReason, delayStrategyLabels, useDelayPreview } from './DelayConfigDialog';
 import { StaticFlowStatusCard } from './StaticFlowStatusCard';
+import { TargetSummaryCard } from './TargetSummaryCard';
 
 const scriptLabels:Record<string,string>={seed:'测种脚本',advance:'过帧脚本',hit:'撞帧脚本',exit:'过场脚本',reverse:'反查脚本',escape:'逃跑脚本',name:'取名脚本'};
 const featureInfo:Record<StaticFeatureKey,{label:string;description:string}>={reverse:{label:'自动反查',description:'未出闪时执行反查；找到的 delay 候选会存入历史样本'},exit:{label:'过场',description:'在目标前预留帧数，执行过场脚本后校正 Seed'},sync:{label:'同步策略',description:'设置队首特性或同步模式后参与搜索'},escape:{label:'逃跑续搜',description:'未出闪且还有更晚候选时，执行逃跑脚本继续搜索'}};
@@ -114,7 +115,7 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
   const idText=()=>[['Adv','TID','SID','TSV','Display TID','累计用时','预计到达时间'],...idRows.map(idCells)].map(row=>row.map(value=>`"${String(value).replaceAll('"','""')}"`).join(',')).join('\r\n');
   const renderTargetEditor=()=>isStatic&&filter?<>
         <div className="automation-target-picker">
-          <label>目标宝可梦<select aria-label="自动定点宝可梦" value={p.target} onChange={event=>{update({target:event.target.value});setDelayOpen(false);}}>{CATEGORY_OPTIONS.filter(option=>option.key!=='all').map(category=><optgroup key={category.key} label={category.label}>{getStaticTargets(category.key,profile.version).map(item=><option key={item.speciesKey} value={item.speciesKey}>{item.species} · {item.level}级{item.roamer?' · 游走':''}</option>)}</optgroup>)}</select></label>
+          <label>目标宝可梦<select aria-label="自动定点宝可梦" disabled={busy||pending} value={p.target} onChange={event=>{update({target:event.target.value});setDelayOpen(false);}}>{CATEGORY_OPTIONS.filter(option=>option.key!=='all').map(category=><optgroup key={category.key} label={category.label}>{getStaticTargets(category.key,profile.version).map(item=><option key={item.speciesKey} value={item.speciesKey}>{item.species} · {item.level}级{item.roamer?' · 游走':''}</option>)}</optgroup>)}</select></label>
           {target&&<div className="automation-target-selected" aria-label="当前目标" aria-live="polite">
             <div className="automation-target-art"><img src={targetSprites[`../assets/bdsp-targets/${target.speciesId}.png`]} alt="" /></div>
             <div className="automation-target-identity"><span>当前目标</span><strong>{target.species}</strong><small>图鉴 #{String(target.speciesId).padStart(3,'0')} · {getCategoryLabel(target.category)} · {target.level} 级{target.roamer?' · 游走':''}</small></div>
@@ -122,14 +123,14 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
         </div>
         <details open><summary>筛选条件 · {p.filters.length} 组</summary><p className="muted">满足任意一组条件即可；同组内的条件需同时满足。</p><div className="automation-toolbar">
           {p.filters.map((_,i)=><button key={i} aria-pressed={filterIndex===i} onClick={()=>setFilterIndex(i)}>条件 {i+1}</button>)}
-          <button disabled={p.filters.length>=20} onClick={()=>{update({filters:[...p.filters,structuredClone(filter)]});setFilterIndex(p.filters.length);}}>添加条件</button>
-          <button disabled={p.filters.length===1} onClick={()=>{update({filters:p.filters.filter((_,i)=>i!==filterIndex)});setFilterIndex(0);}}>移除条件</button></div>
-          <div className="automation-fields"><label>异色<select value={filter.shiny} onChange={event=>changeFilter({shiny:Number(event.target.value)})}><option value={255}>任意</option><option value={3}>异色</option><option value={1}>Star</option><option value={2}>Square</option><option value={0}>非异色</option></select></label>
-            <label>特性<select value={filter.ability} onChange={event=>changeFilter({ability:Number(event.target.value)})}><option value={255}>任意</option><option value={0}>0</option><option value={1}>1</option><option value={2}>隐藏</option></select></label>
-            <label>性别<select value={filter.gender} onChange={event=>changeFilter({gender:Number(event.target.value)})}><option value={255}>任意</option><option value={0}>雄性</option><option value={1}>雌性</option><option value={2}>无性别</option></select></label></div>
-          <div className="automation-ivs">{statNames.map((label,i)=><label key={label}>{label}<input aria-label={`${label}最小IV`} type="number" min={0} max={31} value={filter.ivMin[i]} onChange={event=>changeFilter({ivMin:filter.ivMin.map((value,n)=>n===i?Number(event.target.value):value)})}/><input aria-label={`${label}最大IV`} type="number" min={0} max={31} value={filter.ivMax[i]} onChange={event=>changeFilter({ivMax:filter.ivMax.map((value,n)=>n===i?Number(event.target.value):value)})}/></label>)}</div>
-          <details><summary>性格与体型</summary><div className="automation-natures">{NATURES_ZH.map((name,i)=><label key={name}><input type="checkbox" checked={filter.natures[i]} onChange={event=>changeFilter({natures:filter.natures.map((value,n)=>n===i?event.target.checked:value)})}/>{name}</label>)}</div>
-            <div className="automation-fields">{(['heightMin','heightMax','weightMin','weightMax'] as const).map((key,i)=><label key={key}>{['身高下限','身高上限','体重下限','体重上限'][i]}<input type="number" min={0} max={255} value={filter[key]} onChange={event=>changeFilter({[key]:Number(event.target.value)})}/></label>)}</div></details>
+          <button disabled={busy||pending||p.filters.length>=20} onClick={()=>{update({filters:[...p.filters,structuredClone(filter)]});setFilterIndex(p.filters.length);}}>添加条件</button>
+          <button disabled={busy||pending||p.filters.length===1} onClick={()=>{update({filters:p.filters.filter((_,i)=>i!==filterIndex)});setFilterIndex(0);}}>移除条件</button></div>
+          <div className="automation-fields"><label>异色<select disabled={busy||pending} value={filter.shiny} onChange={event=>changeFilter({shiny:Number(event.target.value)})}><option value={255}>任意</option><option value={3}>异色</option><option value={1}>Star</option><option value={2}>Square</option><option value={0}>非异色</option></select></label>
+            <label>特性<select disabled={busy||pending} value={filter.ability} onChange={event=>changeFilter({ability:Number(event.target.value)})}><option value={255}>任意</option><option value={0}>0</option><option value={1}>1</option><option value={2}>隐藏</option></select></label>
+            <label>性别<select disabled={busy||pending} value={filter.gender} onChange={event=>changeFilter({gender:Number(event.target.value)})}><option value={255}>任意</option><option value={0}>雄性</option><option value={1}>雌性</option><option value={2}>无性别</option></select></label></div>
+          <div className="automation-ivs">{statNames.map((label,i)=><label key={label}>{label}<input aria-label={`${label}最小IV`} disabled={busy||pending} type="number" min={0} max={31} value={filter.ivMin[i]} onChange={event=>changeFilter({ivMin:filter.ivMin.map((value,n)=>n===i?Number(event.target.value):value)})}/><input aria-label={`${label}最大IV`} disabled={busy||pending} type="number" min={0} max={31} value={filter.ivMax[i]} onChange={event=>changeFilter({ivMax:filter.ivMax.map((value,n)=>n===i?Number(event.target.value):value)})}/></label>)}</div>
+          <details><summary>性格与体型</summary><div className="automation-natures">{NATURES_ZH.map((name,i)=><label key={name}><input type="checkbox" disabled={busy||pending} checked={filter.natures[i]} onChange={event=>changeFilter({natures:filter.natures.map((value,n)=>n===i?event.target.checked:value)})}/>{name}</label>)}</div>
+            <div className="automation-fields">{(['heightMin','heightMax','weightMin','weightMax'] as const).map((key,i)=><label key={key}>{['身高下限','身高上限','体重下限','体重上限'][i]}<input disabled={busy||pending} type="number" min={0} max={255} value={filter[key]} onChange={event=>changeFilter({[key]:Number(event.target.value)})}/></label>)}</div></details>
         </details>
   </>:null;
   const runDetails=<>
@@ -176,14 +177,7 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
     </div>
     {(error||notice)&&<p role={error?'alert':'status'} className={error?'panel-error':'automation-notice'}>{error||notice}</p>}
     <div className={'automation-overview'+(isStatic?'':' automation-overview-single')}>
-      {isStatic&&<button type="button" className="automation-target-card" aria-label="选择目标宝可梦与设置筛选条件" aria-haspopup="dialog" disabled={busy||pending} onClick={()=>setTargetSettingsOpen(true)}>
-        <span className="automation-target-heading"><strong>当前目标</strong><span className="automation-target-action">目标设置</span></span>
-        <span className="automation-target-main">
-          {target&&<span className="automation-target-art"><img src={targetSprites[`../assets/bdsp-targets/${target.speciesId}.png`]} alt="" /></span>}
-          <span className="automation-target-identity"><strong>{target?.species||'未选择目标'}</strong>{target&&<small>{getCategoryLabel(target.category)} · {target.level} 级{target.roamer?' · 游走':''}</small>}</span>
-        </span>
-        <span className="automation-target-summary"><span>筛选条件</span><strong>{p.filters.length} 组</strong></span>
-      </button>}
+      {isStatic&&<TargetSummaryCard target={target} sprite={target&&targetSprites[`../assets/bdsp-targets/${target.speciesId}.png`]} filters={p.filters} locked={busy||pending} onSettings={()=>{setFilterIndex(0);setTargetSettingsOpen(true);}} />}
       {isStatic?<StaticFlowStatusCard state={ownState} run={currentRun} activeFlowId={snapshot.staticGroups.activeId} otherBusy={busy&&!ownState} details={runDetails}/>:<section className="automation-status-card" data-status={ownState?.status||(busy?'running':'idle')} aria-label="自动流程状态">
         <div className="automation-status-heading"><span>当前流程状态</span><span className="automation-status-label">{statusLabel}</span></div>
         <strong role="status">{statusMessage}</strong>
@@ -248,7 +242,7 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
     </div>
     {isStatic&&targetSettingsOpen&&<Dialog title="目标与筛选条件" close={()=>setTargetSettingsOpen(false)} className="automation-target-dialog">
       <div className="automation-target-dialog-body">{renderTargetEditor()}{error&&<p className="panel-error" role="alert">{error}</p>}</div>
-      <div className="automation-target-dialog-actions"><span className="muted">{dirty?'配置未保存':'配置已保存'}</span><button type="button" className="button primary" onClick={saveTargetSettings}>完成设置</button></div>
+      <div className="automation-target-dialog-actions"><span className="muted">{busy?'运行中 · 仅查看':dirty?'配置未保存':'配置已保存'}</span><button type="button" className="button primary" onClick={saveTargetSettings}>{busy?'关闭':'完成设置'}</button></div>
     </Dialog>}
     {isStatic&&delayOpen&&<DelayConfigDialog key={`${snapshot.staticGroups.activeId}:${species}`} config={staticConfig.delayConfig} samples={delaySamples} species={target?.species||'当前宝可梦'} flowName={activeGroup?.name||'当前流程'} scopeKey={`${snapshot.staticGroups.activeId}:${species}`} api={api} runningDelay={ownState?.roundDelay} locked={busy||pending} onClose={closeDelay} onApply={draft=>{updateDelay(draft);closeDelay();}} onExclude={async(roundNumber,excluded)=>{const next=await api.delay({species,action:'exclude',number:roundNumber,excluded});setSnapshot(next);}} onClear={async()=>{const next=await api.delay({species,action:'clear'});setSnapshot(next);}} />}
     {isStatic&&removedFeature&&<div className="automation-undo" role="status">已移除{featureInfo[removedFeature].label}<button type="button" onClick={()=>{updateFeature(removedFeature,true);jumpTo(removedFeature);setRemovedFeature(null);}}>撤销</button><button type="button" aria-label="关闭撤销提示" onClick={()=>setRemovedFeature(null)}>×</button></div>}
