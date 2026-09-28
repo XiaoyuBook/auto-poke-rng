@@ -111,7 +111,13 @@ app.whenReady().then(async()=>{
   await click('切换到自动 TID');
   const ids=await js(`window.desktop.automation.tidPreview({seed:['40000000','00000000','40000000','00000000'],frame_threshold:4})`);
   assert.deepEqual(ids.id_states.map(row=>row.advances),[0,1,2,3,4]);
+  assert.equal(await js(`(()=>{const goal=document.querySelector('#automation-panel-tid .automation-tid-target-card').getBoundingClientRect();const status=document.querySelector('#automation-panel-tid .automation-tid-status-card').getBoundingClientRect();return Math.abs(goal.top-status.top)<2&&Math.abs(goal.bottom-status.bottom)<2;})()`),true,'TID goal and status cards align');
+  assert.equal(await js(`Boolean(document.querySelector('#automation-panel-tid .automation-group-sidebar'))`),false,'TID does not have a configuration sidebar');
   await screenshot('automatic-tid.png');
+  main.setSize(1080,820);await delay(180);
+  assert.equal(await js(`(()=>{const goal=document.querySelector('#automation-panel-tid .automation-tid-target-card').getBoundingClientRect();const status=document.querySelector('#automation-panel-tid .automation-tid-status-card').getBoundingClientRect();const primary=document.querySelector('.workspace-primary').getBoundingClientRect();const rail=document.querySelector('.workspace-right-rail').getBoundingClientRect();return status.left>=goal.right&&goal.width>300&&rail.top>=primary.bottom;})()`),true,'TID content keeps usable width and video moves below');
+  await screenshot('automatic-tid-narrow.png');
+  main.setSize(1500,940);await delay(180);
   await click('闪光反查区域');
   await until(`Boolean(document.querySelector('[aria-label="闪光反查区域工作区"]'))`,'OCR page');
   assert.equal(await js(`document.querySelectorAll('.ocr-table tbody tr').length`),10);

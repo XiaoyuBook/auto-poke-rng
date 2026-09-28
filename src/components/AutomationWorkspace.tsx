@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Play, Square, ListChecks, FileClock, Plus, Pencil, Trash2, ChevronDown, SlidersHorizontal, RefreshCw, ArrowRightLeft } from 'lucide-react';
+import { Play, Square, ListChecks, FileClock, Plus, Pencil, Trash2, ChevronDown, SlidersHorizontal, RefreshCw, ArrowRightLeft, Hash } from 'lucide-react';
 import { automationBusy, downloadText, useAutomation, type AutomationConfig, type AutomationKind, type AutomationParameters, type DelayConfig, type IdResults, type Readiness, type StaticAutomationConfig, type StaticFeatureKey, type TargetFilter } from '../automation';
 import type { BlinkConfig } from '../blink';
 import type { BdspProfile } from '../bdspProfile';
@@ -178,12 +178,17 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
       {isStatic&&<><span className="automation-save-status" role="status">{pending?'保存中':saveFailed?'保存失败':dirty?'未保存':'已保存'}</span><button type="button" disabled={busy||pending||!dirty} onClick={()=>void perform(saveDraft,'配置已保存')}>保存配置</button></>}
     </div>
     {(error||notice)&&<p role={error?'alert':'status'} className={error?'panel-error':'automation-notice'}>{error||notice}</p>}
-    <div className={'automation-overview'+(isStatic?'':' automation-overview-single')}>
-      {isStatic&&<TargetSummaryCard target={target} sprite={target&&targetSprites[`../assets/bdsp-targets/${target.speciesId}.png`]} filters={p.filters} locked={busy||pending} onSettings={()=>{setFilterIndex(0);setTargetSettingsOpen(true);}} />}
-      {isStatic?<StaticFlowStatusCard state={ownState} run={currentRun} activeFlowId={snapshot.staticGroups.activeId} otherBusy={busy&&!ownState} details={runDetails}/>:<section className="automation-status-card" data-status={ownState?.status||(busy?'running':'idle')} aria-label="自动流程状态">
+    <div className="automation-overview">
+      {isStatic?<TargetSummaryCard target={target} sprite={target&&targetSprites[`../assets/bdsp-targets/${target.speciesId}.png`]} filters={p.filters} locked={busy||pending} onSettings={()=>{setFilterIndex(0);setTargetSettingsOpen(true);}} />:<section className="automation-target-card automation-tid-target-card" aria-label="当前 TID 目标">
+        <div className="automation-target-heading"><span>当前目标</span><button type="button" className="automation-target-settings" onClick={()=>document.querySelector<HTMLInputElement>('#automation-section-tid-target input')?.focus()}>目标设置</button></div>
+        <div className="automation-tid-target-main"><span className="automation-tid-target-art" aria-hidden="true"><Hash size={42}/></span><div><strong className={p.target_display_tids.length?'':'is-empty'}>{p.target_display_tids.length?String(p.target_display_tids[0]).padStart(6,'0'):'未设置'}</strong><small>{p.target_display_tids.length?`目标 Display TID · 共 ${p.target_display_tids.length} 个`:'请添加目标 Display TID'}</small></div></div>
+        <div className="automation-tid-target-list">{p.target_display_tids.length?<>{p.target_display_tids.slice(1,4).map(value=><span key={value}>{String(value).padStart(6,'0')}</span>)}{p.target_display_tids.length>4&&<span>另有 {p.target_display_tids.length-4} 个</span>}{p.target_display_tids.length===1&&<span>已设置 1 个目标</span>}</>:<span>开始前至少设置一个目标号码</span>}</div>
+      </section>}
+      {isStatic?<StaticFlowStatusCard state={ownState} run={currentRun} activeFlowId={snapshot.staticGroups.activeId} otherBusy={busy&&!ownState} details={runDetails}/>:<section className="automation-status-card automation-tid-status-card" data-status={ownState?.status||(busy?'running':'idle')} aria-label="自动流程状态">
         <div className="automation-status-heading"><span>当前流程状态</span><span className="automation-status-label">{statusLabel}</span></div>
         <strong role="status">{statusMessage}</strong>
         <dl><div><dt>阶段</dt><dd>{progress?.phase||'—'}</dd></div><div><dt>轮次</dt><dd>{progress?.loop_index||'—'}</dd></div><div><dt>当前 Adv</dt><dd>{progress?.current_advances??'—'}</dd></div></dl>
+        <details className="automation-status-details"><summary>查看运行详情</summary><div className="automation-status-details-content">{runDetails}</div></details>
       </section>}
     </div>
     {readiness&&<section className="automation-card" aria-label="开始前准备"><h3>开始前准备</h3>{readiness.checks.map(item=><p key={item.label} className={item.ok?'':'panel-error'}>{item.ok?'✓':'!'} {item.label}：<span>{item.detail}</span>{isStatic&&!item.ok&&readinessTarget(item.label,item.detail)&&<button type="button" onClick={()=>jumpTo(readinessTarget(item.label,item.detail)!)}>定位设置</button>}</p>)}</section>}
@@ -215,25 +220,22 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
       <section id="automation-section-shiny" className="automation-card automation-feature-card" aria-label="闪光判定"><div className="automation-feature-heading"><strong>闪光判定</strong><span className="automation-feature-status">必选</span></div><fieldset disabled={busy||pending} className="automation-feature-body"><p className="muted">两次提示文字的出现间隔达到阈值时判为出闪。<br/>普通定点比较“出现了！”与“去吧/上吧”，御三家比较“去吧/上吧”与“战斗”。</p><div className="automation-fields automation-shiny-fields">{thresholdEditor}<button type="button" className="automation-record-button" aria-label="自动录像" aria-pressed={p.record_shiny} title="判定出闪后自动录像" onClick={()=>update({record_shiny:!p.record_shiny})}>自动录像 · {p.record_shiny?'已开启':'已关闭'}</button></div></fieldset></section>
       {featureOrder.map(featureCard)}
     </div>}
-    {!isStatic&&<div className="automation-config-grid">
-      <details className="automation-card automation-flow-section" open><summary>任务参数<span>起点、运行模式与搜索范围</span></summary><div className="automation-flow-section-body">
-        <header className="automation-toolbar"><span className="muted">{paramDirty?'未保存':'已保存'}</span><button disabled={pending} onClick={()=>void perform(()=>api.save({kind,scope:'parameters',values:p}),'任务参数已保存')}>保存任务参数</button></header>
-        <div className="automation-fields"><label>起点<select aria-label="流程起点" value={p.start} onChange={event=>update({start:event.target.value as AutomationParameters['start']})}><option value="script">从测种脚本开始</option><option value="capture">从捕获 Seed 开始</option></select></label>
+    {!isStatic&&<div className="automation-config-grid automation-tid-sections">
+      <section className="automation-card automation-feature-card" aria-label="基础设置"><div className="automation-feature-heading"><strong>基础设置</strong><span className="automation-feature-status">必选</span></div><div className="automation-feature-body">
+        <div className="automation-toolbar automation-tid-save"><span className="muted">{paramDirty?'未保存':'已保存'}</span><button disabled={pending||!paramDirty} onClick={()=>void perform(()=>api.save({kind,scope:'parameters',values:p}),'任务参数已保存')}>保存设置</button></div>
+        <div className="automation-fields automation-tid-base-fields"><label>起点<select aria-label="流程起点" value={p.start} onChange={event=>update({start:event.target.value as AutomationParameters['start']})}><option value="script">从测种脚本开始</option><option value="capture">从捕获 Seed 开始</option></select></label>
           <label>运行模式<select value={p.loop_mode} onChange={event=>update({loop_mode:event.target.value as AutomationParameters['loop_mode']})}><option value="single">单次</option><option value="count">循环 N 次</option><option value="infinite">无限循环</option></select></label>{p.loop_mode==='count'&&numeric('循环次数','loop_count',1,1000000)}
-          {numeric('TID 搜索范围','frame_threshold',0,250000)}{numeric('取名 delay','delay')}
-          <label>目标 Display TID<input aria-label="目标 Display TID" placeholder="多个号码用空格或逗号分隔" value={tidText} onChange={event=>setTidText(event.target.value)}/></label></div>
-        <button onClick={()=>{const values=tidText.trim().split(/[\s,，]+/);if(values.some(value=>!/^\d{1,6}$/.test(value))){setError('Display TID 需要0–999999之间的整数');return;}update({target_display_tids:[...new Set([...p.target_display_tids,...values.map(Number)])]});setTidText('');}}>添加目标 TID</button>
-        <div className="automation-toolbar">{p.target_display_tids.map(value=><button key={value} title="移除目标" onClick={()=>update({target_display_tids:p.target_display_tids.filter(item=>item!==value)})}>{String(value).padStart(6,'0')} ×</button>)}</div>
-        <p className="muted">使用“眨眼捕获”当前 S[0–3]。手动生成只有相对用时，实际测种后附带预计到达日期。</p>
-        <button disabled={busy||pending} onClick={()=>void perform(async()=>{setIds(await api.tidPreview({seed:blinkConfig.seed,frame_threshold:p.frame_threshold}));setIdPage(0);})}>使用当前 Seed 生成 ID 数据</button>
-      </div></details>
-      <details className="automation-card automation-flow-section"><summary>任务脚本<span>测种与取名脚本</span></summary><div className="automation-flow-section-body"><p className="muted">{scriptDirty?'脚本选择未保存':'脚本选择已保存'} · 使用脚本库中的 .txt 文件</p>
-        {Object.keys(config.scripts).map(scriptField)}
-        <div className="automation-toolbar"><button disabled={pending} onClick={()=>void perform(()=>api.save({kind,scope:'scripts',values:config.scripts}),'脚本选择已保存')}>保存脚本选择</button><button onClick={refreshScripts}>刷新脚本</button></div>
-      </div></details>
-      <details className="automation-card automation-flow-section"><summary>运行详情<span>当前轮次、帧数与 Seed</span></summary><div className="automation-flow-section-body">{runDetails}</div></details>
+          {numeric('TID 搜索范围','frame_threshold',0,250000)}{numeric('取名 delay','delay')}</div>
+        <div className="automation-tid-target-editor" id="automation-section-tid-target"><label>目标 Display TID<input aria-label="目标 Display TID" placeholder="多个号码用空格或逗号分隔" value={tidText} onChange={event=>setTidText(event.target.value)}/></label><button type="button" onClick={()=>{const values=tidText.trim().split(/[\s,，]+/);if(values.some(value=>!/^\d{1,6}$/.test(value))){setError('Display TID 需要0–999999之间的整数');return;}update({target_display_tids:[...new Set([...p.target_display_tids,...values.map(Number)])]});setTidText('');}}>添加目标 TID</button></div>
+        <div className="automation-tid-target-chips">{p.target_display_tids.map(value=><button key={value} type="button" title="移除目标" aria-label={`移除目标 ${String(value).padStart(6,'0')}`} onClick={()=>update({target_display_tids:p.target_display_tids.filter(item=>item!==value)})}>{String(value).padStart(6,'0')} ×</button>)}</div>
+      </div></section>
+      <section className="automation-card automation-feature-card" aria-label="基础脚本"><div className="automation-feature-heading"><strong>基础脚本</strong><span className="automation-feature-status">必选</span><button type="button" className="automation-script-refresh" aria-label="刷新脚本" title="刷新脚本" disabled={pending} onClick={refreshScripts}><RefreshCw size={16} aria-hidden="true" /></button></div><div className="automation-feature-body">
+        <p className="muted">取名脚本必选；从测种脚本开始或循环运行时，还需测种脚本。</p>
+        <div className="automation-fields automation-tid-script-fields">{Object.keys(config.scripts).map(scriptField)}</div>
+        <div className="automation-toolbar automation-tid-save"><span className="muted">{scriptDirty?'未保存':'已保存'}</span><button disabled={pending||!scriptDirty} onClick={()=>void perform(()=>api.save({kind,scope:'scripts',values:config.scripts}),'脚本选择已保存')}>保存脚本</button></div>
+      </div></section>
     </div>}
-    {isStatic?<CandidateTable rows={round?.candidates||[]} selected={round?.selected} sources={round?.sources}/>:<section className="automation-table" aria-label="ID 数据"><div className="automation-toolbar">
+    {isStatic?<CandidateTable rows={round?.candidates||[]} selected={round?.selected} sources={round?.sources}/>:<section className="automation-card automation-table automation-tid-results" aria-label="ID 数据"><header className="automation-tid-results-heading"><div><h3>ID 数据</h3><p>使用当前 Seed 手动生成时显示相对用时；实际测种后显示预计到达时间。</p></div><button disabled={busy||pending} onClick={()=>void perform(async()=>{setIds(await api.tidPreview({seed:blinkConfig.seed,frame_threshold:p.frame_threshold}));setIdPage(0);})}>使用当前 Seed 生成</button></header><div className="automation-toolbar">
       <button aria-pressed={!onlyTargets} onClick={()=>{setOnlyTargets(false);setIdPage(0);}}>全部 TID · {idRows.length}</button><button aria-pressed={onlyTargets} onClick={()=>{setOnlyTargets(true);setIdPage(0);}}>仅目标 TID · {idRows.filter(row=>p.target_display_tids.includes(row.display_tid)).length}</button>
       <button onClick={()=>{const index=visibleIds.findIndex(row=>p.target_display_tids.includes(row.display_tid));if(index>=0){setIdPage(Math.floor(index/50));setSelectedId(visibleIds[index].advances);}}}>定位目标</button>
       <button disabled={selectedId===null} onClick={()=>void perform(()=>navigator.clipboard.writeText(idCells(idRows.find(row=>row.advances===selectedId)!).join('\t')))}>复制选中</button>

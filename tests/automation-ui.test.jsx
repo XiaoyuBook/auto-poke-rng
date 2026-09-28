@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react';
 import { afterEach, expect, test, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { createRequire } from 'node:module';
 import { AutomationWorkspace } from '../src/components/AutomationWorkspace';
 import { AutomationLogs } from '../src/components/AutomationLogs';
@@ -174,6 +174,20 @@ test('C02: preparation is read only and exposes failed checks',async()=>{
   await screen.findByText('请先连接');
   expect(api.start).not.toHaveBeenCalled();expect(api.save).not.toHaveBeenCalled();
 });
+test('TID goal card reflects target edits without a configuration sidebar',async()=>{
+  const {api}=fixture();
+  render(<AutomationWorkspace kind="tid" profile={defaultBdspProfile} blinkConfig={newBlinkConfig()} blinkConfigs={[]} openLogs={()=>{}} onSwitchKind={()=>{}} />);
+  await screen.findByRole('region',{name:'当前 TID 目标'});
+  expect(screen.getByText('未设置')).toBeTruthy();
+  expect(screen.queryByRole('complementary',{name:'配置组'})).toBeNull();
+  fireEvent.click(within(screen.getByRole('region',{name:'当前 TID 目标'})).getByRole('button',{name:'目标设置'}));
+  expect(document.activeElement).toBe(screen.getByLabelText('目标 Display TID'));
+  fireEvent.change(screen.getByLabelText('目标 Display TID'),{target:{value:'123456'}});
+  fireEvent.click(screen.getByRole('button',{name:'添加目标 TID'}));
+  expect(within(screen.getByRole('region',{name:'当前 TID 目标'})).getByText('123456')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button',{name:'保存设置'}));
+  await waitFor(()=>expect(api.save).toHaveBeenCalledWith(expect.objectContaining({kind:'tid',scope:'parameters',values:expect.objectContaining({target_display_tids:[123456]})})));
+});
 test('L01/L03: record navigation filters detailed logs to the selected run and round',async()=>{
   const {snapshot}=fixture();
   snapshot.runs=[{id:'r1',kind:'static',startedAt:'2026-09-25T10:00:00Z',rounds:[{number:1,outcome:'无候选',candidates:[],events:[]}]}];
@@ -213,7 +227,7 @@ test('T05/T06/T07: filtered display never truncates copy-all and recapture clear
   await waitFor(()=>expect(writeText).toHaveBeenCalled());
   expect(writeText.mock.calls[0][0]).toContain('654321');expect(writeText.mock.calls[0][0]).toContain('123456');
   await act(async()=>api.onState.mock.calls[0][0]({...snapshot,state:{...snapshot.state,progress:{phase:'捕获Seed',id_states:[],id_elapsed_seconds:[]}}}));
-  expect(screen.queryByText('123456')).toBeNull();
+  expect(within(screen.getByRole('region',{name:'ID 数据'})).queryByText('123456')).toBeNull();
 });
 test('L03: a new run removes the previous round filter',async()=>{
   const {snapshot,api}=fixture();snapshot.state.runId='r1';

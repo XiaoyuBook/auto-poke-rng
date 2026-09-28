@@ -575,7 +575,7 @@ export default function App({ connections = initialConnections }: { connections?
           </div>
         </header>
 
-        <div className="workspace-content" data-labels-open={inlineLabelsOpen || undefined} data-automation-static={page === '自动流程' && automationTab === 'static' || undefined} style={{ '--video-width': `${videoWidth}px` } as CSSProperties}>
+        <div className="workspace-content" data-labels-open={inlineLabelsOpen || undefined} data-automation-workspace={page === '自动流程' || undefined} style={{ '--video-width': `${videoWidth}px` } as CSSProperties}>
           <div className="workspace-primary">
             <div className="workspace-page" hidden={inlineLabelsOpen}>
               {page === '脚本编辑' && <ScriptWorkspace scriptId={library.active?.path || ''} scriptName={library.active?.name || ''} script={script}
