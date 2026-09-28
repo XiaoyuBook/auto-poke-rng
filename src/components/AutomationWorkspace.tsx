@@ -19,7 +19,7 @@ const statusLabels:Record<string,string>={idle:'待命',starting:'启动中',run
 const statNames=['HP','攻击','防御','特攻','特防','速度'];
 const targetSprites=import.meta.glob<string>('../assets/bdsp-targets/*.png',{eager:true,query:'?url',import:'default'});
 
-export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openLogs}:{kind:AutomationKind;profile:BdspProfile;blinkConfig:BlinkConfig;blinkConfigs:BlinkConfig[];openLogs:()=>void}){
+export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openLogs,onSwitchKind}:{kind:AutomationKind;profile:BdspProfile;blinkConfig:BlinkConfig;blinkConfigs:BlinkConfig[];openLogs:()=>void;onSwitchKind:()=>void}){
   const {api,snapshot,error,setError,setSnapshot}=useAutomation();
   const [config,setConfig]=useState<AutomationConfig|null>(null),[files,setFiles]=useState<ScriptFile[]>([]),[notice,setNotice]=useState('');
   const [targetSettingsOpen,setTargetSettingsOpen]=useState(false);
@@ -43,8 +43,10 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
   const previewSamples=snapshot?.profiles[String(estimateSpecies)]?.samples||[];
   const delayPreview=useDelayPreview(kind==='static'&&config?(config as StaticAutomationConfig).delayConfig:null,previewSamples,`${snapshot?.staticGroups.activeId}:${estimateSpecies}`,api);
   useEffect(()=>{if(!progress?.wait_target_wall)return;const timer=setInterval(()=>setNow(Date.now()),100);return()=>clearInterval(timer);},[progress?.wait_target_wall]);
-  if(!api||!snapshot||!config)return <section className="automation-workspace"><p role="status">{error||(!api?'请在桌面应用中使用自动流程。':'正在加载自动流程…')}</p></section>;
-  const p=config.parameters,busy=automationBusy(snapshot.state),isStatic=kind==='static';
+  const isStatic=kind==='static',otherKind=isStatic?'tid':'static',otherLabel=isStatic?'自动 TID':'自动定点';
+  const headingSwitcher=<div className="automation-heading-switcher" role="group" aria-label="自动流程类型"><h2>{isStatic?'自动定点乱数':'自动 TID 乱数'}</h2><button type="button" aria-label={`切换到${otherLabel}`} onClick={onSwitchKind}>{otherLabel}{automationBusy(snapshot?.state)&&snapshot?.state.kind===otherKind&&<span className="automation-hub-running-dot" aria-hidden="true" />}</button></div>;
+  if(!api||!snapshot||!config)return <section className="automation-workspace"><header className="automation-heading">{headingSwitcher}</header><p role="status">{error||(!api?'请在桌面应用中使用自动流程。':'正在加载自动流程…')}</p></section>;
+  const p=config.parameters,busy=automationBusy(snapshot.state);
   const staticConfig=config as StaticAutomationConfig;
   const groups=snapshot.staticGroups?.items||[],activeGroup=groups.find(item=>item.id===snapshot.staticGroups?.activeId);
   const ownState=snapshot.state.kind===kind?snapshot.state:null;
@@ -187,7 +189,7 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
     {readiness&&<section className="automation-card" aria-label="开始前准备"><h3>开始前准备</h3>{readiness.checks.map(item=><p key={item.label} className={item.ok?'':'panel-error'}>{item.ok?'✓':'!'} {item.label}：<span>{item.detail}</span>{isStatic&&!item.ok&&readinessTarget(item.label,item.detail)&&<button type="button" onClick={()=>jumpTo(readinessTarget(item.label,item.detail)!)}>定位设置</button>}</p>)}</section>}
   </>;
   return <section className={'automation-workspace'+(isStatic?' automation-workspace-with-groups':'')} aria-label={isStatic?'自动定点工作区':'自动TID工作区'}>
-    {isStatic&&<header className="automation-heading automation-static-heading"><div><h2>自动定点乱数</h2></div><div className="automation-flow-manager"><label>流程配置<select aria-label="流程配置" value={snapshot.staticGroups.activeId} disabled={busy||pending} onChange={event=>void activateGroup(event.target.value)}>{groups.map(group=><option key={group.id} value={group.id}>{group.name}</option>)}</select></label><button type="button" aria-label="新建流程配置" title="新建流程配置" disabled={busy||pending} onClick={()=>{setGroupName('');setGroupEditor({mode:'create'});}}><Plus size={16}/></button><button type="button" aria-label="重命名流程配置" title="重命名流程配置" disabled={busy||pending} onClick={()=>{setGroupName(activeGroup?.name||'');setGroupEditor({mode:'rename',id:activeGroup?.id});}}><Pencil size={15}/></button><button type="button" aria-label="删除流程配置" title="删除流程配置" disabled={busy||pending||groups.length<=1} onClick={()=>setGroupDeleteId(snapshot.staticGroups.activeId)}><Trash2 size={15}/></button></div></header>}
+    {isStatic&&<header className="automation-heading automation-static-heading">{headingSwitcher}<div className="automation-flow-manager"><label>流程配置<select aria-label="流程配置" value={snapshot.staticGroups.activeId} disabled={busy||pending} onChange={event=>void activateGroup(event.target.value)}>{groups.map(group=><option key={group.id} value={group.id}>{group.name}</option>)}</select></label><button type="button" aria-label="新建流程配置" title="新建流程配置" disabled={busy||pending} onClick={()=>{setGroupName('');setGroupEditor({mode:'create'});}}><Plus size={16}/></button><button type="button" aria-label="重命名流程配置" title="重命名流程配置" disabled={busy||pending} onClick={()=>{setGroupName(activeGroup?.name||'');setGroupEditor({mode:'rename',id:activeGroup?.id});}}><Pencil size={15}/></button><button type="button" aria-label="删除流程配置" title="删除流程配置" disabled={busy||pending||groups.length<=1} onClick={()=>setGroupDeleteId(snapshot.staticGroups.activeId)}><Trash2 size={15}/></button></div></header>}
     {isStatic&&<div className="automation-workspace-top">{topContent}</div>}
     {isStatic&&<aside className="automation-group-sidebar" aria-label="配置组">
       <div className="automation-group-panel">
@@ -196,7 +198,7 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
       </div>
     </aside>}
     <div className="automation-flow-content">
-    {!isStatic&&<header className="automation-heading"><div><h2>自动 TID 乱数</h2><p>小卡比兽测种、Display TID 搜索与自动取名</p></div></header>}
+    {!isStatic&&<header className="automation-heading"><div>{headingSwitcher}<p>小卡比兽测种、Display TID 搜索与自动取名</p></div></header>}
     {!isStatic&&topContent}
     {isStatic&&<div className="automation-static-sections">
       <section id="automation-section-base" className="automation-card automation-feature-card" aria-label="基础设置"><div className="automation-feature-heading"><strong>基础设置</strong><span className="automation-feature-status">必选</span></div><fieldset disabled={busy||pending} className="automation-feature-body"><div className="automation-fields automation-base-fields">

@@ -588,21 +588,12 @@ export default function App({ connections = initialConnections }: { connections?
                 virtualControllerOpen={virtualControllerOpen} toggleVirtualController={() => void toggleVirtualController()}
                 labelButton={<VideoLabelsButton variant="tool" expanded={panelWindows.videoLabelsOpen} toggle={toggleVideoLabels} />} />}
               {visitedPages.has('自动流程') && <div className="automation-hub" hidden={page !== '自动流程'}>
-                <div className="automation-hub-tabs" role="tablist" aria-label="自动流程类型" onKeyDown={event => {
-                  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-                  event.preventDefault();
-                  const next = event.key === 'Home' ? automationTab : automationTab === 'static' ? 'tid' : 'static';
-                  selectAutomationTab(next);
-                  event.currentTarget.querySelector<HTMLButtonElement>(`#automation-tab-${next}`)?.focus();
-                }}>
-                  {([automationTab, automationTab === 'static' ? 'tid' : 'static'] as AutomationKind[]).map(kind => <button key={kind} type="button" role="tab" id={`automation-tab-${kind}`} aria-controls={`automation-panel-${kind}`} aria-selected={automationTab === kind} tabIndex={automationTab === kind ? 0 : -1} onClick={() => selectAutomationTab(kind)}>{kind === 'static' ? '自动定点' : '自动 TID'}{runningAutomationKind === kind && <span className="automation-hub-running-dot" aria-hidden="true" />}</button>)}
-                </div>
                 {runningAutomationKind && runningAutomationKind !== automationTab && <div className="automation-hub-running-notice" role="status">
                   <span>{runningAutomationKind === 'tid' ? '自动 TID' : '自动定点'}正在运行，此页暂不能启动。</span>
                   <button type="button" onClick={() => selectAutomationTab(runningAutomationKind)}>返回运行页</button>
                 </div>}
-                {visitedAutomationTabs.has('static') && <div className="automation-page automation-hub-panel" id="automation-panel-static" role="tabpanel" aria-labelledby="automation-tab-static" hidden={automationTab !== 'static'}><AutomationWorkspace kind="static" profile={bdspProfile} blinkConfig={blink.config} blinkConfigs={blink.configs} openLogs={() => showPanel('logs')} /></div>}
-                {visitedAutomationTabs.has('tid') && <div className="automation-page automation-hub-panel" id="automation-panel-tid" role="tabpanel" aria-labelledby="automation-tab-tid" hidden={automationTab !== 'tid'}><AutomationWorkspace kind="tid" profile={bdspProfile} blinkConfig={blink.config} blinkConfigs={blink.configs} openLogs={() => showPanel('logs')} /></div>}
+                {visitedAutomationTabs.has('static') && <div className="automation-page automation-hub-panel" id="automation-panel-static" hidden={automationTab !== 'static'}><AutomationWorkspace kind="static" profile={bdspProfile} blinkConfig={blink.config} blinkConfigs={blink.configs} openLogs={() => showPanel('logs')} onSwitchKind={() => selectAutomationTab('tid')} /></div>}
+                {visitedAutomationTabs.has('tid') && <div className="automation-page automation-hub-panel" id="automation-panel-tid" hidden={automationTab !== 'tid'}><AutomationWorkspace kind="tid" profile={bdspProfile} blinkConfig={blink.config} blinkConfigs={blink.configs} openLogs={() => showPanel('logs')} onSwitchKind={() => selectAutomationTab('static')} /></div>}
               </div>}
               {visitedPages.has('闪光反查区域') && <div hidden={page !== '闪光反查区域'}><OcrWorkspace overlayTarget={page === '闪光反查区域' ? ocrOverlayHost : null} previewTarget={page === '闪光反查区域' ? ocrPreviewHost : null} /></div>}
               {page === '定点数据' && <StaticDataWorkspace profile={bdspProfile} onLog={message => addLog(message, '系统', 'success')} />}

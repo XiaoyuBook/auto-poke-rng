@@ -55,8 +55,9 @@ app.whenReady().then(async()=>{
   await click('自动流程');
   await until(`Boolean(document.querySelector('[aria-label="自动定点工作区"] .automation-static-sections'))`,'automation page');
   assert.equal(await js(`document.querySelectorAll('nav[aria-label="工作区"] button').length`),6,'one automation sidebar entry');
-  assert.equal(await js(`document.querySelector('#automation-tab-static').getAttribute('aria-selected')`),'true');
-  assert.deepEqual(await js(`Array.from(document.querySelectorAll('.automation-hub-tabs button'),button=>button.textContent)`),['自动定点','自动 TID']);
+  assert.equal(await js(`document.querySelector('#automation-panel-static .automation-heading-switcher h2').textContent`),'自动定点乱数');
+  assert.equal(await js(`document.querySelector('#automation-panel-static .automation-heading-switcher button').textContent`),'自动 TID');
+  assert.equal(await js(`(()=>{const heading=document.querySelector('#automation-panel-static .automation-heading-switcher h2').getBoundingClientRect();const switchButton=document.querySelector('#automation-panel-static .automation-heading-switcher button').getBoundingClientRect();return switchButton.left>=heading.right&&Math.abs(switchButton.top-heading.top)<12;})()`),true,'flow switch is beside the current heading');
   const ready=await js(`(async()=>window.desktop.automation.check({kind:'static',config:(await window.desktop.automation.getState()).config.static,blink:{},profile:{version:'BD',tid:0,sid:0}}))()`);
   assert.equal(ready.ready,false);assert.equal(automation.getState().runs.length,0);
   await js(`document.querySelector('.automation-delay-trigger').click()`);
@@ -64,7 +65,8 @@ app.whenReady().then(async()=>{
   await js(`(()=>{const input=document.querySelector('[aria-label="固定 delay"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'1442');input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
   await click('应用');
   await click('自动 TID');
-  assert.deepEqual(await js(`Array.from(document.querySelectorAll('.automation-hub-tabs button'),button=>button.textContent)`),['自动 TID','自动定点']);
+  assert.equal(await js(`document.querySelector('#automation-panel-tid .automation-heading-switcher h2').textContent`),'自动 TID 乱数');
+  assert.equal(await js(`document.querySelector('#automation-panel-tid .automation-heading-switcher button').textContent`),'自动定点');
   await click('自动定点');
   await js(`document.querySelector('.automation-delay-trigger').click()`);
   assert.equal(await js(`document.querySelector('[aria-label="固定 delay"]')?.value`),'1442','unsaved draft survives tab switch');
@@ -88,7 +90,7 @@ app.whenReady().then(async()=>{
   assert.equal(await js(`document.querySelector('#automation-panel-tid .automation-run-toolbar button:nth-child(2)').disabled`),true,'other flow cannot stop active flow');
   await screenshot('automatic-tid-other-running.png');
   await click('返回运行页');
-  assert.equal(await js(`document.querySelector('#automation-tab-static').getAttribute('aria-selected')`),'true');
+  assert.equal(await js(`document.querySelector('#automation-panel-static').hidden`),false);
   assert.equal(await js(`window.desktop.devices.controller.press('A').then(()=>false,()=>true)`),true,'manual input blocked');
   await click('查看相关日志');
   await until(`document.querySelector('.floating-panel')?.textContent.includes('自动流程测试日志') || document.querySelector('.automation-log-center')?.textContent.includes('自动流程测试日志')`,'related logs');
@@ -114,7 +116,7 @@ app.whenReady().then(async()=>{
   assert.equal(await js(`document.querySelectorAll('.ocr-table tbody tr').length`),10);
   await screenshot('ocr-settings.png');
   assert.ok(fs.readdirSync(path.join(app.getPath('userData'),'logs')).length,'daily disk log exists after clearing');
-  console.log('PASS: combined automation tabs, saved drafts, cross-tab running guard, real IPC, input exclusion, related/detached logs, stop, ID worker and OCR settings');
+  console.log('PASS: automation heading switch, saved drafts, cross-flow running guard, real IPC, input exclusion, related/detached logs, stop, ID worker and OCR settings');
 }).catch(error=>{console.error(error);process.exitCode=1;}).finally(async()=>{
   clearTimeout(timer);await automation?.close();notifications?.close();await Promise.allSettled([devices?.close(),blink?.close(),rng?.close()]);app.exit(process.exitCode||0);
 });
