@@ -74,7 +74,8 @@ app.whenReady().then(async () => {
   notifications = registerQQNotifications({ ipcMain, getMainWindow: () => mainWindow, safeStorage, nativeImage, userData: app.getPath('userData') });
   rng = registerRng({ ipcMain, getMainWindow: () => mainWindow, isAutomationBusy: () => devices.isAutomationBusy() });
   blink = registerBlink({ ipcMain, getMainWindow: () => mainWindow, getVideo: () => devices.getState().video, isAutomationBusy: () => devices.isAutomationBusy() });
-  automation = registerAutomation({ ipcMain, getMainWindow: () => mainWindow, getWindows: () => BrowserWindow.getAllWindows(), devices, rng, blink, userData: app.getPath('userData'), notifications });
+  automation = registerAutomation({ ipcMain, getMainWindow: () => mainWindow, getWindows: () => BrowserWindow.getAllWindows(), devices, rng, blink, userData: app.getPath('userData'),
+    encodeNotificationImage: bytes => nativeImage.createFromBuffer(bytes).toJPEG(88), notifications });
   notifications.on('log', (message, level = 'info') => automation?.store.log(message, 'QQ通知', level));
   registerScriptRepository({ ipcMain, getMainWindow: () => mainWindow, dialog, storage, rootDirectory, userData: app.getPath('userData'), appVersion: app.getVersion(), gate: scriptGate,
     migrateScriptPaths: aliases => automation.store.migrateScriptPaths(aliases),

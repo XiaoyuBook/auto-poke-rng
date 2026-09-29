@@ -103,7 +103,7 @@ describe('QQ HTTP and WebSocket protocol', () => {
 });
 
 function memoryStore() {
-  return { fail: false, saved: null, load: () => ({ appId: '', secret: '', rememberSecret: false, userOpenId: '', groupOpenId: '', userEnabled: true, groupEnabled: false, notifyCompleted: true, notifyFailed: true, notifyStopped: false }),
+  return { fail: false, saved: null, load: () => ({ appId: '', secret: '', rememberSecret: false, userOpenId: '', groupOpenId: '', userEnabled: true, groupEnabled: false, notifyCompleted: true, notifyFailed: true, notifyStopped: false, attachImage: true }),
     save(value) { if (this.fail) throw new Error('模拟磁盘写入失败'); this.saved = { ...value }; } };
 }
 function serviceFixture() {
@@ -197,7 +197,7 @@ describe('QQ settings and standalone service', () => {
     const logs = [];
     service.on('log', (message, level) => logs.push({ message, level }));
     service.operation = 'verify';
-    const first = service.notifyTask('run-1', '自动定点乱数', 'completed', { target: '骑拉帝纳', detail: '已完成' });
+    const first = service.notifyTask('run-1', '自动定点乱数', 'completed', { target: '骑拉帝纳', detail: '已完成', image: Buffer.from('snapshot') });
     const duplicate = service.notifyTask('run-1', '自动定点乱数', 'completed');
     expect(await duplicate).toBe(false);
     expect(fixture.requests).toHaveLength(0);
@@ -207,10 +207,11 @@ describe('QQ settings and standalone service', () => {
     const message = fixture.requests.find(request => request.path === '/v2/users/USER/messages');
     expect(message.body.content).toContain('自动定点乱数 · 任务完成');
     expect(message.body.content).toContain('目标：骑拉帝纳');
+    expect(fixture.requests.filter(request => request.path === '/v2/users/USER/messages' && request.body.msg_type === 7)).toHaveLength(1);
     expect(logs.some(item => item.message.includes('QQ 通知已提交'))).toBe(true);
     service.update({ notifyFailed: false });
     expect(await service.notifyTask('run-2', '自动定点乱数', 'failed', { detail: '失败' })).toBe(false);
-    expect(fixture.requests.filter(request => request.path === '/v2/users/USER/messages')).toHaveLength(1);
+    expect(fixture.requests.filter(request => request.path === '/v2/users/USER/messages' && request.body.msg_type === 0)).toHaveLength(1);
   });
 
   it('rejects other windows and subframes at the IPC boundary; secrets stay out of state', () => {

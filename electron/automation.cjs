@@ -34,7 +34,7 @@ function validateParameters(kind, parameters) {
   }
 }
 
-function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,userData,workerFactory=startWorker,captureImage,notifications}){
+function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,userData,workerFactory=startWorker,captureImage,encodeNotificationImage,notifications}){
   const store=new AutomationStore(userData);let active=null, auxiliary=null, timer=null, closed=false;
   let state={status:'idle',kind:null,runId:null,progress:null,capture:null,shiny:null,activity:null,flow:null,message:'等待开始',revision:0};
   const snapshot=()=>({...store.snapshot(),state});
@@ -43,13 +43,15 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
   };
   store.on('change',broadcast);store.on('log',broadcast);
   const update=patch=>{state={...state,...patch,revision:state.revision+1};broadcast();};
-  const notifyRun=run=>{
+  const notifyRun=(run,imageBuffer)=>{
     if(!notifications?.notifyTask)return;
     const outcome=run.finalStatus;
     if(!['completed','failed','stopped'].includes(outcome))return;
     const task=run.kind==='tid'?'自动 TID 乱数':'自动定点乱数';
     const target=run.notificationTarget||'';
-    Promise.resolve(notifications.notifyTask(run.id,task,outcome,{target,detail:run.finalMessage||''})).catch(error=>{
+    const options={target,detail:run.finalMessage||''};
+    if (imageBuffer) options.image=imageBuffer;
+    Promise.resolve(notifications.notifyTask(run.id,task,outcome,options)).catch(error=>{
       store.log('QQ 通知调用失败：'+String(error?.message||error), 'QQ通知', 'warning', {runId:run.id,round:run.round});
     });
   };
@@ -128,6 +130,21 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
     if(devices.getState().video.session!==source.session)throw Error('视频源已切换');
     return bytes.toString('base64');
   });
+  const captureNotificationImage=async run=>{
+    if (typeof notifications?.wantsTaskImage!=='function' || !notifications.wantsTaskImage(run.finalStatus)) return undefined;
+    try {
+      const frame=await image();
+      const encoded=Buffer.isBuffer(frame)?frame:typeof frame==='string'?
+        Buffer.from(frame.startsWith('data:')?frame.slice(frame.indexOf(',')+1):frame,'base64'):null;
+      if (!encoded?.length) throw Error('截图数据为空');
+      const result=encodeNotificationImage?await encodeNotificationImage(encoded):encoded;
+      if (!Buffer.isBuffer(result)||!result.length) throw Error('截图编码结果为空');
+      return result;
+    } catch(error) {
+      store.log('QQ通知截图失败：'+String(error?.message||error),'QQ通知','warning',{runId:run.id,round:run.round});
+      return undefined;
+    }
+  };
   const ocrRequest=async(params,rows=store.data.config.ocr)=>devices.ocr.read(params.imageBase64||await image(),'',{...params,regions:Object.fromEntries(rows.map(row=>[row.id,['x','y','width','height'].map(key=>row.rect[key])]))});
   const effectiveInput=input=>{
     if(input?.kind!=='static')return input;
@@ -285,14 +302,15 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
         const message=run.stopReason||outcome.message||'自动流程已结束';
         run.finalStatus=status;run.finalMessage=message;
         store.finishRun(run.id,status,message);store.log(message,source,status==='failed'?'warning':status==='completed'?'success':'info',context());
-        notifyRun(run);
+        const notificationImage=await captureNotificationImage(run);
+        notifyRun(run,notificationImage);
         devices.releaseAutomation(run.id);if(active===run)active=null;
         update({status,message,capture:null,activity:null,shiny:null,
           flow:state.flow?.runId===run.id?{...state.flow,nextNode:null}:state.flow,
           progress:state.progress?{...state.progress,wait_target_wall:null}:null});
       })();
       return snapshot();
-    }catch(error){const status=run.stopped?'stopped':'failed';const message=String(error?.message||error);run.finalStatus=status;run.finalMessage=message;store.finishRun(run.id,status,message);store.log(message,source,'warning',{runId:run.id,round:run.round});notifyRun(run);devices.releaseAutomation(run.id);if(active===run)active=null;update({status,message,flow:state.flow?.runId===run.id?{...state.flow,nextNode:null}:state.flow});throw error;}
+    }catch(error){const status=run.stopped?'stopped':'failed';const message=String(error?.message||error);run.finalStatus=status;run.finalMessage=message;store.finishRun(run.id,status,message);store.log(message,source,'warning',{runId:run.id,round:run.round});const notificationImage=await captureNotificationImage(run);notifyRun(run,notificationImage);devices.releaseAutomation(run.id);if(active===run)active=null;update({status,message,flow:state.flow?.runId===run.id?{...state.flow,nextNode:null}:state.flow});throw error;}
   };
   handle('state',snapshot,false);
   handle('check',async input=>{if(active||auxiliary)throw Error('已有流程正在运行');const {ready,checks:items}=await checks(input);return {ready,checks:items};});

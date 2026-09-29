@@ -8,7 +8,7 @@ const { QQClient } = require('./qq-client.cjs');
 
 const defaults = () => ({
   appId: '', secret: '', rememberSecret: false, userOpenId: '', groupOpenId: '', userEnabled: true, groupEnabled: false,
-  notifyCompleted: true, notifyFailed: true, notifyStopped: false,
+  notifyCompleted: true, notifyFailed: true, notifyStopped: false, attachImage: true,
 });
 
 class QQSettingsStore {
@@ -75,7 +75,7 @@ class QQNotificationService extends EventEmitter {
     if (!values || typeof values !== 'object' || Array.isArray(values)) throw new Error('配置格式无效。');
     const next = { ...this.settings };
     for (const [key, value] of Object.entries(values)) {
-      if (!['appId', 'secret', 'rememberSecret', 'userEnabled', 'groupEnabled', 'notifyCompleted', 'notifyFailed', 'notifyStopped'].includes(key) || typeof value !== typeof next[key]) throw new Error('QQ 配置字段无效。');
+      if (!['appId', 'secret', 'rememberSecret', 'userEnabled', 'groupEnabled', 'notifyCompleted', 'notifyFailed', 'notifyStopped', 'attachImage'].includes(key) || typeof value !== typeof next[key]) throw new Error('QQ 配置字段无效。');
       next[key] = typeof value === 'string' ? value.trim() : value;
     }
     if (next.appId.length > 128 || next.secret.length > 512) throw new Error('AppID 或 AppSecret 过长，请检查输入。');
@@ -159,7 +159,12 @@ class QQNotificationService extends EventEmitter {
     return this.send({ event: '图文测试', text: 'Auto Poke RNG · QQ 通知测试\n请确认同时收到这条文字和测试图片。', image }, 'test');
   }
 
-  notifyTask(runId, task, outcome, { target = '', detail = '' } = {}) {
+  wantsTaskImage(outcome) {
+    const policy = { completed: 'notifyCompleted', failed: 'notifyFailed', stopped: 'notifyStopped' }[outcome];
+    return !this.closed && Boolean(policy) && this.settings.attachImage === true && this.settings[policy] === true && this.snapshot().ready;
+  }
+
+  notifyTask(runId, task, outcome, { target = '', detail = '', image } = {}) {
     const policy = { completed: 'notifyCompleted', failed: 'notifyFailed', stopped: 'notifyStopped' }[outcome];
     if (this.closed || !policy || this.settings[policy] === false || (outcome === 'stopped' && this.settings[policy] !== true)
       || this.notificationRuns.has(runId) || !this.snapshot().ready) return Promise.resolve(false);
@@ -175,7 +180,7 @@ class QQNotificationService extends EventEmitter {
     if (detail) lines.push(`详情：${String(detail).slice(0, 800)}`);
     lines.push('结束时间：' + new Date().toLocaleString('zh-CN', { hour12: false }));
     return new Promise(resolve => {
-      this.notificationQueue.push({ runId, event: labels[outcome], text: lines.join('\n'), resolve });
+      this.notificationQueue.push({ runId, event: labels[outcome], text: lines.join('\n'), image: this.settings.attachImage === true ? image : undefined, resolve });
       this.emit('log', `${task}：已加入 QQ 通知队列（${labels[outcome]}）。`, 'info');
       this.drainNotifications();
     });
@@ -186,7 +191,7 @@ class QQNotificationService extends EventEmitter {
     const item = this.notificationQueue.shift();
     this.notificationActive = item;
     try {
-      const state = await this.send({ event: item.event, text: item.text }, 'send');
+      const state = await this.send({ event: item.event, text: item.text, image: item.image }, 'send');
       const ok = !state.error && state.feedback === '通知已提交。请在 QQ 中核对实际接收情况。';
       this.emit('log', ok ? `${item.event} QQ 通知已提交。` : `${item.event} QQ 通知发送失败：${state.error || state.feedback}`, ok ? 'info' : 'warning');
       item.resolve(ok);

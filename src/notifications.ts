@@ -4,7 +4,7 @@ export type QQRecipient = 'user' | 'group';
 export type QQStatus = 'unconfigured' | 'unverified' | 'unbound' | 'ready' | 'busy' | 'failed';
 export interface QQSettings {
   appId: string; rememberSecret: boolean; userOpenId: string; groupOpenId: string;
-  userEnabled: boolean; groupEnabled: boolean; notifyCompleted: boolean; notifyFailed: boolean; notifyStopped: boolean;
+  userEnabled: boolean; groupEnabled: boolean; notifyCompleted: boolean; notifyFailed: boolean; notifyStopped: boolean; attachImage: boolean;
 }
 export interface QQRecord {
   id: string; time: string; event: string; kind: QQRecipient; success: boolean; detail: string;
@@ -18,7 +18,7 @@ export interface QQState {
 }
 export interface QQApi {
   getState: () => Promise<QQState>;
-  save: (values: Partial<Pick<QQSettings, 'appId' | 'rememberSecret' | 'userEnabled' | 'groupEnabled' | 'notifyCompleted' | 'notifyFailed' | 'notifyStopped'>> & { secret?: string }) => Promise<QQState>;
+  save: (values: Partial<Pick<QQSettings, 'appId' | 'rememberSecret' | 'userEnabled' | 'groupEnabled' | 'notifyCompleted' | 'notifyFailed' | 'notifyStopped' | 'attachImage'>> & { secret?: string }) => Promise<QQState>;
   verify: () => Promise<QQState>;
   bind: (kind: QQRecipient) => Promise<QQState>;
   unbind: (kind: QQRecipient) => Promise<QQState>;

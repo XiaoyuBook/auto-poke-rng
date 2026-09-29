@@ -7,7 +7,7 @@ import type { QQApi, QQState } from '../notifications';
 
 let state: QQState, api: QQApi, listener: (value: QQState) => void;
 beforeEach(() => {
-  state = { settings: { appId: 'APP', rememberSecret: false, userOpenId: 'USER', groupOpenId: '', userEnabled: true, groupEnabled: false, notifyCompleted: true, notifyFailed: true, notifyStopped: false },
+  state = { settings: { appId: 'APP', rememberSecret: false, userOpenId: 'USER', groupOpenId: '', userEnabled: true, groupEnabled: false, notifyCompleted: true, notifyFailed: true, notifyStopped: false, attachImage: true },
     hasSecret: true, ready: true, verified: true, operation: '', binding: null, feedback: '配置已保存', error: '', status: 'ready', testSent: false, testConfirmed: false, records: [] };
   const current = async () => state;
   api = { getState: vi.fn(current), save: vi.fn(current), verify: vi.fn(current), bind: vi.fn(current), unbind: vi.fn(current),
@@ -52,6 +52,13 @@ it('persists automatic outcome notification switches separately from credentials
   await screen.findByLabelText('AppID');
   fireEvent.click(screen.getByLabelText('手动停止通知'));
   await waitFor(() => expect(api.save).toHaveBeenCalledWith({ notifyStopped: true }));
+});
+
+it('persists the automatic task screenshot switch separately from outcome switches', async () => {
+  render(<QQNotifications close={() => {}} />);
+  await screen.findByLabelText('AppID');
+  fireEvent.click(screen.getByLabelText('附带任务截图'));
+  await waitFor(() => expect(api.save).toHaveBeenCalledWith({ attachImage: false }));
 });
 
 it('cancels binding on tab changes and closing, while preserving literal remote error text', async () => {

@@ -77,7 +77,8 @@ export function QQNotifications({ close }: { close: () => void }) {
             </div>)}
             {state.binding && <div className="qq-binding" ref={bindingPanel} aria-live="polite"><p>请{state.binding.kind === 'user' ? '私聊机器人' : '在目标群内 @机器人'}，发送当前绑定码</p><div><strong>{state.binding.code}</strong><button className="icon-button" title="复制绑定码" aria-label="复制绑定码" onClick={() => void navigator.clipboard.writeText(state.binding!.code).then(() => setCopied(state.binding!.code)).catch(() => setError('复制失败，请手动输入绑定码。'))}>{copied === state.binding.code ? <Check size={16} /> : <Copy size={16} />}</button><span>{state.binding.seconds} 秒</span></div><small>每 60 秒自动换码，旧码立即失效。离开此页或关闭窗口会停止绑定。</small></div>}
           </section>
-          <section className="qq-section"><h3><span>3</span>自动流程通知</h3><p className="qq-hint">自动定点和自动 TID 结束时发送文字通知；发送失败只记录日志，不影响任务结果。</p>
+          <section className="qq-section"><h3><span>3</span>自动流程通知</h3><p className="qq-hint">自动定点和自动 TID 结束时发送通知；默认附带任务结束时的截图。截图失败会降级为文字并记录日志。</p>
+            <label className="qq-checkbox"><input type="checkbox" aria-label="附带任务截图" checked={state.settings.attachImage} disabled={busy || dirty || !state.ready} onChange={event => void command(() => api!.save({ attachImage: event.target.checked }))} />附带任务截图<span>每个任务结束时只抓取一次</span></label>
             {([['notifyCompleted', '任务完成', '流程正常结束时通知'], ['notifyFailed', '任务失败', '流程异常结束时通知'], ['notifyStopped', '手动停止', '手动停止或设备中断时通知']] as const).map(([key, label, detail]) =>
               <label className="qq-checkbox" key={key}><input type="checkbox" aria-label={label + '通知'} checked={state.settings[key]} disabled={busy || dirty || !state.ready} onChange={event => void command(() => api!.save({ [key]: event.target.checked }))} />{label}<span>{detail}</span></label>)}
           </section>
