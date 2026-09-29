@@ -25,6 +25,7 @@ import { automationBusy, useAutomation, type AutomationKind } from './automation
 import { StaticDataWorkspace } from './components/StaticDataWorkspace';
 import { BlinkWorkspace } from './components/BlinkWorkspace';
 import { BlinkVideoOverlay } from './components/BlinkVideoOverlay';
+import { AutomationVideoOverlay } from './components/AutomationVideoOverlay';
 import { useBlink } from './blink';
 import { BdspHomeWorkspace } from './components/BdspProfileCard';
 import { useBdspProfile } from './bdspProfile';
@@ -612,8 +613,9 @@ export default function App({ connections = initialConnections }: { connections?
           <aside className="workspace-right-rail" aria-label="固定工作区侧栏">
             <section ref={videoRegion} className="persistent-video" aria-label="视频预览" tabIndex={-1} onContextMenu={openVideoContextMenu}>
               <VideoPreview previewOnly />
-              <div ref={setOcrOverlayHost} className="video-roi-host" aria-hidden={!(page === '闪光反查区域' || page === '眨眼捕获') || inlineLabelsOpen || undefined} hidden={!(page === '闪光反查区域' || page === '眨眼捕获') || inlineLabelsOpen} />
+              <div ref={setOcrOverlayHost} className="video-roi-host" aria-hidden={!(page === '闪光反查区域' || page === '眨眼捕获' || page === '自动流程') || inlineLabelsOpen || undefined} hidden={!(page === '闪光反查区域' || page === '眨眼捕获' || page === '自动流程') || inlineLabelsOpen} />
               {page === '眨眼捕获' && !inlineLabelsOpen && <BlinkVideoOverlay blink={blink} video={devices.video} target={ocrOverlayHost} />}
+              {page === '自动流程' && !inlineLabelsOpen && <AutomationVideoOverlay state={automation.snapshot?.state} video={devices.video} target={ocrOverlayHost} />}
               <button className="video-resize-handle" type="button" aria-label="调整视频预览大小" title="拖动调整视频大小，保持 16:9"
                 onPointerDown={startVideoResize} onPointerMove={resizeVideo} onPointerUp={finishVideoResize} onPointerCancel={finishVideoResize}
                 onLostPointerCapture={() => { videoResize.current = null; }} onKeyDown={nudgeVideoSize}><Maximize2 size={13} aria-hidden="true" /></button>

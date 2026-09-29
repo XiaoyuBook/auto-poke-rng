@@ -168,7 +168,8 @@ class Session:
         config['seed'] = [f'{word:08X}' for word in previous.seed.words] if previous else config['seed']
         count = 64 if tid else 20 if exit_scene or (previous and config['noisy']) else 7 if previous else 40
         capture_id = uuid4().hex
-        self.emit(event='capture',captureId=capture_id,stage='start',captured=0,target=count)
+        self.emit(event='capture',captureId=capture_id,stage='start',captured=0,target=count,
+                  roi=config['roi'],sourceWidth=config['sourceWidth'],sourceHeight=config['sourceHeight'])
         eye = decode_eye(config['eye'])
         detector, gray_before, last_timestamp = None, None, None
         last_progress, last_frame_at, milestones = 0, time.monotonic(), set()

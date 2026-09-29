@@ -15,12 +15,16 @@ fs.mkdirSync(output,{recursive:true});app.setPath('userData',fs.mkdtempSync(path
 const scriptRoot=fs.mkdtempSync(path.join(output,'scripts-'));
 fs.writeFileSync(path.join(scriptRoot,'advance.rng'),'_目标帧数 = 300\nA 10\n');
 fs.writeFileSync(path.join(scriptRoot,'hit.rng'),'A 10\n');
+fs.writeFileSync(path.join(scriptRoot,'name.rng'),'A 10\n');
 app.commandLine.appendSwitch('disable-gpu');
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-let devices,blink,rng,automation,notifications;
+let devices,blink,rng,automation,notifications,emitAutomationEvent;
 const timer=setTimeout(()=>{console.error('Automation Electron test timed out');app.exit(1);},55000);
 app.whenReady().then(async()=>{
   const main=new BrowserWindow({width:1500,height:940,show:false,webPreferences:{preload:path.join(root,'electron/preload.cjs'),contextIsolation:true,sandbox:true,backgroundThrottling:false,offscreen:true}});
+  let fixtureVideo=null;
+  const send=main.webContents.send.bind(main.webContents);
+  main.webContents.send=(channel,...args)=>{if(channel==='devices:state'&&fixtureVideo)args[0]={...args[0],video:fixtureVideo};return send(channel,...args);};
   const js=async code=>{try{return await main.webContents.executeJavaScript(code,true);}catch(error){throw Error(`${error.message}\nExpression: ${code}`);}};
   const until=async(code,name)=>{for(let i=0;i<180;i++){if(await js(code))return;await delay(30);}throw Error(name);};
   const click=text=>js(`Array.from(document.querySelectorAll('button')).find(x=>x.textContent===${JSON.stringify(text)}&&x.getClientRects().length).click()`);
@@ -36,6 +40,7 @@ app.whenReady().then(async()=>{
   automation=registerAutomation({ipcMain,getMainWindow:()=>main,getWindows:()=>BrowserWindow.getAllWindows(),devices,rng,blink,userData:app.getPath('userData'),
     workerFactory:(config,callbacks)=>{
       if(config.command)return startWorker(config,callbacks);
+      emitAutomationEvent=callbacks.event;
       let resolve;const done=new Promise(r=>{resolve=r;});
       queueMicrotask(()=>{
         callbacks.event({event:'history',name:'cycle_start',args:[1]});
@@ -77,14 +82,40 @@ app.whenReady().then(async()=>{
   await screenshot('automatic-static.png');
   // Device integration stays on synthetic video and the mock controller.
   await js(`window.desktop.devices.video.connect({deviceId:'synthetic',backend:'msmf',width:640,height:480,fps:60})`);
+  await until(`document.querySelector('.live-video')?.naturalWidth===640 || document.querySelector('.preview-frame')?.textContent.includes('视频源已中断')`,'video connection');
+  if(devices.getState().video.code==='DEVICE_BUSY'){
+    const svg='<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480"><rect width="640" height="480" fill="#263137"/><rect x="20" y="30" width="100" height="60" fill="#374d4b"/></svg>';
+    fixtureVideo={status:'connected',width:640,height:480,session:'offscreen-fixture',sharedMemory:'offscreen-fixture',previewUrl:'data:image/svg+xml;base64,'+Buffer.from(svg).toString('base64')};
+    const getState=devices.getState;devices.getState=()=>({...getState(),video:fixtureVideo});
+    main.webContents.send('devices:state',devices.getState());
+  }else assert.equal(devices.getState().video.status,'connected','synthetic video connects when no other instance owns it');
   await until(`document.querySelector('.live-video')?.naturalWidth===640`,'synthetic video');
   await js(`window.desktop.devices.controller.connect('mock')`);
+  const verifyVideoCapture=async(kind,targetCount)=>{
+    const captureId=`${kind}-capture`;
+    emitAutomationEvent({event:'progress',clock:2,wall:1001,progress:{phase:'捕获Seed',loop_index:1,seed_text:'',log_message:'正在捕获 Seed'}});
+    emitAutomationEvent({event:'capture',captureId,stage:'start',captured:0,target:targetCount,roi:{x:20,y:30,width:100,height:60},sourceWidth:640,sourceHeight:480});
+    emitAutomationEvent({event:'capture',captureId,stage:'capturing',captured:12,target:targetCount,location:{x:40,y:45,width:25,height:12}});
+    await until(`document.querySelector('.automation-video-progress')?.textContent.includes('12 / ${targetCount}')`,'automation video capture progress');
+    assert.equal(await js(`(()=>{const host=document.querySelector('.video-roi-host').getBoundingClientRect();const badge=document.querySelector('.automation-video-progress').getBoundingClientRect();return document.querySelector('.automation-video-roi')?.getAttribute('x')==='20'&&document.querySelector('.automation-video-eye')?.getAttribute('x')==='40'&&badge.left>host.left+host.width/2&&!document.querySelector('.automation-video-seed');})()`),true,'capture shows eye boxes and blink count at top right');
+    await screenshot(`automatic-${kind}-capturing.png`);
+    emitAutomationEvent({event:'seed',seed:{seed:{words:['12345678','9ABCDEF0','11111111','22222222'],pair:['123456789ABCDEF0','1111111122222222']}}});
+    emitAutomationEvent({event:'capture',captureId,stage:'complete',captured:targetCount,target:targetCount});
+    await until(`document.querySelector('.automation-video-seed')?.textContent.includes('123456789ABCDEF0')`,'automation video Seed');
+    assert.equal(await js(`(()=>{const host=document.querySelector('.video-roi-host').getBoundingClientRect();const badge=document.querySelector('.automation-video-seed').getBoundingClientRect();return badge.left<host.left+host.width/2&&!document.querySelector('.automation-video-progress')&&!document.querySelector('.automation-video-overlay svg');})()`),true,'completed capture shows only Seed at top left');
+    await screenshot(`automatic-${kind}-seed.png`);
+    emitAutomationEvent({event:'capture',captureId:`${captureId}-next`,stage:'start',captured:0,target:targetCount,roi:{x:20,y:30,width:100,height:60},sourceWidth:640,sourceHeight:480});
+    await until(`document.querySelector('.automation-video-progress')?.textContent.includes('0 / ${targetCount}')`,'next capture reset');
+    assert.equal(await js(`document.querySelector('.automation-video-seed')===null`),true,'next capture clears the previous Seed');
+    emitAutomationEvent({event:'progress',clock:3,wall:1002,progress:{phase:'等待触发',loop_index:1,current_advances:0,raw_target_advances:1800,trigger_advances:340,log_message:'测试轮次就绪'}});
+  };
   const input={kind:'static',config:automation.getState().config.static,profile:{version:'BD',tid:0,sid:0},blink:{sourceWidth:640,sourceHeight:480,eye:'data:image/png;base64,AQ==',roi:{x:0,y:0,width:20,height:20},threshold:.9,npc:0,noisy:false,seed:['1','2','3','4'],searchMin:0,searchMax:1000000}};
   input.config.parameters.start='capture';
   input.config.scripts={...input.config.scripts,advance:'advance.rng',hit:'hit.rng'};
   await js(`window.desktop.automation.start(${JSON.stringify(input)})`);
   await until(`document.querySelector('.automation-flow-copy strong')?.textContent==='等待启动撞帧脚本'`,'runtime phase broadcast');
   assert.equal(await js(`document.querySelector('[data-node="wait"]')?.dataset.state`),'current','real phase maps to wait node');
+  await verifyVideoCapture('static',40);
   await click('切换到自动 TID');
   assert.equal(await js(`document.querySelector('.automation-hub-running-notice')?.textContent.includes('自动定点正在运行')`),true,'inactive tab names running flow');
   assert.equal(await js(`document.querySelector('#automation-panel-tid .automation-run-toolbar button:nth-child(1)').disabled`),true,'other flow cannot start');
@@ -124,6 +155,13 @@ app.whenReady().then(async()=>{
   assert.deepEqual(automation.getState().config.tid.parameters.target_display_tids,[123456,123213],'targets saved independently');
   assert.deepEqual(await js(`Array.from(document.querySelectorAll('#automation-panel-tid .automation-tid-target-grid li'),item=>item.textContent.trim())`),['123456','123213'],'both targets are visible in the card');
   await screenshot('automatic-tid.png');
+  const tidInput={kind:'tid',config:automation.getState().config.tid,blink:input.blink,profile:input.profile};
+  tidInput.config.parameters.start='capture';tidInput.config.scripts={...tidInput.config.scripts,name:'name.rng'};
+  await js(`window.desktop.automation.start(${JSON.stringify(tidInput)})`);
+  await until(`document.querySelector('#automation-panel-tid .automation-tid-status-card')?.dataset.status==='running'`,'TID automation running');
+  await verifyVideoCapture('tid',64);
+  await js(`window.desktop.automation.stop()`);
+  await until(`document.querySelector('#automation-panel-tid .automation-tid-status-card')?.dataset.status==='stopped'`,'TID automation stopped');
   main.setSize(1080,820);await delay(180);
   assert.equal(await js(`(()=>{const goal=document.querySelector('#automation-panel-tid .automation-tid-target-card').getBoundingClientRect();const status=document.querySelector('#automation-panel-tid .automation-tid-status-card').getBoundingClientRect();const primary=document.querySelector('.workspace-primary').getBoundingClientRect();const rail=document.querySelector('.workspace-right-rail').getBoundingClientRect();return status.left>=goal.right&&goal.width>300&&rail.top>=primary.bottom;})()`),true,'TID content keeps usable width and video moves below');
   await screenshot('automatic-tid-narrow.png');

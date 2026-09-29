@@ -1515,6 +1515,17 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .blink-selection-tools { position: absolute; inset: auto 5px 5px; display: flex; align-items: center; gap: 5px; background: #161d25ed; padding: 5px; border: 1px solid #425064; border-radius: 4px; font-size: 10px; }
 .blink-selection-tools span { margin-right: auto; }
 .blink-selection-tools button { padding: 3px 5px; border: 1px solid #586a81; background: #293747; border-radius: 3px; flex-shrink: 0; }
+.automation-video-overlay { position: absolute; inset: 1px; pointer-events: none; }
+.automation-video-overlay > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.automation-video-overlay rect { fill: transparent; stroke-width: 1.5px; vector-effect: non-scaling-stroke; }
+.automation-video-roi { stroke: #d48181; stroke-dasharray: 5 3; }
+.automation-video-eye { stroke: #86c59e; }
+.automation-video-progress, .automation-video-seed { position: absolute; z-index: 1; top: 6px; padding: 5px 7px; border: 1px solid #59645c99; border-radius: 4px; background: #141a18e8; color: #cbd5cf; font-size: 11px; }
+.automation-video-progress { right: 6px; display: flex; gap: 8px; align-items: baseline; white-space: nowrap; }
+.automation-video-progress strong, .automation-video-seed code { color: #a6d8b8; font: 11px var(--mono); }
+.automation-video-seed { left: 6px; display: grid; gap: 3px; max-width: calc(100% - 12px); pointer-events: auto; user-select: text; }
+.automation-video-seed > div { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 5px; white-space: nowrap; }
+.automation-video-seed code { user-select: text; }
 
 @media (max-width: 1150px) {
   .script-title-input { max-width: 150px; }

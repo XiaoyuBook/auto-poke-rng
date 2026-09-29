@@ -47,10 +47,11 @@ export type AutomationSnapshot = {
   staticGroups: { activeId: string; items: AutomationConfigGroup[] };
   logs: LogEntry[]; runs: AutomationRun[]; logging: boolean; error: string;
   state: { revision: number; status: string; kind: AutomationKind | null; runId: string | null; message: string; progress: AutomationProgress | null;
-    capture?: { captureId?: string; stage?: string; activityId?: number; captured: number; target: number } | null;
+    capture?: { captureId?: string; stage?: string; activityId?: number; captured: number; target: number;
+      roi?: import('./blink').BlinkRect; location?: import('./blink').BlinkRect; sourceWidth?: number; sourceHeight?: number } | null;
     shiny?: { scriptId?: string; scriptStatus?: string; stage?: string; keyword?: string; intervalSeconds?: number; result?: string } | null;
     activity?: { kind: string; stage: string; activityId: number } | null;
-    flow?: AutomationFlow | null; roundDelay?: number; seed?: { seed: { words: string[]; pair: string[] } } };
+    flow?: AutomationFlow | null; roundDelay?: number; seed?: { seed: { words: string[]; pair: string[] } } | null };
 };
 export type AutomationInput = { kind: AutomationKind; config: AutomationConfig; blink: BlinkConfig; exitBlink?: BlinkConfig; profile: BdspProfile; calibrate?: boolean };
 export type Readiness = { ready: boolean; checks: { label: string; ok: boolean; detail: string }[] };

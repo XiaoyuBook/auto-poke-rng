@@ -244,7 +244,7 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
           else if(message.event==='log')store.log(message.message,source,'info',context());
           else if(message.event==='capture'&&['捕获Seed','校正位置','运行过场脚本'].includes(state.progress?.phase)){
             if(message.stage==='start')run.captureId=message.captureId;
-            if(run.captureId===message.captureId)update({capture:{...message,activityId:state.progress?.activity_id||0}});
+            if(run.captureId===message.captureId)update({capture:{...(message.stage==='start'?{}:state.capture),...message,activityId:state.progress?.activity_id||0},...(message.stage==='start'?{seed:null}:{})});
           }
           else if(message.event==='shiny'&&state.progress?.phase==='运行撞闪脚本'){
             if(message.kind==='script'&&message.status==='running')run.shinyScriptId=message.scriptId;
