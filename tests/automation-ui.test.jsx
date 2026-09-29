@@ -174,18 +174,31 @@ test('C02: preparation is read only and exposes failed checks',async()=>{
   await screen.findByText('请先连接');
   expect(api.start).not.toHaveBeenCalled();expect(api.save).not.toHaveBeenCalled();
 });
-test('TID goal card reflects target edits without a configuration sidebar',async()=>{
-  const {api}=fixture();
+test('TID goal editor saves only targets and leaves other parameter drafts intact',async()=>{
+  const {api,snapshot}=fixture();
+  api.save.mockImplementation(async ({values})=>{snapshot.config.tid.parameters.target_display_tids=[...values.target_display_tids];return structuredClone(snapshot);});
   render(<AutomationWorkspace kind="tid" profile={defaultBdspProfile} blinkConfig={newBlinkConfig()} blinkConfigs={[]} openLogs={()=>{}} onSwitchKind={()=>{}} />);
   await screen.findByRole('region',{name:'当前 TID 目标'});
   expect(screen.getByText('未设置')).toBeTruthy();
   expect(screen.queryByRole('complementary',{name:'配置组'})).toBeNull();
-  expect(within(screen.getByRole('region',{name:'当前 TID 目标'})).queryByRole('button')).toBeNull();
-  fireEvent.change(screen.getByLabelText('目标 Display TID'),{target:{value:'123456'}});
-  fireEvent.click(screen.getByRole('button',{name:'添加目标 TID'}));
+  expect(screen.queryByLabelText('目标 Display TID')).toBeNull();
+  fireEvent.change(screen.getByLabelText('TID 搜索范围'),{target:{value:'600'}});
+  fireEvent.click(within(screen.getByRole('region',{name:'当前 TID 目标'})).getByRole('button',{name:'目标设置'}));
+  const dialog=screen.getByRole('dialog',{name:'目标 Display TID'});
+  fireEvent.change(within(dialog).getByRole('textbox',{name:'目标 Display TID'}),{target:{value:'123456'}});
+  fireEvent.click(within(dialog).getByRole('button',{name:'添加目标'}));
+  expect(within(dialog).getByRole('button',{name:'移除目标 123456'})).toBeTruthy();
+  fireEvent.click(within(dialog).getByRole('button',{name:'保存目标'}));
+  await waitFor(()=>expect(screen.queryByRole('dialog',{name:'目标 Display TID'})).toBeNull());
   expect(within(screen.getByRole('region',{name:'当前 TID 目标'})).getByText('123456')).toBeTruthy();
-  fireEvent.click(screen.getByRole('button',{name:'保存设置'}));
-  await waitFor(()=>expect(api.save).toHaveBeenCalledWith(expect.objectContaining({kind:'tid',scope:'parameters',values:expect.objectContaining({target_display_tids:[123456]})})));
+  expect(api.save).toHaveBeenCalledWith({kind:'tid',scope:'parameters',values:{target_display_tids:[123456]}});
+  expect(screen.getByLabelText('TID 搜索范围').value).toBe('600');
+  expect(snapshot.config.tid.parameters.frame_threshold).toBe(300);
+  fireEvent.click(within(screen.getByRole('region',{name:'当前 TID 目标'})).getByRole('button',{name:'目标设置'}));
+  fireEvent.change(screen.getByRole('textbox',{name:'目标 Display TID'}),{target:{value:'654321'}});
+  fireEvent.click(screen.getByRole('button',{name:'添加目标'}));
+  fireEvent.click(screen.getByRole('button',{name:'取消'}));
+  expect(within(screen.getByRole('region',{name:'当前 TID 目标'})).queryByText('654321')).toBeNull();
 });
 test('L01/L03: record navigation filters detailed logs to the selected run and round',async()=>{
   const {snapshot}=fixture();

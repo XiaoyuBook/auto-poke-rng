@@ -60,7 +60,7 @@ export interface AutomationApi {
   check(input: AutomationInput): Promise<Readiness>;
   start(input: AutomationInput): Promise<AutomationSnapshot>;
   stop(): Promise<void>;
-  save(input: { kind: AutomationKind; scope: 'parameters' | 'scripts' | 'config'; values: AutomationParameters | Record<string, string> | StaticAutomationConfig; expectedId?: string }): Promise<AutomationSnapshot>;
+  save(input: { kind: AutomationKind; scope: 'parameters' | 'scripts' | 'config'; values: Partial<AutomationParameters> | Record<string, string> | StaticAutomationConfig; expectedId?: string }): Promise<AutomationSnapshot>;
   manageStaticGroup(input: { action: 'create' | 'select' | 'rename' | 'delete'; id?: string; name?: string }): Promise<AutomationSnapshot>;
   saveOcr(rows: OcrRegionRow[]): Promise<AutomationSnapshot>;
   defaultOcr(): Promise<OcrRegionRow[]>;

@@ -316,6 +316,10 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .automation-target-dialog-body .automation-ivs input { width: 100%; }
 .automation-target-dialog-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex: 0 0 auto; padding: 12px 22px; border-top: 1px solid var(--line); }
 .automation-target-dialog-actions .muted { margin-right: auto; }
+.dialog.automation-target-dialog.automation-tid-target-dialog { width: min(520px, calc(100vw - 32px)); }
+.automation-tid-target-dialog-body .automation-tid-target-editor { margin-top: 0; }
+.automation-tid-target-dialog-body .automation-tid-target-chips { min-height: 34px; margin-top: 14px; }
+.automation-tid-target-dialog-body .panel-error { margin: 12px 0 0; }
 .automation-workspace-with-groups { display: grid; grid-template-columns: 180px minmax(0, 1fr); grid-template-areas: 'heading heading' 'top top' 'sidebar content'; align-items: start; gap: 14px 16px; padding: 0 0 24px; }
 .automation-workspace-with-groups > .automation-heading { grid-area: heading; }
 .automation-workspace-with-groups > .automation-workspace-top { grid-area: top; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
