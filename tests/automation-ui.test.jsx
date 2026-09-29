@@ -185,13 +185,15 @@ test('TID goal editor saves only targets and leaves other parameter drafts intac
   fireEvent.change(screen.getByLabelText('TID 搜索范围'),{target:{value:'600'}});
   fireEvent.click(within(screen.getByRole('region',{name:'当前 TID 目标'})).getByRole('button',{name:'目标设置'}));
   const dialog=screen.getByRole('dialog',{name:'目标 Display TID'});
-  fireEvent.change(within(dialog).getByRole('textbox',{name:'目标 Display TID'}),{target:{value:'123456'}});
+  fireEvent.change(within(dialog).getByRole('textbox',{name:'目标 Display TID'}),{target:{value:'123456 123213'}});
   fireEvent.click(within(dialog).getByRole('button',{name:'添加目标'}));
   expect(within(dialog).getByRole('button',{name:'移除目标 123456'})).toBeTruthy();
+  expect(within(dialog).getByRole('button',{name:'移除目标 123213'})).toBeTruthy();
   fireEvent.click(within(dialog).getByRole('button',{name:'保存目标'}));
   await waitFor(()=>expect(screen.queryByRole('dialog',{name:'目标 Display TID'})).toBeNull());
-  expect(within(screen.getByRole('region',{name:'当前 TID 目标'})).getByText('123456')).toBeTruthy();
-  expect(api.save).toHaveBeenCalledWith({kind:'tid',scope:'parameters',values:{target_display_tids:[123456]}});
+  const targetCard=within(screen.getByRole('region',{name:'当前 TID 目标'}));
+  expect(within(targetCard.getByRole('list',{name:'目标号码'})).getAllByRole('listitem').map(item=>item.textContent)).toEqual(['123456','123213']);
+  expect(api.save).toHaveBeenCalledWith({kind:'tid',scope:'parameters',values:{target_display_tids:[123456,123213]}});
   expect(screen.getByLabelText('TID 搜索范围').value).toBe('600');
   expect(snapshot.config.tid.parameters.frame_threshold).toBe(300);
   fireEvent.click(within(screen.getByRole('region',{name:'当前 TID 目标'})).getByRole('button',{name:'目标设置'}));
@@ -199,6 +201,13 @@ test('TID goal editor saves only targets and leaves other parameter drafts intac
   fireEvent.click(screen.getByRole('button',{name:'添加目标'}));
   fireEvent.click(screen.getByRole('button',{name:'取消'}));
   expect(within(screen.getByRole('region',{name:'当前 TID 目标'})).queryByText('654321')).toBeNull();
+});
+test('TID target card lists every configured target',async()=>{
+  const {snapshot}=fixture();
+  snapshot.config.tid.parameters.target_display_tids=[123456,123213,654321,7,8,9,10,11];
+  render(<AutomationWorkspace kind="tid" profile={defaultBdspProfile} blinkConfig={newBlinkConfig()} blinkConfigs={[]} openLogs={()=>{}} onSwitchKind={()=>{}} />);
+  const targetCard=within(await screen.findByRole('region',{name:'当前 TID 目标'}));
+  expect(within(targetCard.getByRole('list',{name:'目标号码'})).getAllByRole('listitem').map(item=>item.textContent)).toEqual(['123456','123213','654321','000007','000008','000009','000010','000011']);
 });
 test('L01/L03: record navigation filters detailed logs to the selected run and round',async()=>{
   const {snapshot}=fixture();
