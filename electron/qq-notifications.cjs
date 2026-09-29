@@ -6,7 +6,10 @@ const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const { QQClient } = require('./qq-client.cjs');
 
-const defaults = () => ({ appId: '', secret: '', rememberSecret: false, userOpenId: '', groupOpenId: '', userEnabled: true, groupEnabled: false });
+const defaults = () => ({
+  appId: '', secret: '', rememberSecret: false, userOpenId: '', groupOpenId: '', userEnabled: true, groupEnabled: false,
+  notifyCompleted: true, notifyFailed: true, notifyStopped: false,
+});
 
 class QQSettingsStore {
   constructor(file, safeStorage) { this.file = file; this.safeStorage = safeStorage; this.warning = ''; }
@@ -44,9 +47,10 @@ class QQNotificationService extends EventEmitter {
   constructor({ store, client = new QQClient(), makeTestImage }) {
     super();
     this.store = store; this.client = client; this.makeTestImage = makeTestImage;
-    this.settings = store.load(); this.records = []; this.operation = ''; this.binding = null;
+    this.settings = { ...defaults(), ...(store.load() || {}) }; this.records = []; this.operation = ''; this.binding = null;
     this.verified = false; this.testSent = false; this.testConfirmed = false;
     this.error = store.warning || ''; this.feedback = this.error || '填写机器人凭据，开始配置 QQ 通知。'; this.closed = false;
+    this.notificationQueue = []; this.notificationActive = null; this.notificationRuns = new Set();
   }
   targets() {
     return ['user', 'group'].filter(kind => this.settings[kind + 'Enabled']).map(kind => ({ kind, openId: this.settings[kind + 'OpenId'] }));
@@ -71,7 +75,7 @@ class QQNotificationService extends EventEmitter {
     if (!values || typeof values !== 'object' || Array.isArray(values)) throw new Error('配置格式无效。');
     const next = { ...this.settings };
     for (const [key, value] of Object.entries(values)) {
-      if (!['appId', 'secret', 'rememberSecret', 'userEnabled', 'groupEnabled'].includes(key) || typeof value !== typeof next[key]) throw new Error('QQ 配置字段无效。');
+      if (!['appId', 'secret', 'rememberSecret', 'userEnabled', 'groupEnabled', 'notifyCompleted', 'notifyFailed', 'notifyStopped'].includes(key) || typeof value !== typeof next[key]) throw new Error('QQ 配置字段无效。');
       next[key] = typeof value === 'string' ? value.trim() : value;
     }
     if (next.appId.length > 128 || next.secret.length > 512) throw new Error('AppID 或 AppSecret 过长，请检查输入。');
@@ -81,6 +85,8 @@ class QQNotificationService extends EventEmitter {
     this.store.save(next); // Commit memory only after the atomic save succeeds.
     this.settings = next;
     if (changedCredentials) {
+      for (const item of this.notificationQueue.splice(0)) item.resolve(false);
+      this.notificationRuns.clear();
       this.verified = false; this.client.appId = next.appId; this.client.secret = next.secret;
       this.client.token = ''; this.client.expires = 0;
     }
@@ -104,7 +110,10 @@ class QQNotificationService extends EventEmitter {
     catch (error) {
       this.feedback = this.client.redact(error);
       if (!this.abortController.signal.aborted) this.error = this.feedback;
-    } finally { this.operation = ''; this.binding = null; this.abortController = null; this.changed(); }
+    } finally {
+      this.operation = ''; this.binding = null; this.abortController = null; this.changed();
+      this.drainNotifications();
+    }
     return this.snapshot();
   }
   verify() {
@@ -127,7 +136,7 @@ class QQNotificationService extends EventEmitter {
       this.feedback = (kind === 'user' ? '私聊' : '群聊') + '绑定成功，接收方已保存。';
     });
   }
-  // Future automation entry point. No script/device/task event subscribes to it yet.
+  // Automatic workflow completion is queued through notifyTask; this low-level method remains reusable for tests.
   send({ text, image, event = '通知' }, operation = 'send') {
     this.requireIdle();
     if (!this.snapshot().ready) throw new Error('请填写凭据，并绑定所有勾选的接收方。');
@@ -149,6 +158,47 @@ class QQNotificationService extends EventEmitter {
     if (!Buffer.isBuffer(image) || !image.length) throw new Error('测试图片不可用，未发送测试消息。');
     return this.send({ event: '图文测试', text: 'Auto Poke RNG · QQ 通知测试\n请确认同时收到这条文字和测试图片。', image }, 'test');
   }
+
+  notifyTask(runId, task, outcome, { target = '', detail = '' } = {}) {
+    const policy = { completed: 'notifyCompleted', failed: 'notifyFailed', stopped: 'notifyStopped' }[outcome];
+    if (this.closed || !policy || this.settings[policy] === false || (outcome === 'stopped' && this.settings[policy] !== true)
+      || this.notificationRuns.has(runId) || !this.snapshot().ready) return Promise.resolve(false);
+    if (this.notificationQueue.length >= 20) {
+      this.emit('log', 'QQ 通知队列已满，已跳过本次自动通知。', 'warning');
+      return Promise.resolve(false);
+    }
+    this.notificationRuns.add(runId);
+    if (this.notificationRuns.size > 400) this.notificationRuns = new Set([...this.notificationRuns].slice(-200));
+    const labels = { completed: '任务完成', failed: '任务异常', stopped: '手动停止' };
+    const lines = [`${task} · ${labels[outcome]}`, `结果：${outcome === 'completed' ? '已完成' : outcome === 'failed' ? '失败' : '已停止'}`];
+    if (target) lines.push(`目标：${String(target).slice(0, 240)}`);
+    if (detail) lines.push(`详情：${String(detail).slice(0, 800)}`);
+    lines.push('结束时间：' + new Date().toLocaleString('zh-CN', { hour12: false }));
+    return new Promise(resolve => {
+      this.notificationQueue.push({ runId, event: labels[outcome], text: lines.join('\n'), resolve });
+      this.emit('log', `${task}：已加入 QQ 通知队列（${labels[outcome]}）。`, 'info');
+      this.drainNotifications();
+    });
+  }
+
+  async drainNotifications() {
+    if (this.closed || this.notificationActive || this.operation || !this.notificationQueue.length) return;
+    const item = this.notificationQueue.shift();
+    this.notificationActive = item;
+    try {
+      const state = await this.send({ event: item.event, text: item.text }, 'send');
+      const ok = !state.error && state.feedback === '通知已提交。请在 QQ 中核对实际接收情况。';
+      this.emit('log', ok ? `${item.event} QQ 通知已提交。` : `${item.event} QQ 通知发送失败：${state.error || state.feedback}`, ok ? 'info' : 'warning');
+      item.resolve(ok);
+    } catch (error) {
+      const message = this.client.redact(error);
+      this.emit('log', `${item.event} QQ 通知发送失败：${message}`, 'warning');
+      item.resolve(false);
+    } finally {
+      this.notificationActive = null;
+      this.drainNotifications();
+    }
+  }
   confirmTest() {
     this.requireIdle();
     if (!this.testSent) throw new Error('请先成功提交图文测试。');
@@ -159,7 +209,11 @@ class QQNotificationService extends EventEmitter {
     if (!bindingOnly || this.operation === 'bind') this.abortController?.abort();
     return this.snapshot();
   }
-  close() { this.closed = true; this.cancel(); }
+  close() {
+    this.closed = true;
+    for (const item of this.notificationQueue.splice(0)) item.resolve(false);
+    this.cancel();
+  }
 }
 
 function makeTestImage(nativeImage) {

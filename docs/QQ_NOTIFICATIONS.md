@@ -1,6 +1,6 @@
 # QQ 通知
 
-左上角铃铛打开通知设置。当前实现独立的 QQ 通知能力及手动图文测试，尚未接入脚本异常、`ALERT`、设备事件或任何自动流程，也没有自动通知开关。运行脚本不会因本功能产生 QQ 消息。
+左上角铃铛打开通知设置。QQ 通知只在主进程中发送，渲染层不能直接调用机器人接口；自动定点和自动 TID 在结束时按设置发送一次文字通知。默认通知任务完成和任务失败，手动停止默认关闭，可在“自动流程通知”中调整。通知失败只写入“QQ通知”日志，不改变自动流程结果。
 
 ## 配置与验证
 
@@ -24,14 +24,16 @@ AppSecret 默认仅保留在当前主进程内存中。勾选“记住密钥”�
 
 铃铛状态点：验证且接收方完整时绿色，操作中黄色，需要检查错误时红色，尚未配置／待验证／待绑定时无圆点。重新启动后需要重新验证凭据才能显示可发送状态，绑定信息会保留。
 
-## 后续自动流程接入
+## 自动流程接入与日志
 
 - `electron/qq-client.cjs`：访问令牌、HTTP 请求、网关绑定、图片分片上传和图文发送。
-- `electron/qq-notifications.cjs`：配置持久化、独立通知服务、发送记录和受限 IPC。
+- `electron/qq-notifications.cjs`：配置持久化、独立通知服务、自动通知队列、去重、发送记录和受限 IPC。
 - `src/components/QQNotifications.tsx`：接入设置、图文测试、记录及离线说明。
 - `src/components/QQGuide.tsx`、`src/qqGuide.ts`、`src/assets/qq-guide/`：分步图文教程、原图缩放和本地图片资源。
 
-后续在 Electron 主进程中调用 `QQNotificationService.send({ event, text, image })`；`event` 为记录名称，`text` 最多 2000 字，`image` 为可选的 JPEG Buffer（不超过 10 MB）。方法返回最新服务状态，发送结果在 `records` 和 `error` 中。当前同一时间只执行一个操作，忙碌时调用会被拒绝；未来业务需要在接入时定义事件、截图取得时机、排队、去重和频率限制。任意业务发送未暴露给渲染层，现阶段只开放显式图文测试 IPC。
+自动流程通过主进程调用 `QQNotificationService.notifyTask(runId, task, outcome, { target, detail })`。服务按运行 ID 去重，最多排队 20 条，串行发送并复用现有令牌缓存；配置、绑定和图文测试正在进行时会等待空闲。自动通知只发送文字，不额外抓取视频帧，不把高频进度刷到 QQ。手动测试仍通过 `send({ event, text, image })` 执行，任意业务发送未暴露给渲染层。
+
+自动流程日志继续由 `AutomationStore.log` 统一写入内存和 `userData/automation/logs/run_YYYY-MM-DD.log`，保留最近 7 天文件和最近 10000 条内存记录。流程阶段与最终结果使用“自动定点”／“自动TID”来源，QQ 排队、提交和失败使用“QQ通知”来源；日志中不写入 AppSecret、访问令牌或接收方 OpenID。
 
 ## 验证与来源
 

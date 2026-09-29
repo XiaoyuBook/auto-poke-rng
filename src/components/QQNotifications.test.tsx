@@ -7,7 +7,7 @@ import type { QQApi, QQState } from '../notifications';
 
 let state: QQState, api: QQApi, listener: (value: QQState) => void;
 beforeEach(() => {
-  state = { settings: { appId: 'APP', rememberSecret: false, userOpenId: 'USER', groupOpenId: '', userEnabled: true, groupEnabled: false },
+  state = { settings: { appId: 'APP', rememberSecret: false, userOpenId: 'USER', groupOpenId: '', userEnabled: true, groupEnabled: false, notifyCompleted: true, notifyFailed: true, notifyStopped: false },
     hasSecret: true, ready: true, verified: true, operation: '', binding: null, feedback: '配置已保存', error: '', status: 'ready', testSent: false, testConfirmed: false, records: [] };
   const current = async () => state;
   api = { getState: vi.fn(current), save: vi.fn(current), verify: vi.fn(current), bind: vi.fn(current), unbind: vi.fn(current),
@@ -45,6 +45,13 @@ it('only submits tests on an explicit click and requires checking QQ before conf
   expect(api.confirmTest).not.toHaveBeenCalled();
   fireEvent.click(confirm);
   await waitFor(() => expect(api.confirmTest).toHaveBeenCalledOnce());
+});
+
+it('persists automatic outcome notification switches separately from credentials', async () => {
+  render(<QQNotifications close={() => {}} />);
+  await screen.findByLabelText('AppID');
+  fireEvent.click(screen.getByLabelText('手动停止通知'));
+  await waitFor(() => expect(api.save).toHaveBeenCalledWith({ notifyStopped: true }));
 });
 
 it('cancels binding on tab changes and closing, while preserving literal remote error text', async () => {

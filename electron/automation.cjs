@@ -34,7 +34,7 @@ function validateParameters(kind, parameters) {
   }
 }
 
-function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,userData,workerFactory=startWorker,captureImage}){
+function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,userData,workerFactory=startWorker,captureImage,notifications}){
   const store=new AutomationStore(userData);let active=null, auxiliary=null, timer=null, closed=false;
   let state={status:'idle',kind:null,runId:null,progress:null,capture:null,shiny:null,activity:null,flow:null,message:'等待开始',revision:0};
   const snapshot=()=>({...store.snapshot(),state});
@@ -43,6 +43,16 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
   };
   store.on('change',broadcast);store.on('log',broadcast);
   const update=patch=>{state={...state,...patch,revision:state.revision+1};broadcast();};
+  const notifyRun=run=>{
+    if(!notifications?.notifyTask)return;
+    const outcome=run.finalStatus;
+    if(!['completed','failed','stopped'].includes(outcome))return;
+    const task=run.kind==='tid'?'自动 TID 乱数':'自动定点乱数';
+    const target=run.notificationTarget||'';
+    Promise.resolve(notifications.notifyTask(run.id,task,outcome,{target,detail:run.finalMessage||''})).catch(error=>{
+      store.log('QQ 通知调用失败：'+String(error?.message||error), 'QQ通知', 'warning', {runId:run.id,round:run.round});
+    });
+  };
   const requireWindow=(event,main=false)=>{
     if(event.senderFrame!==event.sender.mainFrame||!getWindows().some(window=>!window.isDestroyed()&&window.webContents===event.sender)||(main&&event.sender!==getMainWindow()?.webContents))throw Error('Unknown automation sender');
   };
@@ -169,6 +179,8 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
     const run={id:randomUUID(),kind:input.kind,round:0,stopped:false,scripts:{},worker:null};active=run;
     const group=store.data.staticGroups?.items.find(item=>item.id===store.data.staticGroups.activeId);
     const target=data.targets.find(item=>item.speciesKey===input.config.parameters.target);
+    const source=input.kind==='tid'?'自动TID':'自动定点';
+    run.notificationTarget=input.kind==='static'?(target?.species||input.config.parameters.target):Array.isArray(input.config.parameters.target_display_tids)?`TID：${input.config.parameters.target_display_tids.join('、')}`:'';
     run.context=input.kind==='static'?{
       flowId:group?.id||'',flowName:group?.name||'当前流程',target:target?.species||input.config.parameters.target,
       loopMode:input.config.parameters.loop_mode,loopCount:input.config.parameters.loop_count,
@@ -186,7 +198,6 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
       for(const selected of Object.values(result.scripts))run.scripts[selected.path]=selected;
       if(input.config.parameters.shiny_threshold_seconds||input.config.parameters.auto_reverse||input.config.parameters.loop_mode!=='single')await devices.ocr.start();
       checkStopped(run);store.beginRun(run.id,run.kind,run.context);
-      const source=input.kind==='tid'?'自动TID':'自动定点';
       const context=()=>({runId:run.id,round:run.round});
       const request=async(method,params)=>{
         checkStopped(run);
@@ -266,14 +277,16 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
         await Promise.allSettled([devices.runner.stop(),rng.cancel()]);
         const status=run.failure?'failed':run.stopped?'stopped':outcome.status;
         const message=run.stopReason||outcome.message||'自动流程已结束';
+        run.finalStatus=status;run.finalMessage=message;
         store.finishRun(run.id,status,message);store.log(message,source,status==='failed'?'warning':status==='completed'?'success':'info',context());
+        notifyRun(run);
         devices.releaseAutomation(run.id);if(active===run)active=null;
         update({status,message,capture:null,activity:null,shiny:null,
           flow:state.flow?.runId===run.id?{...state.flow,nextNode:null}:state.flow,
           progress:state.progress?{...state.progress,wait_target_wall:null}:null});
       })();
       return snapshot();
-    }catch(error){const status=run.stopped?'stopped':'failed';store.finishRun(run.id,status,error.message);devices.releaseAutomation(run.id);if(active===run)active=null;update({status,message:error.message,flow:state.flow?.runId===run.id?{...state.flow,nextNode:null}:state.flow});throw error;}
+    }catch(error){const status=run.stopped?'stopped':'failed';const message=String(error?.message||error);run.finalStatus=status;run.finalMessage=message;store.finishRun(run.id,status,message);store.log(message,source,'warning',{runId:run.id,round:run.round});notifyRun(run);devices.releaseAutomation(run.id);if(active===run)active=null;update({status,message,flow:state.flow?.runId===run.id?{...state.flow,nextNode:null}:state.flow});throw error;}
   };
   handle('state',snapshot,false);
   handle('check',async input=>{if(active||auxiliary)throw Error('已有流程正在运行');const {ready,checks:items}=await checks(input);return {ready,checks:items};});

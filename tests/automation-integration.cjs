@@ -12,7 +12,7 @@ const deferred=()=>{let resolve;const promise=new Promise(done=>{resolve=done;})
 function fixture(t){
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'automation-contract-'));
   const script=path.join(directory,'source.rng');fs.writeFileSync(script,'_目标帧数 = 300\nA 10\n');
-  const trace=[],ocrRequests=[],workerMessages=[],handlers=new Map(),events=new EventEmitter();
+  const trace=[],ocrRequests=[],workerMessages=[],notifications={calls:[],notifyTask(...args){this.calls.push(args);return Promise.resolve(true);}},handlers=new Map(),events=new EventEmitter();
   const window={isDestroyed:()=>false,webContents:{isDestroyed:()=>false,send:()=>{},mainFrame:{}}};
   const state={video:{status:'connected',width:1920,height:1080,sharedMemory:{},session:'one'},controller:{status:'connected'}};
   let resolveDone,callbacks,workerConfig;
@@ -25,13 +25,13 @@ function fixture(t){
   rng.generateReverse=input=>rng.generate(input);
   const workerFactory=(config,handlers)=>{workerConfig=config;callbacks=handlers;return {done:new Promise(resolve=>{resolveDone=resolve;}),send:message=>workerMessages.push(message),stop:async()=>resolveDone({status:'stopped'})};};
   const automation=registerAutomation({ipcMain:{handle:(name,fn)=>handlers.set(name,fn)},getMainWindow:()=>window,getWindows:()=>[window],devices,rng,
-    blink:{getState:()=>({status:'idle'})},userData:directory,workerFactory,captureImage:async()=>{trace.push('frame');return 'image';}});
+    blink:{getState:()=>({status:'idle'})},userData:directory,workerFactory,captureImage:async()=>{trace.push('frame');return 'image';},notifications});
   const invoke=(name,input,event={sender:window.webContents,senderFrame:window.webContents.mainFrame})=>handlers.get('automation:'+name)(event,input);
   const input={kind:'static',config:defaults().static,profile:{version:'BD',tid:0,sid:0},blink:{mode:'recover',eye:'data:image/png;base64,AQ==',
     sourceWidth:1920,sourceHeight:1080,roi:{x:0,y:0,width:100,height:100},threshold:.9,npc:0,seed:['1','2','3','4'],noisy:false,searchMin:0,searchMax:1000000}};
   input.config.scripts={...input.config.scripts,seed:'source.rng',advance:'source.rng',hit:'source.rng'};
   t.after(async()=>{await automation.close();fs.rmSync(directory,{recursive:true,force:true});});
-  return {automation,input,invoke,trace,ocrRequests,workerMessages,devices,state,rng,done:value=>resolveDone(value),callbacks:()=>callbacks,workerConfig:()=>workerConfig};
+  return {automation,input,invoke,trace,ocrRequests,workerMessages,notifications,devices,state,rng,done:value=>resolveDone(value),callbacks:()=>callbacks,workerConfig:()=>workerConfig};
 }
 
 test('C02: preparation compiles but does not save, press, warm up, or claim devices',async t=>{
@@ -97,6 +97,16 @@ test('C04: stopping forbids all late script/search calls and releases the resour
   await assert.rejects(request('script',{text:'A 100',name:'source.rng'}),/停止/);
   await assert.rejects(request('search',{}),/停止/);
   assert.equal(f.automation.getState().state.status,'stopped');assert.equal(f.trace.at(-1),'release');
+});
+
+test('automatic task completion sends one QQ notification with target and final detail',async t=>{
+  const f=fixture(t);await f.invoke('start',f.input);
+  f.done({status:'completed',message:'目标流程已完成'});
+  for(let i=0;i<20&&f.automation.getState().state.status!=='completed';i++)await new Promise(setImmediate);
+  assert.equal(f.automation.getState().state.status,'completed');
+  assert.equal(f.notifications.calls.length,1);
+  assert.deepEqual(f.notifications.calls[0].slice(1),['自动定点乱数','completed',{target:'草苗龟',detail:'目标流程已完成'}]);
+  assert.equal(f.automation.getState().logs.at(-1).source,'自动定点');
 });
 
 test('definite non-shiny stops only its hit script and waits for controller cleanup',async t=>{
