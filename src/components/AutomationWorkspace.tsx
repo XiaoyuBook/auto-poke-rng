@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Play, Square, ListChecks, FileClock, Plus, Pencil, Trash2, ChevronDown, SlidersHorizontal, RefreshCw, ArrowRightLeft, Hash } from 'lucide-react';
+import { Play, Square, ListChecks, FileClock, Plus, Pencil, Trash2, ChevronDown, SlidersHorizontal, RefreshCw, ArrowRightLeft } from 'lucide-react';
 import { automationBusy, downloadText, useAutomation, type AutomationConfig, type AutomationKind, type AutomationParameters, type DelayConfig, type IdResults, type Readiness, type StaticAutomationConfig, type StaticFeatureKey, type TargetFilter } from '../automation';
 import type { BlinkConfig } from '../blink';
 import type { BdspProfile } from '../bdspProfile';
@@ -18,6 +18,7 @@ const featureOrder:StaticFeatureKey[]=['reverse','exit','sync','escape'];
 const statusLabels:Record<string,string>={idle:'待命',starting:'启动中',running:'运行中',stopping:'停止中',completed:'已完成',failed:'失败',stopped:'已停止'};
 const statNames=['HP','攻击','防御','特攻','特防','速度'];
 const targetSprites=import.meta.glob<string>('../assets/bdsp-targets/*.png',{eager:true,query:'?url',import:'default'});
+const displayTid=(value:number)=>String(value).padStart(6,'0');
 
 export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openLogs,onSwitchKind}:{kind:AutomationKind;profile:BdspProfile;blinkConfig:BlinkConfig;blinkConfigs:BlinkConfig[];openLogs:()=>void;onSwitchKind:()=>void}){
   const {api,snapshot,error,setError,setSnapshot}=useAutomation();
@@ -28,6 +29,8 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
   const [readiness,setReadiness]=useState<Readiness|null>(null),[pending,setPending]=useState(false),[filterIndex,setFilterIndex]=useState(0);
   const [delayOpen,setDelayOpen]=useState(false);
   const [tidText,setTidText]=useState(''),[tidTargetEditorOpen,setTidTargetEditorOpen]=useState(false),[tidTargetDraft,setTidTargetDraft]=useState<number[]>([]),[tidTargetError,setTidTargetError]=useState('');
+  const [tidListOpen,setTidListOpen]=useState(false),[tidVisibleCount,setTidVisibleCount]=useState(6);
+  const tidTargetGridRef=useRef<HTMLUListElement>(null);
   const [ids,setIds]=useState<IdResults|null>(null),[onlyTargets,setOnlyTargets]=useState(false),[idPage,setIdPage]=useState(0),[selectedId,setSelectedId]=useState<number|null>(null);
   const [now,setNow]=useState(Date.now());const initialized=useRef(false);
   const [calibration,setCalibration]=useState<{interval:number;suggested:number}|null>(null);
@@ -38,6 +41,14 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
   useEffect(()=>{if(snapshot&&!initialized.current){initialized.current=true;setConfig(structuredClone(snapshot.config[kind]));}},[snapshot,kind]);
   const refreshScripts=()=>{void window.desktop?.scripts.list().then(value=>setFiles(value.files)).catch(error=>setError(error.message));};
   useEffect(()=>{if(api)refreshScripts();},[api]);
+  useEffect(()=>{
+    if(kind!=='tid'||!config?.parameters.target_display_tids?.length)return;
+    const grid=tidTargetGridRef.current;if(!grid)return;
+    const update=()=>{const width=grid.clientWidth;if(width)setTidVisibleCount(Math.max(1,Math.floor((width+6)/156))*3);};
+    update();
+    if(typeof ResizeObserver!=='undefined'){const observer=new ResizeObserver(update);observer.observe(grid);return()=>observer.disconnect();}
+    window.addEventListener('resize',update);return()=>window.removeEventListener('resize',update);
+  },[kind,config?.parameters.target_display_tids?.length]);
   const progress=snapshot?.state.kind===kind?snapshot.state.progress:null;
   useEffect(()=>{if(progress?.id_states){setIds({id_states:progress.id_states,id_elapsed_seconds:progress.id_elapsed_seconds||[],seed_measured_wall_time:progress.seed_measured_wall_time});if(!progress.id_states.length){setSelectedId(null);setIdPage(0);}}},[progress?.id_states,progress?.id_elapsed_seconds,progress?.seed_measured_wall_time]);
   const estimateSpecies=STATIC_TARGETS.find(item=>item.speciesKey===config?.parameters.target)?.speciesId;
@@ -48,6 +59,7 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
   const headingSwitcher=<div className="automation-heading-switcher" role="group" aria-label="自动流程类型"><h2>{isStatic?'自动定点乱数':'自动 TID 乱数'}</h2><button type="button" onClick={onSwitchKind}><ArrowRightLeft size={14} aria-hidden="true" /><span>切换到{otherLabel}</span>{automationBusy(snapshot?.state)&&snapshot?.state.kind===otherKind&&<span className="automation-hub-running-dot" aria-hidden="true" />}</button></div>;
   if(!api||!snapshot||!config)return <section className="automation-workspace"><header className="automation-heading">{headingSwitcher}</header><p role="status">{error||(!api?'请在桌面应用中使用自动流程。':'正在加载自动流程…')}</p></section>;
   const p=config.parameters,busy=automationBusy(snapshot.state);
+  const visibleTidTargets=p.target_display_tids?.slice(0,tidVisibleCount)||[];
   const staticConfig=config as StaticAutomationConfig;
   const groups=snapshot.staticGroups?.items||[],activeGroup=groups.find(item=>item.id===snapshot.staticGroups?.activeId);
   const ownState=snapshot.state.kind===kind?snapshot.state:null;
@@ -118,7 +130,7 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
   const idRows=(ids?.id_states||[]).map((row,index)=>({...row,index}));
   const visibleIds=onlyTargets?idRows.filter(row=>p.target_display_tids.includes(row.display_tid)):idRows;
   const page=Math.min(idPage,Math.max(0,Math.ceil(visibleIds.length/50)-1));
-  const idCells=(row:typeof idRows[number])=>{const elapsed=ids?.id_elapsed_seconds[row.index];return [row.advances,row.tid,row.sid,row.tsv,String(row.display_tid).padStart(6,'0'),elapsed==null?'—':elapsed.toFixed(3),elapsed==null||!ids?.seed_measured_wall_time?'—':new Date((ids.seed_measured_wall_time+elapsed)*1000).toLocaleString()];};
+  const idCells=(row:typeof idRows[number])=>{const elapsed=ids?.id_elapsed_seconds[row.index];return [row.advances,row.tid,row.sid,row.tsv,displayTid(row.display_tid),elapsed==null?'—':elapsed.toFixed(3),elapsed==null||!ids?.seed_measured_wall_time?'—':new Date((ids.seed_measured_wall_time+elapsed)*1000).toLocaleString()];};
   const idText=()=>[['Adv','TID','SID','TSV','Display TID','累计用时','预计到达时间'],...idRows.map(idCells)].map(row=>row.map(value=>`"${String(value).replaceAll('"','""')}"`).join(',')).join('\r\n');
   const renderTargetEditor=()=>isStatic&&filter?<>
         <div className="automation-target-picker">
@@ -185,8 +197,9 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
     {(error||notice)&&<p role={error?'alert':'status'} className={error?'panel-error':'automation-notice'}>{error||notice}</p>}
     <div className="automation-overview">
       {isStatic?<TargetSummaryCard target={target} sprite={target&&targetSprites[`../assets/bdsp-targets/${target.speciesId}.png`]} filters={p.filters} locked={busy||pending} onSettings={()=>{setFilterIndex(0);setTargetSettingsOpen(true);}} />:<section className="automation-target-card automation-tid-target-card" aria-label="当前 TID 目标">
-        <div className="automation-target-heading"><span>目标 Display TID <small>· 共 {p.target_display_tids.length} 个</small></span><button type="button" className="automation-target-settings" disabled={busy||pending} onClick={openTidTargetEditor}>目标设置</button></div>
-        {p.target_display_tids.length?<ul className={`automation-tid-target-grid${p.target_display_tids.length<=4?' is-sparse':''}`} aria-label="目标号码">{p.target_display_tids.map(value=><li key={value}><Hash size={16} aria-hidden="true"/><span>{String(value).padStart(6,'0')}</span></li>)}</ul>:<div className="automation-tid-target-empty"><Hash size={42} aria-hidden="true"/><strong>未设置</strong><span>开始前请添加至少一个目标号码</span></div>}
+        <div className="automation-target-heading"><span>目标 TID</span><button type="button" className="automation-target-settings" disabled={busy||pending} onClick={openTidTargetEditor}>目标设置</button></div>
+        <p className="automation-tid-target-subtitle">显示 ID · {p.target_display_tids.length} 个目标</p>
+        {p.target_display_tids.length?<><ul ref={tidTargetGridRef} className={`automation-tid-target-grid${p.target_display_tids.length===1?' is-single':''}`} aria-label="目标号码">{visibleTidTargets.map(value=><li key={value}>{displayTid(value)}</li>)}</ul>{p.target_display_tids.length>visibleTidTargets.length&&<button type="button" className="automation-tid-target-view-all" onClick={()=>setTidListOpen(true)}>查看全部 {p.target_display_tids.length} 个目标</button>}<p className="automation-tid-target-note">命中任意一个即可</p></>:<div className="automation-tid-target-empty"><strong>暂无目标 TID</strong><span>请通过目标设置添加显示 ID</span></div>}
       </section>}
       {isStatic?<StaticFlowStatusCard state={ownState} run={currentRun} activeFlowId={snapshot.staticGroups.activeId} otherBusy={busy&&!ownState} details={runDetails}/>:<section className="automation-status-card automation-tid-status-card" data-status={ownState?.status||(busy?'running':'idle')} aria-label="自动流程状态">
         <div className="automation-status-heading"><span>当前流程状态</span><span className="automation-status-label">{statusLabel}</span></div>
@@ -254,6 +267,7 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
       <div className="automation-target-dialog-body automation-tid-target-dialog-body"><p className="muted">输入 0–999999 的目标号码；多个号码可用空格或逗号分隔。</p><form className="automation-tid-target-editor" onSubmit={event=>{event.preventDefault();addTidTargets();}}><label>目标 Display TID<input autoFocus aria-label="目标 Display TID" placeholder="例如 123456 654321" value={tidText} onChange={event=>setTidText(event.target.value)}/></label><button type="submit">添加目标</button></form><div className="automation-tid-target-chips" role="group" aria-label="已添加的目标">{tidTargetDraft.length?tidTargetDraft.map(value=><button key={value} type="button" aria-label={`移除目标 ${String(value).padStart(6,'0')}`} onClick={()=>setTidTargetDraft(current=>current.filter(item=>item!==value))}>{String(value).padStart(6,'0')} ×</button>):<span className="muted">尚未添加目标</span>}</div>{tidTargetError&&<p className="panel-error" role="alert">{tidTargetError}</p>}</div>
       <div className="automation-target-dialog-actions"><span className="muted">{tidTargetDraft.length} 个目标</span><button type="button" onClick={closeTidTargetEditor}>取消</button><button type="button" className="button primary" disabled={pending||busy||JSON.stringify(tidTargetDraft)===JSON.stringify(p.target_display_tids)} onClick={()=>void saveTidTargets()}>{pending?'保存中':'保存目标'}</button></div>
     </Dialog>}
+    {!isStatic&&tidListOpen&&<Dialog title={`全部目标 TID（${p.target_display_tids.length} 个）`} close={()=>setTidListOpen(false)} className="automation-target-dialog automation-tid-all-dialog"><div className="automation-target-dialog-body"><p className="automation-tid-target-subtitle">显示 ID · {p.target_display_tids.length} 个目标</p><ul className="automation-tid-target-grid automation-tid-target-all-list" aria-label="全部目标号码">{p.target_display_tids.map(value=><li key={value}>{displayTid(value)}</li>)}</ul><p className="automation-tid-target-note">命中任意一个即可</p></div><div className="automation-target-dialog-actions"><button type="button" onClick={()=>setTidListOpen(false)}>关闭</button></div></Dialog>}
     {isStatic&&delayOpen&&<DelayConfigDialog key={`${snapshot.staticGroups.activeId}:${species}`} config={staticConfig.delayConfig} samples={delaySamples} species={target?.species||'当前宝可梦'} flowName={activeGroup?.name||'当前流程'} scopeKey={`${snapshot.staticGroups.activeId}:${species}`} api={api} runningDelay={ownState?.roundDelay} locked={busy||pending} onClose={closeDelay} onApply={draft=>{updateDelay(draft);closeDelay();}} onExclude={async(roundNumber,excluded)=>{const next=await api.delay({species,action:'exclude',number:roundNumber,excluded});setSnapshot(next);}} onClear={async()=>{const next=await api.delay({species,action:'clear'});setSnapshot(next);}} />}
     {isStatic&&removedFeature&&<div className="automation-undo" role="status">已移除{featureInfo[removedFeature].label}<button type="button" onClick={()=>{updateFeature(removedFeature,true);jumpTo(removedFeature);setRemovedFeature(null);}}>撤销</button><button type="button" aria-label="关闭撤销提示" onClick={()=>setRemovedFeature(null)}>×</button></div>}
     {isStatic&&addFeaturesOpen&&<Dialog title="添加配置组" close={()=>setAddFeaturesOpen(false)} className="automation-add-dialog"><div className="automation-add-options"><p className="muted">完成必要设置后，配置组才会参与运行。</p>{featureOrder.map(key=><label key={key} className="automation-add-option"><input type="checkbox" checked={selectedFeatures.includes(key)} disabled={!!staticConfig.features[key].added} onChange={event=>setSelectedFeatures(current=>event.target.checked?[...current,key]:current.filter(value=>value!==key))}/><span><strong>{featureInfo[key].label}</strong><small>{featureInfo[key].description}</small></span>{staticConfig.features[key].added&&<em>已添加</em>}</label>)}{featureOrder.every(key=>staticConfig.features[key].added)&&<p className="muted">所有可选配置组均已添加。</p>}</div><div className="automation-group-dialog-actions"><button type="button" onClick={()=>setAddFeaturesOpen(false)}>取消</button><button type="button" className="button primary" disabled={!selectedFeatures.length} onClick={()=>{for(const key of selectedFeatures)updateFeature(key,true);const first=selectedFeatures[0];setAddFeaturesOpen(false);setSelectedFeatures([]);if(first)setTimeout(()=>jumpTo(first),0);}}>添加（{selectedFeatures.length}）</button></div></Dialog>}

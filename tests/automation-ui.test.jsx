@@ -179,7 +179,7 @@ test('TID goal editor saves only targets and leaves other parameter drafts intac
   api.save.mockImplementation(async ({values})=>{snapshot.config.tid.parameters.target_display_tids=[...values.target_display_tids];return structuredClone(snapshot);});
   render(<AutomationWorkspace kind="tid" profile={defaultBdspProfile} blinkConfig={newBlinkConfig()} blinkConfigs={[]} openLogs={()=>{}} onSwitchKind={()=>{}} />);
   await screen.findByRole('region',{name:'当前 TID 目标'});
-  expect(screen.getByText('未设置')).toBeTruthy();
+  expect(screen.getByText('暂无目标 TID')).toBeTruthy();
   expect(screen.queryByRole('complementary',{name:'配置组'})).toBeNull();
   expect(screen.queryByLabelText('目标 Display TID')).toBeNull();
   fireEvent.change(screen.getByLabelText('TID 搜索范围'),{target:{value:'600'}});
@@ -202,12 +202,28 @@ test('TID goal editor saves only targets and leaves other parameter drafts intac
   fireEvent.click(screen.getByRole('button',{name:'取消'}));
   expect(within(screen.getByRole('region',{name:'当前 TID 目标'})).queryByText('654321')).toBeNull();
 });
-test('TID target card lists every configured target',async()=>{
+test('TID target card shows a leading-zero single target',async()=>{
   const {snapshot}=fixture();
-  snapshot.config.tid.parameters.target_display_tids=[123456,123213,654321,7,8,9,10,11];
+  snapshot.config.tid.parameters.target_display_tids=[1234];
   render(<AutomationWorkspace kind="tid" profile={defaultBdspProfile} blinkConfig={newBlinkConfig()} blinkConfigs={[]} openLogs={()=>{}} onSwitchKind={()=>{}} />);
   const targetCard=within(await screen.findByRole('region',{name:'当前 TID 目标'}));
-  expect(within(targetCard.getByRole('list',{name:'目标号码'})).getAllByRole('listitem').map(item=>item.textContent)).toEqual(['123456','123213','654321','000007','000008','000009','000010','000011']);
+  expect(targetCard.getByText('目标 TID')).toBeTruthy();
+  expect(targetCard.getByText('显示 ID · 1 个目标')).toBeTruthy();
+  expect(targetCard.getByRole('listitem').textContent).toBe('001234');
+  expect(targetCard.queryByRole('button',{name:/查看全部/})).toBeNull();
+});
+test('TID target card offers a read-only list of every configured target while running',async()=>{
+  const {snapshot}=fixture();
+  snapshot.config.tid.parameters.target_display_tids=[123456,123213,654321,7,8,9,10,11,1234];
+  snapshot.state={...snapshot.state,kind:'tid',status:'running'};
+  render(<AutomationWorkspace kind="tid" profile={defaultBdspProfile} blinkConfig={newBlinkConfig()} blinkConfigs={[]} openLogs={()=>{}} onSwitchKind={()=>{}} />);
+  const targetCard=within(await screen.findByRole('region',{name:'当前 TID 目标'}));
+  expect(targetCard.getByRole('button',{name:'目标设置'}).disabled).toBe(true);
+  expect(within(targetCard.getByRole('list',{name:'目标号码'})).getAllByRole('listitem').map(item=>item.textContent)).toEqual(['123456','123213','654321','000007','000008','000009']);
+  fireEvent.click(targetCard.getByRole('button',{name:'查看全部 9 个目标'}));
+  const dialog=screen.getByRole('dialog',{name:'全部目标 TID（9 个）'});
+  expect(within(dialog).getAllByRole('listitem').map(item=>item.textContent)).toEqual(['123456','123213','654321','000007','000008','000009','000010','000011','001234']);
+  expect(within(dialog).queryByRole('button',{name:'保存目标'})).toBeNull();
 });
 test('L01/L03: record navigation filters detailed logs to the selected run and round',async()=>{
   const {snapshot}=fixture();
