@@ -53,6 +53,12 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
       store.log('QQ 通知调用失败：'+String(error?.message||error), 'QQ通知', 'warning', {runId:run.id,round:run.round});
     });
   };
+  const resolveScriptRoot=()=>{
+    const configured=devices.runner?.rootDirectory;
+    const root=typeof configured==='function'?configured():configured;
+    if(typeof root!=='string'||!root.trim())throw Error('自动流程脚本目录不可用');
+    return path.resolve(root);
+  };
   const requireWindow=(event,main=false)=>{
     if(event.senderFrame!==event.sender.mainFrame||!getWindows().some(window=>!window.isDestroyed()&&window.webContents===event.sender)||(main&&event.sender!==getMainWindow()?.webContents))throw Error('Unknown automation sender');
   };
@@ -229,7 +235,7 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
         throw Error('不允许的自动流程请求');
       };
       run.worker=workerFactory({kind:input.kind,parameters:input.config.parameters,scripts:result.scripts,
-        species:result.target?.speciesId,blink:input.blink,exitBlink:input.exitBlink,video:{sharedMemory:devices.getState().video.sharedMemory},scriptRoot:devices.runner.rootDirectory},
+        species:result.target?.speciesId,blink:input.blink,exitBlink:input.exitBlink,video:{sharedMemory:devices.getState().video.sharedMemory},scriptRoot:resolveScriptRoot()},
         {request,event:message=>{
           if(active===run&&message.event==='log'){store.log(message.message,source,'info',context());return;}
           if(run.stopped||active!==run)return;

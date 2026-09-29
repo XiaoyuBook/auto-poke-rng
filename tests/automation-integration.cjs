@@ -100,7 +100,11 @@ test('C04: stopping forbids all late script/search calls and releases the resour
 });
 
 test('automatic task completion sends one QQ notification with target and final detail',async t=>{
-  const f=fixture(t);await f.invoke('start',f.input);
+  const f=fixture(t),root=f.devices.runner.rootDirectory;let rootCalls=0;
+  f.devices.runner.rootDirectory=()=>{rootCalls++;return root;};
+  await f.invoke('start',f.input);
+  assert.equal(f.workerConfig().scriptRoot,root);
+  assert.equal(rootCalls,1);
   f.done({status:'completed',message:'目标流程已完成'});
   for(let i=0;i<20&&f.automation.getState().state.status!=='completed';i++)await new Promise(setImmediate);
   assert.equal(f.automation.getState().state.status,'completed');
