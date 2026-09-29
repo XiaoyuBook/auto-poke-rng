@@ -180,8 +180,7 @@ test('TID goal card reflects target edits without a configuration sidebar',async
   await screen.findByRole('region',{name:'当前 TID 目标'});
   expect(screen.getByText('未设置')).toBeTruthy();
   expect(screen.queryByRole('complementary',{name:'配置组'})).toBeNull();
-  fireEvent.click(within(screen.getByRole('region',{name:'当前 TID 目标'})).getByRole('button',{name:'目标设置'}));
-  expect(document.activeElement).toBe(screen.getByLabelText('目标 Display TID'));
+  expect(within(screen.getByRole('region',{name:'当前 TID 目标'})).queryByRole('button')).toBeNull();
   fireEvent.change(screen.getByLabelText('目标 Display TID'),{target:{value:'123456'}});
   fireEvent.click(screen.getByRole('button',{name:'添加目标 TID'}));
   expect(within(screen.getByRole('region',{name:'当前 TID 目标'})).getByText('123456')).toBeTruthy();

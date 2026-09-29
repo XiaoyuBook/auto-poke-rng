@@ -112,6 +112,7 @@ app.whenReady().then(async()=>{
   const ids=await js(`window.desktop.automation.tidPreview({seed:['40000000','00000000','40000000','00000000'],frame_threshold:4})`);
   assert.deepEqual(ids.id_states.map(row=>row.advances),[0,1,2,3,4]);
   assert.equal(await js(`(()=>{const goal=document.querySelector('#automation-panel-tid .automation-tid-target-card').getBoundingClientRect();const status=document.querySelector('#automation-panel-tid .automation-tid-status-card').getBoundingClientRect();return Math.abs(goal.top-status.top)<2&&Math.abs(goal.bottom-status.bottom)<2;})()`),true,'TID goal and status cards align');
+  assert.equal(await js(`document.querySelector('#automation-panel-tid .automation-tid-target-card button')===null&&Boolean(document.querySelector('#automation-panel-tid .automation-tid-target-editor input'))`),true,'TID target is edited only in basic settings');
   assert.equal(await js(`Boolean(document.querySelector('#automation-panel-tid .automation-group-sidebar'))`),false,'TID does not have a configuration sidebar');
   await screenshot('automatic-tid.png');
   main.setSize(1080,820);await delay(180);
