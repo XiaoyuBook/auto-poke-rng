@@ -155,6 +155,20 @@ test('optional groups become active when configured and can be removed and resto
   fireEvent.click(screen.getByRole('button',{name:'撤销'}));
   expect(screen.getByRole('region',{name:'自动反查'})).toBeTruthy();
 });
+test('sync strategy hides the fixed lead while dynamic sync is enabled',async()=>{
+  fixture();
+  render(<AutomationWorkspace kind="static" profile={defaultBdspProfile} blinkConfig={newBlinkConfig()} blinkConfigs={[]} openLogs={()=>{}} />);
+  fireEvent.click(await screen.findByRole('button',{name:'添加配置组'}));
+  fireEvent.click(screen.getByRole('checkbox',{name:/同步策略/}));
+  fireEvent.click(screen.getByRole('button',{name:'添加（1）'}));
+  expect(screen.getByText('队首特性')).toBeTruthy();
+  fireEvent.change(screen.getByLabelText('同步模式'),{target:{value:'2'}});
+  expect(screen.queryByText('队首特性')).toBeNull();
+  expect(screen.getByLabelText('同步性格')).toBeTruthy();
+  fireEvent.change(screen.getByLabelText('同步模式'),{target:{value:'0'}});
+  expect(screen.getByText('队首特性')).toBeTruthy();
+  expect(screen.queryByLabelText('同步性格')).toBeNull();
+});
 test('failed complete save preserves the current draft and prevents a workflow switch',async()=>{
   const {api,snapshot}=fixture();
   snapshot.staticGroups.items.push({id:'second',name:'第二套',config:structuredClone(snapshot.config.static)});
