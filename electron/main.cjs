@@ -78,7 +78,9 @@ app.whenReady().then(async () => {
   frlgRng = registerFrlgRng({
     ipcMain,
     getMainWindow: () => mainWindow,
-    sourceRoot: process.env.FRLG_AUTO_RNG_ROOT || path.resolve(app.getAppPath(), '..', 'frlg-auto-rng'),
+    // The planner is bundled under runtime/python/frlg_planner.  Keep the
+    // environment override only for explicit development comparisons.
+    sourceRoot: process.env.FRLG_AUTO_RNG_ROOT || undefined,
     isBusy: () => devices.isAutomationBusy(),
   });
   blink = registerBlink({ ipcMain, getMainWindow: () => mainWindow, getVideo: () => devices.getState().video, isAutomationBusy: () => devices.isAutomationBusy() });

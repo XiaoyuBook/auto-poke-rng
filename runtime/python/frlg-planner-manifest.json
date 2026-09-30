@@ -1,0 +1,32 @@
+{
+  "source": "frlg-auto-rng",
+  "commit": "5a5383ff226059cbf85f0b531c9de283f7b76c45",
+  "path": "frlg_planner",
+  "purpose": "FRLG planner algorithm and its read-only search data bundled for the main application's isolated runtime",
+  "files": {
+    "app_paths.py": "0f926155b7bfea00c3ea36a62d608b106beab00857ed2e0c77afa1cabe69c5d7",
+    "assets/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "assets/game_text.json": "e26fd04a4348a94c75303dad004e3eca1064d1b798724e0f0a05537595ee8a87",
+    "assets/game_text.py": "7d75e810e4ec63d364fdb0dc406cded6cf21524e4d553bcbcc24532a9995f5fc",
+    "automation/__init__.py": "f31a55618b765934d19d94d215262bdbaac245445b4ae2717c7b579c9fdfbcd4",
+    "automation/planner.py": "97a5a2dc1efb2f9b4f2ef9ae9e8d1d27d6cb4cf6744de1cc6e14875cf9667875",
+    "automation/seed_modes.py": "44489e4b6f878917d5a67c77292272bc5e0697f2b81cdc7024ffd541cd97aef9",
+    "automation/static_targets.py": "273cfa94fcace588d9240c621b13d699b585d5a0074da0f1f5d267916aa483ef",
+    "automation/support.py": "93bd5ea4838e21b74a112b52e83ff5a7087c7fa1181d99976eb3722071294375",
+    "fingerprint_policy.py": "29829f3903dad7b6938ad9064162561e144746345e1359af50db8d0a2871d773",
+    "rng/__init__.py": "48cad43d3dae0dd4e2f95a967ad47b7912df356c87b8b566108deb80defb80a7",
+    "rng/config.py": "435a9194aed4a783c29d91667b4b751b877ab77fa240d8e54592a99fe434bb81",
+    "rng/LICENSE": "0db2bf1e663e02599e44315945059e111473c88f0e54f00ac4490f73c71ef456",
+    "rng/resources/EncounterTables/Gen3/frlg/wild_encounters.json": "7038b24f691040c500462b6ed8d6086ceb9893f3a79c1342a50ef19a63aadd43",
+    "rng/resources/fr_eng_nx.bin": "5f7e5230670a018651c72a2e41d5ab37763245eba49ce92c29b33f9742da798e",
+    "rng/resources/fr_jpn_nx.bin": "d2ba1518112d0fb384e41db01f2b6587c12e19fdea36095d7860a009fc8bc764",
+    "rng/resources/i18n/en/abilities_en.txt": "1c532afa43b4fa7f89edec51b48324e6d78bd571a25eeeaaedbd672c740447af",
+    "rng/resources/i18n/en/species_en.txt": "f814cc5f6921451c0c6eb8df45f71da59898bd2997f9ca7220d2b79593e6c99d",
+    "rng/resources/lg_eng_nx.bin": "a1e2050147f7f8e0b7b237235879af13d3e6684041e01b591f7e42b10244cfea",
+    "rng/resources/lg_jpn_nx.bin": "8c9e582dc7602891c48af34d4d3e943bd3e6629e83b5c010adaf9511695026bf",
+    "rng/resources/Personal/Gen3/personal_rsefrlg.bin": "1b19f2cdeb667b9dcce547eb07500c81b692132d861f5b53d3bc4a5085b5afaa",
+    "rng/tenlines_utils.py": "20771f73fa94ead696b5a4466fe1ccc1f47299055df40284665070a87151b616",
+    "rng/tenlines.py": "f21083915156eb1852fcd2c905e7fdbbef5dcee160c3f37c6ac350a174019b3b",
+    "tenlines_seed_updater.py": "e3605b72022c0202746d9dc9b0b956674ccc3c2d44bac98e310b565857b1b21a"
+  }
+}

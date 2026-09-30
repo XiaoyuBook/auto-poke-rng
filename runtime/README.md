@@ -65,7 +65,7 @@ HTTP 只监听 `127.0.0.1` 随机端口，要求当前运行时 token。程序�
 
 ## 脚本复用
 
-`python/easycon/native` 直接保存 FRLG 项目现有解释器和图像标签实现的源码快照，未重写语法；来源提交与逐文件 SHA-256 在 `python/vendor-manifest.json`。`python/script_host.py` 是适配层：编译、校验资源后获取控制租约；将按键和等待交给 C++，通过共享内存读取 OCR 和 `.IL` 搜图所需帧。运行脚本不要求视频连接，只有搜图或 OCR 语句需要视频源。
+`python/easycon/native` 直接保存 FRLG 项目现有解释器和图像标签实现的源码快照，未重写语法；来源提交与逐文件 SHA-256 在 `python/vendor-manifest.json`。`python/frlg_planner` 保存 FRLG planner 的算法和它需要的只读搜索数据，来源提交与逐文件 SHA-256 在 `python/frlg-planner-manifest.json`。`frlg_rng_host.py` 默认只加载这个内置目录，因此部署机器不需要存在 `frlg-auto-rng` 项目；`FRLG_AUTO_RNG_ROOT` 仅用于开发期显式指定另一个经过核对的快照。`python/script_host.py` 是脚本适配层：编译、校验资源后获取控制租约；将按键和等待交给 C++，通过共享内存读取 OCR 和 `.IL` 搜图所需帧。运行脚本不要求视频连接，只有搜图或 OCR 语句需要视频源。
 
 支持原版循环、条件、变量、函数、`lib/*.ecs`、按键/摇杆语句和 `ImgLabel/*.IL` 图像匹配。新页面已有 `.rng` 文件中 `press A` 是按键别名，转换成原版 `A 50` 后执行，行号保持不变。不根据左上角游戏环境修改脚本行为。
 

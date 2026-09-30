@@ -1,9 +1,9 @@
-"""Small JSONL bridge for the isolated FRLG planner.
+"""JSONL host for the self-contained FRLG planner snapshot.
 
-The planner remains the source of truth in the sibling ``frlg-auto-rng``
-project.  This host deliberately exposes search and validation only; device
-ownership and script execution stay in the main application's existing
-boundaries.
+The planner and the data it needs live under this application's runtime tree.
+An explicit ``FRLG_AUTO_RNG_ROOT`` override is retained for development and
+contract comparison, but a normal checkout or packaged build never needs a
+second project directory.
 """
 from __future__ import annotations
 
@@ -19,15 +19,12 @@ def _source_root() -> Path:
     configured = os.environ.get("FRLG_AUTO_RNG_ROOT")
     if configured:
         return Path(configured).resolve()
-    # Development checkout: D:/project/auto-poke-rng/runtime/python ->
-    # D:/project/frlg-auto-rng.  A packaged build must set the environment
-    # explicitly or bundle an audited source snapshot at this location.
-    return Path(__file__).resolve().parents[3] / "frlg-auto-rng"
+    return Path(__file__).resolve().parent / "frlg_planner"
 
 
 SOURCE_ROOT = _source_root()
 if not SOURCE_ROOT.is_dir():
-    raise RuntimeError(f"找不到 FRLG planner 源码目录：{SOURCE_ROOT}")
+    raise RuntimeError(f"找不到内置 FRLG planner 运行时目录：{SOURCE_ROOT}")
 sys.path.insert(0, str(SOURCE_ROOT))
 
 from automation.planner import AutoSearchRequest, search_best_plan  # noqa: E402

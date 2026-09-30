@@ -10,7 +10,7 @@
 | auto-bdsp-rng controller overlay | `ui/controller_overlay.py` 的绘制坐标、图层顺序及 SwitchHat 枚举 | `JoyConGraphic.tsx` 将 100×100 绘制移植为 SVG，并改进控件描边和缩放。`JoyCon-transparent.png` 按原版去白底，并消除外沿抗锯齿像素的白色杂边；生成脚本为 `tools/prepare-vpad-assets.py`，原素材另行保留；GPL-3.0 |
 | auto-bdsp-rng controller background | 用户提供的 auto-bdsp-rng `ui/controller_bg.png` | 图形化按键映射窗口背景，随参考项目 GPL-3.0 条款使用 |
 | Auto Poke RNG dark controller background | 由上述 `controller_bg.png` 转换为当前深色主题的派生素材 | 仅调整背景与轮廓颜色，保留原版几何布局；随参考项目 GPL-3.0 条款使用 |
-| frlg-auto-rng | 提交 `4d2b7b50d64e83a3ae35456c29b6bf6f7fd6ee32`，`easycon/native` | 原有解释器、编译校验、图像标签匹配原样复用；逐文件 hash 见 vendor-manifest.json |
+| frlg-auto-rng | `easycon/native` 提交 `4d2b7b50d64e83a3ae35456c29b6bf6f7fd6ee32`；planner 提交 `5a5383ff226059cbf85f0b531c9de283f7b76c45` | 原有解释器、编译校验、图像标签匹配和 FRLG planner 算法/只读搜索数据按快照内置；逐文件 SHA-256 分别见 `python/vendor-manifest.json` 与 `python/frlg-planner-manifest.json`。运行时不依赖 `frlg-auto-rng` 兄弟目录 |
 | auto-bdsp-rng / frlg-auto-rng Capture Broker | 用户提供的现有实现 | 单采集所有者、共享帧、MSMF transforms workaround、DirectShow 设置顺序、首帧/断流超时的行为参考 |
 | Windows SDK | 系统依赖 | MF/DirectShow 设备枚举、COM、命名共享内存/互斥量、串口、父进程句柄 |
 | [auto-bdsp-rng](https://github.com/XiaoyuBook/auto-bdsp-rng) 自动流程 | `494793ed467cd1a2ef376d5886d0add5924b620f`，GPL-3.0 | 定点/TID 状态机、delay 策略、OCR 规则、脚本与测试；固定快照、LICENSE 和逐文件 SHA-256 见 `third_party/bdsp-automation-reference/`。业务包迁入 `runtime/python/auto_bdsp_rng/`，Electron/React 接口重新适配，OCR 使用现有 PP-OCRv6 服务，未引入 Qt 界面或第二个硬件所有者 |
