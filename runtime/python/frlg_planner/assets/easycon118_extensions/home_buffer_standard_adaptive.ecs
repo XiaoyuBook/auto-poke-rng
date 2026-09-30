@@ -1,0 +1,87 @@
+# 1.6.4-a 正式版 HOME_BUFFER：可选稳定低分自适应，关闭时保持原 95 分逻辑。
+FUNC HOME_BUFFER
+    $HOME_BUFFER尝试 = 0
+    $孵蛋HOME_BUFFER尝试 = 0
+    $孵蛋HOME_BUFFER失败 = 0
+    $HOME_BUFFER未知连续次数 = 0
+    $HOME_BUFFER锁定连续失败 = 0
+    $HOME_BUFFER本轮待确认 = 0
+    $HOME_BUFFER恢复需要 = 1
+    $HOME_BUFFER恢复已按HOME = 0
+    $HOME_BUFFER恢复关闭次数 = 0
+    $HOME_BUFFER恢复稳定 = 0
+    $HOME_BUFFER恢复未知 = 0
+    PRINT "FRLG_STAGE|BEGIN|main.home_buffer|main.home_buffer|0|NS火叶全自动一键乱数2.0.ecs|HOME_BUFFER|main.home_buffer.calibrate|manual_prepare_then_restart|OR;主页.IL:>=:95,主页_NS2.IL:>=:95,正确退出.IL:>=:" & $HOME_BUFFER有效识图阈值 & ",正确退出_NS2.IL:>=:" & $HOME_BUFFER有效识图阈值 & ",HOME_BUFFER正确退出.IL:>=:" & $HOME_BUFFER有效识图阈值 & ",HOME_BUFFER正确退出_NS2.IL:>=:" & $HOME_BUFFER有效识图阈值 & ",错误退出.IL:>=:" & $HOME_BUFFER有效识图阈值 & ",错误退出_NS2.IL:>=:" & $HOME_BUFFER有效识图阈值 & ",正在关闭.IL:>=:95,正在关闭_暗.IL:>=:95|!"
+    FOR
+        $HOME_BUFFER尝试 = $HOME_BUFFER尝试 + 1
+        $孵蛋HOME_BUFFER尝试 = $HOME_BUFFER尝试
+        IF $HOME_BUFFER尝试 > 20
+            PRINT HOME_BUFFER校准失败：20轮恢复或试探后仍未确认可用窗口
+            PRINT "FRLG_STAGE|FAIL|main.home_buffer|HOME_BUFFER校准达到20轮上限|!"
+            IF $静态或野生 == "孵蛋"
+                $孵蛋HOME_BUFFER失败 = 1
+            ENDIF
+            RETURN
+        ENDIF
+        IF $HOME_BUFFER锁定启用 == 1
+            $HOME_BUFFER延迟 = $HOME_BUFFER锁定延迟
+        ENDIF
+        IF $HOME_BUFFER恢复需要 == 1
+            $HOME_BUFFER恢复结果 = HOME_BUFFER恢复启动原点()
+            IF $HOME_BUFFER恢复结果 == 2
+                $HOME_BUFFER延迟 = $HOME_BUFFER本轮延迟
+                $HOME_BUFFER锁定启用 = 1
+                $HOME_BUFFER锁定延迟 = $HOME_BUFFER本轮延迟
+                $HOME_BUFFER锁定连续失败 = 0
+                PRINT 可用并锁定HOME_BUFFER延迟: & $HOME_BUFFER锁定延迟 & " ms"
+                PRINT "FRLG_STAGE|END|main.home_buffer|!"
+                RETURN
+            ENDIF
+            IF $HOME_BUFFER恢复结果 == 0
+                PRINT HOME_BUFFER恢复未确认：保持延迟，只重采样，不启动游戏
+                WAIT 500
+                CONTINUE
+            ENDIF
+            $HOME_BUFFER恢复需要 = 0
+        ENDIF
+        $HOME_BUFFER本轮待确认 = 0
+        $HOME_BUFFER本轮延迟 = $HOME_BUFFER延迟
+        A
+        WAIT 1500
+        A
+        WAIT $HOME_BUFFER延迟
+        IF $调试日志输出 == 1
+            PRINT 尝试HOME_BUFFER延迟: & $HOME_BUFFER延迟 & " ms"
+        ENDIF
+        HOME 100
+        WAIT 1500
+        $HOME_BUFFER识别状态 = HOME_BUFFER重采样状态(1)
+        IF $HOME_BUFFER识别状态 == 1
+            $HOME_BUFFER锁定启用 = 1
+            $HOME_BUFFER锁定延迟 = $HOME_BUFFER延迟
+            $HOME_BUFFER锁定连续失败 = 0
+            PRINT 可用并锁定HOME_BUFFER延迟: & $HOME_BUFFER锁定延迟 & " ms"
+            PRINT "FRLG_STAGE|END|main.home_buffer|!"
+            RETURN
+        ENDIF
+        IF $HOME_BUFFER识别状态 == 0
+            $HOME_BUFFER本轮待确认 = 1
+        ENDIF
+        $HOME_BUFFER下一延迟 = HOME_BUFFER规划下一延迟($HOME_BUFFER识别状态)
+        IF $HOME_BUFFER下一延迟 < 100 or $HOME_BUFFER下一延迟 > 3000
+            PRINT HOME_BUFFER校准失败：下一延迟超出100-3000 ms
+            PRINT "FRLG_STAGE|FAIL|main.home_buffer|下一延迟超出100-3000毫秒范围|!"
+            IF $静态或野生 == "孵蛋"
+                $孵蛋HOME_BUFFER失败 = 1
+            ENDIF
+            RETURN
+        ENDIF
+        $HOME_BUFFER延迟 = $HOME_BUFFER下一延迟
+        $HOME_BUFFER恢复需要 = 1
+        $HOME_BUFFER恢复已按HOME = 0
+        $HOME_BUFFER恢复关闭次数 = 0
+        $HOME_BUFFER恢复稳定 = 0
+        $HOME_BUFFER恢复未知 = 0
+    NEXT
+    PRINT "FRLG_STAGE|FAIL|main.home_buffer|HOME_BUFFER校准循环意外退出|!"
+ENDFUNC

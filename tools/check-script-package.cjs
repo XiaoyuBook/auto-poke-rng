@@ -14,7 +14,7 @@ async function check(archive) {
     const plan = await repository.planArchive(await fs.readFile(archive));
     await repository.apply({ token: plan.token, policy: 'keep' });
     const runner = new ScriptRunner({ rootDirectory });
-    const scripts = plan.package.files.filter(file => /\.(txt|rng)$/i.test(file.path));
+    const scripts = plan.package.files.filter(file => /\.(txt|rng|ecs)$/i.test(file.path) && !file.path.startsWith('lib/'));
     for (const file of scripts) {
       const relative = plan.package.installFolder + '/' + file.path;
       const result = await runner.validate({ path: relative, text: await fs.readFile(path.join(rootDirectory, relative), 'utf8') });

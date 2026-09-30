@@ -11,7 +11,7 @@ const SOURCES = {
   gitee: { name: 'Gitee', url: 'https://gitee.com/shekongsk/auto-poke-rng-scripts' },
 };
 const META = '.rng-package.json';
-const MAX_ARCHIVE = 20 * 1024 * 1024, MAX_FILES = 256, MAX_EXPANDED = 50 * 1024 * 1024;
+const MAX_ARCHIVE = 20 * 1024 * 1024, MAX_FILES = 2048, MAX_EXPANDED = 50 * 1024 * 1024;
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const version = value => typeof value === 'string' && value.length <= 50 && /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(value) && value.split('.').every(n => Number.isSafeInteger(Number(n)));
 const compare = (a,b) => { const right = b.split('.').map(Number); for (const [i,n] of a.split('.').map(Number).entries()) { if (n !== right[i]) return n > right[i] ? 1 : -1; } return 0; };
@@ -29,7 +29,7 @@ function validatePackage(item) {
     if (!Array.isArray(item.files) || item.files.length > MAX_FILES) throw Error('脚本包文件清单无效。');
     const seen = new Set();
     for (const file of item.files) {
-      if (!file || !safePath(file.path) || !/\.(txt|rng|il|md)$/i.test(file.path) || !Number.isSafeInteger(file.bytes) || file.bytes < 0 || file.bytes > 12 * 1024 * 1024 || !digest(file.sha256)
+      if (!file || !safePath(file.path) || !/\.(txt|rng|ecs|il|md|json|traineddata)$/i.test(file.path) || !Number.isSafeInteger(file.bytes) || file.bytes < 0 || file.bytes > 12 * 1024 * 1024 || !digest(file.sha256)
         || seen.has(file.path.toLowerCase()) || file.category != null && !text(file.category, 50)) throw Error('脚本包资源路径或文件清单无效。');
       seen.add(file.path.toLowerCase());
     }
@@ -76,11 +76,11 @@ function unpackArchive(bytes) {
   if (!Array.isArray(manifest.files) || !manifest.files.length || manifest.files.length > MAX_FILES) throw Error('脚本包资源清单无效。');
   const files = Object.create(null), names = new Set();
   for (const file of manifest.files) {
-    if (!safePath(file.path) || !/\.(rng|il|md|txt)$/i.test(file.path) || names.has(file.path.toLowerCase()) || !digest(file.sha256)) throw Error('脚本包资源路径无效。');
+    if (!safePath(file.path) || !/\.(rng|ecs|il|md|txt|json|traineddata)$/i.test(file.path) || names.has(file.path.toLowerCase()) || !digest(file.sha256)) throw Error('脚本包资源路径无效。');
     names.add(file.path.toLowerCase());
     const content = entries['files/' + file.path];
     if (!content || content.length !== file.bytes || hash(content) !== file.sha256) throw Error('脚本包资源校验失败：' + file.path);
-    if (/\.(txt|rng)$/i.test(file.path) && content.length > 1024 * 1024) throw Error('脚本超过 1 MB。');
+    if (/\.(txt|rng|ecs)$/i.test(file.path) && content.length > 1024 * 1024) throw Error('脚本超过 1 MB。');
     if (/\.il$/i.test(file.path)) {
       const label = JSON.parse(Buffer.from(content).toString('utf8').replace(/^\uFEFF/, ''));
       if (typeof label.ImgBase64 !== 'string' || !Number.isFinite(label.searchMethod)) throw Error('图像标签无效。');
@@ -88,7 +88,7 @@ function unpackArchive(bytes) {
     files[file.path] = Buffer.from(content);
   }
   checkPathCase(Object.keys(files));
-  if (!Object.keys(files).some(name => /\.(txt|rng)$/i.test(name)) || Object.keys(entries).length !== manifest.files.length + 1) throw Error('脚本包有未声明的文件或缺少脚本。');
+  if (!Object.keys(files).some(name => /\.(txt|rng|ecs)$/i.test(name)) || Object.keys(entries).length !== manifest.files.length + 1) throw Error('脚本包有未声明的文件或缺少脚本。');
   return { manifest, files };
 }
 

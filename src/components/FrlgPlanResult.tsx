@@ -80,7 +80,7 @@ export function FrlgPlanDetails({ plan, close }: { plan: FrlgPlannerResult; clos
         <Metric title="Seed 按键">{label(FRLG_SEED_BTN_LABELS, settings.seed_button)}</Metric>
         <Metric title="额外按键">{label(FRLG_EXTRA_BTN_LABELS, settings.extra_button)}</Metric>
         <Metric title="路线状态">{route_support.summary}</Metric>
-        <Metric title="脚本状态">尚未生成运行脚本；未执行设备与脚本预检。</Metric>
+        <Metric title="脚本状态">开始运行时生成独立脚本，并检查标签、OCR、视频源和伊机控。</Metric>
       </dl></section>
       {plan.warnings.length > 0 && <section className="frlg-dialog-section"><h3>运行提示</h3><ul className="frlg-warnings">{plan.warnings.map(warning => <li key={warning}>{warning}</li>)}</ul></section>}
     </div>

@@ -126,6 +126,12 @@ contextBridge.exposeInMainWorld('desktop', {
     search: request => ipcRenderer.invoke('frlg-rng:search', request),
     cancel: () => ipcRenderer.invoke('frlg-rng:cancel'),
   },
+  frlgAutomation: {
+    getState: () => ipcRenderer.invoke('frlg-automation:state'),
+    onState: listener => subscribe('frlg-automation:state', listener),
+    start: input => ipcRenderer.invoke('frlg-automation:start', input),
+    stop: () => ipcRenderer.invoke('frlg-automation:stop'),
+  },
   panels: {
     open: tool => ipcRenderer.invoke('panels:open', tool),
     getState: () => ipcRenderer.invoke('panels:get-state'),

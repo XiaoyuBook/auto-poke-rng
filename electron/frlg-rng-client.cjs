@@ -19,6 +19,7 @@ class FrlgRngClient extends EventEmitter {
   }
   start() {
     if (this.child && !this.child.killed) return;
+    this.buffer = '';
     const child = spawn(pythonPath(), ['-u', path.join(__dirname, '..', 'runtime', 'python', 'frlg_rng_host.py')], {
       windowsHide: true,
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -80,10 +81,10 @@ function registerFrlgRng({ ipcMain, getMainWindow, sourceRoot, isBusy = () => fa
   const requireWindow = event => {
     if (!event.sender || event.sender !== getMainWindow()?.webContents || event.senderFrame !== event.sender.mainFrame) throw new Error('Unknown FRLG RNG sender');
   };
-  ipcMain.handle('frlg-rng:validate', async (event, request) => { requireWindow(event); return client.call('validate', request, 15000); });
+  ipcMain.handle('frlg-rng:validate', async (event, request) => { requireWindow(event); if (isBusy()) throw new Error('请先停止其他自动流程。'); return client.call('validate', request, 15000); });
   ipcMain.handle('frlg-rng:search', async (event, request) => { requireWindow(event); if (isBusy()) throw new Error('请先停止其他自动流程。'); return client.call('search', request); });
-  ipcMain.handle('frlg-rng:cancel', async event => { requireWindow(event); client.close(); });
-  return { client, close: async () => client.close(), isBusy: () => Boolean(client.child) };
+  ipcMain.handle('frlg-rng:cancel', async event => { requireWindow(event); if (isBusy()) throw new Error('请使用自动流程的停止按钮。'); client.close(); });
+  return { client, close: async () => client.close(), isBusy: () => client.pending.size > 0 };
 }
 
 module.exports = { FrlgRngClient, registerFrlgRng, pythonPath };

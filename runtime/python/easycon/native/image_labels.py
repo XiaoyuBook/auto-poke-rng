@@ -247,6 +247,17 @@ class ImageLabel:
             ),
         )
 
+    def preflight(self, frame: np.ndarray) -> None:
+        """Validate referenced assets before any controller input is acquired."""
+        _validate_rect(self.range_rect, frame, field_name="Range")
+        _validate_rect(self.target_rect, frame, field_name="Target")
+        if self.search_method.is_image_method:
+            template, alpha_mask = _decode_template(self.image_base64, self.name)
+            if template.shape[0] > self.range_rect[3] or template.shape[1] > self.range_rect[2]:
+                raise ImageLabelError(f"Search image is smaller than the EasyCon template: {self.name}")
+            if self.search_method is SearchMethod.MASKED_SQ_DIFF_NORMED and alpha_mask is None:
+                raise ImageLabelError(f"EasyCon method 14 requires an alpha mask: {self.name}")
+
     def search(
         self,
         frame: np.ndarray,

@@ -133,7 +133,7 @@ class _Validator:
     def _validate_function(self, declaration: FunctionDeclaration, globals_scope: _Scope) -> None:
         scope = _Scope(globals_scope)
         for parameter in declaration.parameters:
-            scope.declare(parameter.name, _Symbol(parameter.type_name, True))
+            scope.declare(parameter.name, _Symbol(parameter.type_name, False))
         self._validate_statements(declaration.body, scope, declaration)
         if declaration.return_type != "VOID" and not self._all_paths_return(declaration.body):
             _error(f"函数 {declaration.name} 并非所有路径都返回值", declaration.location)
@@ -218,6 +218,11 @@ class _Validator:
                     self._expect_type(self._expression_type(statement.lower, scope), "INT", statement.location)
                     self._expect_type(self._expression_type(statement.upper, scope), "INT", statement.location)
                     self._expect_type(self._expression_type(statement.step, scope), "INT", statement.location)
+                    existing = scope.lookup(statement.variable)
+                    if existing is not None:
+                        self._expect_type(existing.type_name, "INT", statement.location)
+                        if existing.readonly:
+                            _error(f"变量 {statement.variable} 是只读的", statement.location)
                     loop_scope.declare(statement.variable, _Symbol("INT", True))
                 elif statement.count is not None:
                     self._expect_type(self._expression_type(statement.count, scope), "INT", statement.location)
@@ -310,6 +315,10 @@ class _Validator:
         _error(f"无法绑定表达式 {type(expression).__name__}", expression.location)
 
     def _binary_type(self, operator: str, left: str, right: str, location: SourceLocation) -> str:
+        if operator == "in":
+            if not (left == right == "STRING" or right == left + "[]"):
+                _error(f"IN 不支持 {left} 和 {right}", location)
+            return "BOOL"
         if operator in {"==", "!="}:
             if left != right:
                 _error(f"比较两侧类型不一致: {left} 和 {right}", location)

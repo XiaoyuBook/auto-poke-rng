@@ -53,7 +53,7 @@ function createScriptStore(rootDirectory, { serialize: sharedSerialize } = {}) {
       const needsDirectory = index < parts.length - 1 || directory;
       if (needsDirectory ? !info.isDirectory() : !info.isFile()) throw new Error('脚本路径类型无效。');
     }
-    if (!directory && (!relative || !['.txt', '.rng'].includes(path.extname(relative).toLowerCase()))) throw new Error('请选择 .txt 脚本文件。');
+    if (!directory && (!relative || !['.txt', '.rng', '.ecs'].includes(path.extname(relative).toLowerCase()))) throw new Error('请选择 .txt 或 .ecs 脚本文件。');
     return current;
   }
 
@@ -72,14 +72,14 @@ function createScriptStore(rootDirectory, { serialize: sharedSerialize } = {}) {
       const entries = await fs.readdir(directory, { withFileTypes: true });
       entries.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN', { numeric: true }));
       for (const entry of entries) {
-        if (entry.name === '.rng-repository') continue;
+        if (entry.name === '.rng-repository' || entry.name === '.frlg-runs') continue;
         const relative = folder ? folder + '/' + entry.name : entry.name;
         if (entry.isSymbolicLink()) { warnings.push('已跳过链接：' + relative); continue; }
         try {
           if (entry.isDirectory()) {
             folders.push({ path: relative, name: entry.name });
             await visit(relative);
-          } else if (entry.isFile() && ['.txt', '.rng'].includes(path.extname(entry.name).toLowerCase())) files.push(await read(relative));
+          } else if (entry.isFile() && ['.txt', '.rng', '.ecs'].includes(path.extname(entry.name).toLowerCase())) files.push(await read(relative));
         } catch (error) { warnings.push(relative + '：' + error.message); }
       }
     }

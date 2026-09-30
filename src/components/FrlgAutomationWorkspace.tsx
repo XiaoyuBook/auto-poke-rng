@@ -26,6 +26,8 @@ import { FrlgPlanSummary, FrlgPlanDetails } from './FrlgPlanResult';
 import { FrlgSprite } from './FrlgSprite';
 import { FRLG_ABILITY_LABELS, FRLG_NATURE_LABELS, FRLG_TYPE_LABELS } from '../frlgMetadata';
 import type { FrlgSaveProfile } from '../frlgProfile';
+import { frlgRunBusy, loadFrlgRunOptions, type FrlgRunOptions, type FrlgRunState } from '../frlgExecution';
+import { FrlgRunSettings } from './FrlgRunSettings';
 
 const gameLabels: Record<string, string> = {
   fr_nx: '火红 · 美版 · Switch 1', fr_nx2: '火红 · 美版 · Switch 2',
@@ -105,6 +107,37 @@ export function FrlgAutomationWorkspace({ profile }: { profile?: FrlgSaveProfile
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
+  const profileId = profile?.id || 'frlg-save-1';
+  const [run, setRun] = useState<FrlgRunState | null>(null);
+  const [options, setOptions] = useState<FrlgRunOptions>(() => loadFrlgRunOptions(profileId));
+  const running = frlgRunBusy(run);
+  const locked = busy || running;
+  useEffect(() => { setOptions(loadFrlgRunOptions(profileId)); }, [profileId]);
+  useEffect(() => {
+    const api = window.desktop?.frlgAutomation;
+    if (!api) return;
+    let alive = true;
+    void api.getState().then(value => { if (alive) setRun(value); }).catch(() => {});
+    const unsubscribe = api.onState(setRun);
+    return () => { alive = false; unsubscribe(); };
+  }, []);
+  const saveOptions = (value: FrlgRunOptions) => {
+    setOptions(value);
+    localStorage.setItem('auto-poke-frlg-run:' + profileId, JSON.stringify(value));
+  };
+  const startRun = async () => {
+    if (!result || locked) return;
+    setError('');
+    try {
+      const api = window.desktop?.frlgAutomation;
+      if (!api) throw Error('请在桌面应用中运行火叶流程');
+      setRun(await api.start({ request: result.request, profileId, options: { ...options, item_rng_mode: wildMethod(request.method) && !!options.item_rng_mode } }));
+    } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
+  };
+  const stopRun = async () => {
+    try { const value = await window.desktop?.frlgAutomation?.stop(); if (value) setRun(value); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
+  };
   const [targetSettingsOpen, setTargetSettingsOpen] = useState(false);
   const [resultDetailOpen, setResultDetailOpen] = useState(false);
   const searchGeneration = useRef(0);
@@ -218,19 +251,19 @@ export function FrlgAutomationWorkspace({ profile }: { profile?: FrlgSaveProfile
   }, [abilityOptions, request.ability]);
   return <section className="automation-workspace frlg-automation-workspace" aria-label="火叶自动流程工作区">
     <header className="automation-heading frlg-automation-heading">
-      <div><h2>火叶自动流程</h2><p>搜索定点与野生目标，查看具体个体和初始 Seed 方案。</p></div>
-      <span className="frlg-source-badge">FRLG · 方案搜索</span>
+      <div><h2>火叶自动流程</h2><p>搜索目标，执行捕获、反查校准与自动重试。</p></div>
+      <span className="frlg-source-badge">FRLG · 野生／静态</span>
     </header>
     <div className="automation-toolbar automation-run-toolbar frlg-run-toolbar">
-      <button type="button" className="button primary" disabled={busy || diagnostics.length > 0} onClick={() => void search()}><Play size={14} />{busy ? '搜索中…' : '搜索并生成方案'}</button>
-      <button type="button" disabled={!busy} onClick={() => void cancelSearch()}><Square size={14} />停止</button>
-      <button type="button" disabled={busy} onClick={() => void validate()}><ListChecks size={14} />参数检查</button>
-      <button type="button" disabled title="尚未生成运行脚本；设备与脚本预检接入后启用"><Play size={14} />开始运行</button>
-      <span className="frlg-save-status" role="status">{busy ? '正在搜索方案' : result ? '搜索完成' : '待命'}</span>
+      <button type="button" className="button primary" disabled={locked || diagnostics.length > 0} onClick={() => void search()}><Play size={14} />{busy ? '搜索中…' : '搜索并生成方案'}</button>
+      <button type="button" disabled={!locked} onClick={() => void (running ? stopRun() : cancelSearch())}><Square size={14} />停止</button>
+      <button type="button" disabled={locked} onClick={() => void validate()}><ListChecks size={14} />参数检查</button>
+      <button type="button" disabled={locked || !result?.route_support.can_start} onClick={() => void startRun()}><Play size={14} />开始运行</button>
+      <span className="frlg-save-status" role="status">{running ? run?.message : busy ? '正在搜索方案' : result ? '搜索完成' : '待命'}</span>
     </div>
     {(error || notice) && <p role={error ? 'alert' : 'status'} className={error ? 'panel-error' : 'automation-notice'}>{error || notice}</p>}
     <div className="automation-overview frlg-overview">
-      <FrlgTargetCard request={request} target={target} locked={busy} onSettings={() => setTargetSettingsOpen(true)} />
+      <FrlgTargetCard request={request} target={target} locked={locked} onSettings={() => setTargetSettingsOpen(true)} />
       {result ? <FrlgPlanSummary plan={result} onDetails={() => setResultDetailOpen(true)} /> :
         <section className="automation-status-card frlg-status-card" data-status={busy ? 'running' : error ? 'failed' : 'idle'} aria-label="火叶方案状态">
           <div className="automation-status-heading"><span>推荐方案</span><span className="automation-status-label">{busy ? '搜索中' : error ? '需要检查' : '待命'}</span></div>
@@ -240,7 +273,7 @@ export function FrlgAutomationWorkspace({ profile }: { profile?: FrlgSaveProfile
     </div>
     <section className="automation-card automation-feature-card frlg-base-card" aria-label="火叶自动流程参数">
       <div className="automation-feature-heading"><strong>基础设置</strong><span className="automation-feature-status">必选</span></div>
-      <fieldset disabled={busy} className="automation-feature-body">
+      <fieldset disabled={locked} className="automation-feature-body">
         <div className="automation-fields frlg-base-fields">
           <label>TID<input aria-label="TID" type="number" min={0} max={65535} value={request.tid} onChange={event => update('tid', Number(event.target.value))} /></label>
           <label>SID<input aria-label="SID" type="number" min={0} max={65535} value={request.sid} onChange={event => update('sid', Number(event.target.value))} /></label>
@@ -259,7 +292,14 @@ export function FrlgAutomationWorkspace({ profile }: { profile?: FrlgSaveProfile
         </details>
       </fieldset>
     </section>
-    {targetSettingsOpen && <Dialog title="火叶目标与筛选条件" close={() => setTargetSettingsOpen(false)} className="automation-target-dialog frlg-target-dialog">
+    <FrlgRunSettings key={profileId} options={options} onChange={saveOptions} locked={locked} wild={wildMethod(request.method)} />
+    {run && run.status !== 'idle' && <section className="automation-card" aria-label="火叶运行状态">
+      <strong>{run.message}</strong>
+      {run.profileId !== profileId && <p>正在显示存档 {run.profileId} 的运行记录。</p>}
+      {run.progress && <p className="muted">{run.progress.action} · {run.progress.source}:{run.progress.line}</p>}
+      <pre className="frlg-run-log" aria-label="火叶运行日志">{run.logs.join('\n')}</pre>
+    </section>}
+    {targetSettingsOpen && !running && <Dialog title="火叶目标与筛选条件" close={() => setTargetSettingsOpen(false)} className="automation-target-dialog frlg-target-dialog">
       <div className="automation-target-dialog-body">
         <section className="frlg-dialog-section"><h3>目标</h3><div className="automation-fields frlg-fields">
           <label>游戏版本<select aria-label="游戏版本" value={request.game} disabled={busy} onChange={event => changeGame(event.target.value)}>{FRLG_GAMES.map(game => <option key={game} value={game}>{gameLabels[game]}</option>)}</select></label>

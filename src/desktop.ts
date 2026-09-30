@@ -85,4 +85,10 @@ export interface DesktopApi {
   scripts: ScriptFilesApi;
   rng?: StaticEngineApi;
   frlgRng?: FrlgRngApi;
+  frlgAutomation?: {
+    getState: () => Promise<import('./frlgExecution').FrlgRunState>;
+    onState: (listener: (state: import('./frlgExecution').FrlgRunState) => void) => () => void;
+    start: (input: import('./frlgExecution').FrlgRunInput) => Promise<import('./frlgExecution').FrlgRunState>;
+    stop: () => Promise<import('./frlgExecution').FrlgRunState>;
+  };
 }

@@ -234,7 +234,10 @@ def run(config, program):
                     }))
             # Fail before controller.acquire when a required video source has
             # not published a usable frame yet.
-            read_frame()
+            first_frame = read_frame()
+            if labels is not None:
+                for name in sorted(program.external_labels):
+                    labels.labels[name].preflight(first_frame)
         # Compile + asset preflight before taking controller ownership or sending input.
         request("script.acquire", {})
         trace.begin(config["name"])

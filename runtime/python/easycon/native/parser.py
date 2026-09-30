@@ -74,6 +74,7 @@ _BINARY_PRECEDENCE = {
     "<=": 3,
     ">": 3,
     ">=": 3,
+    "in": 3,
     "+": 4,
     "-": 4,
     "|": 4,
@@ -259,7 +260,7 @@ def _tokenize_expression(text: str, source: str, line: int, column_offset: int =
                 tokens.append(_Token("LITERAL", True, column))
             elif lower == "false":
                 tokens.append(_Token("LITERAL", False, column))
-            elif lower in {"and", "or", "not"}:
+            elif lower in {"and", "or", "not", "in"}:
                 tokens.append(_Token("OP", lower, column))
             else:
                 tokens.append(_Token("IDENT", raw, column))

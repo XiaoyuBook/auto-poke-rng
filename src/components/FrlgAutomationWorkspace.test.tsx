@@ -26,9 +26,22 @@ function chooseGolbat() {
   change('火叶自动目标宝可梦', 'Golbat');
   fireEvent.click(screen.getByRole('button', { name: '完成设置' }));
 }
-afterEach(() => { cleanup(); delete window.desktop; });
+afterEach(() => { cleanup(); delete window.desktop; localStorage.clear(); });
 
 describe('real FRLG planner result contract', () => {
+  it('handles damaged saved options and restores expansion settings when switching saves', () => {
+    mockApi();
+    localStorage.setItem('auto-poke-frlg-run:' + profile.id, 'null');
+    localStorage.setItem('auto-poke-frlg-run:save-b', JSON.stringify({ entry: 'timeline', reverse_expansion_seed_tolerances: [2, 4, 8] }));
+    const view = render(<FrlgAutomationWorkspace profile={profile} />);
+    expect((screen.getByLabelText('脚本入口') as HTMLSelectElement).value).toBe('formal');
+    view.rerender(<FrlgAutomationWorkspace profile={{ ...profile, id: 'save-b' }} />);
+    expect((screen.getByLabelText('脚本入口') as HTMLSelectElement).value).toBe('timeline');
+    expect((screen.getByLabelText('三层 Seed 容差') as HTMLInputElement).value).toBe('2,4,8');
+    view.rerender(<FrlgAutomationWorkspace profile={profile} />);
+    expect((screen.getByLabelText('三层 Seed 容差') as HTMLInputElement).value).toBe('');
+  });
+
   it('shows static target attributes without inventing an uncomputed level', async () => {
     mockApi(starterPlan);
     render(<FrlgAutomationWorkspace profile={profile} />);
@@ -52,7 +65,7 @@ describe('real FRLG planner result contract', () => {
     }
     const { dunsparce_three_segment: _unused, ...request } = golbatPlan.request;
     expect(api.search).toHaveBeenCalledWith(request);
-    expect((screen.getByRole('button', { name: '开始运行' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: '开始运行' }) as HTMLButtonElement).disabled).toBe(false);
     expect(screen.queryByText('预检通过')).toBeNull();
     fireEvent.click(within(card).getByRole('button', { name: '查看方案详情' }));
     const dialog = screen.getByRole('dialog', { name: '火叶推荐方案详情' });
@@ -60,7 +73,7 @@ describe('real FRLG planner result contract', () => {
     expect(fields).toMatchObject({ 宝可梦: '大嘴蝠', 地点: '华蓝洞窟1F', 等级: '46', PID: 'EE2F781E', 闪光: '星形闪光', 性格: '勤奋', 特性: '精神力', 性别: '雌性', 隐藏力量: '超能力 · 68', '目标 Seed': '95594272', '初始 Seed': '7422', Advance: '25,296', 'Seed 模式': '0', SOUND: '单声道 (mono)', 'BUTTON MODE': '帮助 (h)', 'Seed 按键': 'A', 额外按键: '无', 总等待: '00:08:11.027' });
     expect(Object.values(fields)).not.toContain('—');
     expect(within(dialog).getByText(golbatPlan.warnings[0])).toBeTruthy();
-    expect(within(dialog).getByText('尚未生成运行脚本；未执行设备与脚本预检。')).toBeTruthy();
+    expect(within(dialog).getByText('开始运行时生成独立脚本，并检查标签、OCR、视频源和伊机控。')).toBeTruthy();
   });
 
   it('does not turn direct-mode filter placeholders into a calculated Pokémon', async () => {

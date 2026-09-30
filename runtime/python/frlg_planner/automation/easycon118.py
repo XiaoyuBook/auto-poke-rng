@@ -1,0 +1,5707 @@
+"""Generate and launch a configured 2.0 project on pinned EasyCon 1.6.4a."""
+
+import json
+import hashlib
+import re
+import shutil
+import struct
+import subprocess
+import sys
+from dataclasses import asdict, dataclass, replace
+from pathlib import Path
+from typing import Any
+
+from assets.game_text import CATEGORY_EN_TO_ZH, location_to_zh
+from app_paths import RESOURCE_ROOT
+from device_label_overrides import validate_project_overrides
+from fingerprint_policy import record_fingerprint_mismatch
+from tenlines_seed_updater import (
+    apply_easycon_seed_table_overrides,
+    decode_nx_seed_binary,
+    upgrade_easycon_seed_mode3_tables,
+)
+
+from .planner import RunPlan
+from .calibration_trust_gates import apply_calibration_trust_gates_text
+from .precalibration import (
+    DEFAULT_STORE_PATH as DEFAULT_PRECALIBRATION_STORE_PATH,
+    PrecalibrationContext,
+    normalize_kind as normalize_precalibration_kind,
+    read_record as read_precalibration_record,
+)
+from .seed_common_regions import apply_seed_common_regions
+
+
+EXPECTED_LABEL_COUNT = 1154
+EXPECTED_LABEL_METHODS = {1: 17, 3: 1, 5: 781, 11: 1, 14: 354}
+EXPECTED_LABEL_SHA256 = "4d99ab33920f8812dea403b4ab0680b40aabf1c4eb370e1a6678a193898429ac"
+EASYCON_BACKEND_NAME = "EasyCon 1.6.4a"
+EXPECTED_EZCON_VERSION = "1.6.4-a+9c86137c7e63bff842175470895727a5fa9bab52"
+EXPECTED_EZCON_SHA256 = "559b81c234d2548c439926a88f5355ccac0958b8a191c1ecca48b2c7c71c1260"
+EXPECTED_COMPAT_SOURCE_COMMIT = "9c86137c7e63bff842175470895727a5fa9bab52"
+EXPECTED_COMPAT_PATCH_ID = "easycon164a-label-supervision-v9"
+EXPECTED_TESSDATA_SHA256 = {
+    "frlg_battle.traineddata": "7abcaef4936727b33717656b38fd5b5027823e1cafec21abb06cc8ef1f7ff758",
+    "FRLG_EN_ALL.traineddata": "3272f23a6f259518813025d89be77d706574ccdf163132ccf6f5be15ca19cfa0",
+}
+EXPECTED_COMPAT_OCR_NATIVE_SHA256 = {
+    "x64/leptonica-1.82.0.dll": "dfcb3e6ed0b16bc55bfdbcf53543cfe42a354b87c3e35bd3a95eebf005d73e76",
+    "x64/tesseract50.dll": "de4d04ec75095374d98f5dd7a60d14d7e2e0f76589db693eccf7ae658be8cb2b",
+}
+DEFAULT_EZCON_PATH = (
+    Path.home()
+    / "Downloads"
+    / "伊机控-EasyCon-v1.6.4alpha测试版-260518"
+    / "publish"
+    / "ezcon.exe"
+)
+if getattr(sys, "frozen", False):
+    DEFAULT_EZCON_PATH = RESOURCE_ROOT / "easycon" / "publish" / "ezcon.exe"
+DEFAULT_COMPAT_RUNNER_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "runtime_backend"
+    / "easycon164a-cli-gui-rounding-selfcontained"
+    / "EasyCon2.CLI.PreviewV5.exe"
+)
+STANDARD_TEMPLATE_NAME = "NS火叶全自动一键乱数2.0.ecs"
+EGG_TEMPLATE_NAME = "NS火叶全自动一键乱数2.0-时间轴.ecs"
+EGG_FORMAL_WAIT_MARKER = "# FORMAL_EGG_WAIT_V1"
+EXPECTED_TEMPLATE_NAMES = (STANDARD_TEMPLATE_NAME, EGG_TEMPLATE_NAME)
+OPTIONAL_DIRECT_TEMPLATE_NAMES = (
+    "NS火叶全自动一键乱数2.0-正式版-170a.ecs",
+    "NS火叶全自动一键乱数2.0-170a.ecs",
+)
+PRECALIBRATION_RUNTIME_MARKER = "# GUI_PRECALIBRATION_V1"
+EXPECTED_SCRIPT_FILE_COUNT = 33
+EGG_PARENT_TYPES_COMMENT_OLD = (
+    '# 亲本A固定填写雌方或无性别方，亲本B固定填写雄方；性别填写 "雌" / "雄" / "无性别"。'
+)
+EGG_PARENT_TYPES_COMMENT_CURRENT = (
+    '# 亲本A/B类型填写 "雄" / "雌" / "无性别" / "百变怪"，顺序与 Ten Lines 保持一致。\n'
+    '# 合法组合为雄+雌，或恰好一只是百变怪。'
+)
+EGG_PARENT_PAIRING_OLD = '''    IF ($孵蛋亲本A性别 != "雌" and $孵蛋亲本A性别 != "无性别") or ($孵蛋亲本B性别 != "雄" and $孵蛋亲本B性别 != "无性别")
+        PRINT 孵蛋亲本性别填写无效: A填写雌或无性别，B填写雄或无性别
+        RETURN 0
+    ENDIF
+    IF $孵蛋亲本A性别 == "无性别" and $孵蛋亲本B性别 == "无性别"
+        PRINT 两只亲本不能同时填写无性别
+        RETURN 0
+    ENDIF'''
+EGG_PARENT_PAIRING_CURRENT = '''    IF ($孵蛋亲本A性别 != "雄" and $孵蛋亲本A性别 != "雌" and $孵蛋亲本A性别 != "无性别" and $孵蛋亲本A性别 != "百变怪") or ($孵蛋亲本B性别 != "雄" and $孵蛋亲本B性别 != "雌" and $孵蛋亲本B性别 != "无性别" and $孵蛋亲本B性别 != "百变怪")
+        PRINT 孵蛋亲本类型填写无效: 只能填写雄、雌、无性别或百变怪
+        RETURN 0
+    ENDIF
+    IF $孵蛋亲本A性别 != "百变怪" and $孵蛋亲本B性别 != "百变怪"
+        IF ($孵蛋亲本A性别 != "雄" or $孵蛋亲本B性别 != "雌") and ($孵蛋亲本A性别 != "雌" or $孵蛋亲本B性别 != "雄")
+            PRINT 孵蛋亲本组合无效: 需要雄+雌或一只百变怪
+            RETURN 0
+        ENDIF
+    ELSE
+        IF $孵蛋亲本A性别 == "百变怪" and $孵蛋亲本B性别 == "百变怪"
+            PRINT 孵蛋亲本组合无效: 两只百变怪不能孵蛋
+            RETURN 0
+        ENDIF
+    ENDIF'''
+# The legacy package is still accepted by the importer, then upgraded in the
+# ignored local cache.  Generators only run against the materialized corpus so
+# direct EasyCon execution and GUI-generated execution use the same fixes.
+LEGACY_SCRIPT_SHA256 = "7d5e13e4391d5bcc9045044544f409919a6f95c602e2ad0308313470ce23e625"
+# Previously audited corpora and the latest download package are accepted as
+# upgrade inputs. Keep them separate from the current fingerprint so existing
+# installations can be upgraded in place without accepting arbitrary changes.
+PREVIOUS_SCRIPT_SHA256S = (
+    # September 23 package: a roaming Pokemon that flees during an ordinary
+    # wild run invalidates only that round and triggers an automatic restart.
+    "3416e3867227ad7c022770140f4e7c000747882dd0949258a5f49f14470665c0",
+    "aea14e79615bfda89e1f7428014adc2dcc848005bd7ebad0bd170eac67703aef",
+    "fe0ae41be3fe035cbefec9afd525b968a070c8781a73595e1ae16b4cd1e2e839",
+    "43c3944bad75a1cb424203237b6aad51b351aa5c9bb81bfc6aa2c93ce96932cf",
+    # Download package with the egg candy navigation fix; importing it
+    # materializes the remaining 1.6.4-a runtime fixes below.
+    "cc11e48441fa58c06ea06d307bc868821477483f4a696e02e81779247891ff4f",
+    # Earlier download package after the latest egg-flow timing edits.
+    "cd263d5e94021df1fdfe68ae3da385f20c478d2f901fddd159f0922b263489f8",
+    # Earlier package with the audited egg wild reverse window raised to
+    # 6500 advances.
+    "407e3fde784c631e871c48f201759e29487cc3e3a10b301aac051cbede9f3385",
+    # Download package after adding cross-level IV-range intersection and
+    # preserving the current screen on terminal egg lookup failures.
+    "bf3601815339f253ca0ee0b354fdfb2c26c07a8840f01e7cc375843a14e353b7",
+    # Download package after adding Held/Pickup fixed pre-calibration and
+    # cross-round multi-candidate trajectory selection.
+    "48cdfb839a81333e6115c72adc3ea40bf8642b091fbf55d7b49dac76cba4556f",
+    # Download package that keeps the completed no-egg pre-calibration after
+    # a post-pickup Seed miss and retries generation/pickup directly.
+    "77bea49b62c909d105dd7b81529bbb3a8046d996781d68b2ebc479cd6096c841",
+    # Download package with the Ten Lines Held no-egg interval table used to
+    # leave stable no-egg regions during fine calibration.
+    "bdd0ecbb9644555dd9adad4834ce61fa2ab343fe90df9d429de4be5fb8da6dbc",
+    # Download package with the latest egg-flow updates imported on 2026-08-25.
+    "79c543b4b65cc85c3bced3e2bd15dedb26abcf4bff380d7c7c4e8b2f5cee7842",
+    # Download package where target-Seed no-egg evidence is accumulated even
+    # before Pickup stabilizes, allowing temporary Held no-egg interval exits.
+    "92f5870f09c28b55a583a9ea5ddf4d23a55af4e847220c0aade35d7e66bb52f5",
+    # Download package that preserves confirmed no-egg interval evidence across
+    # intervening non-target Seed rounds while the Held request is unchanged.
+    "4e00e389381ae92cf040ac1c620334b808758241e82fd50138ab3c5cb7e0c2f0",
+    # Download package where the egg timeline reuses the formal F1+1/F2-1
+    # parity phase for the normally parity-matched Held/Pickup deadlines.
+    "355c79d87d8272524cbbda0680f30d6de0d77d61b57046458c295e12f1275ac6",
+    # Download package where a residual odd Pickup phase uses the measured
+    # post-daycare X/B menu action and pre-deducts its 7 advances.
+    "e5a7c8312282070efe5bee72c0b3c5572c46c7ba4205a90188b39b792e228d95",
+    # Download package where the post-hit Seed hold advances on every trusted
+    # reverse lookup while only ±1 results vote on the correction direction.
+    "af0b4b16b6b90ba89ebbec3cc37b402b37b09196ba9bbbce8c6ffe94d2212123",
+    # Download package where the first valid HOME_BUFFER delay is locked for
+    # the run, then unlocked only after three consecutive recognition misses.
+    "5e6cc6db83a020b59d71993eff390c04681c9e251f5534412ee63c54d8b0a5f9",
+    # Download package with verified HOME recovery and unknown-state-safe
+    # 50 ms probing, without contradictory binary-search boundaries.
+    "0b4d7fdfc4370fd84f7956e12b001e867b7cbe40e13c39baf191dfc245b279a9",
+    # Mode 3 is stereo/HELP/Start; the LR/A column is no longer reused.
+    "1d8dc9f0b207c4f44f5a62a72cbcc6346aa28a1f0cdaa2cf6880f191430d6db1",
+    # Current download package: immediate no-egg Seed checks after Held calibration.
+    "0c011cb464ff3a83a9be379d9493455c2cd0075139626f28dad6c1e2b6ec3028",
+    # Egg wild verification adds one +5 Seed / +1000 upper-advance fallback.
+    "c4a1ca509199d1ad3c3589bb019d286b0c2cac5e52a51c0f70e7d297597b2c8a",
+    # Download package with the selectable current/fixed-user Seed startup path.
+    "e82ed39b65a5b4c8ee39287906d4317e58c84334c656f08a8cad6b31d8fde0f5",
+    # Download package with near-1113 Held recovery, anchor-first parity
+    # calibration, and dense same-parity fallback anchors.
+    "b256082acbc7823d172e0f8124fdd91e51331a08a045ad47209c8bfb950fd8e4",
+    # Version 2.0 package: formal/timeline entry logs now identify their
+    # version and script type explicitly.
+    "71dcb35840422e97ce64652ec801e771ee57524271bd84033ddd89a1f0fe160e",
+    # Version 2.0 package after renaming both entry filenames.
+    "f0a14ad634c8a00d9c9d74c8afee05a59721b72618952128582acd38061c37bf",
+    # Version 2.0 package with the direct timeline entry filename.
+    "531bd08e5ed39abaac7d694b2ec01ff429e5e0be5df5c279fc50dc067e2b7482",
+    # Version 2.0 package with the timeline-only entry removing the legacy TV
+    # runtime switch from both main entry paths.
+    "ac4481ebd8f0b3fd456a489b8ecf357f6fb4b583b37ac7e3ffdda66e2b5cfc1f",
+    # Version 2.0 package before the egg Held parity experiment switched from
+    # F1/F2 compensation to one generation-time X/B menu action.
+    "39a2f7a5046e2d1c7213b6689158402be8656fc5dd790bb73ed8a77c8390f15b",
+    # Version 2.0 package with the first generation-menu experiment: the
+    # physical +7 advance was still subtracted from both timing deadlines.
+    "e8b807402408c76cbbe204c0921422ee8ccbf43fd0d1f7e23428c065bc743d6d",
+)
+PREVIOUS_SCRIPT_SHA256S += (
+    # Version 2.0 package before the selectable log/parity/expansion fields.
+    "750eb3349405395edb1879c0bc12f8e53888e6e73d0efde223ae40f17f31530c",
+    # First Version 2.0 package with selectable log/parity/expansion fields.
+    "183393d7190add9aeb8ea806efcdd14590ee89c887f908abca66580ca928c191",
+    # Version 2.0 package before the latest upstream egg-flow edits.
+    "43a5a9c220db51177f4cc6a9171148a0094b63f3ba49a3d8eb339243203aeca2",
+    # Latest upstream package before per-axis calibration trust gates.
+    "4c3760ce6d96a80f70d1722122713787601c79e510019376edc83dc7703bb8e2",
+    # Package before starter paired final selection and measured menu budgeting.
+    "dc0249d5e3fe01cc7d89c23851eab16be3bb84d21805cb9a12d532b1bed7ceac",
+    # Package before frame hold required the same round to hit Seed and ADV.
+    "8d3d70aaa58bb809fe76cd5466623996f925829ea30200a09f5862d6258b57b8",
+    # Version 2.0 package before both egg parents exposed the Ten Lines Ditto
+    # type and validated the complete four-type parent pairing rules.
+    "208cbab1b9635c21873350a4891e90cc982fb59b26631f664eec6a8eed422b2f",
+    # September 16 source package before egg Held candidates were normalized
+    # and intersected across reverse-lookup rounds.
+    "79a7e2b9f3056057075564fbdd02aa495d87f52ee2fa9b0387fd6c2b1711153b",
+)
+PREVIOUS_SCRIPT_SHA256S += (
+    "d607e8a2702be9a7cacecb24cb0bdf59083188954c76b5196e2b7e23b62647db",
+    "1e0da82c8c4d9b64e9b8768079ac14ff98c84c0ead1b3d87486912940175a129",
+    # September 20 package before shiny recording/non-target shiny handling
+    # and the dark HOME-closing label were added upstream.
+    "a7789ecb4a89d57234ae69bd9dd877fad847861153a40d5b3a23a1a3439e56df",
+    # September 21 package before the Safari fishing route adopted the
+    # per-tile PyEasyCon movement model.
+    "331abc02c477bc018b7fe2d4c9bc7ff71206ed8fd666d5809589b06549446d79",
+    # September 22 package with adaptive frame-parity scheme 0; the
+    # ordinary F1/F2 parity offset advances after three target-Seed misses.
+    "bedcd4a3d33fab526a9fcc715cd6ab2325ef46272d0ab3f52167c4eae7b36bc1",
+    # September 24 package with registered label-wait failures for capture,
+    # Safari, egg restart, settings and pond checks without changing actions.
+    "3b18638522d1be9a5292a6d013da29902c903ed2bb51c83fcef137840683df3a",
+    # September 24 package with label-wait registration for HOME_BUFFER,
+    # Japanese starter reads, wild-name OCR and stat candidate fallbacks.
+    "5ab831733be435433f436f078d9ac94fe1b1008aa814231033d9fcfb1b761f03",
+    # September 26 package: keep the egg no-save message inside the egg
+    # completion branch and make formal fishing logs say ordinary fishing.
+    "0c081869fcae6dee8fb897136fcf577d316c026fe207bc332cff4238c740dc96",
+    # September 27 direct-run package with trusted Held +/-1 no-egg
+    # correction and recovery-attempt reset after an anchor is absorbed.
+    "8ab1f246c17805828a4b2008ba89ab5a9586d2cd34c9f70216658175b49a40aa",
+    # Equivalent direct-run corpus after removing the mistaken fixed-236
+    # experiment; dynamic Held/Pickup correction remains authoritative.
+    "52fd35b079b6d873a0160c77d958cb168bc2727c09c1cfcdfef96b148943d64d",
+    # Direct-run corpus with deterministic roaming summary navigation and
+    # the obsolete roaming-bicycle setup requirement removed.
+    "2bb95144cc8c2b7149af3a54d65d0470fd885b65be481b2d1ab2ef681c1586eb",
+    # Direct-run corpus with every fishing route using a registered rod,
+    # Teachy TV opened from Bag, and explicit post-catch cursor navigation.
+    "abc734a8f44ff152312bf3f62f5e8cc87194b13325bb3e2985f567a45325418b",
+)
+EXPECTED_SCRIPT_SHA256 = "eb18777c634b7c5ab10c0f5a930fe29d65b1fdca7d18edb10b461c733dd30bbb"
+# Previously materialized 1.6.4-a corpora remain accepted as audited
+# compatibility inputs. This is not a general bypass for modified ECS files.
+SUPPORTED_RUNTIME_SCRIPT_SHA256S = (
+    # Canonical corpus before the first/second/third Key Items shortcut
+    # labels were checked and corrected during the round-zero settings pass.
+    "95af0d033097233b4c273abeeaff96448fd9a8948532134f7f9b28031066f553",
+    # Canonical corpus before ordinary fishing passed its per-round Bag-TV
+    # wait into the helper explicitly and all Bag-TV exits became layer-safe.
+    "13c161b688aeee5cf78b2583920d9925ac8dcbaa4d7aef0b67a2beea19b5514e",
+    # September 27 materialization before the final roaming/fishing mother
+    # was re-imported through every existing 1.6.4-a compatibility transform.
+    "c6419713b40c79b33b813baab2e21ddc65c46bab32b34c50f5e8da37cce7e29c",
+    # Canonical corpus before fishing TV and rod shortcut roles were swapped.
+    "fb6e46385fe0e97e68bfa5fb5e365ab6ba2a9a6df75265ec43f70443d1408f77",
+    # Canonical materialization before roaming summary navigation stopped
+    # depending on the unrelated Teachy TV shortcut state.
+    "381b4703d9b183118f7bb38a74cbb3775483c8221f5600f1d07642d699e336c3",
+    # Canonical corpus before the Held no-egg deadlock fix.  Keep accepting
+    # installed caches while newly bundled projects use the corrected mother.
+    "6a0afe3ff17890c9387f53efa6cd364f052b342a7a916a5efe8e1213a406a750",
+    # Local canonical mother immediately before the trusted Held +/-1
+    # no-egg evidence and recovery-attempt reset were added.
+    "03047c6bed6c67bbff7830fa17496c70d482b17e660574b4c49dbf9b212dc693",
+    # Materialized counterpart of the September 27 direct-run package.
+    "866fa5e0bae2c26a5b5f753de22c6d9088d43d99c092b65e64a81f4a3c3c58d3",
+    # Canonical corpus before the egg flow was promoted to the formal WAIT entry.
+    "36c83915f208741608d278c17754deae7951c3389b3a3f1e450694c687f66003",
+    # Canonical corpus before the fixed user-selection HOME startup A/B was added.
+    "bde2ffddbb42b6c71b2494968c2ccfb8d04291ea3f3c6c755fa79ac825aba923",
+    # Canonical corpus before the no-egg escape switched from whole-envelope
+    # fitting to a same-parity point target.
+    "2ad7486f7be10e46fe57ca61d26065722340c6522907f8d7f084637161bb03f2",
+    # Cross-method confirmation before no-egg destination parity was enforced.
+    "208cc09726ca7f902ee1374f0103d88bd245938e028969d6e45073c84ef398c9",
+    # Canonical corpus before cross-method Egg confirmation and no-egg
+    # prediction-envelope jumps were added.
+    "910667b1bb4f82f5ee82767db5d3b9dbf0f272c4cb2feb78cde4fbc5d5066bbf",
+    # Paired, bounded 2D common regions (direct source and materialized tool).
+    "c83b9a4b11c15aea37bc824f758e7f6c316b89d0dda15dbf460085e3c36925ad",
+    "f0220899d797bc94b1d3cd7e30e82db24452b696e6ba3aa4345995e69b77e50c",
+    "3527aaa13ac30108c93699b8566353627d740f5e9dc7dc2becfd6aa7b50da946",
+    "04514280811922c6b0809c0e61f1395a0b172d6197703f4a905b92a412e84db2",
+    "3df6f91b12901b488f84b07ecde2ba9a45b9ee5638f76b2b28d6fe9b906a7ccc",
+    "b7d3cf56cc3018522548514a279a950176b136c938dcceda90f60b9b133d2d57",
+    # In-place upgrade of the existing local cache has equivalent HOME_BUFFER
+    # functions but retains its historical global-declaration ordering.
+    "272406a322605609787af5dd29af9a0203e22b0aed7d2d40c38a4a870122b476",
+    # Previous canonical corpus before later upstream egg-flow updates.
+    "b0941989541991148e075926775f35bac301b524587048ba741a52f7f01da1b4",
+    # Materialized corpus before the Held no-egg interval table was added.
+    "74b4a3ecce59e3817699ee8dece2594d67f48bad08b33068358c45b74aaf6e9e",
+    # Materialized corpus before post-pickup Seed failures began preserving
+    # the completed no-egg pre-calibration.
+    "1700ba02cc60fdfd9857f14a2a8384c5736c06908a92e468d1dfd721a9be4865",
+    # Materialized corpus before the opt-in HOME_BUFFER stable-low-score
+    # classifier was added to both entry scripts.
+    "da32012466a7349113ff166cf158c39dd721fc6e33c8d84355b9747cd7888f86",
+    "1ea3bd0ba820e3cb3b1b8616f24e7e8d23b87767b23c49c77cc0a187c2037f73",
+    "30fea007607c06d69efdefe256c4b4a639d865854ca94da8afe309eaf0272451",
+    "4843f4044e69dc4bc0eb2f3506490651589e531fe2d3b2bad905a6b977c3eec0",
+    # Importer materialization adds one controlled trailing newline to the
+    # timeline entry while applying the reviewed 1.6.4-a fixes.
+    "316c6aa9b6f05adeef0d7f306032b7ae553779d6a86848ae301aa981fd9a8188",
+    # Materialized corpus for the latest imported egg-flow package.
+    "96882c1d918d9996fc7893051941729f8bdf0a9babc3cab3d8a9eda2ebde3aac",
+    # Materialized corpus with same-Held no-egg evidence retention.
+    "961e7eb688ae10479a8335ae71771c3462bb3adf2ed3b8d2e27102a886e050fd",
+    # Materialized corpus with the formal parity overlay in the egg timeline.
+    "4a706951d032ed806c665889720cb235f72320d695dd60de3a782b23297bbd7d",
+    # Materialized corpus with the Pickup 7-advance menu parity overlay.
+    "4290019dc8c28deed87f647f72b0f65b56f8564cd9faf89688ec7955d41f4dc4",
+    # Materialized corpus with bounded ten-observation Seed hold windows.
+    "1240aeeb1e44d467f2074d1dced2ef650e1b89068f913c10b382817c45b4a79a",
+    # Materialized corpus with HOME_BUFFER run locking, three-miss unlocks,
+    # and a 50 ms minimum search adjustment in both entry scripts.
+    "a3e6eedb7e35efcf8dc8c0ed0866a96efd66bc7e032411f296d9aa6801115a9c",
+    # Local materialized corpus with cross-round Seed hit-range clustering.
+    "419b599234a28c23611f60fac558f963d87d12adb641feaef115a8c1e00935bc",
+    # Materialized corpus with generated near/dense Held recovery anchors and
+    # anchor-first parity/numeric calibration before returning to the target.
+    "e3bb467b21f14b7e16838ffdbbb67061c721f3dc5e0410ab0685196782ce1a62",
+    # Materialized corpus with the static Togepi-only 14-step bicycle cycle
+    # and Dex-only starter classification.
+    "4a0417d61a379275e14fd6fc3df92cf9036cda8a5f8022384c96ae7043699983",
+    # Version 2.0 materialized corpus with explicit formal/timeline log tags.
+    "79d375baf43d0086947af4f395108ebd1ba023dee0a33e69b8b3d08060d6eb33",
+    # Version 2.0 materialized corpus after renaming both entry filenames.
+    "6c009e75c468e0ad224ce392c8912c2ff286f9882994055afc2b8103a12b2e59",
+    # Version 2.0 materialized corpus with the direct timeline entry filename.
+    "9c6d8804a76f305ae848498280c8e48d8444b288cd22a4be4bd3074f48c3294a",
+    # Version 2.0 materialized corpus with the timeline-only entry removing
+    # the legacy TV runtime switch from both main entry paths.
+    "f307167e9c9e19e9de6910caf21f28fd83e54fd3b5f16144b78b92393a06bece",
+    # Materialized corpus for the timeline-only egg generation parity menu;
+    # the formal entry keeps its original F1/F2 behavior and passes menu=0.
+    "e1408185eb0cdc8270002544cab98c2590d6ad15d0ce048e2c842ec833bdcf2b",
+    # Current Version 2.0 corpus: generation-menu timing no longer subtracts
+    # the physical +7 twice, and Pickup uses its measured -1 net effect.
+    "93f09eaf6229fc810da98957f9979bfc0d3d2abd9925d54e80006132169bfccb",
+    # Version 2.0 corpus with selectable script logging, parity adjustment,
+    # and three user-configurable reverse-lookup expansion windows.
+    "f16d0824459e71a56d4efb0b644784fc7f47e50efb9b628c46aa9c019e8eca27",
+    # Version 2.0 materialization before the restart-overlay marker was renamed.
+    "595819c0323db072d5845ef1ba4b9bb73ab7c83fff0fad25bd7f88c3c47509a2",
+    # Current Version 2.0 materialization with all user-facing script version
+    # text normalized while retaining legacy-overlay migration support.
+    "5c292a2139ac6ed86fe3e75a3c9885a1ad1d1334cc53c0f76ff5db00ff1cb6cd",
+    # Current materialization after the remaining repository overlays were
+    # normalized to the 2.0 user-facing version name.
+    "4f78b8f30219092e4608eb342d63fd8fde76cbaf9e112b2df17a271ea949008c",
+    # Current Version 2.0 materialization with per-axis calibration trust
+    # gates and the upstream Togepi post-pickup Seed verification helpers.
+    # Diagnostic candidates remain visible but cannot drive an untrusted
+    # Seed, TV-frame or remaining-frame controller.
+    "98efbac0927f5cd9998b3dd85b375459cf2430d508bcc1ea757217e84fdbe1ae",
+    # Starter final selection uses current paired evidence before calibration;
+    # formal menu elapsed time is included in its F2 wait budget.
+    "81599b13fc46ccc301d5e43411cfc04040a548a6e1d10927c35c6cbb187b8d88",
+    # Frame hold now starts only on a trusted same-round Seed+ADV exact hit.
+    "f2b2c1c3efbd9d67fbe699c4a9f026b43c8e8486380768165b30af4dd3a13a0f",
+    # Current materialization with complete Ten Lines parent types, including
+    # Ditto, in both egg entry-script validations.
+    "9a9bb56a2b9f380f7f57301fa1741938811127bec8a60656e92e5ad35ef28724",
+    # Starter common-region scanning, collection, scoring and submission are
+    # isolated from normal targets in both direct-run 2.0 entries.
+    "5fb10f4c1e91756ac69ea51b190c3823c88947bfcc0773c250efe82bf304edab",
+    # September 12 source sync: NX-aware blackout/egg startup, counted roamer
+    # route, and upstream first-hit majority/logging preserved by overlays.
+    "f4b90d479dc4d5c02c5572580aa3321ffaa252d7f5b49c35ac814733624d5f65",
+    # September 16 source sync: NX-specific HOME_BUFFER, Safari first-round
+    # TV startup guard, and current Seed table metadata without backups.
+    "c31a0e05b72885ff03e4e98e5bdaca2ec92f7affcf26e2f0fd6e62d3efcfc1da",
+    # Egg Held candidates from all four methods are normalized by the actual
+    # per-round correction and intersected before consuming another anchor.
+    "1fb41159f4b585c1a3e6a355a867f0b62c8660d5ce06b23c6a987c7098525209",
+    # September 21 materialization adds optional shiny video capture,
+    # non-target wild shiny stopping and the dark HOME-closing label.
+    "6ea987719a9837b42bb1008a353abd3e1516031445e588272a110b77c1d02473",
+    # Current materialization additionally uses the per-tile Safari fishing
+    # entry route from the latest upstream wild-target library.
+    "2f47da7a92a1a2e2de7842e3b663512fbddaacd97c8cb78ac1e70f8756c243fa",
+    # September 22 materialization with adaptive frame-parity scheme 0.
+    "2427104527607ab470756b8a2fdf75d02537580177b3dac0887c8f17680555b1",
+    # Ordinary menu parity pre-deducts the measured 128 advances, while
+    # starters keep their independent timing model; 5+ ambiguous candidates
+    # can use the paired cross-round common-region fallback.
+    "38d1e97107d9f5a67d44dbed176538d49b6709fb35ac0c22c75e797d30a16e69",
+    # Materialized counterpart of the roaming-encounter retry policy.
+    "744de89df74600a604c8b8a0fa27b909ce1a6e470af8d7ec54809f751ad0e9c9",
+    # Local materialization with supervised capture turns and bounded egg
+    # restart, settings, pond-surf and battle-result waits.
+    "72db7407b63fdd388d90df2bf06015505c940a5f4af0daede65723c6c5c74747",
+    # September 24 materialization with HOME_BUFFER, Japanese starter,
+    # wild-name OCR and stat-candidate stages.
+    "95c6e2924217fd40615ae8785df42ccc3eeb02d8d8381c4bf2f7664ea5a4578f",
+    # September 26 materialization of the corrected formal/timeline logging.
+    "f6287406e4a7c3b04baee4cbcddabca07e8f1d192a8503b1a0e3491251527416",
+)
+
+
+def is_supported_runtime_script_sha256(sha256: str) -> bool:
+    """Return whether a script corpus is an audited generator/runtime input."""
+    return sha256 in {
+        EXPECTED_SCRIPT_SHA256,
+        *SUPPORTED_RUNTIME_SCRIPT_SHA256S,
+    }
+
+
+def is_supported_script_input_sha256(sha256: str) -> bool:
+    """Return whether an imported source corpus is an audited upgrade input."""
+    return sha256 in {
+        LEGACY_SCRIPT_SHA256,
+        *PREVIOUS_SCRIPT_SHA256S,
+        EXPECTED_SCRIPT_SHA256,
+        *SUPPORTED_RUNTIME_SCRIPT_SHA256S,
+    }
+EASYCON118_EXTENSION_LABEL_DIR = (
+    Path(__file__).resolve().parents[1]
+    / "assets"
+    / "easycon118_extensions"
+)
+# PyInstaller can preserve the bytes of non-ASCII asset names while exposing
+# a mojibake filename on some Windows extraction/build paths.  The bundled
+# The 2.0 label corpus is also shipped under ``local_assets`` with the exact
+# EasyCon names, so use it as a deterministic fallback for the two labels
+# injected into generated projects.
+EASYCON118_LOCAL_LABEL_DIR = (
+    RESOURCE_ROOT / "local_assets" / "easycon118" / "ImgLabel"
+)
+EASYCON118_EXTENSION_LABEL_NAMES = (
+    "闪公图标.IL",
+    "冲浪.IL",
+    "正在关闭_暗.IL",
+    "快捷第一位.IL",
+    "快捷第二位.IL",
+    "快捷第三位.IL",
+)
+SHORTCUT_REGISTRATION_MAIN_PATH = (
+    EASYCON118_EXTENSION_LABEL_DIR / "shortcut_registration_main.ecs"
+)
+SHORTCUT_REGISTRATION_EGG_PATH = (
+    EASYCON118_EXTENSION_LABEL_DIR / "shortcut_registration_egg.ecs"
+)
+EGG_SETTINGS_OVERRIDE_PATH = (
+    EASYCON118_EXTENSION_LABEL_DIR
+    / "egg_settings_retry.ecs"
+)
+EGG_RESTART_OVERRIDE_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "assets"
+    / "easycon118_extensions"
+    / "egg_restart_original_flow.ecs"
+)
+EGG_HOME_BUFFER_OVERRIDE_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "assets"
+    / "easycon118_extensions"
+    / "egg_home_buffer_refine.ecs"
+)
+HOME_BUFFER_ADAPTIVE_CLASSIFIER_PATH = (
+    EASYCON118_EXTENSION_LABEL_DIR / "home_buffer_adaptive_classifier.ecs"
+)
+STANDARD_HOME_BUFFER_OVERRIDE_PATH = (
+    EASYCON118_EXTENSION_LABEL_DIR / "home_buffer_standard_adaptive.ecs"
+)
+HOME_BUFFER_RECOVERY_PATH = (
+    EASYCON118_EXTENSION_LABEL_DIR / "home_buffer_recovery.ecs"
+)
+EGG_PARTY_SLOT_MAIN_OVERRIDE_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "assets"
+    / "easycon118_extensions"
+    / "egg_party_slot_main.ecs"
+)
+EGG_PARTY_SLOT_CANDY_OVERRIDE_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "assets"
+    / "easycon118_extensions"
+    / "egg_party_slot_candy.ecs"
+)
+EGG_SURF_BATTLE_OVERRIDE_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "assets"
+    / "easycon118_extensions"
+    / "egg_surf_battle_retry.ecs"
+)
+EGG_SEED_CONTROLLER_OVERRIDE_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "assets"
+    / "easycon118_extensions"
+    / "egg_seed_controller_main.ecs"
+)
+SEED_LOCK_CONTROLLER_OVERRIDE_PATH = (
+    EASYCON118_EXTENSION_LABEL_DIR / "seed_lock_controller_main.ecs"
+)
+EGG_FORMAL_PARITY_OVERRIDE_PATH = (
+    EASYCON118_EXTENSION_LABEL_DIR / "egg_formal_parity_main.ecs"
+)
+EGG_HATCH_EXIT_OVERRIDE_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "assets"
+    / "easycon118_extensions"
+    / "egg_hatch_exit_retry.ecs"
+)
+TOGEPI_HATCH_CYCLE_OVERRIDE_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "assets"
+    / "easycon118_extensions"
+    / "togepi_hatch_cycle.ecs"
+)
+PARTY_SUMMARY_NAVIGATION_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "assets"
+    / "easycon118_extensions"
+    / "party_summary_up_navigation.ecs"
+)
+OCR_NAME_LIBRARY_NAME = "19_OCR_GEN3战斗场景名称.ecs"
+OCR_RUNTIME_FALLBACK_MARKER = "# GUI 运行时覆盖：OCR 不可用时直接回到单字识别"
+OCR_NAME_ORIGINAL_FUNCTION = "FUNC OCR识别抓捕对象名称(): STRING"
+OCR_NAME_NEXT_FUNCTION = "FUNC OCR最小3"
+WILD_PID_RETRY_LIMIT_MARKER = "# GUI 运行时覆盖：野生 PID 尝试上限"
+WILD_PID_RETRY_LIMIT_IMPORTED = "$野生PID尝试上限 = 1000"
+WILD_PID_RETRY_LIMIT_RUNTIME = "$野生PID尝试上限 = 200"
+OCR_RUNTIME_FALLBACK_FUNCTION = """\
+# GUI 运行时覆盖：OCR 不可用时直接回到单字识别
+FUNC OCR识别抓捕对象名称(): STRING
+
+    $name = OCR(310, 141, 360, 53, "frlg_battle")
+    IF $name == "OCR NOT SUPPORT"
+        PRINT ""
+        PRINT 【OCR名称识别】
+        PRINT "OCR原文:" & $name
+        PRINT OCR运行时不可用，跳过名称后处理
+        RETURN ""
+    ENDIF
+    IF $name == "OCR ARGS ERR!"
+        PRINT ""
+        PRINT 【OCR名称识别】
+        PRINT "OCR原文:" & $name
+        PRINT OCR区域参数无效，跳过名称后处理
+        RETURN ""
+    ENDIF
+
+    $fixedName = OCR名称V2后处理($name)
+
+    PRINT ""
+    PRINT 【OCR名称识别】
+    PRINT "OCR原文:" & $name
+    PRINT "后处理:" & $fixedName
+
+    RETURN $fixedName
+ENDFUNC
+"""
+EGG_SETTINGS_LIBRARY_NAME = "27_孵蛋测试流程.ecs"
+EGG_SETTINGS_OVERRIDE_MARKER = "# GUI 孵蛋运行时覆盖：游戏设置 OCR 使用有限重试"
+EGG_SETTINGS_NEXT_FUNCTION = "FUNC 孵蛋测试_执行前置准备"
+SHORTCUT_REGISTRATION_MAIN_MARKER = (
+    "# 1.6.4-a 第0轮快捷登记检查：重要道具第1项TV、第2项自行车、第3项当前钓竿。"
+)
+SHORTCUT_REGISTRATION_EGG_MARKER = (
+    "# 1.6.4-a 孵蛋前快捷登记检查：重要道具第2项必须是已登记的自行车。"
+)
+SHORTCUT_REGISTRATION_SETTINGS_FUNCTION = "FUNC 检查并校正游戏设置(): INT"
+SHORTCUT_REGISTRATION_MAIN_CALL_ANCHOR = """\
+    $游戏设置目标按键 = 0
+
+    # 模式0-9均使用HELP；模式3为STEREO/HELP/START；模式10为日版MONO/HELP/A。
+"""
+SHORTCUT_REGISTRATION_MAIN_CALL_PREVIOUS = """\
+    $游戏设置目标按键 = 0
+
+    # 按本轮流程自动检查并切换重要道具快捷登记。
+    $游戏设置快捷目标位 = 取当前流程快捷登记目标()
+    $游戏设置快捷结果 = 检查并校正快捷登记($游戏设置快捷目标位, $游戏设置识图阈值)
+    IF $游戏设置快捷结果 == 0
+        RETURN 0
+    ENDIF
+
+    # 模式0-9均使用HELP；模式3为STEREO/HELP/START；模式10为日版MONO/HELP/A。
+"""
+SHORTCUT_REGISTRATION_MAIN_CALL_BLOCK = """\
+    $游戏设置目标按键 = 0
+
+    # 按本轮流程自动检查并切换重要道具快捷登记。
+    $游戏设置快捷目标位 = 取当前流程快捷登记目标()
+    $游戏设置快捷结果 = 检查并校正快捷登记($游戏设置快捷目标位, $游戏设置识图阈值)
+    IF $游戏设置快捷结果 == 0
+        RETURN 0
+    ENDIF
+    IF $游戏设置快捷结果 == 2
+        # 快捷登记属于存档状态；必须走本函数的保存/重启分支才能保留。
+        $游戏设置已修改 = 1
+    ENDIF
+
+    # 模式0-9均使用HELP；模式3为STEREO/HELP/START；模式10为日版MONO/HELP/A。
+"""
+SHORTCUT_REGISTRATION_OPTIONS_ORIGINAL = """\
+    X
+    WAIT 500
+    IF 是否御三家目标() == 1
+"""
+SHORTCUT_REGISTRATION_OPTIONS_CURRENT = """\
+    X
+    WAIT 500
+    # 快捷登记检查会改变主菜单记忆位置，进入Options前统一夹到顶部。
+    FOR 8
+        UP
+        WAIT 100
+    NEXT
+    IF 是否御三家目标() == 1
+"""
+SHORTCUT_REGISTRATION_EGG_CALL_MARKER = (
+    "    $孵蛋库_快捷登记结果 = 孵蛋测试_检查并登记自行车快捷($识图阈值)\n"
+)
+SHORTCUT_REGISTRATION_EGG_CALL_ANCHOR = """\
+    PRINT 【孵蛋准备】按 Seed模式检查游戏设置
+    X
+    WAIT 500
+    FOR 5
+"""
+SHORTCUT_REGISTRATION_EGG_CALL_BLOCK = """\
+    PRINT 【孵蛋准备】按 Seed模式检查游戏设置
+    $孵蛋库_快捷登记结果 = 孵蛋测试_检查并登记自行车快捷($识图阈值)
+    IF $孵蛋库_快捷登记结果 == 0
+        RETURN 0
+    ENDIF
+
+    X
+    WAIT 500
+    # 快捷登记检查会改变主菜单记忆位置，进入Options前统一夹到顶部。
+    FOR 8
+        UP
+        WAIT 100
+    NEXT
+    FOR 5
+"""
+SHORTCUT_REGISTRATION_REQUIREMENT_ANCHOR = (
+    "    PRINT 背包第一页第一格放神奇糖果，数量不限\n"
+)
+SHORTCUT_REGISTRATION_REQUIREMENT_BLOCK = """\
+    PRINT 背包第一页第一格放神奇糖果，数量不限
+    PRINT 重要道具固定顺序: 第1项Teachy TV，第2项自行车，钓鱼时第3项放本次使用的钓竿
+    PRINT 第0轮会按当前流程自动检查并切换快捷登记
+"""
+SHORTCUT_REGISTRATION_REQUIREMENT_REPLACEMENTS = (
+    (
+        "PRINT Teachy TV放在背包第二页第一格，不要登录快捷键",
+        "PRINT 重要道具第1项放Teachy TV；本流程不登记TV快捷键",
+    ),
+    (
+        "PRINT Teachy TV登录快捷键",
+        "PRINT 重要道具第1项放Teachy TV，第0轮自动登记第1项",
+    ),
+    (
+        "PRINT 背包第二页第四格放自行车",
+        "PRINT 重要道具第2项放自行车",
+    ),
+    (
+        "PRINT 自行车登录快捷键",
+        "PRINT 重要道具第2项放自行车，第0轮自动登记第2项",
+    ),
+    (
+        "PRINT 破旧钓竿登录快捷键",
+        "PRINT 重要道具第3项放破旧钓竿，第0轮自动登记第3项",
+    ),
+    (
+        "PRINT 好钓竿登录快捷键",
+        "PRINT 重要道具第3项放好钓竿，第0轮自动登记第3项",
+    ),
+    (
+        "PRINT 厉害钓竿登录快捷键",
+        "PRINT 重要道具第3项放厉害钓竿，第0轮自动登记第3项",
+    ),
+)
+EGG_RESTART_OVERRIDE_MARKER = "# GUI 孵蛋运行时覆盖：按 2.0 顺序关闭游戏，优先处理退出状态"
+EGG_RESTART_LEGACY_OVERRIDE_MARKER = "# GUI 孵蛋运行时覆盖：按 1.1.8 原版顺序关闭游戏，优先处理退出状态"
+EGG_RESTART_ORIGINAL_FUNCTION = "FUNC 孵蛋测试_关闭游戏"
+EGG_RESTART_NEXT_FUNCTION = "FUNC 孵蛋测试_软重启并跳过回忆"
+EGG_RESTART_GLOBALS = """\
+$孵蛋库_重启识别尝试 = 0
+$孵蛋库_已请求主页 = 0
+"""
+EGG_HOME_BUFFER_OVERRIDE_MARKER = "# GUI 孵蛋运行时覆盖：按当前 NX 机型二分查找 HOME_BUFFER 窗口"
+EGG_HOME_BUFFER_ORIGINAL_FUNCTION = "FUNC HOME_BUFFER\n"
+EGG_HOME_BUFFER_NEXT_FUNCTION = "FUNC 各阶段脚本固定延迟转帧数"
+HOME_BUFFER_ADAPTIVE_CLASSIFIER_MARKER = "# 1.6.4-a HOME_BUFFER 稳定低分自适应"
+STANDARD_HOME_BUFFER_OVERRIDE_MARKER = "# 1.6.4-a 正式版 HOME_BUFFER"
+HOME_BUFFER_ADAPTIVE_SWITCH = "HOME_BUFFER稳定低分自适应"
+EGG_PARTY_SLOT_MAIN_OVERRIDE_MARKER = "# GUI 孵蛋运行时覆盖：按目标身份选择队伍末位或固定槽位"
+EGG_PARTY_SLOT_MAIN_ORIGINAL_FUNCTION = "FUNC 孵蛋流程_选择队伍槽"
+EGG_PARTY_SLOT_MAIN_NEXT_SECTION = "# -------------------- 野生Seed验证"
+EGG_PARTY_SLOT_MAIN_EGG_FUNCTION = "FUNC 孵蛋流程_执行蛋个体反查(): INT"
+EGG_PARTY_SLOT_MAIN_EGG_NEXT_SECTION = "# -------------------- 总控与重试"
+EGG_REVERSE_LOOKUP_POLICY_MARKER = "# GUI 孵蛋反查覆盖：四方法候选全部合并确认"
+EGG_REVERSE_LOOKUP_LEGACY_POLICY_MARKER = "# GUI 孵蛋反查覆盖：Normal 优先，方法候选不跨算法累加"
+EGG_REVERSE_LOOKUP_WINDOW_MARKER = "# GUI 孵蛋反查覆盖：固定帧窗，不再扩展"
+EGG_REVERSE_LOOKUP_METHOD_COMMENT = "# FRLG常用Split优先；Split有候选时不再混入其他方法，避免扩大歧义。"
+EGG_PARTY_SLOT_CANDY_OVERRIDE_MARKER = "# GUI 孵蛋运行时覆盖：神奇糖果按目标身份选择队伍末位或固定槽位"
+EGG_PARTY_SLOT_CANDY_ORIGINAL_FUNCTION = "FUNC 孵蛋测试_使用神奇糖果指定槽"
+EGG_SURF_BATTLE_OVERRIDE_MARKER = "# GUI 孵蛋运行时覆盖：识别冲浪结束后再打开菜单，并在名称 OCR 前确认已进入野生战斗"
+EGG_SURF_BATTLE_ORIGINAL_FUNCTION = "FUNC 孵蛋测试_前往池塘并甜甜香气抓捕"
+EGG_SURF_BATTLE_NEXT_FUNCTION = "FUNC 孵蛋测试_执行骑车孵化"
+EGG_SEED_CONTROLLER_OVERRIDE_MARKER = "# GUI 孵蛋运行时覆盖：复用 Seed 锁定、固定半步与方案2方向票接续控制器"
+EGG_SEED_CONTROLLER_ORIGINAL_FUNCTION = "FUNC 孵蛋流程_按观测Seed校正等待"
+EGG_SEED_CONTROLLER_NEXT_SECTION = "# -------------------- 蛋个体反查"
+SEED_HOLD_OBSERVATION_MARKER = "# 保持窗口按每次可信Seed反查推进；超出±1只占观察次数，不投方向票。"
+SEED_HOLD_OBSERVATION_FUNCTION = "FUNC 计算Seed锁定众数修正(): INT"
+SEED_HOLD_OBSERVATION_OLD_GLOBAL = "$Seed命中保持样本数 = 10"
+SEED_HOLD_OBSERVATION_GLOBAL_ANCHOR = "$Seed命中保持样本数 = 5"
+SEED_HOLD_OBSERVATION_MIN_GLOBAL = "$Seed命中保持最少方向样本数 = 3"
+SEED_SCHEME2_CONTINUATION_GLOBAL_ANCHOR = "$Seed命中保持本轮刷新 = 0"
+SEED_SCHEME2_CONTINUATION_GLOBALS = """\
+$方案2Seed接续启用 = 0
+$方案2Seed接续正方向票数 = 0
+$方案2Seed接续负方向票数 = 0"""
+SEED_HOLD_OBSERVATION_DIRECT_HALF_MARKER = "连续5次未命中，按±1多数方向直接固定半步微调"
+SEED_HOLD_OBSERVATION_OLD_BRANCH = """\
+        ELIF $Seed差绝对 == 1
+            $Seed锁定本轮样本计入 = 1
+            IF $Seed命中保持启用 == 1
+                $Seed命中保持计数 = $Seed命中保持计数 + 1
+                IF $命中差索引 > 0
+                    $Seed命中保持正方向票数 = $Seed命中保持正方向票数 + 1
+                ELSE
+                    $Seed命中保持负方向票数 = $Seed命中保持负方向票数 + 1
+                ENDIF
+            ELSE
+                $Seed锁定窗口[$Seed锁定窗口样本数] = $命中差索引
+                $Seed锁定窗口样本数 = $Seed锁定窗口样本数 + 1
+                $Seed锁定窗口指针 = $Seed锁定窗口样本数
+            ENDIF
+        ELSE
+            # 已经收敛到±1后，偶发大偏差视为机器波动：不修正，也不占5次/10次有效样本。
+            $Seed锁定本轮大波动忽略 = 1
+            $Seed修正模式文本 = "Seed已锁定，忽略本轮超出±1的机器波动"
+            RETURN 0
+        ENDIF
+"""
+SEED_HOLD_OBSERVATION_CURRENT_BRANCH = """\
+        ELIF $Seed命中保持启用 == 1
+            # 保持窗口按每次可信Seed反查推进；超出±1只占观察次数，不投方向票。
+            $Seed命中保持计数 = $Seed命中保持计数 + 1
+            IF $Seed差绝对 == 1
+                $Seed锁定本轮样本计入 = 1
+                IF $命中差索引 > 0
+                    $Seed命中保持正方向票数 = $Seed命中保持正方向票数 + 1
+                ELSE
+                    $Seed命中保持负方向票数 = $Seed命中保持负方向票数 + 1
+                ENDIF
+            ELSE
+                $Seed锁定本轮大波动忽略 = 1
+            ENDIF
+        ELIF $Seed差绝对 == 1
+            $Seed锁定本轮样本计入 = 1
+            $Seed锁定窗口[$Seed锁定窗口样本数] = $命中差索引
+            $Seed锁定窗口样本数 = $Seed锁定窗口样本数 + 1
+            $Seed锁定窗口指针 = $Seed锁定窗口样本数
+        ELSE
+            # 非保持期仍只收集±1微调样本；偶发大偏差不修正，也不占5次方向窗口。
+            $Seed锁定本轮大波动忽略 = 1
+            $Seed修正模式文本 = "Seed已锁定，忽略本轮超出±1的机器波动"
+            RETURN 0
+        ENDIF
+"""
+SEED_HOLD_OBSERVATION_OLD_DECISION = """\
+    IF $Seed命中保持启用 == 1
+        IF $Seed命中保持计数 < $Seed命中保持样本数
+            $Seed修正模式文本 = "目标Seed参数保持中：" & $Seed命中保持计数 & "/" & $Seed命中保持样本数
+            RETURN 0
+        ENDIF
+        IF $Seed命中保持正方向票数 == $Seed命中保持负方向票数
+            # 10次出现5比5时没有唯一最多方向，继续保持并重新收集，避免任意选边。
+            $Seed命中保持计数 = 0
+            $Seed命中保持正方向票数 = 0
+            $Seed命中保持负方向票数 = 0
+            $Seed修正模式文本 = "目标Seed保持10次后方向5比5，继续保持重新采样"
+            RETURN 0
+        ENDIF
+"""
+SEED_HOLD_OBSERVATION_CURRENT_DECISION = """\
+    IF $Seed命中保持启用 == 1
+        IF $Seed命中保持计数 < $Seed命中保持样本数
+            IF $Seed锁定本轮大波动忽略 == 1
+                $Seed修正模式文本 = "目标Seed参数保持中：" & $Seed命中保持计数 & "/" & $Seed命中保持样本数 & "；本轮大波动不投方向票"
+            ELSE
+                $Seed修正模式文本 = "目标Seed参数保持中：" & $Seed命中保持计数 & "/" & $Seed命中保持样本数
+            ENDIF
+            RETURN 0
+        ENDIF
+        $Seed锁定方向票数 = $Seed命中保持正方向票数 + $Seed命中保持负方向票数
+        IF $Seed锁定方向票数 < $Seed命中保持最少方向样本数
+            $Seed命中保持计数 = 0
+            $Seed命中保持正方向票数 = 0
+            $Seed命中保持负方向票数 = 0
+            $Seed修正模式文本 = "目标Seed保持10次后±1方向样本不足3，继续保持重新采样"
+            RETURN 0
+        ENDIF
+        IF $Seed命中保持正方向票数 == $Seed命中保持负方向票数
+            # 大波动只占观察次数，因此任意方向平票时都继续保持，避免任意选边。
+            $Seed命中保持计数 = 0
+            $Seed命中保持正方向票数 = 0
+            $Seed命中保持负方向票数 = 0
+            $Seed修正模式文本 = "目标Seed保持10次后±1方向票相同，继续保持重新采样"
+            RETURN 0
+        ENDIF
+"""
+EGG_FORMAL_PARITY_OVERRIDE_LEGACY_MARKERS = (
+    "# GUI 孵蛋运行时覆盖：生成与领取复用正式版F1/F2奇偶校准",
+    "# GUI 孵蛋运行时覆盖：生成奇偶改用独立菜单动作，领取保留独立菜单校准",
+)
+EGG_FORMAL_PARITY_OVERRIDE_MARKER = "# GUI 孵蛋运行时覆盖：生成菜单动作不预扣物理advance，领取按实测净效果校准"
+EGG_FORMAL_PARITY_ORIGINAL_FUNCTION = "FUNC 孵蛋流程_计算两次命中时间(): INT"
+EGG_FORMAL_PARITY_NEXT_FUNCTION = "FUNC 孵蛋流程_执行Seed预校准轮(): INT"
+EGG_HATCH_EXIT_OVERRIDE_MARKER = "# GUI 孵蛋运行时覆盖：孵化骑车前可靠退出能力页、队伍菜单和主菜单"
+EGG_HATCH_EXIT_ORIGINAL_FUNCTION = "FUNC 孵蛋测试_执行骑车孵化"
+EGG_HATCH_EXIT_NEXT_FUNCTION = "FUNC 孵蛋测试_使用神奇糖果指定槽"
+TOGEPI_HATCH_CYCLE_OVERRIDE_MARKER = "# 1.6.4-a 波克比专用孵化执行：按14步循环骑车，不再读取蛋孵化标签。"
+TOGEPI_HATCH_CYCLE_ORIGINAL_FUNCTION = "FUNC 获取波克比"
+TOGEPI_HATCH_CYCLE_NEXT_FUNCTION = "FUNC 获取游走"
+PARTY_SUMMARY_NAVIGATION_MARKER = "# 1.6.4-a 共享反查导航：队伍页按上移次数选择目标。"
+PARTY_SUMMARY_NAVIGATION_ANCHOR = "FUNC 打开能力值识图页面"
+PARTY_SUMMARY_ORIGINAL_UP_BLOCK = """\
+            ELSE
+                UP
+                500
+                UP
+                500
+            ENDIF
+"""
+PARTY_SUMMARY_INVALID_CALL_BLOCK = """\
+            ELSE
+                CALL 反查_队伍页按上移次数选择目标(2)
+            ENDIF
+"""
+PARTY_SUMMARY_SHARED_UP_BLOCK = """\
+            ELSE
+                $反查队伍槽选择结果 = 反查_队伍页按上移次数选择目标(2)
+            ENDIF
+"""
+ROAMER_SUMMARY_CURSOR_LEGACY_BLOCK = """\
+                # 游走
+                IF $遭遇类型 == 1 and ($目标全国图鉴编号 == 243 or $目标全国图鉴编号 == 244 or $目标全国图鉴编号 == 245)
+                    IF $刚进入TV == 1
+                        UP
+                        500
+                        BREAK
+                    ELSE
+                        BREAK
+                    ENDIF
+                ENDIF
+"""
+ROAMER_SUMMARY_CURSOR_CURRENT_BLOCK = """\
+                # 游走路线在2号道路必定从主菜单进入背包使用黄金喷雾；
+                # Teachy TV通过Y快捷键启动，不影响最终停在“背包”的主菜单光标。
+                IF $遭遇类型 == 1 and ($目标全国图鉴编号 == 243 or $目标全国图鉴编号 == 244 or $目标全国图鉴编号 == 245)
+                    UP
+                    500
+                    BREAK
+                ENDIF
+"""
+ROAMER_BICYCLE_BAG_REQUIREMENT_LEGACY = (
+    "            IF $目标全国图鉴编号 == 175 or $目标全国图鉴编号 == 243 or "
+    "$目标全国图鉴编号 == 244 or $目标全国图鉴编号 == 245\n"
+    "                PRINT 背包第二页第四格放自行车\n"
+    "            ENDIF\n"
+)
+ROAMER_BICYCLE_BAG_REQUIREMENT_PREVIOUS = (
+    "            IF $目标全国图鉴编号 == 175\n"
+    "                PRINT 背包第二页第四格放自行车\n"
+    "            ENDIF\n"
+)
+ROAMER_BICYCLE_BAG_REQUIREMENT_CURRENT = (
+    "            IF $目标全国图鉴编号 == 175\n"
+    "                PRINT 重要道具第2项放自行车\n"
+    "            ENDIF\n"
+)
+ROAMER_BICYCLE_SHORTCUT_REQUIREMENT_LEGACY = (
+    "        IF $目标全国图鉴编号 == 243 or $目标全国图鉴编号 == 244 or "
+    "$目标全国图鉴编号 == 245 or $目标全国图鉴编号 == 175\n"
+    "            PRINT 自行车登录快捷键\n"
+    "        ENDIF\n"
+)
+ROAMER_BICYCLE_SHORTCUT_REQUIREMENT_PREVIOUS = (
+    "        IF $目标全国图鉴编号 == 175\n"
+    "            PRINT 自行车登录快捷键\n"
+    "        ENDIF\n"
+)
+ROAMER_BICYCLE_SHORTCUT_REQUIREMENT_CURRENT = (
+    "        IF $目标全国图鉴编号 == 175\n"
+    "            PRINT 重要道具第2项放自行车，第0轮自动登记第2项\n"
+    "        ENDIF\n"
+)
+FISHING_REQUIREMENTS_LEGACY_BLOCK = """\
+    IF $目标消耗帧 > $TV进入阈值
+        IF $静态或野生 == "野生" and 是否狩猎地带($运行前遭遇地点) == 1
+            PRINT Teachy TV放在背包第二页第一格，不要登录快捷键
+            IF $宝可梦遭遇方法 == "破旧钓竿"
+                PRINT 破旧钓竿登录快捷键
+            ELIF $宝可梦遭遇方法 == "好钓竿"
+                PRINT 好钓竿登录快捷键
+            ELIF $宝可梦遭遇方法 == "厉害钓竿" or $宝可梦遭遇方法 == "超级钓竿"
+                PRINT 厉害钓竿登录快捷键
+            ENDIF
+        ELSE
+            PRINT Teachy TV登录快捷键
+            IF $静态或野生 == "野生" and $宝可梦遭遇方法 == "破旧钓竿"
+                PRINT 背包第二页第一格放破旧钓竿
+            ENDIF
+            IF $静态或野生 == "野生" and $宝可梦遭遇方法 == "好钓竿"
+                PRINT 背包第二页第二格放好钓竿
+            ENDIF
+            IF $静态或野生 == "野生" and ($宝可梦遭遇方法 == "厉害钓竿" or $宝可梦遭遇方法 == "超级钓竿")
+                PRINT 背包第二页第三格放厉害钓竿
+            ENDIF
+            IF $目标全国图鉴编号 == 175
+                PRINT 背包第二页第四格放自行车
+            ENDIF
+        ENDIF
+    ELSE
+        IF $静态或野生 == "野生" and $宝可梦遭遇方法 == "破旧钓竿"
+            PRINT 破旧钓竿登录快捷键
+        ENDIF
+        IF $静态或野生 == "野生" and $宝可梦遭遇方法 == "好钓竿"
+            PRINT 好钓竿登录快捷键
+        ENDIF
+        IF $静态或野生 == "野生" and ($宝可梦遭遇方法 == "厉害钓竿" or $宝可梦遭遇方法 == "超级钓竿")
+            PRINT 厉害钓竿登录快捷键
+        ENDIF
+        IF $目标全国图鉴编号 == 175
+            PRINT 自行车登录快捷键
+        ENDIF
+    ENDIF
+"""
+FISHING_REQUIREMENTS_PREVIOUS_BLOCK = """\
+    IF $目标消耗帧 > $TV进入阈值
+        IF $静态或野生 == "野生" and ($宝可梦遭遇方法 == "破旧钓竿" or $宝可梦遭遇方法 == "好钓竿" or $宝可梦遭遇方法 == "厉害钓竿" or $宝可梦遭遇方法 == "超级钓竿")
+            PRINT Teachy TV放在背包第二页第一格，不要登录快捷键
+            IF $宝可梦遭遇方法 == "破旧钓竿"
+                PRINT 破旧钓竿登录快捷键
+            ELIF $宝可梦遭遇方法 == "好钓竿"
+                PRINT 好钓竿登录快捷键
+            ELSE
+                PRINT 厉害钓竿登录快捷键
+            ENDIF
+        ELIF $静态或野生 == "野生" and 是否狩猎地带($运行前遭遇地点) == 1
+            PRINT Teachy TV放在背包第二页第一格，不要登录快捷键
+        ELSE
+            PRINT Teachy TV登录快捷键
+            IF $目标全国图鉴编号 == 175
+                PRINT 背包第二页第四格放自行车
+            ENDIF
+        ENDIF
+    ELSE
+        IF $静态或野生 == "野生" and $宝可梦遭遇方法 == "破旧钓竿"
+            PRINT 破旧钓竿登录快捷键
+        ENDIF
+        IF $静态或野生 == "野生" and $宝可梦遭遇方法 == "好钓竿"
+            PRINT 好钓竿登录快捷键
+        ENDIF
+        IF $静态或野生 == "野生" and ($宝可梦遭遇方法 == "厉害钓竿" or $宝可梦遭遇方法 == "超级钓竿")
+            PRINT 厉害钓竿登录快捷键
+        ENDIF
+        IF $目标全国图鉴编号 == 175
+            PRINT 自行车登录快捷键
+        ENDIF
+    ENDIF
+"""
+FISHING_REQUIREMENTS_CURRENT_BLOCK = FISHING_REQUIREMENTS_PREVIOUS_BLOCK
+for _shortcut_requirement_old, _shortcut_requirement_new in SHORTCUT_REGISTRATION_REQUIREMENT_REPLACEMENTS:
+    FISHING_REQUIREMENTS_CURRENT_BLOCK = FISHING_REQUIREMENTS_CURRENT_BLOCK.replace(
+        _shortcut_requirement_old,
+        _shortcut_requirement_new,
+    )
+FISHING_TV_GUARD_LEGACY_BLOCK = """\
+    # 狩猎区第0轮固定延迟测试不能以0ms立刻退出Teachy TV：实机确认首个B会被启动切换吞掉。
+    # 只给第0轮传入1000ms保护；后续乱数轮仍使用原TV等待，不改变既有参数。
+    $目标获取TV等待MS = $TV等待MS
+    IF $循环计数 == 0 and $进入TV == 1 and 是否狩猎地带($遭遇地点) == 1
+        $目标获取TV等待MS = 1000
+        IF $调试日志输出 == 1
+            PRINT 狩猎区第0轮Teachy TV启动保护: & $目标获取TV等待MS & " ms"
+        ENDIF
+    ENDIF
+"""
+FISHING_TV_GUARD_CURRENT_BLOCK = """\
+    # 从背包启动Teachy TV时，第0轮不能以0ms立刻退出：首个B可能被启动切换吞掉。
+    # 狩猎区与普通钓鱼都只在第0轮使用1000ms保护；后续仍使用原TV等待。
+    $目标获取TV等待MS = $TV等待MS
+    IF $循环计数 == 0 and $进入TV == 1
+        IF 是否狩猎地带($遭遇地点) == 1
+            $目标获取TV等待MS = 1000
+            IF $调试日志输出 == 1
+                PRINT 背包Teachy TV第0轮启动保护: & $目标获取TV等待MS & " ms"
+            ENDIF
+        ELIF $遭遇类型 == 2 and ($遭遇方法 == 201 or $遭遇方法 == 202 or $遭遇方法 == 203)
+            $目标获取TV等待MS = 1000
+            IF $调试日志输出 == 1
+                PRINT 背包Teachy TV第0轮启动保护: & $目标获取TV等待MS & " ms"
+            ENDIF
+        ENDIF
+    ENDIF
+"""
+FISHING_TV_DISPATCH_LEGACY_BLOCK = """\
+    IF $进入TV == 1 and $目标全国图鉴编号 != 1 and $目标全国图鉴编号 != 4 and $目标全国图鉴编号 != 7 and 是否狩猎地带($遭遇地点) == 0
+        IF $循环计数 == 0
+            $time_TV开始 = TIME()
+        ENDIF
+        CALL 执行TV等待流程
+        $刚进入TV = 1
+    ELIF $进入TV == 1 and 是否狩猎地带($遭遇地点) == 1
+"""
+FISHING_TV_DISPATCH_PREVIOUS_BLOCK = """\
+    IF $进入TV == 1 and $目标全国图鉴编号 != 1 and $目标全国图鉴编号 != 4 and $目标全国图鉴编号 != 7 and 是否狩猎地带($遭遇地点) == 0
+        IF $循环计数 == 0
+            $time_TV开始 = TIME()
+        ENDIF
+        IF $遭遇类型 == 2 and ($遭遇方法 == 201 or $遭遇方法 == 202 or $遭遇方法 == 203)
+            CALL 执行钓鱼背包TV等待流程
+        ELSE
+            CALL 执行TV等待流程
+        ENDIF
+        $刚进入TV = 1
+    ELIF $进入TV == 1 and 是否狩猎地带($遭遇地点) == 1
+"""
+FISHING_TV_DISPATCH_CURRENT_BLOCK = FISHING_TV_DISPATCH_PREVIOUS_BLOCK.replace(
+    "            CALL 执行钓鱼背包TV等待流程\n",
+    "            # 目标获取TV等待MS是本函数的局部变量，必须显式传入子函数。\n"
+    "            # EasyCon 1.6.4-a 跨函数读取它会触发 IndexOutOfRangeException。\n"
+    "            $钓鱼背包TV执行结果 = 执行钓鱼背包TV等待流程($目标获取TV等待MS)\n",
+    1,
+)
+FISHING_SUMMARY_CURSOR_LEGACY_BLOCK = """\
+                IF $遭遇类型 == 2 and ($遭遇方法 == 201 or $遭遇方法 == 202 or $遭遇方法 == 203)
+                    IF 是否狩猎地带($遭遇地点) == 1
+                        # 狩猎区钓鱼：菜单从“图鉴”起，当前少一次DOWN会按A进图鉴，固定补一次DOWN。
+                        DOWN
+                        500
+                        DOWN
+                        500
+                    ELIF $刚进入TV == 1
+                        UP
+                        500
+                    ENDIF
+                    BREAK
+                ENDIF
+"""
+FISHING_SUMMARY_CURSOR_PREVIOUS_BLOCK = """\
+                IF $遭遇类型 == 2 and ($遭遇方法 == 201 or $遭遇方法 == 202 or $遭遇方法 == 203)
+                    IF 是否狩猎地带($遭遇地点) == 1
+                        # 狩猎区战斗返回后菜单从“退出”起：下移两次到“宝可梦”。
+                        DOWN
+                        500
+                        DOWN
+                        500
+                    ELIF $刚进入TV == 1
+                        # 普通钓鱼TV从背包进入，退出后主菜单记忆光标在“背包”。
+                        UP
+                        500
+                    ELSE
+                        # 普通非TV钓鱼只用Y快捷键；冷启动主菜单光标在“图鉴”。
+                        DOWN
+                        500
+                    ENDIF
+                    BREAK
+                ENDIF
+"""
+FISHING_SUMMARY_CURSOR_CURRENT_BLOCK = """\
+                IF $遭遇类型 == 2 and ($遭遇方法 == 201 or $遭遇方法 == 202 or $遭遇方法 == 203)
+                    IF 是否狩猎地带($遭遇地点) == 1
+                        IF $刚进入TV == 1
+                            # 狩猎区TV从背包使用Teachy TV；退出后光标仍记忆在“背包”。
+                            UP
+                            500
+                        ELSE
+                            # 狩猎区非TV钓鱼没有打开菜单；初始光标在“退出”。
+                            DOWN
+                            500
+                            DOWN
+                            500
+                        ENDIF
+                    ELIF $刚进入TV == 1
+                        # 普通钓鱼TV从背包进入，退出后主菜单记忆光标在“背包”。
+                        UP
+                        500
+                    ELSE
+                        # 普通非TV钓鱼只用Y快捷键；冷启动主菜单光标在“图鉴”。
+                        DOWN
+                        500
+                    ENDIF
+                    BREAK
+                ENDIF
+"""
+FISHING_TV_FUNCTION_MARKER = "FUNC 执行钓鱼背包TV等待流程"
+FISHING_TV_FUNCTION_ANCHOR = "FUNC 执行TV等待流程"
+FISHING_TV_FUNCTION_LEGACY_FORMAL = """\
+FUNC 执行钓鱼背包TV等待流程
+    # 冷启动进档后普通主菜单光标在“图鉴”：下移两次进入背包。
+    X
+    WAIT 3000
+    DOWN
+    WAIT 1000
+    DOWN
+    WAIT 500
+    A
+    WAIT 3500
+    RIGHT
+    WAIT 2500
+    A
+    WAIT 500
+    A
+    IF $循环计数 == 0
+        $time_TV等待开始 = TIME()
+        $第0轮TV等待请求 = $目标获取TV等待MS
+    ENDIF
+    WAIT $目标获取TV等待MS
+    IF $循环计数 == 0
+        $time_TV等待结束 = TIME()
+    ENDIF
+    # 依次退出Teachy TV、背包和主菜单；主菜单记忆光标停在“背包”。
+    B
+    WAIT 2500
+    B
+    WAIT 2000
+    B
+    WAIT 1500
+    IF $循环计数 == 0
+        $time_TV结束 = TIME()
+    ENDIF
+ENDFUNC
+
+"""
+FISHING_TV_FUNCTION_PREVIOUS_FORMAL = FISHING_TV_FUNCTION_LEGACY_FORMAL.replace(
+    "    # 依次退出Teachy TV、背包和主菜单；主菜单记忆光标停在“背包”。\n"
+    "    B\n"
+    "    WAIT 2500\n"
+    "    B\n"
+    "    WAIT 2000\n"
+    "    B\n"
+    "    WAIT 1500\n",
+    "    # TV等待很短时启动转场可能吞掉前面的B。保持原6000ms退出预算，\n"
+    "    # 分6次发送B，稳定退出TV、道具子菜单、背包和主菜单；多余B在场地无副作用。\n"
+    "    FOR 6\n"
+    "        B\n"
+    "        WAIT 1000\n"
+    "    NEXT\n",
+    1,
+)
+FISHING_TV_FUNCTION_FORMAL = (
+    FISHING_TV_FUNCTION_PREVIOUS_FORMAL
+    .replace(
+        "FUNC 执行钓鱼背包TV等待流程\n",
+        "FUNC 执行钓鱼背包TV等待流程($TV等待: INT): INT\n",
+        1,
+    )
+    .replace("$目标获取TV等待MS", "$TV等待")
+    .replace("ENDFUNC\n\n", "    RETURN 1\nENDFUNC\n\n", 1)
+)
+FISHING_TV_FUNCTION_LEGACY_TIMELINE = FISHING_TV_FUNCTION_LEGACY_FORMAL.replace(
+    "    WAIT $目标获取TV等待MS\n",
+    "    $Seed时间轴开始 = TIME()\n"
+    "    $Seed时间轴结果 = 执行时间轴等待到($Seed时间轴开始, $目标获取TV等待MS)\n"
+    "    $Seed时间轴实际 = TIME() - $Seed时间轴开始\n"
+    "    $Seed时间轴超时 = $Seed时间轴实际 - $目标获取TV等待MS\n"
+    "    PRINT TV局部时间轴: 请求 & $目标获取TV等待MS & \" ms，实际 \" & $Seed时间轴实际 & \" ms，超时 \" & $Seed时间轴超时 & \" ms\"\n",
+    1,
+)
+FISHING_TV_FUNCTION_PREVIOUS_TIMELINE = FISHING_TV_FUNCTION_PREVIOUS_FORMAL.replace(
+    "    WAIT $目标获取TV等待MS\n",
+    "    $Seed时间轴开始 = TIME()\n"
+    "    $Seed时间轴结果 = 执行时间轴等待到($Seed时间轴开始, $目标获取TV等待MS)\n"
+    "    $Seed时间轴实际 = TIME() - $Seed时间轴开始\n"
+    "    $Seed时间轴超时 = $Seed时间轴实际 - $目标获取TV等待MS\n"
+    "    PRINT TV局部时间轴: 请求 & $目标获取TV等待MS & \" ms，实际 \" & $Seed时间轴实际 & \" ms，超时 \" & $Seed时间轴超时 & \" ms\"\n",
+    1,
+)
+FISHING_TV_FUNCTION_TIMELINE = FISHING_TV_FUNCTION_FORMAL.replace(
+    "    WAIT $TV等待\n",
+    "    $Seed时间轴开始 = TIME()\n"
+    "    $Seed时间轴结果 = 执行时间轴等待到($Seed时间轴开始, $TV等待)\n"
+    "    $Seed时间轴实际 = TIME() - $Seed时间轴开始\n"
+    "    $Seed时间轴超时 = $Seed时间轴实际 - $TV等待\n"
+    "    PRINT TV局部时间轴: 请求 & $TV等待 & \" ms，实际 \" & $Seed时间轴实际 & \" ms，超时 \" & $Seed时间轴超时 & \" ms\"\n",
+    1,
+)
+FISHING_LIBRARY_LEGACY_BLOCK = """\
+        IF $进入TV == 0
+            $钓鱼时间轴允许抛竿 = 钓鱼时间轴检查可否抛竿()
+            IF $钓鱼时间轴允许抛竿 != 1
+                RETURN 0
+            ENDIF
+            Y
+        ELSE
+            X
+            500
+            DOWN
+            500
+            DOWN
+            500
+            A
+            1500
+            RIGHT
+            1500
+            IF $遭遇方法 == 201
+                # 破旧钓竿
+            ELIF $遭遇方法 == 202
+                # 好钓竿
+                DOWN
+                500
+            ELIF $遭遇方法 == 203
+                # 厉害钓竿
+                DOWN
+                500
+                DOWN
+                500
+            ENDIF
+            A
+            500
+            $钓鱼时间轴允许抛竿 = 钓鱼时间轴检查可否抛竿()
+            IF $钓鱼时间轴允许抛竿 != 1
+                RETURN 0
+            ENDIF
+            A
+            1500
+        ENDIF
+"""
+FISHING_LIBRARY_CURRENT_BLOCK = """\
+        # 所有普通钓鱼统一由Y快捷键使用钓竿；TV模式会在进入本函数前
+        # 从背包第一格打开Teachy TV，并完整退回场地。
+        $钓鱼时间轴允许抛竿 = 钓鱼时间轴检查可否抛竿()
+        IF $钓鱼时间轴允许抛竿 != 1
+            RETURN 0
+        ENDIF
+        Y
+"""
+SAFARI_TV_EXIT_PREVIOUS_BLOCK = """\
+FUNC 狩猎区执行TV等待($TV等待: INT, $TV时间轴模式: INT): INT
+    X
+    WAIT 3000
+    DOWN
+    WAIT 1000
+    DOWN
+    WAIT 1000
+    DOWN
+    WAIT 500
+    A
+    WAIT 3500
+    RIGHT
+    WAIT 2500
+    A
+    WAIT 500
+    A
+    IF $TV时间轴模式 == 1
+        $狩猎区TV调用结果 = 狩猎区TV时间轴等待($TV等待)
+    ELSE
+        WAIT $TV等待
+    ENDIF
+    B
+    WAIT 2500
+    B
+    WAIT 2000
+    RETURN 1
+ENDFUNC
+
+FUNC 狩猎区TV后准备甜甜香气($TV等待: INT, $TV时间轴模式: INT): INT
+    $狩猎区TV调用结果 = 狩猎区执行TV等待($TV等待, $TV时间轴模式)
+    UP
+    WAIT 500
+    A
+    WAIT 1200
+    A
+    WAIT 500
+    DOWN
+    RETURN 1
+ENDFUNC
+
+FUNC 狩猎区TV后返回场地($TV等待: INT, $TV时间轴模式: INT): INT
+    $狩猎区TV调用结果 = 狩猎区执行TV等待($TV等待, $TV时间轴模式)
+    B
+    WAIT 1500
+    RETURN 1
+ENDFUNC
+"""
+SAFARI_TV_EXIT_CURRENT_BLOCK = """\
+FUNC 狩猎区执行TV等待($TV等待: INT, $TV时间轴模式: INT): INT
+    X
+    WAIT 3000
+    DOWN
+    WAIT 1000
+    DOWN
+    WAIT 1000
+    DOWN
+    WAIT 500
+    A
+    WAIT 3500
+    RIGHT
+    WAIT 2500
+    A
+    WAIT 500
+    A
+    IF $TV时间轴模式 == 1
+        $狩猎区TV调用结果 = 狩猎区TV时间轴等待($TV等待)
+    ELSE
+        WAIT $TV等待
+    ENDIF
+    # 最短TV等待可能吞掉第一次B；五次退出覆盖TV、道具子菜单、背包和主菜单。
+    # 等待总量保持4000ms，甜甜香气/钓鱼调用方再补足各自原有固定时序。
+    B
+    WAIT 1000
+    B
+    WAIT 1000
+    B
+    WAIT 1000
+    B
+    WAIT 500
+    B
+    WAIT 500
+    RETURN 1
+ENDFUNC
+
+FUNC 狩猎区TV后准备甜甜香气($TV等待: INT, $TV时间轴模式: INT): INT
+    $狩猎区TV调用结果 = 狩猎区执行TV等待($TV等待, $TV时间轴模式)
+    X
+    WAIT 500
+    UP
+    WAIT 500
+    A
+    WAIT 1200
+    A
+    WAIT 500
+    DOWN
+    RETURN 1
+ENDFUNC
+
+FUNC 狩猎区TV后返回场地($TV等待: INT, $TV时间轴模式: INT): INT
+    $狩猎区TV调用结果 = 狩猎区执行TV等待($TV等待, $TV时间轴模式)
+    WAIT 2000
+    RETURN 1
+ENDFUNC
+"""
+EGG_PREPARED_254_OVERRIDE_MARKER = "# GUI 孵蛋运行时覆盖：可从已完成254步的基础存档开始"
+EGG_TRANSIENT_RETRY_OVERRIDE_MARKER = "# GUI 孵蛋运行时覆盖：瞬时动作失败重启后继续下一轮"
+EGG_TERMINAL_STOP_OVERRIDE_MARKER = "# GUI 孵蛋终止策略：无精确结果时保留当前游戏画面"
+EGG_POST_PICKUP_RETRY_POLICY_MARKER = "# GUI 孵蛋领取后Seed失败：保留首次预校准，直接重试生成领取"
+EGG_NO_EGG_EVIDENCE_OVERRIDE_MARKER = "# GUI 孵蛋无蛋区间：同一Held请求跨非目标Seed轮保留证据"
+EGG_FORMAL_PARITY_GLOBAL_ANCHOR = "$孵蛋流程请求Held帧 = 0"
+EGG_FORMAL_PARITY_GLOBALS = """\
+$孵蛋流程请求Pickup帧 = 0
+$孵蛋流程执行Held帧 = 0
+$孵蛋流程执行Pickup帧 = 0
+$孵蛋流程奇偶F1修正帧 = 0
+$孵蛋流程奇偶F2扣除帧 = 0
+$孵蛋流程奇偶增加MS = 0
+$孵蛋流程本轮奇偶等待MS = 0
+$孵蛋流程生成菜单奇偶开关 = 0
+$孵蛋流程生成菜单推进帧 = 0
+$孵蛋流程Pickup奇偶基准帧 = 0
+$孵蛋流程Pickup菜单奇偶开关 = 0
+$孵蛋流程Pickup菜单推进帧 = 0
+$孵蛋流程Held已稳定 = 0
+"""
+EGG_FORMAL_PARITY_REAL_CALL_OLD = "$孵蛋测试结果 = 孵蛋测试_执行同Seed两次命中($Seed模式, $孵蛋Seed等待MS, $时间轴精确尾段MS, $孵蛋奇偶等待MS, $孵蛋封面长按MS, $孵蛋流程TV过帧开关, $孵蛋流程TV等待MS, $孵蛋流程生成目标截止MS, $孵蛋流程领取目标截止MS, $孵蛋出蛋检测阈值, $识图阈值, 1, $孵蛋流程无蛋复核Seed开关)"
+EGG_FORMAL_PARITY_REAL_CALL_PRE_MENU = EGG_FORMAL_PARITY_REAL_CALL_OLD.replace(
+    "$孵蛋奇偶等待MS",
+    "$孵蛋流程本轮奇偶等待MS",
+    1,
+)
+EGG_FORMAL_PARITY_REAL_CALL_PICKUP_CURRENT = (
+    "$孵蛋测试结果 = 孵蛋测试_执行同Seed两次命中($Seed模式, $孵蛋Seed等待MS, "
+    "$时间轴精确尾段MS, $孵蛋流程本轮奇偶等待MS, $孵蛋封面长按MS, "
+    "$孵蛋流程TV过帧开关, $孵蛋流程TV等待MS, $孵蛋流程生成目标截止MS, "
+    "$孵蛋流程领取目标截止MS, $孵蛋流程Pickup菜单奇偶开关, $孵蛋出蛋检测阈值, "
+    "$识图阈值, 1, $孵蛋流程无蛋复核Seed开关, $Seed启动方案)"
+)
+EGG_FORMAL_PARITY_REAL_CALL_PICKUP_WAIT_MODE = (
+    EGG_FORMAL_PARITY_REAL_CALL_PICKUP_CURRENT[:-1]
+    + ", $孵蛋使用绝对时间轴)"
+)
+EGG_FORMAL_PARITY_REAL_CALL_CURRENT = EGG_FORMAL_PARITY_REAL_CALL_PICKUP_CURRENT.replace(
+    "$孵蛋流程领取目标截止MS, $孵蛋流程Pickup菜单奇偶开关",
+    "$孵蛋流程领取目标截止MS, $孵蛋流程生成菜单奇偶开关, $孵蛋流程Pickup菜单奇偶开关",
+    1,
+)
+EGG_FORMAL_PARITY_REAL_CALL_WAIT_MODE = EGG_FORMAL_PARITY_REAL_CALL_PICKUP_WAIT_MODE.replace(
+    "$孵蛋流程领取目标截止MS, $孵蛋流程Pickup菜单奇偶开关",
+    "$孵蛋流程领取目标截止MS, $孵蛋流程生成菜单奇偶开关, $孵蛋流程Pickup菜单奇偶开关",
+    1,
+)
+EGG_FORMAL_PARITY_REAL_CALL_NX_WAIT_MODE = EGG_FORMAL_PARITY_REAL_CALL_WAIT_MODE.replace(
+    "$Seed启动方案, $孵蛋使用绝对时间轴)",
+    "$NX机型, $Seed启动方案, $孵蛋使用绝对时间轴)",
+)
+EGG_GENERATION_PARITY_MENU_LEGACY_MARKER = "# GUI 孵蛋生成奇偶：生成前开关菜单增加7 advance"
+EGG_GENERATION_PARITY_MENU_MARKER = "# GUI 孵蛋生成奇偶：生成前保留菜单动作，计时截止不预扣物理advance"
+EGG_PICKUP_PARITY_MENU_MARKER = "# GUI 孵蛋领取奇偶：确认出蛋后开关菜单增加7 advance"
+EGG_PICKUP_PARITY_ORIGINAL_FUNCTION = "FUNC 孵蛋测试_执行同Seed两次命中"
+EGG_PICKUP_PARITY_SIGNATURE_OLD = "FUNC 孵蛋测试_执行同Seed两次命中($Seed模式: INT, $Seed等待MS: INT, $精确尾段MS: INT, $奇偶等待MS: INT, $封面长按MS: INT, $TV开关: INT, $TV等待MS: INT, $出蛋目标MS: INT, $领蛋目标MS: INT, $出蛋识图阈值: INT, $抓捕识图阈值: INT, $出闪后继续抓捕: INT, $无蛋后复核Seed: INT): INT"
+EGG_PICKUP_PARITY_SIGNATURE_PICKUP_CURRENT = EGG_PICKUP_PARITY_SIGNATURE_OLD.replace(
+    "$领蛋目标MS: INT, $出蛋识图阈值",
+    "$领蛋目标MS: INT, $Pickup菜单奇偶开关: INT, $出蛋识图阈值",
+    1,
+).replace(
+    "$无蛋后复核Seed: INT): INT",
+    "$无蛋后复核Seed: INT, $Seed启动方案: INT): INT",
+    1,
+)
+EGG_PICKUP_PARITY_SIGNATURE_PICKUP_WAIT_MODE = EGG_PICKUP_PARITY_SIGNATURE_PICKUP_CURRENT.replace(
+    "$Seed启动方案: INT): INT",
+    "$Seed启动方案: INT, $使用绝对时间轴: INT): INT",
+    1,
+)
+EGG_PICKUP_PARITY_SIGNATURE_CURRENT = EGG_PICKUP_PARITY_SIGNATURE_PICKUP_CURRENT.replace(
+    "$领蛋目标MS: INT, $Pickup菜单奇偶开关: INT",
+    "$领蛋目标MS: INT, $生成菜单奇偶开关: INT, $Pickup菜单奇偶开关: INT",
+    1,
+)
+EGG_PICKUP_PARITY_SIGNATURE_WAIT_MODE = EGG_PICKUP_PARITY_SIGNATURE_PICKUP_WAIT_MODE.replace(
+    "$领蛋目标MS: INT, $Pickup菜单奇偶开关: INT",
+    "$领蛋目标MS: INT, $生成菜单奇偶开关: INT, $Pickup菜单奇偶开关: INT",
+    1,
+)
+EGG_PICKUP_PARITY_SIGNATURE_NX_WAIT_MODE = EGG_PICKUP_PARITY_SIGNATURE_WAIT_MODE.replace(
+    "$Seed启动方案: INT, $使用绝对时间轴: INT)",
+    "$NX机型: INT, $Seed启动方案: INT, $使用绝对时间轴: INT)",
+)
+EGG_PICKUP_PARITY_VALIDATION_OLD = """\
+    IF $无蛋后复核Seed != 0 and $无蛋后复核Seed != 1
+        PRINT 孵蛋无蛋后Seed复核开关无效: & $无蛋后复核Seed
+        RETURN 0
+    ENDIF
+    $孵蛋库_启动结果 = 孵蛋测试_启动并进入存档($Seed模式, $Seed等待MS, $精确尾段MS, $奇偶等待MS, $封面长按MS)
+"""
+EGG_PICKUP_PARITY_VALIDATION_CURRENT = """\
+    IF $无蛋后复核Seed != 0 and $无蛋后复核Seed != 1
+        PRINT 孵蛋无蛋后Seed复核开关无效: & $无蛋后复核Seed
+        RETURN 0
+    ENDIF
+    IF $生成菜单奇偶开关 != 0 and $生成菜单奇偶开关 != 1
+        PRINT 孵蛋生成菜单奇偶开关无效: & $生成菜单奇偶开关
+        RETURN 0
+    ENDIF
+    IF $Pickup菜单奇偶开关 != 0 and $Pickup菜单奇偶开关 != 1
+        PRINT 孵蛋Pickup菜单奇偶开关无效: & $Pickup菜单奇偶开关
+        RETURN 0
+    ENDIF
+    $孵蛋库_启动结果 = 孵蛋测试_启动并进入存档($Seed模式, $Seed等待MS, $精确尾段MS, $奇偶等待MS, $封面长按MS, $Seed启动方案)
+"""
+EGG_GENERATION_PARITY_VALIDATION = """\
+    IF $生成菜单奇偶开关 != 0 and $生成菜单奇偶开关 != 1
+        PRINT 孵蛋生成菜单奇偶开关无效: & $生成菜单奇偶开关
+        RETURN 0
+    ENDIF
+"""
+EGG_GENERATION_PARITY_ACTION_BODY = """\
+    IF $生成菜单奇偶开关 == 1
+        PRINT 孵蛋生成奇偶测试: 生成前开关一次菜单，物理增加7 advance
+        X
+        WAIT 500
+        B
+        WAIT 500
+    ENDIF
+"""
+EGG_GENERATION_PARITY_ACTION = f"""\
+    WAIT 500
+    {EGG_GENERATION_PARITY_MENU_MARKER}
+{EGG_GENERATION_PARITY_ACTION_BODY}"""
+EGG_GENERATION_PARITY_ACTION_UNMARKED = "    WAIT 500\n" + EGG_GENERATION_PARITY_ACTION_BODY
+EGG_GENERATION_PARITY_ACTION_ANCHOR = """\
+    $孵蛋库_出蛋误差MS = 孵蛋测试_按模式等待到($孵蛋库_游戏时间轴原点, $孵蛋库_出蛋目标MS, $精确尾段MS, $使用绝对时间轴)
+"""
+EGG_PICKUP_PARITY_ACTION_OLD = """\
+        RETURN 2
+    ENDIF
+    LS RIGHT
+"""
+EGG_PICKUP_PARITY_ACTION_UNMARKED = """\
+        RETURN 2
+    ENDIF
+    IF $Pickup菜单奇偶开关 == 1
+        PRINT 孵蛋领取奇偶校准: 出培育屋后开关一次菜单，物理增加7 advance
+        X
+        WAIT 500
+        B
+        WAIT 500
+    ENDIF
+    LS RIGHT
+"""
+EGG_PICKUP_PARITY_ACTION_CURRENT = EGG_PICKUP_PARITY_ACTION_UNMARKED.replace(
+    "    IF $Pickup菜单奇偶开关 == 1\n",
+    f"    {EGG_PICKUP_PARITY_MENU_MARKER}\n    IF $Pickup菜单奇偶开关 == 1\n",
+    1,
+)
+EGG_POND_SETTLE_ORIGINAL = """\
+    LS RESET
+    WAIT 500
+    DOWN
+    $孵蛋库_已到池塘 = 1
+"""
+EGG_POND_SETTLE_FIXED = """\
+    LS RESET
+    WAIT 500
+    DOWN
+    WAIT 500
+    $孵蛋库_已到池塘 = 1
+"""
+EGG_PREPARED_254_GLOBAL = "$孵蛋从已完成254步开始"
+EGG_PREPARED_254_GLOBAL_ANCHOR = "$孵蛋同Seed模式 = 1"
+EGG_PARTY_SLOT_CANDY_NEXT_SECTION = "# ============================================================\n# Seed启动与同Seed两次命中"
+EGG_HOME_BUFFER_GLOBALS = """\
+$孵蛋HOME_BUFFER尝试 = 0
+$孵蛋HOME_BUFFER短边界 = 0
+$孵蛋HOME_BUFFER长边界 = 0
+$孵蛋HOME_BUFFER已有短边界 = 0
+$孵蛋HOME_BUFFER已有长边界 = 0
+$孵蛋HOME_BUFFER下一延迟 = 0
+$孵蛋HOME_BUFFER调整差 = 0
+$孵蛋HOME_BUFFER选中正确 = 0
+$孵蛋HOME_BUFFER选中普通 = 0
+$孵蛋HOME_BUFFER选中错误 = 0
+$孵蛋HOME_BUFFER失败 = 0
+"""
+HOME_BUFFER_ADAPTIVE_GLOBALS = """\
+# HOME_BUFFER 稳定低分自适应默认关闭；开启后只接受连续3次相同且唯一最高的90-94分标签。
+$HOME_BUFFER稳定低分自适应 = 0
+$HOME_BUFFER自适应最低阈值 = 90
+$HOME_BUFFER有效识图阈值 = 95
+$HOME_BUFFER自适应稳定要求 = 3
+$HOME_BUFFER自适应采样 = 0
+$HOME_BUFFER选中正确 = 0
+$HOME_BUFFER选中普通 = 0
+$HOME_BUFFER选中错误 = 0
+$HOME_BUFFER自适应候选状态 = 0
+$HOME_BUFFER自适应候选分数 = 0
+$HOME_BUFFER自适应首次状态 = 0
+$HOME_BUFFER自适应首次分数 = 0
+$HOME_BUFFER识别状态 = 0
+# 首次命中后锁定延迟；同一锁定值连续失败3次才重新校准，单次调整至少50 ms。
+$HOME_BUFFER最小调整MS = 50
+$HOME_BUFFER锁定失败阈值 = 3
+$HOME_BUFFER锁定启用 = 0
+$HOME_BUFFER锁定延迟 = 0
+$HOME_BUFFER锁定连续失败 = 0
+$HOME_BUFFER尝试 = 0
+$HOME_BUFFER未知连续次数 = 0
+$HOME_BUFFER重采样 = 0
+$HOME_BUFFER本轮待确认 = 0
+$HOME_BUFFER本轮延迟 = 0
+$HOME_BUFFER恢复需要 = 0
+$HOME_BUFFER恢复结果 = 0
+$HOME_BUFFER恢复采样 = 0
+$HOME_BUFFER恢复已按HOME = 0
+$HOME_BUFFER恢复关闭次数 = 0
+$HOME_BUFFER恢复主页 = 0
+$HOME_BUFFER恢复普通 = 0
+$HOME_BUFFER恢复窗口 = 0
+$HOME_BUFFER恢复错误 = 0
+$HOME_BUFFER恢复关闭中 = 0
+$HOME_BUFFER恢复稳定 = 0
+$HOME_BUFFER恢复未知 = 0
+$HOME_BUFFER下一延迟 = 0
+"""
+EGG_SETTINGS_GLOBALS = """\
+$孵蛋库_设置识别尝试 = 0
+$孵蛋库_设置分数1 = -1
+$孵蛋库_设置分数2 = -1
+$孵蛋库_设置分数3 = -1
+$孵蛋库_设置候选分数 = -1
+$孵蛋库_设置最佳分数 = -1
+$孵蛋库_设置状态 = -1
+"""
+EGG_TRANSIENT_RETRY_REPLACEMENTS = (
+    (
+        """\
+    ELIF $孵蛋测试结果 != 1
+        PRINT 孵蛋生成、领取或Seed复核野生抓捕失败
+        CALL 孵蛋流程_重开下一轮
+        RETURN 0
+    ENDIF
+""",
+        f"""\
+    {EGG_TRANSIENT_RETRY_OVERRIDE_MARKER}
+    ELIF $孵蛋测试结果 != 1
+        PRINT 孵蛋生成、领取或Seed复核野生抓捕失败，关闭游戏并继续下一轮
+        CALL 孵蛋流程_重开下一轮
+        RETURN 2
+    ENDIF
+""",
+    ),
+    (
+        """\
+    PRINT 领取后野生Seed反查失败
+    CALL 孵蛋流程_重开下一轮
+    RETURN 0
+""",
+        """\
+    PRINT 领取后野生Seed反查失败，关闭游戏并直接重试生成领取
+    $孵蛋流程Seed已预校准 = 1
+    CALL 孵蛋流程_重开下一轮
+    RETURN 2
+""",
+    ),
+    (
+        """\
+    IF $孵蛋流程孵化结果 != 1
+        RETURN 0
+    ENDIF
+""",
+        """\
+    IF $孵蛋流程孵化结果 != 1
+        PRINT 孵化动作失败，关闭游戏并继续下一轮
+        CALL 孵蛋流程_重开下一轮
+        RETURN 2
+    ENDIF
+""",
+    ),
+)
+EGG_POST_PICKUP_MISS_OLD = """\
+    ELIF $孵蛋流程Seed验证结果 == 2
+        PRINT 领取后未命中目标Seed，本轮丢弃并重新预校准
+        $孵蛋流程Seed已预校准 = 0
+        $孵蛋流程Seed校正结果 = 孵蛋流程_按观测Seed校正等待($候选同一Seed值)
+        IF $孵蛋流程Seed校正结果 != 1
+            CALL 孵蛋流程_重开下一轮
+            RETURN 0
+        ENDIF
+        CALL 孵蛋流程_重开下一轮
+        RETURN 2
+    ENDIF
+"""
+EGG_POST_PICKUP_MISS_CURRENT = """\
+    ELIF $孵蛋流程Seed验证结果 == 2
+        PRINT 领取后未命中目标Seed，本轮丢弃并校正Seed等待
+        PRINT 首次不领蛋预校准已经完成，下一轮直接重新生成、领取并反查
+        $孵蛋流程Seed已预校准 = 1
+        $孵蛋流程Seed校正结果 = 孵蛋流程_按观测Seed校正等待($候选同一Seed值)
+        IF $孵蛋流程Seed校正结果 != 1
+            CALL 孵蛋流程_重开下一轮
+            RETURN 0
+        ENDIF
+        CALL 孵蛋流程_重开下一轮
+        RETURN 2
+    ENDIF
+"""
+EGG_POST_PICKUP_FAILURE_OLD = """\
+    PRINT 领取后野生Seed反查失败，关闭游戏并重新预校准
+    $孵蛋流程Seed已预校准 = 0
+    CALL 孵蛋流程_重开下一轮
+    RETURN 2
+"""
+EGG_POST_PICKUP_FAILURE_CURRENT = """\
+    PRINT 领取后野生Seed反查失败，关闭游戏并直接重试生成领取
+    $孵蛋流程Seed已预校准 = 1
+    CALL 孵蛋流程_重开下一轮
+    RETURN 2
+"""
+EGG_NO_EGG_REQUEST_CHANGE_OLD = """\
+    IF $孵蛋流程上次无蛋请求Held帧 != $孵蛋流程请求Held帧
+        $孵蛋流程无蛋连续次数 = 0
+        $孵蛋流程上次无蛋请求Held帧 = $孵蛋流程请求Held帧
+    ENDIF
+"""
+EGG_NO_EGG_SEED_GATE_OLD = """\
+    $孵蛋流程无蛋复核Seed开关 = 0
+    IF $孵蛋流程Pickup已稳定 == 1
+        $孵蛋流程无蛋复核Seed开关 = 1
+    ELIF $孵蛋流程无蛋连续次数 + 1 >= $孵蛋普通无蛋复核阈值
+        $孵蛋流程无蛋复核Seed开关 = 1
+    ENDIF
+"""
+EGG_NO_EGG_SEED_GATE_CURRENT = """\
+    $孵蛋流程无蛋复核Seed开关 = 0
+    # 使用蛋反查留下的Held记录，不把固定预校准或当前累计修正当作已校准标志。
+    IF $孵蛋流程上次确认实际Held帧 >= 0 or $孵蛋流程Pickup已稳定 == 1
+        $孵蛋流程无蛋复核Seed开关 = 1
+    ELIF $孵蛋流程无蛋连续次数 + 1 >= $孵蛋普通无蛋复核阈值
+        $孵蛋流程无蛋复核Seed开关 = 1
+    ENDIF
+"""
+EGG_WILD_SEED_WINDOW_INIT = """\
+    # 同一只野生扩窗后，后续吃糖继续使用扩大窗口；下一只重新从默认窗口开始。
+    $有效Seed容差 = $孵蛋野生Seed容差
+    $有效最小消耗帧 = $孵蛋野生最小消耗帧
+    $有效最大消耗帧 = $孵蛋野生最大消耗帧
+"""
+EGG_WILD_SEED_SCAN_OLD = """\
+        $有效Seed容差 = $孵蛋野生Seed容差
+        $有效最小消耗帧 = $孵蛋野生最小消耗帧
+        $有效最大消耗帧 = $孵蛋野生最大消耗帧
+        $孵蛋流程扫描结果 = 执行反查扫描()
+        IF $孵蛋流程扫描结果 != 1
+            PRINT 孵蛋野生Seed反查无候选
+            RETURN 0
+        ENDIF
+"""
+EGG_WILD_SEED_SCAN_CURRENT = """\
+        $孵蛋流程扫描结果 = 执行反查扫描()
+        IF $孵蛋流程扫描结果 != 1 and $有效Seed容差 == $孵蛋野生Seed容差
+            # 仅默认窗口无候选时追加一档：Seed前后各5，帧上限增加1000，下限不变。
+            $有效Seed容差 = $孵蛋野生Seed容差 + 5
+            $有效最大消耗帧 = $孵蛋野生最大消耗帧 + 1000
+            PRINT 孵蛋野生Seed反查无候选，追加一档扩窗
+            PRINT 有效Seed容差: ± & $有效Seed容差 & "，有效消耗帧范围: " & $有效最小消耗帧 & "-" & $有效最大消耗帧
+            $孵蛋流程扫描结果 = 执行反查扫描()
+        ENDIF
+        IF $孵蛋流程扫描结果 != 1
+            PRINT 孵蛋野生Seed反查无候选
+            RETURN 0
+        ENDIF
+"""
+EGG_NO_EGG_REQUEST_CHANGE_CURRENT = f"""\
+    {EGG_NO_EGG_EVIDENCE_OVERRIDE_MARKER}
+    IF $孵蛋流程上次无蛋请求Held帧 != $孵蛋流程请求Held帧
+        $孵蛋流程无蛋连续次数 = 0
+        $孵蛋流程目标Seed无蛋次数 = 0
+        $孵蛋流程目标Seed无蛋区间索引 = -1
+        $孵蛋流程目标Seed无蛋区间确认次数 = 0
+        $孵蛋流程上次无蛋请求Held帧 = $孵蛋流程请求Held帧
+    ENDIF
+"""
+EGG_NO_EGG_REQUEST_CHANGE_FIXED_UNMARKED = EGG_NO_EGG_REQUEST_CHANGE_CURRENT.replace(
+    f"    {EGG_NO_EGG_EVIDENCE_OVERRIDE_MARKER}\n",
+    "",
+    1,
+)
+EGG_NO_EGG_NON_TARGET_OLD = """\
+        ELIF $孵蛋流程Seed验证结果 == 2
+            PRINT 无蛋后未命中目标Seed：本轮只校正Seed等待，不累计Held无蛋区间证据
+            $孵蛋流程目标Seed无蛋次数 = 0
+            $孵蛋流程目标Seed无蛋区间索引 = -1
+            $孵蛋流程目标Seed无蛋区间确认次数 = 0
+            $孵蛋流程无蛋连续次数 = 0
+"""
+EGG_NO_EGG_NON_TARGET_CURRENT = """\
+        ELIF $孵蛋流程Seed验证结果 == 2
+            PRINT 无蛋后未命中目标Seed：本轮只校正Seed等待；保留同一Held请求已有无蛋区间证据
+            $孵蛋流程无蛋连续次数 = 0
+"""
+EGG_TERMINAL_STOP_REPLACEMENTS = (
+    (
+        """\
+    ELIF $孵蛋流程蛋反查结果 == 2
+        PRINT 蛋个体在自动扩窗后仍无结果，停止以检查亲本或目标数据
+        CALL 孵蛋流程_重开下一轮
+        RETURN 0
+""",
+        f"""\
+    {EGG_TERMINAL_STOP_OVERRIDE_MARKER}
+    ELIF $孵蛋流程蛋反查结果 == 2
+        PRINT 蛋个体在自动扩窗后仍无结果，停止以检查亲本或目标数据
+        PRINT 停止前保留当前游戏画面，不关闭或重启游戏
+        RETURN 0
+""",
+    ),
+    (
+        """\
+    ELIF $孵蛋流程蛋反查结果 != 1
+        PRINT 蛋个体反查失败，请检查双亲、相性、目标帧或识图配置
+        CALL 孵蛋流程_重开下一轮
+        RETURN 0
+""",
+        """\
+    ELIF $孵蛋流程蛋反查结果 != 1
+        PRINT 蛋个体反查失败，请检查双亲、相性、目标帧或识图配置
+        PRINT 停止前保留当前游戏画面，不关闭或重启游戏
+        RETURN 0
+""",
+    ),
+)
+
+
+@dataclass(frozen=True)
+class EasyCon118Options:
+    nx_model: int | None = None
+    paralysis: bool = False
+    false_swipe: bool = False
+    continue_capture_after_shiny: bool = False
+    home_buffer_adaptive_threshold: bool = False
+    # 0 keeps the current HOME_BUFFER path; 1 uses the fixed user-selection
+    # HOME sequence measured by the legacy standalone RNG script.
+    seed_startup_scheme: int = 0
+    # Temporary Japanese starter branch.  It changes only the generated
+    # starter project; ordinary English 2.0 projects keep their corpus.
+    japanese_starter: bool = False
+    # The formal entry supports the two audited Seed calibration paths.  This
+    # is appended after the historical fields to keep positional callers
+    # compatible.
+    seed_calibration_scheme: int = 0
+    # Wild encounters can optionally target held-item outcomes.  The ECS
+    # runtime uses the number of empty party slots as the number of item hits
+    # to collect before stopping.
+    item_rng_mode: bool = False
+    party_empty_slots: int = 1
+    # Persist a successful run's calibration for the matching game/NX/entry.
+    # These fields are appended to preserve positional callers from older tools.
+    update_precalibration: bool = False
+    precalibration_seed_ns1: int | None = None
+    precalibration_seed_ns2: int | None = None
+    precalibration_frame_ns1: int | None = None
+    precalibration_frame_ns2: int | None = None
+    # ``STARTER`` keeps the TID -> rival starter route separate from ordinary
+    # static encounters, whose preceding menu/bridge flow is different.
+    precalibration_context_kind: str | None = None
+    # Runtime output and reverse-search controls exposed by the desktop tool.
+    # ``None`` keeps the selected ECS template's own expansion defaults.
+    debug_log_output: int = 1
+    frame_parity_scheme: int = 1
+    reverse_expansion_layers: int | None = None
+    reverse_expansion_seed_tolerances: tuple[int, int, int] | None = None
+    reverse_expansion_frame_half_widths: tuple[int, int, int] | None = None
+    # Static Togepi performs a separate wild encounter after pickup to verify
+    # the Seed.  Its one-shot frame window must not share the ordinary layered
+    # reverse-search controls.
+    togepi_seed_reverse_frame_half_width: int | None = None
+    # Upstream 2.0 can save the Switch's recent video after any detected
+    # shiny.  Wild encounters may additionally stop immediately when the
+    # shiny species differs from the requested target.
+    record_shiny_video: bool = False
+    stop_on_non_target_shiny: bool = True
+
+
+EGG_PARENT_GENDERS = frozenset({"雄", "雌", "无性别", "百变怪"})
+
+
+def is_valid_egg_parent_pair(parent_a_gender: str, parent_b_gender: str) -> bool:
+    """Match the parent-pair rules used by Ten Lines' FRLG Egg search."""
+    if (parent_a_gender, parent_b_gender) in {("雄", "雌"), ("雌", "雄")}:
+        return True
+    return (
+        parent_a_gender != parent_b_gender
+        and "百变怪" in {parent_a_gender, parent_b_gender}
+    )
+
+
+@dataclass(frozen=True)
+class EggRunRequest:
+    """User-provided Ten Lines Egg result for the experimental same-seed flow."""
+
+    game: str
+    seed_mode: int
+    target_seed: str
+    held_advances: int
+    pickup_advances: int
+    species_id: int
+    compatibility: int
+    parent_a_gender: str
+    parent_a_ivs: tuple[int, int, int, int, int, int]
+    parent_b_gender: str
+    parent_b_ivs: tuple[int, int, int, int, int, int]
+    start_from_prepared_254: bool = False
+    home_buffer_adaptive_threshold: bool = False
+    seed_startup_scheme: int = 0
+    # The timeline entry also exposes its current scheme 2.  Keep that as the
+    # backwards-compatible default while allowing advanced callers to choose
+    # the audited 0/1 A/B paths explicitly.
+    seed_calibration_scheme: int = 2
+    update_precalibration: bool = False
+    precalibration_seed_ns1: int | None = None
+    precalibration_seed_ns2: int | None = None
+    precalibration_held: int | None = None
+    precalibration_pickup: int | None = None
+    debug_log_output: int = 1
+    # Egg runs always use the menu-based parity adjustment.  Expansion
+    # overrides remain optional because the pre-calibration wild reverse
+    # search shares the ordinary reverse-search controller.
+    reverse_expansion_layers: int | None = None
+    reverse_expansion_seed_tolerances: tuple[int, int, int] | None = None
+    reverse_expansion_frame_half_widths: tuple[int, int, int] | None = None
+    # The post-pickup wild encounter has its own Seed-search window.  ``None``
+    # preserves the selected 2.0 template values for older saved configs.
+    egg_seed_reverse_seed_tolerance: int | None = None
+    egg_seed_reverse_min_advances: int | None = None
+    egg_seed_reverse_max_advances: int | None = None
+
+    @property
+    def nx_model(self) -> int:
+        return 2 if self.game.endswith("nx2") else 1
+
+    @property
+    def normalized_seed(self) -> str:
+        value = self.target_seed.strip().upper()
+        if value.startswith("0X"):
+            value = value[2:]
+        return value.zfill(4)
+
+    def validate(self) -> None:
+        if self.game not in {"fr_nx", "fr_nx2", "lg_nx", "lg_nx2"}:
+            raise ValueError(f"孵蛋测试只支持火红/叶绿 Switch 1/2，当前为 {self.game!r}")
+        if not 0 <= self.seed_mode <= 9:
+            raise ValueError("孵蛋 Seed 模式必须在 0-9 之间")
+        raw_seed = self.target_seed.strip().upper()
+        if raw_seed.startswith("0X"):
+            raw_seed = raw_seed[2:]
+        seed = self.normalized_seed
+        if not raw_seed or len(raw_seed) > 4 or not re.fullmatch(r"[0-9A-F]{4}", seed):
+            raise ValueError("孵蛋目标 Seed 必须是 0000-FFFF 的十六进制数")
+        if self.held_advances <= 0:
+            raise ValueError("Held/生成目标帧必须大于 0")
+        if self.pickup_advances - self.held_advances < 1800:
+            raise ValueError("Pickup/领取目标帧必须至少比 Held/生成目标帧晚 1800 帧")
+        if not 1 <= self.species_id <= 386:
+            raise ValueError("孵蛋蛋种全国图鉴编号必须在 1-386 之间")
+        if self.compatibility not in {20, 50, 70}:
+            raise ValueError("孵蛋双亲相性只能填写 20、50 或 70")
+        if self.parent_a_gender not in EGG_PARENT_GENDERS:
+            raise ValueError("孵蛋亲本 A 必须是雄、雌、无性别或百变怪")
+        if self.parent_b_gender not in EGG_PARENT_GENDERS:
+            raise ValueError("孵蛋亲本 B 必须是雄、雌、无性别或百变怪")
+        if not is_valid_egg_parent_pair(self.parent_a_gender, self.parent_b_gender):
+            raise ValueError("孵蛋亲本组合必须是雄+雌，或一只百变怪搭配另一只非百变怪")
+        if not isinstance(self.start_from_prepared_254, bool):
+            raise ValueError("孵蛋254步启动模式必须是布尔值")
+        if not isinstance(self.home_buffer_adaptive_threshold, bool):
+            raise ValueError("HOME_BUFFER稳定低分自适应开关必须是布尔值")
+        if self.seed_startup_scheme not in {0, 1}:
+            raise ValueError("Seed启动方案只能是0（当前HOME_BUFFER）或1（固定用户界面HOME）")
+        if self.seed_calibration_scheme not in {0, 1, 2}:
+            raise ValueError(
+                "Seed校准方案只能是0（原始12轮众数）、1（实验锁定细调）或2（命中保持后的方向票接续）"
+            )
+        _validate_runtime_output_mode(self.debug_log_output)
+        _reverse_expansion_values(
+            self.reverse_expansion_layers,
+            self.reverse_expansion_seed_tolerances,
+            self.reverse_expansion_frame_half_widths,
+        )
+        if not isinstance(self.update_precalibration, bool):
+            raise ValueError("更新预校准开关必须是布尔值")
+        for name, value in (
+            ("Seed预校准索引_NS1", self.precalibration_seed_ns1),
+            ("Seed预校准索引_NS2", self.precalibration_seed_ns2),
+            ("孵蛋Held动态预校准帧", self.precalibration_held),
+            ("孵蛋Pickup动态预校准帧", self.precalibration_pickup),
+        ):
+            _validated_optional_int(name, value)
+        for label, ivs in (("A", self.parent_a_ivs), ("B", self.parent_b_ivs)):
+            if len(ivs) != 6 or any(not 0 <= iv <= 31 for iv in ivs):
+                raise ValueError(f"亲本 {label} 的六项 IV 必须均在 0-31 之间")
+
+    def to_dict(self) -> dict[str, Any]:
+        self.validate()
+        result = asdict(self)
+        result["target_seed"] = self.normalized_seed
+        result["nx_model"] = self.nx_model
+        result["mode"] = "egg_same_seed_experimental"
+        return result
+
+
+@dataclass(frozen=True)
+class EasyConRuntimeCheck:
+    ok: bool
+    errors: tuple[str, ...]
+    warnings: tuple[str, ...]
+
+
+def parse_easycon_video_devices(output: str) -> dict[int, str]:
+    """Parse ``ezcon video --list`` into index-to-name mappings."""
+    devices: dict[int, str] = {}
+    for match in re.finditer(r"(?m)^\s*\[(\d+)\]\s*(.*?)\s*$", output):
+        index = int(match.group(1))
+        devices[index] = match.group(2).strip() or "未命名设备"
+    return devices
+
+
+def probe_easycon_devices(
+    ezcon_path: str | Path,
+    *,
+    include_video_names: bool = False,
+):
+    """Return currently enumerated ports, videos and raw EasyCon output.
+
+    Existing CLI callers receive a set of video indexes.  The GUI opts into a
+    mapping so its dropdown can show both the EasyCon index and device name.
+    """
+    ezcon_path = Path(ezcon_path).resolve()
+    if not ezcon_path.is_file():
+        raise FileNotFoundError(
+            f"设备检测找不到 EasyCon 程序：{ezcon_path}\n"
+            "请在共通设置中点击“选择 ezcon.exe”，选择当前解压目录下的 "
+            "_internal\\easycon\\publish\\ezcon.exe，然后重新检测。\n"
+            "如果该文件也不存在，请重新完整解压发布包。"
+        )
+    run_options = dict(
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    port = subprocess.run([str(ezcon_path), "port", "--list"], timeout=15, **run_options)
+    video = subprocess.run([str(ezcon_path), "video", "--list"], timeout=20, **run_options)
+    if port.returncode != 0 or video.returncode != 0:
+        details = "\n".join(filter(None, (port.stderr, video.stderr)))
+        raise RuntimeError(f"设备检测命令失败：{details or '未知错误'}")
+    ports = {item.upper() for item in re.findall(r"\bCOM\d+\b", port.stdout, re.IGNORECASE)}
+    video_devices = parse_easycon_video_devices(video.stdout)
+    videos = video_devices if include_video_names else set(video_devices)
+    output = "端口：\n" + port.stdout + "\n采集设备：\n" + video.stdout
+    if not ports:
+        output += "\n未检测到 EasyCon 单片机串口。"
+    if not videos:
+        output += "\n未检测到采集设备。"
+    return ports, videos, output
+
+
+def inspect_label_corpus(label_dir: str | Path) -> dict[str, Any]:
+    """Return a deterministic fingerprint of a 2.0 ``ImgLabel`` folder."""
+    label_dir = Path(label_dir)
+    files = sorted(
+        (path for path in label_dir.iterdir() if path.is_file() and path.suffix == ".IL"),
+        key=lambda path: path.name,
+    )
+    digest = hashlib.sha256()
+    method_counts: dict[int, int] = {}
+    total_bytes = 0
+    for path in files:
+        name = path.name.encode("utf-8")
+        data = path.read_bytes()
+        digest.update(struct.pack(">I", len(name)))
+        digest.update(name)
+        digest.update(struct.pack(">Q", len(data)))
+        digest.update(data)
+        total_bytes += len(data)
+        payload = json.loads(data.decode("utf-8-sig"))
+        method = int(payload.get("searchMethod", 5))
+        method_counts[method] = method_counts.get(method, 0) + 1
+    return {
+        "count": len(files),
+        "bytes": total_bytes,
+        "methods": method_counts,
+        "sha256": digest.hexdigest(),
+    }
+
+
+def copy_easycon118_extension_labels(label_dir: str | Path) -> None:
+    """Install the audited repository labels into an ImgLabel directory.
+
+    The bundled text files may carry a source-control newline. EasyCon's
+    audited corpus uses the original one-line IL form, so normalize only the
+    trailing line ending while copying.
+    """
+    label_dir = Path(label_dir)
+    if not label_dir.is_dir():
+        raise FileNotFoundError(f"2.0 脚本包缺少 ImgLabel 目录: {label_dir}")
+    for name in EASYCON118_EXTENSION_LABEL_NAMES:
+        source = EASYCON118_EXTENSION_LABEL_DIR / name
+        if not source.is_file():
+            fallback = EASYCON118_LOCAL_LABEL_DIR / name
+            if fallback.is_file():
+                source = fallback
+            else:
+                raise FileNotFoundError(f"仓库缺少 EasyCon 扩展标签: {name}")
+        (label_dir / name).write_bytes(source.read_bytes().rstrip(b"\r\n"))
+
+
+def inspect_script_corpus(source_dir: str | Path) -> dict[str, Any]:
+    """Fingerprint both entries and runtime libraries, excluding Seed backups."""
+    source_dir = Path(source_dir)
+    templates = [source_dir / name for name in EXPECTED_TEMPLATE_NAMES]
+    missing_templates = [path.name for path in templates if not path.is_file()]
+    if missing_templates:
+        raise FileNotFoundError(
+            f"2.0 脚本包缺少正式/孵蛋入口: {', '.join(missing_templates)}"
+        )
+    lib_dir = source_dir / "lib"
+    if not lib_dir.is_dir():
+        raise FileNotFoundError(f"2.0 脚本包缺少 lib 目录: {lib_dir}")
+    files = [(path.name, path) for path in templates]
+    files.extend(
+        (path.relative_to(source_dir).as_posix(), path)
+        for path in sorted(
+            item for item in lib_dir.rglob("*")
+            if item.is_file() and item.relative_to(lib_dir).parts[0] != "seed_backup"
+        )
+    )
+    digest = hashlib.sha256()
+    total_bytes = 0
+    for relative_name, path in files:
+        name = relative_name.encode("utf-8")
+        data = path.read_bytes()
+        digest.update(struct.pack(">I", len(name)))
+        digest.update(name)
+        digest.update(struct.pack(">Q", len(data)))
+        digest.update(data)
+        total_bytes += len(data)
+    return {
+        "count": len(files),
+        "bytes": total_bytes,
+        "sha256": digest.hexdigest(),
+        "template": STANDARD_TEMPLATE_NAME,
+        "templates": [path.name for path in templates],
+    }
+
+
+def _is_wild(plan: RunPlan) -> bool:
+    key = (plan.request.method or plan.target.method).lower()
+    return "wild" in key
+
+
+def _validated_optional_int(name: str, value: object) -> int | None:
+    """Normalize an optional pre-calibration value before writing ECS."""
+    if value is None:
+        return None
+    if type(value) is not int:
+        raise ValueError(f"预校准值{name}必须是整数")
+    if name.startswith("Seed预校准索引_") and not -10000 <= value <= 10000:
+        raise ValueError(f"预校准值{name}超出允许范围")
+    if name.startswith("消耗帧预校准修正_") and not -1_000_000 <= value <= 1_000_000:
+        raise ValueError(f"预校准值{name}超出允许范围")
+    if name.startswith("孵蛋") and not -1_000_000 <= value <= 1_000_000:
+        raise ValueError(f"预校准值{name}超出允许范围")
+    return value
+
+
+def _normalized_template_name(template_name: str | None, *, default: str) -> str:
+    selected = default if template_name is None else str(template_name).strip()
+    if selected not in EXPECTED_TEMPLATE_NAMES:
+        raise ValueError(
+            "脚本模板只能选择正式版或时间轴版入口，当前为 " + repr(selected)
+        )
+    return selected
+
+
+def _precalibration_entry(template_name: str) -> str:
+    return "FORMAL" if template_name == STANDARD_TEMPLATE_NAME else "TIMELINE"
+
+
+def _precalibration_frame_enabled(context: PrecalibrationContext) -> bool:
+    # The ordinary formal static route has target-specific preparation whose
+    # frame correction must not leak to another static target. Starter runs
+    # have their own isolated context and may therefore retain their frame.
+    return context.entry == "TIMELINE" or context.kind in {"WILD", "EGG", "STARTER"}
+
+
+def _plan_precalibration_context(
+    plan: RunPlan,
+    options: EasyCon118Options,
+    template_name: str,
+) -> PrecalibrationContext:
+    nx_model = options.nx_model
+    if nx_model is None:
+        nx_model = 2 if plan.request.game.endswith("nx2") else 1
+    expected_kind = "WILD" if _is_wild(plan) else "STATIC"
+    kind = normalize_precalibration_kind(
+        options.precalibration_context_kind or expected_kind
+    )
+    if kind == "STARTER":
+        if expected_kind != "STATIC" or plan.species_id not in {1, 4, 7}:
+            raise ValueError("御三家预校准上下文只允许用于图鉴1/4/7的静态流程")
+    elif kind != expected_kind:
+        raise ValueError("预校准流程类型与当前生成计划不一致")
+    return PrecalibrationContext(
+        game=plan.request.game,
+        nx_model=nx_model,
+        seed_mode=10 if options.japanese_starter else plan.seed_mode,
+        seed_startup_scheme=options.seed_startup_scheme,
+        entry=_precalibration_entry(template_name),
+        kind=kind,
+    )
+
+
+def _egg_precalibration_context(
+    request: EggRunRequest,
+    template_name: str,
+) -> PrecalibrationContext:
+    return PrecalibrationContext(
+        game=request.game,
+        nx_model=request.nx_model,
+        seed_mode=request.seed_mode,
+        seed_startup_scheme=request.seed_startup_scheme,
+        entry=_precalibration_entry(template_name),
+        kind="EGG",
+    )
+
+
+def _precalibration_store_path(path: str | Path | None) -> Path:
+    selected = DEFAULT_PRECALIBRATION_STORE_PATH if path is None else Path(path)
+    return selected.expanduser().resolve()
+
+
+def _load_plan_precalibration(
+    plan: RunPlan,
+    options: EasyCon118Options,
+    template_name: str,
+    store_path: Path,
+) -> tuple[EasyCon118Options, dict[str, Any]]:
+    if not isinstance(options.update_precalibration, bool):
+        raise ValueError("更新预校准开关必须是布尔值")
+    context = _plan_precalibration_context(plan, options, template_name)
+    frame_enabled = _precalibration_frame_enabled(context)
+    loaded = (
+        read_precalibration_record(store_path, context)
+        if options.update_precalibration
+        else None
+    )
+    effective = options
+    if loaded is not None:
+        replacements: dict[str, Any] = {}
+        seed_field = "seed_ns1" if context.nx_model == 1 else "seed_ns2"
+        seed_value = loaded.get(seed_field)
+        if seed_value is not None:
+            replacements[f"precalibration_{seed_field}"] = seed_value
+        if frame_enabled:
+            frame_field = "frame_ns1" if context.nx_model == 1 else "frame_ns2"
+            frame_value = loaded.get(frame_field)
+            if frame_value is not None:
+                replacements[f"precalibration_{frame_field}"] = frame_value
+        if replacements:
+            effective = replace(options, **replacements)
+    manifest = {
+        "enabled": bool(options.update_precalibration),
+        "context": context.to_dict(),
+        "source_path": str(store_path),
+        "frame_enabled": frame_enabled,
+        "loaded": loaded,
+    }
+    return effective, manifest
+
+
+def _load_egg_precalibration(
+    request: EggRunRequest,
+    template_name: str,
+    store_path: Path,
+) -> tuple[EggRunRequest, dict[str, Any]]:
+    context = _egg_precalibration_context(request, template_name)
+    loaded = (
+        read_precalibration_record(store_path, context)
+        if request.update_precalibration
+        else None
+    )
+    effective = request
+    if loaded is not None:
+        replacements: dict[str, Any] = {}
+        seed_field = "seed_ns1" if context.nx_model == 1 else "seed_ns2"
+        seed_value = loaded.get(seed_field)
+        if seed_value is not None:
+            replacements[f"precalibration_{seed_field}"] = seed_value
+        if loaded.get("held_pre") is not None:
+            replacements["precalibration_held"] = loaded["held_pre"]
+        if loaded.get("pickup_pre") is not None:
+            replacements["precalibration_pickup"] = loaded["pickup_pre"]
+        if replacements:
+            effective = replace(request, **replacements)
+    manifest = {
+        "enabled": bool(request.update_precalibration),
+        "context": context.to_dict(),
+        "source_path": str(store_path),
+        "frame_enabled": True,
+        "loaded": loaded,
+    }
+    return effective, manifest
+
+
+def _function_block(text: str, signature: str) -> tuple[int, int, str]:
+    if text.count(signature) != 1:
+        raise ValueError(f"2.0 模板缺少唯一函数: {signature}")
+    start = text.index(signature)
+    end_marker = "\nENDFUNC"
+    end = text.index(end_marker, start) + len(end_marker)
+    return start, end, text[start:end]
+
+
+def _replace_function_block(text: str, signature: str, block: str) -> str:
+    start, end, _ = _function_block(text, signature)
+    return text[:start] + block + text[end:]
+
+
+def _insert_precalibration_globals(text: str, lines: list[str]) -> str:
+    if PRECALIBRATION_RUNTIME_MARKER in text:
+        raise ValueError("生成脚本已经包含预校准运行时覆盖，拒绝重复注入")
+    pattern = re.compile(r"(?m)^(\$Seed预校准索引_NS2\s*=\s*[^\r\n]*)$")
+    addition = "\n" + PRECALIBRATION_RUNTIME_MARKER + "\n" + "\n".join(lines)
+    configured, count = pattern.subn(r"\1" + addition, text, count=1)
+    if count != 1:
+        raise ValueError("2.0 模板缺少唯一的 NS2 Seed 预校准字段")
+    return configured
+
+
+def _apply_seed_precalibration_globals(
+    text: str,
+    *,
+    seed_ns1: int | None,
+    seed_ns2: int | None,
+) -> str:
+    """Replace the two audited advanced globals outside the user section."""
+    configured = text
+    for name, value in (
+        ("Seed预校准索引_NS1", seed_ns1),
+        ("Seed预校准索引_NS2", seed_ns2),
+    ):
+        normalized = _validated_optional_int(name, value)
+        if normalized is None:
+            continue
+        pattern = re.compile(rf"(?m)^\${re.escape(name)}\s*=\s*[^\r\n]*$")
+        configured, count = pattern.subn(f"${name} = {normalized}", configured)
+        if count != 1:
+            raise ValueError(f"2.0 模板字段 ${name} 应出现 1 次，实际为 {count} 次")
+    return configured
+
+
+def _precalibration_marker_head(context: PrecalibrationContext) -> str:
+    return (
+        "PRECALIBRATION_UPDATE|V=1"
+        f"|GAME={context.game.upper()}"
+        f"|NX={context.nx_model}"
+        f"|MODE={context.seed_mode}"
+        f"|STARTUP={context.seed_startup_scheme}"
+        f"|ENTRY={context.entry}"
+        f"|KIND={context.kind}"
+        "|SEED_INDEX="
+    )
+
+
+def _apply_regular_precalibration_runtime_text(
+    text: str,
+    options: EasyCon118Options,
+    config: dict[str, Any],
+) -> str:
+    context = PrecalibrationContext(**config["context"])
+    text = _apply_seed_precalibration_globals(
+        text,
+        seed_ns1=options.precalibration_seed_ns1,
+        seed_ns2=options.precalibration_seed_ns2,
+    )
+    frame_enabled = bool(config["frame_enabled"])
+    frame_ns1 = options.precalibration_frame_ns1 if frame_enabled else 0
+    frame_ns2 = options.precalibration_frame_ns2 if frame_enabled else 0
+    frame_ns1 = 0 if frame_ns1 is None else frame_ns1
+    frame_ns2 = 0 if frame_ns2 is None else frame_ns2
+    frame_ns1 = _validated_optional_int("消耗帧预校准修正_NS1", frame_ns1)
+    frame_ns2 = _validated_optional_int("消耗帧预校准修正_NS2", frame_ns2)
+    text = _insert_precalibration_globals(
+        text,
+        [
+            f"$更新预校准 = {1 if config['enabled'] else 0}",
+            f"$消耗帧预校准修正_NS1 = {frame_ns1}",
+            f"$消耗帧预校准修正_NS2 = {frame_ns2}",
+            "$消耗帧预校准修正 = 0",
+        ],
+    )
+    ns1_anchor = "    $Seed预校准索引 = $Seed预校准索引_NS1"
+    ns2_anchor = "    $Seed预校准索引 = $Seed预校准索引_NS2"
+    if text.count(ns1_anchor) != 1 or text.count(ns2_anchor) != 1:
+        raise ValueError("2.0 模板的 NX Seed 预校准选择分支数量异常")
+    text = text.replace(
+        ns1_anchor,
+        ns1_anchor + "\n    $消耗帧预校准修正 = $消耗帧预校准修正_NS1",
+        1,
+    ).replace(
+        ns2_anchor,
+        ns2_anchor + "\n    $消耗帧预校准修正 = $消耗帧预校准修正_NS2",
+        1,
+    )
+
+    signature = "FUNC 记录固定延迟并开始自动乱数(): INT"
+    _, _, block = _function_block(text, signature)
+    recalc_anchor = "    $校准成功 = 重新计算等待参数()"
+    if block.count(recalc_anchor) != 1:
+        raise ValueError("2.0 固定延迟函数缺少唯一的等待参数重算入口")
+    block = block.replace(
+        recalc_anchor,
+        "    $消耗帧实际执行修正量 += $消耗帧预校准修正\n"
+        "    $消耗帧本次新增修正量 += $消耗帧预校准修正\n"
+        + recalc_anchor,
+        1,
+    )
+    text = _replace_function_block(text, signature, block)
+
+    if not config["enabled"]:
+        return text
+    marker_line = (
+        f'        PRINT "{_precalibration_marker_head(context)}" & '
+        '$Seed累计修正索引 & "|FRAME_PRE=" & $消耗帧实际执行修正量 & '
+        f'"|FRAME_ENABLED={1 if frame_enabled else 0}"'
+    )
+    signature = "FUNC 执行自动校准与等待更新(): INT"
+    _, _, block = _function_block(text, signature)
+    terminal_anchor = "        PRINT 已命中目标，脚本停止"
+    if block.count(terminal_anchor) != 1:
+        raise ValueError("2.0 自动校准函数缺少唯一的完整目标命中分支")
+    block = block.replace(terminal_anchor, marker_line + "\n" + terminal_anchor, 1)
+    return _replace_function_block(text, signature, block)
+
+
+def _apply_egg_precalibration_runtime_text(
+    text: str,
+    request: EggRunRequest,
+    config: dict[str, Any],
+) -> str:
+    text = _apply_seed_precalibration_globals(
+        text,
+        seed_ns1=request.precalibration_seed_ns1,
+        seed_ns2=request.precalibration_seed_ns2,
+    )
+    held = 0 if request.precalibration_held is None else request.precalibration_held
+    pickup = 0 if request.precalibration_pickup is None else request.precalibration_pickup
+    held = _validated_optional_int("孵蛋Held动态预校准帧", held)
+    pickup = _validated_optional_int("孵蛋Pickup动态预校准帧", pickup)
+    text = _insert_precalibration_globals(
+        text,
+        [
+            f"$更新预校准 = {1 if config['enabled'] else 0}",
+            f"$孵蛋Held动态预校准帧 = {held}",
+            f"$孵蛋Pickup动态预校准帧 = {pickup}",
+        ],
+    )
+    signature = "FUNC 孵蛋流程_执行(): INT"
+    _, _, block = _function_block(text, signature)
+    init_anchor = (
+        "    $孵蛋流程Seed已预校准 = 0\n"
+        "    $孵蛋Held执行修正帧 = 0\n"
+        "    $孵蛋Pickup执行修正帧 = 0"
+    )
+    init_replacement = (
+        "    $孵蛋流程Seed已预校准 = 0\n"
+        "    $孵蛋Held执行修正帧 = $孵蛋Held动态预校准帧\n"
+        "    $孵蛋Pickup执行修正帧 = $孵蛋Pickup动态预校准帧"
+    )
+    if block.count(init_anchor) != 1:
+        raise ValueError("2.0 孵蛋总控缺少唯一的 Held/Pickup 动态修正初始化")
+    block = block.replace(init_anchor, init_replacement, 1)
+    text = _replace_function_block(text, signature, block)
+
+    if not config["enabled"]:
+        return text
+    context = PrecalibrationContext(**config["context"])
+    marker_line = (
+        f'    PRINT "{_precalibration_marker_head(context)}" & '
+        '$Seed累计修正索引 & "|FRAME_PRE=0|FRAME_ENABLED=1|HELD_PRE=" & '
+        '$孵蛋Held执行修正帧 & "|PICKUP_PRE=" & $孵蛋Pickup执行修正帧'
+    )
+    signature = "FUNC 孵蛋流程_执行孵化与个体反查(): INT"
+    _, _, block = _function_block(text, signature)
+    success_anchor = "    PRINT 孵蛋目标Seed、Held帧和Pickup帧全部命中，流程完成"
+    if block.count(success_anchor) != 1:
+        raise ValueError("2.0 孵蛋完成函数缺少唯一的完整目标命中分支")
+    block = block.replace(success_anchor, marker_line + "\n" + success_anchor, 1)
+    return _replace_function_block(text, signature, block)
+
+
+def _game_text(game: str) -> str:
+    if game.startswith("fr"):
+        return "火红"
+    if game.startswith("lg"):
+        return "叶绿"
+    raise ValueError(f"2.0 只支持火红/叶绿，当前游戏为 {game!r}")
+
+
+def _validate_runtime_output_mode(value: int) -> int:
+    try:
+        value = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("输出日志模式只能是0（精简）或1（完整调试）") from exc
+    if value not in {0, 1}:
+        raise ValueError("输出日志模式只能是0（精简）或1（完整调试）")
+    return value
+
+
+def _validate_frame_parity_scheme(value: int) -> int:
+    try:
+        value = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("奇偶调整方案只能是0（F1/F2）或1（菜单）") from exc
+    if value not in {0, 1}:
+        raise ValueError("奇偶调整方案只能是0（F1/F2）或1（菜单）")
+    return value
+
+
+def _reverse_expansion_values(
+    layers: int | None,
+    seed_tolerances: tuple[int, int, int] | None,
+    frame_half_widths: tuple[int, int, int] | None,
+) -> dict[str, int]:
+    """Validate optional three-layer reverse-search overrides for ECS."""
+    if layers is None and seed_tolerances is None and frame_half_widths is None:
+        return {}
+    if layers is None or seed_tolerances is None or frame_half_widths is None:
+        raise ValueError("反查扩窗覆盖必须同时填写层数、三层 Seed 容差和三层帧半宽")
+    try:
+        layers = int(layers)
+        seeds = tuple(int(value) for value in seed_tolerances)
+        frames = tuple(int(value) for value in frame_half_widths)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("反查扩窗参数必须是整数") from exc
+    if not 0 <= layers <= 3:
+        raise ValueError("反查扩窗层数必须在0-3之间")
+    if len(seeds) != 3 or len(frames) != 3:
+        raise ValueError("反查扩窗必须提供三层 Seed 容差和三层帧半宽")
+    if any(value < 0 for value in seeds):
+        raise ValueError("反查扩窗 Seed 容差不能为负数")
+    if any(value < 0 for value in frames):
+        raise ValueError("反查扩窗帧半宽不能为负数")
+    values = {"扩窗层数上限": layers}
+    for index, (seed, frame) in enumerate(zip(seeds, frames), 1):
+        values[f"扩窗第{index}层Seed容差"] = seed
+        values[f"扩窗第{index}层帧半宽"] = frame
+    return values
+
+
+def reverse_expansion_to_ecs_values(
+    options: EasyCon118Options | EggRunRequest,
+) -> dict[str, int]:
+    values = _reverse_expansion_values(
+        options.reverse_expansion_layers,
+        options.reverse_expansion_seed_tolerances,
+        options.reverse_expansion_frame_half_widths,
+    )
+    togepi_half_width = getattr(options, "togepi_seed_reverse_frame_half_width", None)
+    if togepi_half_width is not None:
+        try:
+            togepi_half_width = int(togepi_half_width)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("波克比 Seed 反查帧半宽必须是整数") from exc
+        if togepi_half_width < 0:
+            raise ValueError("波克比 Seed 反查帧半宽不能为负数")
+        values["波克比野生反查帧半宽"] = togepi_half_width
+
+    egg_window = (
+        getattr(options, "egg_seed_reverse_seed_tolerance", None),
+        getattr(options, "egg_seed_reverse_min_advances", None),
+        getattr(options, "egg_seed_reverse_max_advances", None),
+    )
+    if any(value is not None for value in egg_window):
+        if any(value is None for value in egg_window):
+            raise ValueError("孵蛋 Seed 反查必须同时填写 Seed 容差、最小消耗帧和最大消耗帧")
+        try:
+            seed_tolerance, minimum, maximum = (int(value) for value in egg_window)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("孵蛋 Seed 反查窗口必须是整数") from exc
+        if seed_tolerance < 0 or minimum < 0:
+            raise ValueError("孵蛋 Seed 容差和最小消耗帧不能为负数")
+        if maximum < minimum:
+            raise ValueError("孵蛋 Seed 反查最大消耗帧不能小于最小消耗帧")
+        values.update({
+            "孵蛋野生Seed容差": seed_tolerance,
+            "孵蛋野生最小消耗帧": minimum,
+            "孵蛋野生最大消耗帧": maximum,
+        })
+    return values
+
+
+def plan_to_user_values(
+    plan: RunPlan,
+    options: EasyCon118Options | None = None,
+) -> dict[str, Any]:
+    """Map a generated plan to the editable variables at the top of 2.0."""
+    options = options or EasyCon118Options()
+    nx_model = options.nx_model
+    if nx_model is None:
+        nx_model = 2 if plan.request.game.endswith("nx2") else 1
+    if nx_model not in (1, 2):
+        raise ValueError("NX 机型必须是 1 (Switch1) 或 2 (Switch2)")
+    expected_nx_model = 2 if plan.request.game.endswith("nx2") else 1
+    if nx_model != expected_nx_model:
+        raise ValueError(
+            f"搜索游戏 {plan.request.game} 必须使用 NX 机型 {expected_nx_model}，"
+            f"不能写入 {nx_model}"
+        )
+
+    request_uses_japanese_rom = "_jpn_" in plan.request.game
+    if request_uses_japanese_rom != options.japanese_starter:
+        raise ValueError(
+            "日版御三家生成标志与搜索使用的 ROM 语言不一致；拒绝生成可能调用英文 Seed 表或英文标签的脚本"
+        )
+
+    if options.seed_startup_scheme not in {0, 1}:
+        raise ValueError("Seed启动方案只能是0（当前HOME_BUFFER）或1（固定用户界面HOME）")
+    if options.seed_calibration_scheme not in {0, 1}:
+        raise ValueError("正式版 Seed校准方案只能是0（原始12轮众数）或1（实验锁定细调）")
+    debug_log_output = _validate_runtime_output_mode(options.debug_log_output)
+    frame_parity_scheme = _validate_frame_parity_scheme(options.frame_parity_scheme)
+    reverse_expansion_to_ecs_values(options)
+    is_wild = _is_wild(plan)
+    if not isinstance(options.item_rng_mode, bool):
+        raise ValueError("道具乱数模式必须是布尔值")
+    if not isinstance(options.record_shiny_video, bool):
+        raise ValueError("出闪录像开关必须是布尔值")
+    if not isinstance(options.stop_on_non_target_shiny, bool):
+        raise ValueError("非目标闪光停止开关必须是布尔值")
+    if options.item_rng_mode and not is_wild:
+        raise ValueError("道具乱数模式当前仅支持野生目标")
+    item_rng_enabled = options.item_rng_mode and is_wild
+    if item_rng_enabled:
+        try:
+            party_empty_slots = int(options.party_empty_slots)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("队伍空位数量必须是 1-5 的整数") from exc
+        if not 1 <= party_empty_slots <= 5:
+            raise ValueError("队伍空位数量必须在 1-5 之间")
+    else:
+        party_empty_slots = 1
+    category_zh = CATEGORY_EN_TO_ZH.get(plan.request.category, plan.request.category)
+    location_zh = location_to_zh(plan.request.location)
+    if options.japanese_starter and (
+        plan.request.category != "Starter" or plan.species_id not in {1, 4, 7}
+    ):
+        raise ValueError("日版御三家临时分支仅支持静态图鉴1/4/7")
+    # The Japanese NX table currently contains only mono_h_a.  Keep the
+    # planner's logical setting at mode 0, but materialize it as the
+    # generated-project-only mode 10 so the English table cannot be reused.
+    script_seed_mode = 10 if options.japanese_starter else plan.seed_mode
+    values = {
+        "游戏版本文本": _game_text(plan.request.game),
+        "Seed模式": script_seed_mode,
+        "NX机型": nx_model,
+        "Seed校准方案": options.seed_calibration_scheme,
+        "Seed启动方案": options.seed_startup_scheme,
+        "调试日志输出": debug_log_output,
+        "帧奇偶修正方案": frame_parity_scheme,
+        "目标Seed": plan.initial_seed.seed.upper(),
+        "目标消耗帧": plan.initial_seed.advances,
+        # The ECS resolves the name before the numeric Dex field.  Generated
+        # plans are authoritative, so clear any stale template name instead
+        # of letting a previous target override the generated Dex number.
+        "目标宝可梦名称": "",
+        "目标全国图鉴编号": plan.species_id,
+        "静态或野生": "野生" if is_wild else "静态",
+        "宝可梦遭遇方法": category_zh if is_wild else "草丛",
+        "宝可梦遭遇地点": location_zh if is_wild else "",
+        "麻痹": int(options.paralysis),
+        "点到为止": int(options.false_swipe),
+        "出闪后继续抓捕": int(options.continue_capture_after_shiny),
+        "出闪录像": int(options.record_shiny_video),
+        "非目标闪光停止": int(is_wild and options.stop_on_non_target_shiny),
+        # Static and ordinary wild runs always materialize the safe defaults;
+        # item mode is only meaningful for wild encounters.
+        "道具乱数模式": int(item_rng_enabled),
+        "队伍空位数量": party_empty_slots,
+    }
+    return values
+
+
+def egg_request_to_user_values(request: EggRunRequest) -> dict[str, Any]:
+    """Map a Ten Lines Egg result to the experimental same-seed ECS fields."""
+    request.validate()
+    values: dict[str, Any] = {
+        "游戏版本文本": _game_text(request.game),
+        "Seed模式": request.seed_mode,
+        "NX机型": request.nx_model,
+        "Seed校准方案": request.seed_calibration_scheme,
+        "Seed启动方案": request.seed_startup_scheme,
+        "调试日志输出": _validate_runtime_output_mode(request.debug_log_output),
+        # Egg generation deliberately ignores any caller/UI parity choice.
+        "帧奇偶修正方案": 1,
+        "目标Seed": request.normalized_seed,
+        "目标消耗帧": request.held_advances,
+        "目标宝可梦名称": "",
+        "目标全国图鉴编号": request.species_id,
+        "静态或野生": "孵蛋",
+        # The timeline template is also used for item-RNG experiments and may
+        # retain the author's last value. Egg generation must always disable
+        # that mutually exclusive mode or runtime validation rejects the run.
+        "道具乱数模式": 0,
+        "队伍空位数量": 1,
+        "孵蛋同Seed模式": 1,
+        "孵蛋领取目标帧": request.pickup_advances,
+        "孵蛋双亲相性": request.compatibility,
+        "孵蛋亲本A性别": request.parent_a_gender,
+        "孵蛋亲本B性别": request.parent_b_gender,
+    }
+    for parent, ivs in (("A", request.parent_a_ivs), ("B", request.parent_b_ivs)):
+        for stat, value in zip(("HP", "ATK", "DEF", "SPA", "SPD", "SPE"), ivs):
+            values[f"孵蛋双亲{parent}_{stat}"] = value
+    return values
+
+
+def build_egg_held_availability(
+    request: EggRunRequest,
+    *,
+    held_offset: int = 0,
+    before: int = 100,
+    after: int = 100,
+) -> dict[str, Any]:
+    """Build Ten Lines-compatible FRLG Held no-egg intervals."""
+    request.validate()
+    if held_offset < 0:
+        raise ValueError("Held Offset 不能为负数")
+    if before < 0 or after < 0:
+        raise ValueError("Held无蛋表前后窗口不能为负数")
+    range_start = max(0, request.held_advances - before)
+    range_end = request.held_advances + after
+    seed = int(request.normalized_seed, 16)
+
+    # Ten Lines Egg Held判定：目标帧先加Offset，再前进1次取高16位。
+    state = seed
+    for _ in range(range_start + held_offset + 1):
+        state = (state * 0x41C64E6D + 0x6073) & 0xFFFFFFFF
+
+    intervals: list[tuple[int, int]] = []
+    producing_frames: list[int] = []
+    interval_start: int | None = None
+    for frame in range(range_start, range_end + 1):
+        produces_egg = (((state >> 16) * 100) // 65535) < request.compatibility
+        if produces_egg:
+            producing_frames.append(frame)
+        if not produces_egg and interval_start is None:
+            interval_start = frame
+        elif produces_egg and interval_start is not None:
+            intervals.append((interval_start, frame - 1))
+            interval_start = None
+        state = (state * 0x41C64E6D + 0x6073) & 0xFFFFFFFF
+    if interval_start is not None:
+        intervals.append((interval_start, range_end))
+
+    produced = set(producing_frames)
+    near_recovery_anchors: list[int] = []
+    for candidate in (request.held_advances - 2, request.held_advances + 2):
+        middle = (candidate + request.held_advances) // 2
+        if (
+            candidate in produced
+            and middle in produced
+            and request.held_advances in produced
+        ):
+            near_recovery_anchors.append(candidate)
+
+    def parity_run(frame: int) -> int:
+        count = 1
+        cursor = frame - 2
+        while cursor in produced:
+            count += 1
+            cursor -= 2
+        cursor = frame + 2
+        while cursor in produced:
+            count += 1
+            cursor += 2
+        return count
+
+    def local_density(frame: int) -> int:
+        return sum(candidate in produced for candidate in range(frame - 2, frame + 3))
+
+    fallback_recovery_anchors = [
+        frame
+        for frame in producing_frames
+        if frame != request.held_advances
+        and frame not in near_recovery_anchors
+        and frame % 2 == request.held_advances % 2
+    ]
+    fallback_recovery_anchors.sort(
+        key=lambda frame: (
+            -local_density(frame),
+            -parity_run(frame),
+            abs(frame - request.held_advances),
+            frame,
+        )
+    )
+
+    return {
+        "schema": "frlg-held-availability/v2",
+        "heldSeed": request.normalized_seed,
+        "targetHeld": request.held_advances,
+        "compatibility": request.compatibility,
+        "heldOffset": held_offset,
+        "rangeStart": range_start,
+        "rangeEnd": range_end,
+        "targetProducesEgg": not any(
+            start <= request.held_advances <= end for start, end in intervals
+        ),
+        "noEggIntervals": intervals,
+        "nearRecoveryAnchors": near_recovery_anchors,
+        "fallbackRecoveryAnchors": fallback_recovery_anchors,
+    }
+
+
+def egg_held_availability_to_ecs_values(
+    availability: dict[str, Any],
+) -> dict[str, Any]:
+    intervals = availability["noEggIntervals"]
+    return {
+        "孵蛋Held无蛋表Seed": availability["heldSeed"],
+        "孵蛋Held无蛋表目标帧": availability["targetHeld"],
+        "孵蛋Held无蛋表相性": availability["compatibility"],
+        "孵蛋Held无蛋表Offset": availability["heldOffset"],
+        "孵蛋Held无蛋表最小帧": availability["rangeStart"],
+        "孵蛋Held无蛋表最大帧": availability["rangeEnd"],
+        "孵蛋Held无蛋区间起点表": [start for start, _ in intervals],
+        "孵蛋Held无蛋区间终点表": [end for _, end in intervals],
+        "孵蛋Held近邻恢复锚点表": availability["nearRecoveryAnchors"],
+        "孵蛋Held远端恢复锚点表": availability["fallbackRecoveryAnchors"],
+    }
+
+
+def _ecs_literal(value: Any) -> str:
+    if isinstance(value, str):
+        return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+    if isinstance(value, bool):
+        return "1" if value else "0"
+    if isinstance(value, (list, tuple)):
+        return "[" + ",".join(_ecs_literal(item) for item in value) + "]"
+    return str(value)
+
+
+def _configure_all_values(template_text: str, values: dict[str, Any]) -> str:
+    configured = template_text
+    for name, value in values.items():
+        pattern = re.compile(rf"(?m)^\s*\${re.escape(name)}\s*=\s*[^\r\n]*$")
+        configured, count = pattern.subn(f"${name} = {_ecs_literal(value)}", configured)
+        if count != 1:
+            raise ValueError(f"2.0 模板字段 ${name} 应出现 1 次，实际为 {count} 次")
+    return configured
+
+
+def _shiny_strategy_to_ecs_values(
+    options: EasyCon118Options,
+    *,
+    is_wild: bool,
+) -> dict[str, int]:
+    """Return advanced shiny post-processing assignments.
+
+    These assignments live below the 2.0 advanced-settings marker in the
+    upstream mother template, so they must not be sent through the ordinary
+    user-section replacement pass.
+    """
+    if not isinstance(options.record_shiny_video, bool):
+        raise ValueError("出闪录像开关必须是布尔值")
+    if not isinstance(options.stop_on_non_target_shiny, bool):
+        raise ValueError("非目标闪光停止开关必须是布尔值")
+    return {
+        "出闪录像": int(options.record_shiny_video),
+        "非目标闪光停止": int(is_wild and options.stop_on_non_target_shiny),
+    }
+
+
+def configure_template_text(
+    template_text: str,
+    plan: RunPlan,
+    options: EasyCon118Options | None = None,
+    *,
+    allow_experimental: bool = False,
+) -> str:
+    """Replace only the declared 2.0 user-input assignments."""
+    if not plan.route_support.can_start and not allow_experimental:
+        raise ValueError(
+            "该路线只允许搜索/生成计划，不能生成可启动的 2.0 正式脚本: "
+            + plan.route_support.summary
+        )
+
+    options = options or EasyCon118Options()
+    user_values = plan_to_user_values(plan, options)
+    is_wild = _is_wild(plan)
+    shiny_values = _shiny_strategy_to_ecs_values(options, is_wild=is_wild)
+    for name in shiny_values:
+        user_values.pop(name, None)
+    configured = _configure_user_values(
+        template_text,
+        user_values,
+        optional_names={"Seed校准方案", "调试日志输出", "帧奇偶修正方案"},
+    )
+    all_values = reverse_expansion_to_ecs_values(options)
+    all_values.update(shiny_values)
+    return _configure_all_values(
+        configured,
+        all_values,
+    )
+
+
+def _configure_user_values(
+    template_text: str,
+    values: dict[str, Any],
+    *,
+    optional_names: set[str] | frozenset[str] = frozenset(),
+) -> str:
+    template_text = _apply_seed_mode3_help_start_text(template_text)
+    marker = "# ============================进阶设置"
+    user_section, separator, remainder = template_text.partition(marker)
+    if not separator:
+        raise ValueError("2.0 模板缺少进阶设置分界标记，拒绝在未知版本中替换参数")
+    configured = user_section
+    for name, value in values.items():
+        pattern = re.compile(rf"(?m)^\s*\${re.escape(name)}\s*=\s*[^\r\n]*$")
+        configured, count = pattern.subn(f"${name} = {_ecs_literal(value)}", configured)
+        if count == 0 and name in optional_names:
+            continue
+        if count != 1:
+            raise ValueError(f"2.0 模板字段 ${name} 应出现 1 次，实际为 {count} 次")
+    return configured + (separator + remainder if separator else "")
+
+
+def _configured_user_assignments(project_main: str | Path) -> dict[str, str]:
+    """Read the generated ECS user-input assignments for consistency checks."""
+    project_main = Path(project_main)
+    text = project_main.read_text(encoding="utf-8-sig")
+    user_section, separator, _ = text.partition("# ============================进阶设置")
+    if not separator:
+        raise ValueError("生成脚本缺少进阶设置分界标记，无法核对写入参数")
+    assignments: dict[str, str] = {}
+    pattern = re.compile(r"^\s*\$([^\s=]+)\s*=\s*(.*?)\s*$")
+    for line in user_section.splitlines():
+        match = pattern.match(line)
+        if match:
+            assignments[match.group(1)] = match.group(2)
+    return assignments
+
+
+def _assert_configured_user_values(
+    project_main: str | Path,
+    values: dict[str, Any],
+) -> None:
+    assignments = _configured_user_assignments(project_main)
+    for name, value in values.items():
+        expected = _ecs_literal(value)
+        actual = assignments.get(name)
+        if actual != expected:
+            raise ValueError(
+                f"生成脚本参数不一致: ${name} 应为 {expected}，实际为 {actual!r}"
+            )
+
+
+def _assert_configured_all_values(
+    project_main: str | Path,
+    values: dict[str, Any],
+) -> None:
+    if not values:
+        return
+    text = Path(project_main).read_text(encoding="utf-8-sig")
+    for name, value in values.items():
+        expected = _ecs_literal(value)
+        matches = re.findall(
+            rf"(?m)^\s*\${re.escape(name)}\s*=\s*([^\r\n]*?)\s*$",
+            text,
+        )
+        if matches != [expected]:
+            raise ValueError(
+                f"生成脚本参数不一致: ${name} 应为 {expected}，实际为 {matches!r}"
+            )
+
+
+def _manifest(project_main: str | Path) -> dict[str, Any]:
+    path = Path(project_main).parent / "plan.json"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"生成项目缺少有效 plan.json: {path}: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise ValueError(f"生成项目 plan.json 根结构无效: {path}")
+    return payload
+
+
+def validate_generated_project_consistency(
+    project_main: str | Path,
+    plan: RunPlan,
+    options: EasyCon118Options | None = None,
+    *,
+    template_name: str | None = None,
+) -> None:
+    """Reject a generated normal project whose manifest/ECS values disagree."""
+    options = options or EasyCon118Options()
+    selected_template = _normalized_template_name(
+        template_name,
+        default=STANDARD_TEMPLATE_NAME,
+    )
+    manifest = _manifest(project_main)
+    if manifest.get("template") != selected_template:
+        raise ValueError(
+            "生成脚本入口不一致: "
+            f"应为 {selected_template}，实际为 {manifest.get('template')!r}"
+        )
+    manifest_plan = manifest.get("plan")
+    if not isinstance(manifest_plan, dict):
+        raise ValueError("生成项目 plan.json 缺少 plan")
+    request = manifest_plan.get("request")
+    target = manifest_plan.get("target")
+    initial = manifest_plan.get("initial_seed")
+    execution = manifest_plan.get("execution")
+    if not all(isinstance(item, dict) for item in (request, target, initial, execution)):
+        raise ValueError("生成项目 plan.json 的计划结构不完整")
+    checks = (
+        ("目标宝可梦", request.get("pokemon"), plan.request.pokemon),
+        ("目标结果宝可梦", target.get("pokemon"), plan.target.pokemon),
+        ("目标Seed", str(target.get("target_seed", "")).upper(), plan.target.target_seed.upper()),
+        ("初始Seed", str(initial.get("seed", "")).upper(), plan.initial_seed.seed.upper()),
+        ("Advance", initial.get("advances"), plan.initial_seed.advances),
+        ("Seed模式", execution.get("seed_mode"), plan.seed_mode),
+    )
+    for label, actual, expected in checks:
+        if actual != expected:
+            raise ValueError(f"生成项目{label}不一致: 应为 {expected!r}，实际为 {actual!r}")
+    runtime_overrides = manifest.get("runtime_overrides")
+    expected_controller = (
+        "FORMAL" if selected_template == STANDARD_TEMPLATE_NAME else "TIMELINE"
+    )
+    if not isinstance(runtime_overrides, dict) or runtime_overrides.get(
+        "home_buffer_controller"
+    ) != expected_controller:
+        raise ValueError(
+            "生成项目 HOME_BUFFER 控制器与脚本入口不一致: "
+            f"应为 {expected_controller}"
+        )
+    user_values = plan_to_user_values(plan, options)
+    shiny_values = _shiny_strategy_to_ecs_values(options, is_wild=_is_wild(plan))
+    for name in shiny_values:
+        user_values.pop(name, None)
+    _assert_configured_user_values(project_main, user_values)
+    all_values = reverse_expansion_to_ecs_values(options)
+    all_values.update(shiny_values)
+    _assert_configured_all_values(
+        project_main,
+        all_values,
+    )
+
+
+def validate_generated_egg_project_consistency(
+    project_main: str | Path,
+    request: EggRunRequest,
+    *,
+    template_name: str | None = None,
+) -> None:
+    """Reject a generated egg project whose manifest/ECS values disagree."""
+    selected_template = _normalized_template_name(
+        template_name,
+        default=EGG_TEMPLATE_NAME,
+    )
+    manifest = _manifest(project_main)
+    if manifest.get("template") != selected_template:
+        raise ValueError(
+            "孵蛋生成脚本入口不一致: "
+            f"应为 {selected_template}，实际为 {manifest.get('template')!r}"
+        )
+    manifest_request = manifest.get("egg_request")
+    if not isinstance(manifest_request, dict):
+        raise ValueError("孵蛋生成项目 plan.json 缺少 egg_request")
+    expected_request = request.to_dict()
+    for key in (
+        "game", "seed_mode", "target_seed", "held_advances", "pickup_advances",
+        "species_id", "compatibility", "parent_a_gender", "parent_b_gender",
+        "parent_a_ivs", "parent_b_ivs", "seed_startup_scheme",
+        "seed_calibration_scheme", "debug_log_output",
+        "reverse_expansion_layers", "reverse_expansion_seed_tolerances",
+        "reverse_expansion_frame_half_widths",
+        "egg_seed_reverse_seed_tolerance", "egg_seed_reverse_min_advances",
+        "egg_seed_reverse_max_advances",
+    ):
+        actual = manifest_request.get(key)
+        expected = expected_request.get(key)
+        if key == "target_seed":
+            actual = str(actual or "").upper()
+            expected = str(expected or "").upper()
+        elif key in {
+            "parent_a_ivs", "parent_b_ivs",
+            "reverse_expansion_seed_tolerances",
+            "reverse_expansion_frame_half_widths",
+        }:
+            actual = tuple(actual) if isinstance(actual, (list, tuple)) else actual
+            expected = tuple(expected) if isinstance(expected, (list, tuple)) else expected
+        if actual != expected:
+            raise ValueError(
+                f"孵蛋生成项目{key}不一致: 应为 {expected!r}，实际为 {actual!r}"
+            )
+    expected_wait_mode = (
+        "formal_wait" if selected_template == STANDARD_TEMPLATE_NAME else "legacy_timeline"
+    )
+    if manifest.get("egg_wait_mode") != expected_wait_mode:
+        raise ValueError(
+            "孵蛋生成项目等待模式与脚本入口不一致: "
+            f"应为 {expected_wait_mode}，实际为 {manifest.get('egg_wait_mode')!r}"
+        )
+    _assert_configured_user_values(project_main, egg_request_to_user_values(request))
+    _assert_configured_all_values(
+        project_main,
+        reverse_expansion_to_ecs_values(request),
+    )
+
+
+def _apply_seed_mode3_help_start_text(text: str) -> str:
+    """Upgrade only mode 3: stereo/HELP/Start (controller X), without disabling it."""
+    text = re.sub(r"(?m)^(#\s+3\s*=\s*)stereo_r_a\b", r"\1stereo_h_start", text)
+    text = text.replace(
+        "# Seed模式名称中的mono/stereo和h/r分别对应Sound与Button Mode。",
+        "# 模式0-9均使用HELP；mono/stereo决定Sound，模式3为STEREO/HELP/START。",
+    )
+    for variable in ("游戏设置目标按键", "孵蛋库_目标按键"):
+        text = re.sub(
+            rf"(?m)^    IF \$Seed模式 == 3\r?\n"
+            rf"        \${variable} = 1\r?\n    ENDIF\r?\n",
+            "", text,
+        )
+    text = text.replace(
+        "$Seed模式 == 0 or $Seed模式 == 1 or $Seed模式 == 3 or $Seed模式 == 4",
+        "$Seed模式 == 0 or $Seed模式 == 1 or $Seed模式 == 4",
+    )
+    return text.replace(
+        "$Seed模式 == 2 or $Seed模式 == 8 or $Seed模式 == 9",
+        "$Seed模式 == 2 or $Seed模式 == 3 or $Seed模式 == 8 or $Seed模式 == 9",
+    )
+
+
+def _apply_seed_mode3_library_mapping(library_path: Path) -> None:
+    original = library_path.read_text(encoding="utf-8")
+    configured = _apply_seed_mode3_help_start_text(original)
+    if configured != original:
+        library_path.write_text(configured, encoding="utf-8")
+
+
+_JAPANESE_NATURE_LABELS = (
+    "勤奋", "怕寂寞", "勇敢", "固执", "顽皮", "大胆", "坦率", "悠闲",
+    "淘气", "乐天", "胆小", "急躁", "认真", "爽朗", "天真", "内敛",
+    "慢吞吞", "冷静", "害羞", "马虎", "温和", "温顺", "自大", "慎重", "浮躁",
+)
+_JAPANESE_STAT_LABELS = (
+    ("HP", "实HP", "日版HP_", (18, 19, 20, 21)),
+    ("ATK", "实ATK", "日版ATTACK_", tuple(range(8, 15))),
+    ("DEF", "实DEF", "日版DEFENSE_", tuple(range(8, 15))),
+    ("SPA", "实SPA", "日版SP_ATK_", tuple(range(9, 15))),
+    ("SPD", "实SPD", "日版SP_DEF_", tuple(range(9, 15))),
+    ("SPE", "实SPE", "日版SPEED_", tuple(range(8, 15))),
+)
+_JAPANESE_STARTER_MARKER = "# ===== 日版御三家临时识图分支 ====="
+_JAPANESE_STARTER_GUARD_MARKER = "日版御三家临时模式10仅支持静态图鉴1/4/7"
+_JAPANESE_STARTER_PAGE_SYNC_MARKER = "# JAPANESE_STARTER_PAGE_SYNC_V2"
+
+
+def _render_japanese_starter_ocr_helper() -> str:
+    """Render the main-script-only Japanese starter OCR helper."""
+    lines = [
+        _JAPANESE_STARTER_MARKER,
+        "# 日版御三家临时分支；日版标签随 2.0 脚本包提供，默认英文流程不调用。",
+        "FUNC 读取并输出日版御三家识图结果(): INT",
+        "    $性别识图失败 = 0",
+        "    $性格识图失败 = 0",
+        "    $LV识图失败 = 0",
+        "    $HP识图失败 = 0",
+        "    $ATK识图失败 = 0",
+        "    $DEF识图失败 = 0",
+        "    $SPA识图失败 = 0",
+        "    $SPD识图失败 = 0",
+        "    $SPE识图失败 = 0",
+        "    $等级表直读 = 1",
+        "    $等级标签识别 = 0",
+        "    $候选数字命中项数 = 0",
+        "    $候选数字回退项数 = 0",
+        "    $候选数字标签次数 = 0",
+        "    CALL 重置候选数字标签次数",
+        "",
+        "    IF $道具乱数模式 == 0 and @出闪 >= $识图阈值",
+        "        PRINT 已识别到出闪，脚本停止",
+        "        RETURN 0",
+        "    ENDIF",
+        "",
+        f"    {_JAPANESE_STARTER_PAGE_SYNC_MARKER}",
+        "    # 旧日版御三家脚本会先确认性格页，再右切并确认能力值页。",
+        "    $日版页面等待次数 = 0",
+        "    FOR",
+        "        $日版性格页分数 = @日版性格界面",
+        "        $日版能力页分数 = @日版能力值界面",
+        "        IF $日版性格页分数 > $识图阈值",
+        "            BREAK",
+        "        ENDIF",
+        "        WAIT 100",
+        "        $日版页面等待次数 += 1",
+        "        IF $日版页面等待次数 >= 30",
+        "            PRINT 日版性格页确认失败: 性格页 & $日版性格页分数 & \" 能力值页 \" & $日版能力页分数",
+        "            RETURN 0",
+        "        ENDIF",
+        "    NEXT",
+        "    WAIT 200",
+        "",
+        "    $日版公图标分数 = @火红公图标",
+        "    $日版母图标分数 = @火红母图标",
+        "    IF $日版公图标分数 < $识图阈值 and $日版母图标分数 < $识图阈值",
+        "        $识图性别 = -1",
+        "        $性别识图失败 = 1",
+        "        PRINT 日版性别识图失败，公母标签均低于阈值",
+        "    ELIF $日版公图标分数 >= $日版母图标分数",
+        "        $识图性别 = 0",
+        "        $当前性别 = 0",
+        "        PRINT ▶ 日版性别: ♂",
+        "    ELSE",
+        "        $识图性别 = 1",
+        "        $当前性别 = 1",
+        "        $检测到性别母 = 1",
+        "        PRINT ▶ 日版性别: ♀",
+        "    ENDIF",
+        "",
+        "    $识图性格 = -1",
+        "    $日版性格最高分 = -1",
+    ]
+    for index, label in enumerate(_JAPANESE_NATURE_LABELS):
+        lines.extend(
+            (
+                f"    $日版性格候选分数 = @性格日版{label}",
+                "    IF $日版性格候选分数 > $日版性格最高分",
+                "        $日版性格最高分 = $日版性格候选分数",
+                f"        $识图性格 = {index}",
+                "    ENDIF",
+            )
+        )
+    lines.extend(
+        (
+            "    IF $日版性格最高分 <= $识图阈值",
+            "        $识图性格 = -1",
+            "        $性格识图失败 = 1",
+            "        PRINT 日版性格识图失败，日版性格标签均低于阈值",
+            "    ENDIF",
+            "    PRINT 日版性格最高匹配度: & $日版性格最高分",
+            "    $当前性格 = $识图性格",
+            "",
+            "    $等级 = 5",
+            "    LS RIGHT",
+            "    WAIT 50",
+            "    LS RESET",
+            "    WAIT 1000",
+            "    $日版页面等待次数 = 0",
+            "    FOR",
+            "        $日版能力页分数 = @日版能力值界面",
+            "        IF $日版能力页分数 > $识图阈值",
+            "            BREAK",
+            "        ENDIF",
+            "        WAIT 100",
+            "        $日版页面等待次数 += 1",
+            "        IF $日版页面等待次数 >= 30",
+            "            PRINT 日版能力值页确认失败: & $日版能力页分数",
+            "            RETURN 0",
+            "        ENDIF",
+            "    NEXT",
+            "    WAIT 200",
+            "",
+        )
+    )
+    for stat_name, target_name, prefix, values in _JAPANESE_STAT_LABELS:
+        lines.append(f"    ${target_name} = -1")
+        lines.append(f"    $日版{stat_name}最高分 = -1")
+        for value in values:
+            lines.extend(
+                (
+                    f"    $日版{stat_name}候选分数 = @{prefix}{value:02d}",
+                    f"    IF $日版{stat_name}候选分数 > $日版{stat_name}最高分",
+                    f"        $日版{stat_name}最高分 = $日版{stat_name}候选分数",
+                    f"        ${target_name} = {value}",
+                    "    ENDIF",
+                )
+            )
+        lines.extend(
+            (
+                f"    IF $日版{stat_name}最高分 <= $识图阈值",
+                f"        ${target_name} = -1",
+                f"        ${stat_name}识图失败 = 1",
+                f"        PRINT 日版{stat_name}识图失败，标签均低于阈值",
+                "    ENDIF",
+                f"    PRINT 日版{stat_name}最高匹配度: & $日版{stat_name}最高分",
+                "",
+            )
+        )
+    lines.extend(
+        (
+            "    $识图性别文本 = 性别文本($识图性别)",
+            "    $识图性格文本 = 性格文本($识图性格)",
+            "    PRINT \"\"",
+            "    PRINT 【日版御三家识图】",
+            "    PRINT 个体: & $识图性格文本 & \"，\" & $识图性别文本 & \"，LV\" & $等级",
+            "    PRINT 能力: HP & $实HP & \" ATK \" & $实ATK & \" DEF \" & $实DEF & \" SPA \" & $实SPA & \" SPD \" & $实SPD & \" SPE \" & $实SPE",
+            "",
+            "    IF $性别识图失败 == 1",
+            "        RETURN 0",
+            "    ENDIF",
+            "    IF $性格识图失败 == 1",
+            "        RETURN 0",
+            "    ENDIF",
+        )
+    )
+    for stat_name, _, _, _ in _JAPANESE_STAT_LABELS:
+        lines.extend(
+            (
+                f"    IF ${stat_name}识图失败 == 1",
+                "        RETURN 0",
+                "    ENDIF",
+            )
+        )
+    lines.extend(("", "    RETURN 1", "ENDFUNC", ""))
+    return "\n".join(lines)
+
+
+def _apply_japanese_starter_guard_text(text: str) -> str:
+    """Restrict mode 10 to the static starter encounters it can recognize."""
+    if _JAPANESE_STARTER_GUARD_MARKER in text:
+        return text
+    anchor = "FUNC 检查运行参数(): INT\n"
+    if text.count(anchor) != 1:
+        raise ValueError("2.0 主脚本缺少唯一的运行参数检查入口")
+    guard = (
+        "    IF $Seed模式 == 10\n"
+        "        IF $遭遇类型 != 1 or ($目标全国图鉴编号 != 1 and $目标全国图鉴编号 != 4 and $目标全国图鉴编号 != 7)\n"
+        "            PRINT 日版御三家临时模式10仅支持静态图鉴1/4/7\n"
+        "            RETURN 0\n"
+        "        ENDIF\n"
+        "    ENDIF\n\n"
+    )
+    return text.replace(anchor, anchor + guard, 1)
+
+
+def _apply_japanese_starter_runtime_text(text: str) -> str:
+    """Inject Japanese starter recognition into one generated main script."""
+    configured = _apply_japanese_starter_guard_text(text)
+    anchor = "FUNC 读取并输出识图结果(): INT\n"
+    branch = (
+        "    IF $Seed模式 == 10\n"
+        "        RETURN 读取并输出日版御三家识图结果()\n"
+        "    ENDIF\n"
+    )
+    if branch not in configured and configured.count(anchor) != 1:
+        raise ValueError("2.0 主脚本缺少唯一的识图结果入口")
+    if branch not in configured:
+        configured = configured.replace(anchor, anchor + branch, 1)
+    mode10_comment = "#   10 = japanese_mono_h_a（临时日版御三家，仅MONO/HELP/A）"
+    if mode10_comment not in configured:
+        configured = configured.replace(
+            "#   9 = mono_h_start_blackout_l",
+            "#   9 = mono_h_start_blackout_l\n" + mode10_comment,
+            1,
+        )
+    configured = configured.replace(
+        "# 模式0-9均使用HELP；mono/stereo决定Sound，模式3为STEREO/HELP/START。",
+        "# 模式0-9均使用HELP；模式3为STEREO/HELP/START；模式10为日版MONO/HELP/A。",
+    )
+    configured = re.sub(
+        r"(?m)^    IF \$Seed模式 == 0 or \$Seed模式 == 1 or \$Seed模式 == 4 or \$Seed模式 == 5 or \$Seed模式 == 6 or  \$Seed模式 == 7$",
+        "    IF $Seed模式 == 0 or $Seed模式 == 1 or $Seed模式 == 4 or $Seed模式 == 5 or $Seed模式 == 6 or  $Seed模式 == 7 or $Seed模式 == 10",
+        configured,
+        count=1,
+    )
+    configured = re.sub(
+        r"(?m)^    ELIF \$Seed模式 < 0 or \$Seed模式 > 9$",
+        "    ELIF $Seed模式 < 0 or $Seed模式 > 10",
+        configured,
+        count=1,
+    )
+    helper = _render_japanese_starter_ocr_helper()
+    if _JAPANESE_STARTER_MARKER not in configured:
+        return configured + "\n" + helper
+    if _JAPANESE_STARTER_PAGE_SYNC_MARKER in configured:
+        return configured
+
+    marker_at = configured.index(_JAPANESE_STARTER_MARKER)
+    function_at = configured.index("FUNC 读取并输出日版御三家识图结果(): INT", marker_at)
+    function_end = configured.index("\nENDFUNC", function_at) + len("\nENDFUNC")
+    return configured[:marker_at] + helper.rstrip() + configured[function_end:]
+
+
+def _japanese_seed_values(game: str) -> tuple[str, ...]:
+    filename = "fr_jpn_nx.bin" if game == "fr" else "lg_jpn_nx.bin"
+    path = RESOURCE_ROOT / "rng" / "resources" / filename
+    if not path.is_file():
+        raise FileNotFoundError(f"缺少日版御三家 Seed 资源: {path}")
+    table = decode_nx_seed_binary(path.read_bytes())
+    values = table.modes.get("mono_h_a")
+    if values is None:
+        raise ValueError(f"日版 Seed 表缺少 mono_h_a: {filename}")
+    return tuple("" if value is None else f"{value:04X}" for value in values)
+
+
+def _apply_japanese_seed_mode10(library_path: Path, game_cn: str, game: str) -> str:
+    """Add temporary mode 10 to a copied ECS table, leaving source cache intact."""
+    original = library_path.read_text(encoding="utf-8-sig")
+    if re.search(r"(?m)^# mode 10 = japanese_mono_h_a$", original):
+        return original
+    values = _japanese_seed_values(game)
+    max_index = re.search(rf"(?m)^FUNC 取Seed最大索引_{re.escape(game_cn)}\(\): INT\n    RETURN (\d+)$", original)
+    if max_index is None or int(max_index.group(1)) != len(values) - 1:
+        raise ValueError(f"{game_cn}日版 Seed 表长度与 2.0 时间表不一致")
+    rendered = ",".join('""' if value == "" else f'"{value}"' for value in values)
+    function_anchor = f"\nFUNC 取SeedHEX_{game_cn}($idx: INT, $mode: INT): STRING\n"
+    if original.count(function_anchor) != 1:
+        raise ValueError(f"{game_cn} Seed 表缺少唯一的取SeedHEX入口")
+    array = (
+        f"\n# mode 10 = japanese_mono_h_a（临时日版御三家）\n"
+        f"$Seed_HEX_{game_cn}_m10 = [{rendered}]\n"
+    )
+    configured = original.replace(function_anchor, array + function_anchor, 1)
+    mode_anchor = f"    ELIF $mode == 9\n        RETURN $Seed_HEX_{game_cn}_m9[$idx]"
+    if configured.count(mode_anchor) != 1:
+        raise ValueError(f"{game_cn} Seed 表缺少模式9入口")
+    configured = configured.replace(
+        mode_anchor,
+        mode_anchor + f"\n    ELIF $mode == 10\n        RETURN $Seed_HEX_{game_cn}_m10[$idx]",
+        1,
+    )
+    return configured
+
+
+def configure_egg_template_text(template_text: str, request: EggRunRequest) -> str:
+    """Configure the 1.6.4a-only experimental same-seed egg entry."""
+    template_text = _apply_egg_parent_pairing_text(template_text)
+    configured = _configure_user_values(
+        template_text,
+        egg_request_to_user_values(request),
+        optional_names={"Seed校准方案", "调试日志输出", "帧奇偶修正方案"},
+    )
+    configured = _configure_all_values(
+        configured,
+        reverse_expansion_to_ecs_values(request),
+    )
+    availability = build_egg_held_availability(request)
+    availability_values = egg_held_availability_to_ecs_values(availability)
+    missing_fields = tuple(
+        name
+        for name in availability_values
+        if len(
+            re.findall(
+                rf"(?m)^\s*\${re.escape(name)}\s*=\s*[^\r\n]*$",
+                configured,
+            )
+        )
+        != 1
+    )
+    if missing_fields:
+        raise ValueError(
+            "当前 2.0 孵蛋模板未包含 Held 无蛋区间字段，通常是 local_assets 仍为旧缓存。"
+            "请重新运行安装脚本刷新 2.0 缓存，或在 GUI 选择更新后的 2.0 脚本包。"
+            "缺少字段：" + "、".join(f"${name}" for name in missing_fields)
+        )
+    configured = _configure_all_values(
+        configured,
+        availability_values,
+    )
+    configured = _apply_egg_summary_fix_text(configured)
+    return _apply_egg_reverse_lookup_policy_text(configured)
+
+
+def _apply_egg_parent_pairing_text(template_text: str) -> str:
+    """Upgrade legacy A/B restrictions to Ten Lines' four parent types."""
+    if EGG_PARENT_PAIRING_CURRENT in template_text:
+        configured = template_text
+    elif EGG_PARENT_PAIRING_OLD in template_text:
+        configured = template_text.replace(
+            EGG_PARENT_PAIRING_OLD,
+            EGG_PARENT_PAIRING_CURRENT,
+            1,
+        )
+    elif "FUNC 孵蛋流程_解析并校验配置" in template_text:
+        raise ValueError("孵蛋模板缺少已知的亲本组合校验，拒绝自动改写")
+    else:
+        # Small unit-test/user-value fixtures do not contain the runtime
+        # validation function and therefore have nothing to upgrade.
+        return template_text
+
+    if EGG_PARENT_TYPES_COMMENT_OLD in configured:
+        configured = configured.replace(
+            EGG_PARENT_TYPES_COMMENT_OLD,
+            EGG_PARENT_TYPES_COMMENT_CURRENT,
+            1,
+        )
+    return configured
+
+
+def _apply_egg_summary_fix_text(template_text: str) -> str:
+    """Keep function calls out of PRINT and remove a stray quote in the egg summary."""
+    inline_species = (
+        "    PRINT 孵蛋蛋种: & 目标中文名称($游戏版本, $孵蛋蛋种族全国图鉴编号)"
+        " & \"（全国图鉴 \" & $孵蛋蛋种族全国图鉴编号 & \"）\""
+    )
+    fixed_species = (
+        "    $孵蛋蛋种名称文本 = 目标中文名称($游戏版本, $孵蛋蛋种族全国图鉴编号)\n"
+        "    PRINT 孵蛋蛋种: & $孵蛋蛋种名称文本 & \"（全国图鉴 \""
+        " & $孵蛋蛋种族全国图鉴编号 & \"）\""
+    )
+    bad_parents = (
+        "    PRINT 亲本: A \" & $孵蛋亲本A性别 & \"，B \""
+        " & $孵蛋亲本B性别 & \"，相性 \" & $孵蛋双亲相性"
+    )
+    fixed_parents = (
+        "    PRINT 亲本: A & $孵蛋亲本A性别 & \"，B \""
+        " & $孵蛋亲本B性别 & \"，相性 \" & $孵蛋双亲相性"
+    )
+    if fixed_species not in template_text:
+        safe_species_assignment = (
+            "    $孵蛋蛋种名称文本 = "
+            "目标中文名称($游戏版本, $孵蛋蛋种族全国图鉴编号)"
+        )
+        if template_text.count(inline_species) == 1:
+            template_text = template_text.replace(inline_species, fixed_species, 1)
+        elif template_text.count(safe_species_assignment) != 1:
+            raise ValueError("孵蛋模板缺少唯一的蛋种摘要，拒绝应用日志修正")
+    if fixed_parents not in template_text:
+        if template_text.count(bad_parents) != 1:
+            raise ValueError("孵蛋模板缺少唯一的亲本摘要，拒绝应用日志修正")
+        template_text = template_text.replace(bad_parents, fixed_parents, 1)
+    return template_text
+
+
+def _egg_prepared_254_override_text(enabled: bool) -> str:
+    value = 1 if enabled else 0
+    return f"""\
+{EGG_PREPARED_254_OVERRIDE_MARKER}
+{EGG_PREPARED_254_GLOBAL} = {value}
+"""
+
+
+def _apply_egg_prepared_254_runtime_override_text(
+    template_text: str,
+    enabled: bool,
+) -> str:
+    """Optionally skip only the one-time walk/settings/save preparation."""
+    override = _egg_prepared_254_override_text(enabled).rstrip()
+    if EGG_PREPARED_254_OVERRIDE_MARKER in template_text:
+        assignment = re.compile(
+            rf"(?m)^\s*{re.escape(EGG_PREPARED_254_GLOBAL)}\s*=\s*[01]\s*$"
+        )
+        template_text, count = assignment.subn(
+            f"{EGG_PREPARED_254_GLOBAL} = {1 if enabled else 0}",
+            template_text,
+        )
+        if count != 1:
+            raise ValueError("孵蛋模板的254步启动模式字段不唯一，拒绝生成运行副本")
+        return template_text
+
+    if template_text.count(EGG_PREPARED_254_GLOBAL_ANCHOR) != 1:
+        raise ValueError("孵蛋模板缺少唯一的同Seed模式字段，拒绝添加254步启动模式")
+    template_text = template_text.replace(
+        EGG_PREPARED_254_GLOBAL_ANCHOR,
+        EGG_PREPARED_254_GLOBAL_ANCHOR + "\n" + override,
+        1,
+    )
+
+    original = """\
+    $孵蛋前置结果 = 孵蛋测试_执行前置准备($Seed模式, $游戏设置识图阈值)
+    IF $孵蛋前置结果 != 1
+        RETURN 0
+    ENDIF
+    CALL 孵蛋流程_重开下一轮
+"""
+    replacement = """\
+    IF $孵蛋从已完成254步开始 == 1
+        PRINT 【孵蛋准备】使用已有254步基础存档，跳过走位、设置检查和存档
+    ELSE
+        $孵蛋前置结果 = 孵蛋测试_执行前置准备($Seed模式, $游戏设置识图阈值)
+        IF $孵蛋前置结果 != 1
+            RETURN 0
+        ENDIF
+    ENDIF
+    CALL 孵蛋流程_重开下一轮
+"""
+    if template_text.count(original) != 1:
+        raise ValueError("孵蛋模板缺少唯一的前置准备调用，拒绝添加254步启动模式")
+    return template_text.replace(original, replacement, 1)
+
+
+def _apply_ocr_runtime_fallback_text(library_text: str) -> str:
+    """Do not feed EasyCon OCR sentinel strings into Pokémon-name correction."""
+    if OCR_RUNTIME_FALLBACK_MARKER in library_text:
+        return library_text
+    if library_text.count(OCR_NAME_ORIGINAL_FUNCTION) != 1:
+        raise ValueError("OCR 名称库缺少唯一的识别函数，拒绝应用不可用兜底")
+    if library_text.count(OCR_NAME_NEXT_FUNCTION) != 1:
+        raise ValueError("OCR 名称库缺少唯一的后继函数，拒绝应用不可用兜底")
+    start = library_text.index(OCR_NAME_ORIGINAL_FUNCTION)
+    end = library_text.index(OCR_NAME_NEXT_FUNCTION, start)
+    replacement = OCR_RUNTIME_FALLBACK_FUNCTION.rstrip() + "\n\n"
+    return library_text[:start] + replacement + library_text[end:]
+
+
+def apply_ocr_runtime_fallback(library_path: str | Path) -> str:
+    """Patch a copied runtime library and return the audited overlay hash."""
+    library_path = Path(library_path)
+    configured = _apply_ocr_runtime_fallback_text(
+        library_path.read_text(encoding="utf-8")
+    )
+    library_path.write_text(configured, encoding="utf-8")
+    return hashlib.sha256(OCR_RUNTIME_FALLBACK_FUNCTION.encode("utf-8")).hexdigest()
+
+
+def _apply_wild_pid_retry_limit_text(template_text: str) -> str:
+    """Set the reviewed runtime Wild PID retry cap without altering its algorithms."""
+    if WILD_PID_RETRY_LIMIT_MARKER in template_text:
+        return template_text
+    imported_count = template_text.count(WILD_PID_RETRY_LIMIT_IMPORTED)
+    if imported_count != 1:
+        raise ValueError("2.0 模板的野生 PID 尝试上限不唯一，拒绝生成运行副本")
+    return template_text.replace(
+        WILD_PID_RETRY_LIMIT_IMPORTED,
+        WILD_PID_RETRY_LIMIT_MARKER + "\n" + WILD_PID_RETRY_LIMIT_RUNTIME,
+        1,
+    )
+
+
+def apply_wild_pid_retry_limit(main_path: str | Path) -> str:
+    """Apply the configured Wild PID retry cap and return the overlay hash."""
+    main_path = Path(main_path)
+    configured = _apply_wild_pid_retry_limit_text(main_path.read_text(encoding="utf-8"))
+    main_path.write_text(configured, encoding="utf-8")
+    return hashlib.sha256(
+        (WILD_PID_RETRY_LIMIT_MARKER + "\n" + WILD_PID_RETRY_LIMIT_RUNTIME).encode(
+            "utf-8"
+        )
+    ).hexdigest()
+
+
+def _apply_egg_party_slot_main_runtime_override_text(
+    template_text: str,
+    override_text: str,
+) -> str:
+    """Select just-caught wild Pokémon by party tail and the egg by slot five."""
+    if EGG_PARTY_SLOT_MAIN_OVERRIDE_MARKER in template_text:
+        start = template_text.index(EGG_PARTY_SLOT_MAIN_OVERRIDE_MARKER)
+    else:
+        if template_text.count(EGG_PARTY_SLOT_MAIN_ORIGINAL_FUNCTION) != 1:
+            raise ValueError("孵蛋模板缺少唯一的队伍槽选择函数，拒绝应用末位导航修正")
+        start = template_text.index(EGG_PARTY_SLOT_MAIN_ORIGINAL_FUNCTION)
+    if template_text.count(EGG_PARTY_SLOT_MAIN_NEXT_SECTION) != 1:
+        raise ValueError("孵蛋模板缺少野生Seed验证分区，拒绝应用末位导航修正")
+    end = template_text.index(EGG_PARTY_SLOT_MAIN_NEXT_SECTION, start)
+    replacement = override_text.rstrip() + "\n\n"
+    template_text = template_text[:start] + replacement + template_text[end:]
+
+    call_replacements = (
+        (
+            "$孵蛋流程开页结果 = 孵蛋流程_打开指定槽能力页($队伍位置)",
+            "$孵蛋流程开页结果 = 孵蛋流程_打开指定槽能力页($队伍位置, 1)",
+            "野生能力页末位选择",
+        ),
+        (
+            "$神奇糖果结果 = 孵蛋测试_使用神奇糖果指定槽($队伍位置)",
+            "$神奇糖果结果 = 孵蛋测试_使用神奇糖果指定槽($队伍位置, 1)",
+            "野生神奇糖果末位选择",
+        ),
+        (
+            "$孵蛋流程开页结果 = 孵蛋流程_打开指定槽能力页(5)",
+            "$孵蛋流程开页结果 = 孵蛋流程_打开指定槽能力页(5, 0)",
+            "蛋能力页第五槽选择",
+        ),
+        (
+            "$神奇糖果结果 = 孵蛋测试_使用神奇糖果指定槽(5)",
+            "$神奇糖果结果 = 孵蛋测试_使用神奇糖果指定槽(5, 0)",
+            "蛋神奇糖果第五槽选择",
+        ),
+    )
+    for original, fixed, description in call_replacements:
+        if fixed in template_text:
+            continue
+        if template_text.count(original) != 1:
+            raise ValueError(f"孵蛋模板缺少唯一的{description}调用，拒绝应用末位导航修正")
+        template_text = template_text.replace(original, fixed, 1)
+
+    egg_start = template_text.index(EGG_PARTY_SLOT_MAIN_EGG_FUNCTION)
+    if template_text.count(EGG_PARTY_SLOT_MAIN_EGG_NEXT_SECTION) == 1:
+        egg_end = template_text.index(EGG_PARTY_SLOT_MAIN_EGG_NEXT_SECTION, egg_start)
+    else:
+        # Minimal unit fixtures may stop after the egg function; the real
+        # The 2.0 template is still checked against the explicit next section.
+        egg_end = template_text.index("ENDFUNC", egg_start)
+    egg_section = template_text[egg_start:egg_end]
+    if "$孵蛋流程开页结果 = 孵蛋流程_喂糖后打开蛋能力页()" not in egg_section:
+        for indent in ("        ", "    "):
+            generic_candy_navigation = (
+                f"{indent}$刚使用神奇糖果 = 1\n"
+                f"{indent}CALL 打开能力值识图页面"
+            )
+            if egg_section.count(generic_candy_navigation) != 1:
+                continue
+            egg_candy_navigation = (
+                f"{indent}$刚使用神奇糖果 = 1\n"
+                f"{indent}$孵蛋流程开页结果 = 孵蛋流程_喂糖后打开蛋能力页()\n"
+                f"{indent}IF $孵蛋流程开页结果 != 1\n"
+                f"{indent}    RETURN 0\n"
+                f"{indent}ENDIF"
+            )
+            egg_section = egg_section.replace(
+                generic_candy_navigation,
+                egg_candy_navigation,
+                1,
+            )
+            break
+        else:
+            raise ValueError("孵蛋个体反查缺少唯一的通用喂糖后导航调用，拒绝应用第五槽修正")
+        template_text = template_text[:egg_start] + egg_section + template_text[egg_end:]
+    return template_text
+
+
+def _apply_egg_reverse_lookup_window_text(template_text: str) -> str:
+    """Keep egg candidate scans inside the configured frame tolerance."""
+    if EGG_REVERSE_LOOKUP_WINDOW_MARKER in template_text:
+        return template_text
+
+    egg_start = template_text.find(EGG_PARTY_SLOT_MAIN_EGG_FUNCTION)
+    if egg_start < 0:
+        return template_text
+    egg_end = template_text.find(EGG_PARTY_SLOT_MAIN_EGG_NEXT_SECTION, egg_start)
+    if egg_end < 0:
+        raise ValueError("孵蛋模板缺少总控与重试分区，拒绝应用固定帧窗修正")
+    egg_section = template_text[egg_start:egg_end]
+    original = """        FOR $孵蛋流程蛋扩窗层 = 0 TO 2
+            IF $孵蛋流程蛋扩窗层 == 0
+                $孵蛋流程蛋帧半宽 = $孵蛋个体反查帧容差
+            ELIF $孵蛋流程蛋扩窗层 == 1
+                $孵蛋流程蛋帧半宽 = 5000
+            ELSE
+                $孵蛋流程蛋帧半宽 = 10000
+            ENDIF
+"""
+    fixed = """        # GUI 孵蛋反查覆盖：固定帧窗，不再扩展
+        FOR $孵蛋流程蛋扩窗层 = 0 TO 0
+            $孵蛋流程蛋帧半宽 = $孵蛋个体反查帧容差
+"""
+    if original not in egg_section:
+        # Minimal unit fixtures may omit the full scan loop. The real template
+        # is still guarded by the exact replacement above.
+        return template_text
+    egg_section = egg_section.replace(original, fixed, 1)
+    expansion_log = "            PRINT 孵蛋蛋个体反查第 & $孵蛋流程蛋扩窗层 & \" 层无结果，自动扩窗\""
+    fixed_log = "            PRINT 孵蛋蛋个体反查固定帧窗无结果"
+    if egg_section.count(expansion_log) != 1:
+        raise ValueError("孵蛋模板缺少唯一的扩窗日志，拒绝应用固定帧窗修正")
+    egg_section = egg_section.replace(expansion_log, fixed_log, 1)
+    return template_text[:egg_start] + egg_section + template_text[egg_end:]
+
+
+def _apply_egg_reverse_lookup_policy_text(template_text: str) -> str:
+    """Preserve the current cross-method policy and upgrade raw legacy templates."""
+    if EGG_REVERSE_LOOKUP_POLICY_MARKER in template_text:
+        return _apply_egg_reverse_lookup_window_text(template_text)
+    if EGG_REVERSE_LOOKUP_LEGACY_POLICY_MARKER in template_text:
+        return _apply_egg_reverse_lookup_window_text(template_text)
+
+    # This limit belongs to the egg reverse lookup only. The separate generic
+    # wild reverse candy limit remains unchanged.
+    template_text = template_text.replace(
+        "$孵蛋蛋反查最多糖果 = 8",
+        "$孵蛋蛋反查最多糖果 = 20",
+        1,
+    )
+
+    egg_start = template_text.find("FUNC 孵蛋流程_执行蛋个体反查(): INT")
+    if egg_start < 0:
+        return template_text
+    egg_end = template_text.find(EGG_PARTY_SLOT_MAIN_EGG_NEXT_SECTION, egg_start)
+    if egg_end < 0:
+        raise ValueError("孵蛋模板缺少总控与重试分区，拒绝应用反查方法优先级修正")
+    method_start = template_text.find(EGG_REVERSE_LOOKUP_METHOD_COMMENT, egg_start, egg_end)
+    if method_start < 0:
+        raise ValueError("孵蛋模板缺少候选方法扫描分区，拒绝应用Normal优先修正")
+    method_end = template_text.find(
+        "            IF $孵蛋流程候选总数 > 0",
+        method_start,
+        egg_end,
+    )
+    if method_end < 0:
+        raise ValueError("孵蛋模板缺少候选方法扫描结束标记，拒绝应用Normal优先修正")
+
+    replacement = """# GUI 孵蛋反查覆盖：Normal 优先，方法候选不跨算法累加
+            # Normal 无候选时再尝试 Split；仅在两者均无结果时保留兼容回退方法。
+            FOR $孵蛋流程方法顺序 = 0 TO 3
+                IF $孵蛋流程方法顺序 == 0
+                    $孵蛋流程扫描方法 = 11
+                ELIF $孵蛋流程方法顺序 == 1
+                    $孵蛋流程扫描方法 = 12
+                ELIF $孵蛋流程方法顺序 == 2
+                    $孵蛋流程扫描方法 = 13
+                ELSE
+                    $孵蛋流程扫描方法 = 14
+                ENDIF
+                $孵蛋流程蛋扫描结果 = 孵蛋反查_执行HEX($孵蛋Seed关系模式, $目标Seed, $目标Seed, $孵蛋流程Held最小帧, $孵蛋流程Held最大帧, $孵蛋流程Pickup最小帧, $孵蛋流程Pickup最大帧, $孵蛋HeldOffset, $孵蛋PickupOffset, $孵蛋流程扫描方法, $孵蛋双亲相性, 256)
+                IF $孵蛋流程蛋扫描结果 < 0
+                    PRINT 孵蛋蛋个体反查参数无效
+                    RETURN 0
+                ENDIF
+                $孵蛋流程当前方法候选数 = 孵蛋反查_取总命中数()
+                IF $孵蛋流程当前方法候选数 > 0
+                    PRINT 孵蛋方法 & $孵蛋流程扫描方法 & " 候选: " & $孵蛋流程当前方法候选数
+                    $孵蛋流程候选总数 = $孵蛋流程当前方法候选数
+                    IF $孵蛋流程当前方法候选数 == 1
+                        $孵蛋流程实际Held帧 = 孵蛋反查_取结果Held帧(0)
+                        $孵蛋流程实际Pickup帧 = 孵蛋反查_取结果Pickup帧(0)
+                        $孵蛋流程实际方法 = $孵蛋流程扫描方法
+                    ENDIF
+                    BREAK
+                ENDIF
+            NEXT
+"""
+    configured = template_text[:method_start] + replacement + template_text[method_end:]
+    return _apply_egg_reverse_lookup_window_text(configured)
+
+
+def _apply_egg_party_slot_candy_runtime_override_text(
+    library_text: str,
+    override_text: str,
+) -> str:
+    """Use the same party-tail rule when feeding candy during reverse lookup."""
+    if EGG_PARTY_SLOT_CANDY_OVERRIDE_MARKER in library_text:
+        start = library_text.index(EGG_PARTY_SLOT_CANDY_OVERRIDE_MARKER)
+    else:
+        if library_text.count(EGG_PARTY_SLOT_CANDY_ORIGINAL_FUNCTION) != 1:
+            raise ValueError("孵蛋流程库缺少唯一的神奇糖果函数，拒绝应用末位导航修正")
+        start = library_text.index(EGG_PARTY_SLOT_CANDY_ORIGINAL_FUNCTION)
+    if library_text.count(EGG_PARTY_SLOT_CANDY_NEXT_SECTION) != 1:
+        raise ValueError("孵蛋流程库缺少Seed启动分区，拒绝应用末位导航修正")
+    end = library_text.index(EGG_PARTY_SLOT_CANDY_NEXT_SECTION, start)
+    replacement = override_text.rstrip() + "\n\n"
+    return library_text[:start] + replacement + library_text[end:]
+
+
+def _apply_egg_surf_battle_runtime_override_text(
+    library_text: str,
+    override_text: str,
+) -> str:
+    """Gate egg-route name OCR on a verified wild-battle screen."""
+    if EGG_SURF_BATTLE_OVERRIDE_MARKER in library_text:
+        start = library_text.index(EGG_SURF_BATTLE_OVERRIDE_MARKER)
+    else:
+        if library_text.count(EGG_SURF_BATTLE_ORIGINAL_FUNCTION) != 1:
+            raise ValueError("孵蛋流程库缺少唯一的池塘抓捕函数，拒绝应用冲浪修正")
+        start = library_text.index(EGG_SURF_BATTLE_ORIGINAL_FUNCTION)
+    if library_text.count(EGG_SURF_BATTLE_NEXT_FUNCTION) != 1:
+        raise ValueError("孵蛋流程库缺少池塘抓捕后继函数，拒绝应用冲浪修正")
+    end = library_text.index(EGG_SURF_BATTLE_NEXT_FUNCTION, start)
+    replacement = override_text.rstrip() + "\n\n"
+    return library_text[:start] + replacement + library_text[end:]
+
+
+def _apply_egg_seed_controller_runtime_override_text(
+    template_text: str,
+    override_text: str,
+) -> str:
+    """Reuse the formal Seed lock/fine-tune controller in the egg entry."""
+    if EGG_SEED_CONTROLLER_OVERRIDE_MARKER in template_text:
+        start = template_text.index(EGG_SEED_CONTROLLER_OVERRIDE_MARKER)
+    else:
+        if template_text.count(EGG_SEED_CONTROLLER_ORIGINAL_FUNCTION) != 1:
+            raise ValueError("孵蛋模板缺少唯一的Seed校正函数，拒绝应用控制器修正")
+        start = template_text.index(EGG_SEED_CONTROLLER_ORIGINAL_FUNCTION)
+    if template_text.count(EGG_SEED_CONTROLLER_NEXT_SECTION) != 1:
+        raise ValueError("孵蛋模板缺少蛋个体反查分区，拒绝应用Seed控制器修正")
+    end = template_text.index(EGG_SEED_CONTROLLER_NEXT_SECTION, start)
+    replacement = override_text.rstrip() + "\n\n"
+    return template_text[:start] + replacement + template_text[end:]
+
+
+def _apply_seed_hold_observation_window_text(template_text: str) -> str:
+    """Install the shared scheme-1/2 five-miss fixed-half controller."""
+    configured = template_text
+    for declaration in ("$Seed曾命中目标 = 0", "$Seed锁定提前多数票数 = 3"):
+        name = declaration.split(" = ", 1)[0]
+        if not re.search(rf"(?m)^{re.escape(name)}[ \t]*=", configured):
+            configured = declaration + "\n" + configured
+    if SEED_HOLD_OBSERVATION_OLD_GLOBAL in configured:
+        if configured.count(SEED_HOLD_OBSERVATION_OLD_GLOBAL) != 1:
+            raise ValueError("主脚本Seed命中保持样本数不唯一，拒绝升级连续未命中窗口")
+        configured = configured.replace(
+            SEED_HOLD_OBSERVATION_OLD_GLOBAL,
+            SEED_HOLD_OBSERVATION_GLOBAL_ANCHOR,
+            1,
+        )
+    elif configured.count(SEED_HOLD_OBSERVATION_GLOBAL_ANCHOR) != 1:
+        raise ValueError("主脚本缺少唯一的Seed命中保持样本数，拒绝升级连续未命中窗口")
+
+    if SEED_HOLD_OBSERVATION_MIN_GLOBAL not in configured:
+        if configured.count(SEED_HOLD_OBSERVATION_GLOBAL_ANCHOR) != 1:
+            raise ValueError("主脚本缺少唯一的Seed命中保持样本数，拒绝升级观察窗口")
+        configured = configured.replace(
+            SEED_HOLD_OBSERVATION_GLOBAL_ANCHOR,
+            SEED_HOLD_OBSERVATION_GLOBAL_ANCHOR
+            + "\n"
+            + SEED_HOLD_OBSERVATION_MIN_GLOBAL,
+            1,
+        )
+
+    continuation_globals = tuple(SEED_SCHEME2_CONTINUATION_GLOBALS.splitlines())
+    present_continuation_globals = tuple(
+        line for line in continuation_globals if line in configured
+    )
+    if present_continuation_globals and len(present_continuation_globals) != len(
+        continuation_globals
+    ):
+        raise ValueError("主脚本方案2接续方向票全局变量不完整，拒绝生成")
+    if not present_continuation_globals:
+        if configured.count(SEED_SCHEME2_CONTINUATION_GLOBAL_ANCHOR) != 1:
+            raise ValueError("主脚本缺少唯一的Seed保持刷新变量，拒绝添加方案2接续状态")
+        configured = configured.replace(
+            SEED_SCHEME2_CONTINUATION_GLOBAL_ANCHOR,
+            SEED_SCHEME2_CONTINUATION_GLOBAL_ANCHOR
+            + "\n"
+            + SEED_SCHEME2_CONTINUATION_GLOBALS,
+            1,
+        )
+
+    if configured.count(SEED_HOLD_OBSERVATION_FUNCTION) != 1:
+        raise ValueError("主脚本缺少唯一的Seed锁定修正函数，拒绝升级观察窗口")
+    start = configured.index(SEED_HOLD_OBSERVATION_FUNCTION)
+    end = configured.index("ENDFUNC", start) + len("ENDFUNC")
+    override_text = SEED_LOCK_CONTROLLER_OVERRIDE_PATH.read_text(encoding="utf-8")
+    override_start = override_text.index(SEED_HOLD_OBSERVATION_FUNCTION)
+    replacement = override_text[override_start:].rstrip()
+    if SEED_HOLD_OBSERVATION_DIRECT_HALF_MARKER not in replacement:
+        raise ValueError("Seed锁定覆盖缺少连续5次未命中固定半步标记")
+    return configured[:start] + replacement + configured[end:]
+
+
+def _apply_egg_formal_parity_runtime_override_text(
+    template_text: str,
+    override_text: str,
+) -> str:
+    """Use a generation menu for Held parity and keep Pickup's menu phase."""
+    configured = template_text
+    required_globals = tuple(
+        line for line in EGG_FORMAL_PARITY_GLOBALS.splitlines() if line
+    )
+    missing_globals = tuple(line for line in required_globals if line not in configured)
+    if missing_globals:
+        if configured.count(EGG_FORMAL_PARITY_GLOBAL_ANCHOR) != 1:
+            raise ValueError("孵蛋模板缺少唯一的Held请求全局变量，拒绝应用奇偶校准")
+        configured = configured.replace(
+            EGG_FORMAL_PARITY_GLOBAL_ANCHOR,
+            EGG_FORMAL_PARITY_GLOBAL_ANCHOR + "\n" + "\n".join(missing_globals),
+            1,
+        )
+
+    if EGG_FORMAL_PARITY_OVERRIDE_MARKER in configured:
+        start = configured.index(EGG_FORMAL_PARITY_OVERRIDE_MARKER)
+    else:
+        legacy_marker = next(
+            (
+                marker
+                for marker in EGG_FORMAL_PARITY_OVERRIDE_LEGACY_MARKERS
+                if marker in configured
+            ),
+            None,
+        )
+        if legacy_marker is not None:
+            start = configured.index(legacy_marker)
+        else:
+            if configured.count(EGG_FORMAL_PARITY_ORIGINAL_FUNCTION) != 1:
+                raise ValueError("孵蛋模板缺少唯一的两次命中时间计算函数，拒绝应用奇偶校准")
+            start = configured.index(EGG_FORMAL_PARITY_ORIGINAL_FUNCTION)
+    if configured.count(EGG_FORMAL_PARITY_NEXT_FUNCTION) != 1:
+        raise ValueError("孵蛋模板缺少Seed预校准后继函数，拒绝应用奇偶校准")
+    end = configured.index(EGG_FORMAL_PARITY_NEXT_FUNCTION, start)
+    configured = configured[:start] + override_text.rstrip() + "\n\n" + configured[end:]
+
+    uses_explicit_wait_mode = (
+        EGG_FORMAL_WAIT_MARKER in configured
+        or EGG_FORMAL_PARITY_REAL_CALL_WAIT_MODE in configured
+        or EGG_FORMAL_PARITY_REAL_CALL_PICKUP_WAIT_MODE in configured
+    )
+    desired_call = (
+        EGG_FORMAL_PARITY_REAL_CALL_WAIT_MODE
+        if uses_explicit_wait_mode
+        else EGG_FORMAL_PARITY_REAL_CALL_CURRENT
+    )
+    if EGG_FORMAL_PARITY_REAL_CALL_NX_WAIT_MODE in configured:
+        desired_call = EGG_FORMAL_PARITY_REAL_CALL_NX_WAIT_MODE
+    if desired_call not in configured:
+        if configured.count(EGG_FORMAL_PARITY_REAL_CALL_PICKUP_WAIT_MODE) == 1:
+            configured = configured.replace(
+                EGG_FORMAL_PARITY_REAL_CALL_PICKUP_WAIT_MODE,
+                desired_call,
+                1,
+            )
+        elif configured.count(EGG_FORMAL_PARITY_REAL_CALL_PICKUP_CURRENT) == 1:
+            configured = configured.replace(
+                EGG_FORMAL_PARITY_REAL_CALL_PICKUP_CURRENT,
+                desired_call,
+                1,
+            )
+        elif uses_explicit_wait_mode and configured.count(EGG_FORMAL_PARITY_REAL_CALL_CURRENT) == 1:
+            configured = configured.replace(
+                EGG_FORMAL_PARITY_REAL_CALL_CURRENT,
+                desired_call,
+                1,
+            )
+        elif configured.count(EGG_FORMAL_PARITY_REAL_CALL_PRE_MENU) == 1:
+            configured = configured.replace(
+                EGG_FORMAL_PARITY_REAL_CALL_PRE_MENU,
+                desired_call,
+                1,
+            )
+        elif configured.count(EGG_FORMAL_PARITY_REAL_CALL_OLD) == 1:
+            configured = configured.replace(
+                EGG_FORMAL_PARITY_REAL_CALL_OLD,
+                desired_call,
+                1,
+            )
+        else:
+            raise ValueError("孵蛋模板缺少唯一的生成领取执行调用，拒绝应用奇偶校准")
+    return configured
+
+
+def _apply_egg_pickup_parity_menu_text(library_text: str) -> str:
+    """Install generation/Pickup menu actions without double-counting time."""
+    if library_text.count(EGG_PICKUP_PARITY_ORIGINAL_FUNCTION) != 1:
+        raise ValueError("孵蛋流程库缺少唯一的同Seed两次命中函数，拒绝应用Pickup奇偶菜单")
+    start = library_text.index(EGG_PICKUP_PARITY_ORIGINAL_FUNCTION)
+    end = library_text.index("ENDFUNC", start) + len("ENDFUNC")
+    section = library_text[start:end]
+    if (
+        EGG_GENERATION_PARITY_MENU_MARKER in section
+        and EGG_PICKUP_PARITY_MENU_MARKER in section
+        and (
+            EGG_PICKUP_PARITY_SIGNATURE_CURRENT in section
+            or EGG_PICKUP_PARITY_SIGNATURE_WAIT_MODE in section
+            or EGG_PICKUP_PARITY_SIGNATURE_NX_WAIT_MODE in section
+        )
+    ):
+        return library_text
+
+    uses_explicit_wait_mode = (
+        EGG_PICKUP_PARITY_SIGNATURE_WAIT_MODE in section
+        or EGG_PICKUP_PARITY_SIGNATURE_PICKUP_WAIT_MODE in section
+        or EGG_PICKUP_PARITY_SIGNATURE_NX_WAIT_MODE in section
+    )
+    if EGG_PICKUP_PARITY_SIGNATURE_PICKUP_WAIT_MODE in section:
+        section = section.replace(
+            EGG_PICKUP_PARITY_SIGNATURE_PICKUP_WAIT_MODE,
+            EGG_PICKUP_PARITY_SIGNATURE_WAIT_MODE,
+            1,
+        )
+    elif EGG_PICKUP_PARITY_SIGNATURE_PICKUP_CURRENT in section:
+        section = section.replace(
+            EGG_PICKUP_PARITY_SIGNATURE_PICKUP_CURRENT,
+            EGG_PICKUP_PARITY_SIGNATURE_CURRENT,
+            1,
+        )
+    elif EGG_PICKUP_PARITY_SIGNATURE_OLD in section:
+        section = section.replace(
+            EGG_PICKUP_PARITY_SIGNATURE_OLD,
+            EGG_PICKUP_PARITY_SIGNATURE_CURRENT,
+            1,
+        )
+    elif (
+        EGG_PICKUP_PARITY_SIGNATURE_CURRENT not in section
+        and not uses_explicit_wait_mode
+    ):
+        raise ValueError("孵蛋流程库的同Seed两次命中参数签名不受支持")
+
+    if EGG_PICKUP_PARITY_VALIDATION_OLD in section:
+        section = section.replace(
+            EGG_PICKUP_PARITY_VALIDATION_OLD,
+            EGG_PICKUP_PARITY_VALIDATION_CURRENT,
+            1,
+        )
+    elif EGG_PICKUP_PARITY_VALIDATION_CURRENT not in section:
+        wait_mode_validation = (
+            "IF $使用绝对时间轴 != 0 and $使用绝对时间轴 != 1" in section
+            and any(call in section for call in (
+                "孵蛋测试_启动并进入存档($Seed模式, $Seed等待MS, $精确尾段MS, $奇偶等待MS, $封面长按MS, $Seed启动方案, $使用绝对时间轴)",
+                "孵蛋测试_启动并进入存档($Seed模式, $Seed等待MS, $精确尾段MS, $奇偶等待MS, $封面长按MS, $NX机型, $Seed启动方案, $使用绝对时间轴)",
+            ))
+        )
+        if not wait_mode_validation:
+            raise ValueError("孵蛋流程库缺少Pickup菜单奇偶开关校验位置")
+        if EGG_GENERATION_PARITY_VALIDATION not in section:
+            pickup_validation = """\
+    IF $Pickup菜单奇偶开关 != 0 and $Pickup菜单奇偶开关 != 1
+        PRINT 孵蛋Pickup菜单奇偶开关无效: & $Pickup菜单奇偶开关
+        RETURN 0
+    ENDIF
+"""
+            if section.count(pickup_validation) != 1:
+                raise ValueError("孵蛋流程库缺少生成菜单奇偶开关校验位置")
+            section = section.replace(
+                pickup_validation,
+                EGG_GENERATION_PARITY_VALIDATION + pickup_validation,
+                1,
+            )
+
+    # The first experiment placed the generation action after the target
+    # deadline. Remove that marked block before installing the current order.
+    legacy_generation_action = (
+        f"    {EGG_GENERATION_PARITY_MENU_LEGACY_MARKER}\n"
+        + EGG_GENERATION_PARITY_ACTION_BODY
+    )
+    if legacy_generation_action in section:
+        section = section.replace(legacy_generation_action, "", 1)
+    elif EGG_GENERATION_PARITY_MENU_LEGACY_MARKER in section:
+        # The latest upstream source already has the correct unmarked action
+        # before the deadline and retains only the old marker at the old site.
+        section = section.replace(
+            f"    {EGG_GENERATION_PARITY_MENU_LEGACY_MARKER}\n",
+            "",
+            1,
+        )
+
+    if EGG_GENERATION_PARITY_MENU_MARKER not in section:
+        if EGG_GENERATION_PARITY_ACTION_UNMARKED in section:
+            section = section.replace(
+                EGG_GENERATION_PARITY_ACTION_UNMARKED,
+                EGG_GENERATION_PARITY_ACTION,
+                1,
+            )
+        elif section.count(EGG_GENERATION_PARITY_ACTION_ANCHOR) == 1:
+            section = section.replace(
+                EGG_GENERATION_PARITY_ACTION_ANCHOR,
+                EGG_GENERATION_PARITY_ACTION
+                + "\n"
+                + EGG_GENERATION_PARITY_ACTION_ANCHOR,
+                1,
+            )
+        else:
+            raise ValueError("孵蛋流程库缺少生成前菜单奇偶动作位置")
+
+    if EGG_PICKUP_PARITY_MENU_MARKER in section:
+        pass
+    elif EGG_PICKUP_PARITY_ACTION_OLD in section:
+        section = section.replace(
+            EGG_PICKUP_PARITY_ACTION_OLD,
+            EGG_PICKUP_PARITY_ACTION_CURRENT,
+            1,
+        )
+    elif EGG_PICKUP_PARITY_ACTION_UNMARKED in section:
+        section = section.replace(
+            EGG_PICKUP_PARITY_ACTION_UNMARKED,
+            EGG_PICKUP_PARITY_ACTION_CURRENT,
+            1,
+        )
+    else:
+        raise ValueError("孵蛋流程库缺少确认出蛋后的Pickup菜单插入位置")
+    return library_text[:start] + section + library_text[end:]
+
+
+def _apply_egg_transient_retry_runtime_override_text(template_text: str) -> str:
+    """Keep transient egg-route failures inside the existing retry loop."""
+    if EGG_TRANSIENT_RETRY_OVERRIDE_MARKER in template_text:
+        return template_text
+    configured = template_text
+    for original, replacement in EGG_TRANSIENT_RETRY_REPLACEMENTS:
+        if configured.count(original) != 1:
+            raise ValueError("孵蛋模板缺少唯一的瞬时失败分支，拒绝应用自动重试修正")
+        configured = configured.replace(original, replacement, 1)
+    return configured
+
+
+def _apply_egg_post_pickup_retry_policy_text(template_text: str) -> str:
+    """Keep the completed no-egg Seed pre-calibration across pickup retries."""
+    if EGG_POST_PICKUP_RETRY_POLICY_MARKER in template_text:
+        return template_text
+
+    configured = template_text
+    if EGG_POST_PICKUP_MISS_OLD in configured:
+        configured = configured.replace(
+            EGG_POST_PICKUP_MISS_OLD,
+            EGG_POST_PICKUP_MISS_CURRENT,
+            1,
+        )
+    elif EGG_POST_PICKUP_MISS_CURRENT not in configured:
+        raise ValueError("孵蛋模板缺少领取后Seed未命中分支，拒绝应用直接重试策略")
+
+    if EGG_POST_PICKUP_FAILURE_OLD in configured:
+        configured = configured.replace(
+            EGG_POST_PICKUP_FAILURE_OLD,
+            EGG_POST_PICKUP_FAILURE_CURRENT,
+            1,
+        )
+    elif EGG_POST_PICKUP_FAILURE_CURRENT not in configured:
+        raise ValueError("孵蛋模板缺少领取后Seed反查失败分支，拒绝应用直接重试策略")
+
+    return configured.replace(
+        EGG_POST_PICKUP_MISS_CURRENT,
+        f"    {EGG_POST_PICKUP_RETRY_POLICY_MARKER}\n"
+        + EGG_POST_PICKUP_MISS_CURRENT,
+        1,
+    )
+
+
+def _apply_egg_no_egg_evidence_policy_text(template_text: str) -> str:
+    """Retain target-Seed no-egg evidence while the Held request is unchanged."""
+    if EGG_NO_EGG_EVIDENCE_OVERRIDE_MARKER in template_text:
+        return template_text
+
+    configured = template_text
+    if EGG_NO_EGG_REQUEST_CHANGE_OLD in configured:
+        configured = configured.replace(
+            EGG_NO_EGG_REQUEST_CHANGE_OLD,
+            EGG_NO_EGG_REQUEST_CHANGE_CURRENT,
+            1,
+        )
+    elif EGG_NO_EGG_REQUEST_CHANGE_FIXED_UNMARKED in configured:
+        configured = configured.replace(
+            EGG_NO_EGG_REQUEST_CHANGE_FIXED_UNMARKED,
+            EGG_NO_EGG_REQUEST_CHANGE_CURRENT,
+            1,
+        )
+    else:
+        raise ValueError("孵蛋模板缺少Held请求变化分支，拒绝应用无蛋证据策略")
+
+    if EGG_NO_EGG_NON_TARGET_OLD in configured:
+        configured = configured.replace(
+            EGG_NO_EGG_NON_TARGET_OLD,
+            EGG_NO_EGG_NON_TARGET_CURRENT,
+            1,
+        )
+    elif EGG_NO_EGG_NON_TARGET_CURRENT not in configured:
+        raise ValueError("孵蛋模板缺少无蛋后的非目标Seed分支，拒绝应用无蛋证据策略")
+    return configured
+
+
+def _apply_egg_no_egg_seed_gate_text(template_text: str) -> str:
+    """Check Seed on every no-egg round after the first Held calibration."""
+    old_count = template_text.count(EGG_NO_EGG_SEED_GATE_OLD)
+    current_count = template_text.count(EGG_NO_EGG_SEED_GATE_CURRENT)
+    if old_count == 1 and current_count == 0:
+        configured = template_text.replace(
+            EGG_NO_EGG_SEED_GATE_OLD, EGG_NO_EGG_SEED_GATE_CURRENT, 1
+        )
+    elif old_count == 0 and current_count == 1:
+        configured = template_text
+    else:
+        raise ValueError("孵蛋模板缺少唯一的无蛋Seed复核门槛，拒绝应用Held校准后立即复核策略")
+    return configured.replace(
+        "# 普通阶段累计无蛋后才复核Seed；微调阶段第一次无蛋就复核。",
+        "# 首次Held反查校准前才使用连续无蛋门槛；有校准记录后无蛋立即复核Seed，不要求Pickup稳定。",
+    )
+
+
+def _apply_egg_wild_seed_fallback_text(template_text: str) -> str:
+    """Add one fallback only to egg-flow wild verification, keeping its lower bound."""
+    signature = "FUNC 孵蛋流程_验证野生Seed($队伍位置: INT): INT"
+    if template_text.count(signature) != 1:
+        raise ValueError("孵蛋模板缺少唯一的野生Seed反查函数")
+    start = template_text.index(signature)
+    end = template_text.index("ENDFUNC", start) + len("ENDFUNC")
+    section = template_text[start:end]
+    old_count = section.count(EGG_WILD_SEED_SCAN_OLD)
+    current_count = section.count(EGG_WILD_SEED_SCAN_CURRENT)
+    semantic_current = (
+        section.count(EGG_WILD_SEED_WINDOW_INIT) == 1
+        and section.count("$孵蛋流程扫描结果 = 执行反查扫描()") == 2
+        and section.count("$有效Seed容差 = $孵蛋野生Seed容差 + 5") == 1
+        and section.count("$有效最大消耗帧 = $孵蛋野生最大消耗帧 + 1000") == 1
+    )
+    if old_count == 1 and current_count == 0 and section.count("    FOR\n") == 1:
+        section = section.replace(EGG_WILD_SEED_SCAN_OLD, EGG_WILD_SEED_SCAN_CURRENT, 1)
+        section = section.replace("    FOR\n", EGG_WILD_SEED_WINDOW_INIT + "    FOR\n", 1)
+    elif old_count == 0 and (current_count == 1 or semantic_current):
+        # 新版正式脚本会用“完整调试日志”开关包住两条扩窗明细；
+        # 判断关键赋值和两次扫描，避免因纯日志结构变化重复打补丁。
+        pass
+    else:
+        raise ValueError("孵蛋野生Seed反查缺少唯一的扫描分支，拒绝应用兜底扩窗")
+    if (section.count(EGG_WILD_SEED_WINDOW_INIT) != 1
+            or section.index(EGG_WILD_SEED_WINDOW_INIT) > section.index("    FOR\n")):
+        raise ValueError("孵蛋野生Seed反查窗口必须在吃糖循环前初始化")
+    return template_text[:start] + section + template_text[end:]
+
+
+def _apply_egg_terminal_stop_policy_text(template_text: str) -> str:
+    """Stop terminal egg lookup failures without closing or restarting the game."""
+    if EGG_TERMINAL_STOP_OVERRIDE_MARKER in template_text:
+        return template_text
+    configured = template_text
+    for original, replacement in EGG_TERMINAL_STOP_REPLACEMENTS:
+        if configured.count(original) != 1:
+            raise ValueError("孵蛋模板缺少唯一的终止分支，拒绝应用保留画面策略")
+        configured = configured.replace(original, replacement, 1)
+    return configured
+
+
+def _apply_egg_pond_settle_delay_text(library_text: str) -> str:
+    """Let the final pond-facing input settle before the surf sequence starts."""
+    if EGG_POND_SETTLE_FIXED in library_text:
+        return library_text
+    if library_text.count(EGG_POND_SETTLE_ORIGINAL) != 1:
+        raise ValueError("孵蛋流程库缺少唯一的池塘到位等待位置，拒绝应用稳定延迟")
+    return library_text.replace(
+        EGG_POND_SETTLE_ORIGINAL,
+        EGG_POND_SETTLE_FIXED,
+        1,
+    )
+
+
+def _apply_egg_hatch_exit_runtime_override_text(
+    library_text: str,
+    override_text: str,
+) -> str:
+    """Reliably leave summary/menu layers before starting the bicycle loop."""
+    if EGG_HATCH_EXIT_OVERRIDE_MARKER in library_text:
+        start = library_text.index(EGG_HATCH_EXIT_OVERRIDE_MARKER)
+    else:
+        if library_text.count(EGG_HATCH_EXIT_ORIGINAL_FUNCTION) != 1:
+            raise ValueError("孵蛋流程库缺少唯一的骑车孵化函数，拒绝应用退页修正")
+        start = library_text.index(EGG_HATCH_EXIT_ORIGINAL_FUNCTION)
+    if library_text.count(EGG_HATCH_EXIT_NEXT_FUNCTION) != 1:
+        raise ValueError("孵蛋流程库缺少骑车孵化后继函数，拒绝应用退页修正")
+    end = library_text.index(EGG_HATCH_EXIT_NEXT_FUNCTION, start)
+    replacement = override_text.rstrip() + "\n\n"
+    return library_text[:start] + replacement + library_text[end:]
+
+
+def _apply_togepi_hatch_cycle_override_text(
+    library_text: str,
+    override_text: str,
+) -> str:
+    """Use the Togepi-only 14-step bicycle cycle for the static gift."""
+    if TOGEPI_HATCH_CYCLE_OVERRIDE_MARKER in library_text:
+        start = library_text.index(TOGEPI_HATCH_CYCLE_OVERRIDE_MARKER)
+    else:
+        if library_text.count(TOGEPI_HATCH_CYCLE_ORIGINAL_FUNCTION) != 1:
+            raise ValueError("静态目标库缺少唯一的波克比函数，拒绝应用周期孵化修正")
+        start = library_text.index(TOGEPI_HATCH_CYCLE_ORIGINAL_FUNCTION)
+        comment_start = library_text.rfind("# 175:", 0, start)
+        if comment_start >= 0:
+            start = comment_start
+    if library_text.count(TOGEPI_HATCH_CYCLE_NEXT_FUNCTION) != 1:
+        raise ValueError("静态目标库缺少波克比后继函数，拒绝应用周期孵化修正")
+    end = library_text.index(TOGEPI_HATCH_CYCLE_NEXT_FUNCTION, start)
+    next_comment = library_text.rfind("# 243:", start, end)
+    if next_comment >= 0:
+        end = next_comment
+    replacement = override_text.rstrip() + "\n\n"
+    return library_text[:start] + replacement + library_text[end:]
+
+
+def _apply_party_summary_navigation_text(
+    template_text: str,
+    helper_text: str,
+) -> str:
+    """Share party-page target selection between normal and egg reverse lookup."""
+    if PARTY_SUMMARY_NAVIGATION_MARKER not in template_text:
+        if template_text.count(PARTY_SUMMARY_NAVIGATION_ANCHOR) != 1:
+            raise ValueError("主脚本缺少唯一的能力页入口，拒绝注入共享队伍导航")
+        anchor = template_text.index(PARTY_SUMMARY_NAVIGATION_ANCHOR)
+        template_text = (
+            template_text[:anchor]
+            + helper_text.rstrip()
+            + "\n\n"
+            + template_text[anchor:]
+        )
+
+    if PARTY_SUMMARY_SHARED_UP_BLOCK in template_text:
+        return template_text
+    if PARTY_SUMMARY_INVALID_CALL_BLOCK in template_text:
+        return template_text.replace(
+            PARTY_SUMMARY_INVALID_CALL_BLOCK,
+            PARTY_SUMMARY_SHARED_UP_BLOCK,
+            1,
+        )
+    if template_text.count(PARTY_SUMMARY_ORIGINAL_UP_BLOCK) != 1:
+        raise ValueError("主脚本普通反查的末位导航不唯一，拒绝替换共享队伍导航")
+    return template_text.replace(
+        PARTY_SUMMARY_ORIGINAL_UP_BLOCK,
+        PARTY_SUMMARY_SHARED_UP_BLOCK,
+        1,
+    )
+
+
+def _apply_roamer_menu_cursor_text(template_text: str) -> str:
+    """Keep roaming summary navigation and visible setup requirements in sync."""
+    if ROAMER_SUMMARY_CURSOR_CURRENT_BLOCK not in template_text:
+        if template_text.count(ROAMER_SUMMARY_CURSOR_LEGACY_BLOCK) != 1:
+            raise ValueError("主脚本缺少唯一的游走能力页光标分支，拒绝修正")
+        template_text = template_text.replace(
+            ROAMER_SUMMARY_CURSOR_LEGACY_BLOCK,
+            ROAMER_SUMMARY_CURSOR_CURRENT_BLOCK,
+            1,
+        )
+
+    if ROAMER_BICYCLE_BAG_REQUIREMENT_CURRENT not in template_text:
+        previous_blocks = (
+            ROAMER_BICYCLE_BAG_REQUIREMENT_PREVIOUS,
+            ROAMER_BICYCLE_BAG_REQUIREMENT_LEGACY,
+        )
+        matches = [block for block in previous_blocks if template_text.count(block) == 1]
+        if len(matches) != 1:
+            raise ValueError("主脚本缺少唯一的游走TV自行车背包要求，拒绝修正")
+        template_text = template_text.replace(
+            matches[0],
+            ROAMER_BICYCLE_BAG_REQUIREMENT_CURRENT,
+            1,
+        )
+
+    if ROAMER_BICYCLE_SHORTCUT_REQUIREMENT_CURRENT not in template_text:
+        previous_blocks = (
+            ROAMER_BICYCLE_SHORTCUT_REQUIREMENT_PREVIOUS,
+            ROAMER_BICYCLE_SHORTCUT_REQUIREMENT_LEGACY,
+        )
+        matches = [block for block in previous_blocks if template_text.count(block) == 1]
+        if len(matches) != 1:
+            raise ValueError("主脚本缺少唯一的游走自行车快捷键要求，拒绝修正")
+        template_text = template_text.replace(
+            matches[0],
+            ROAMER_BICYCLE_SHORTCUT_REQUIREMENT_CURRENT,
+            1,
+        )
+    return template_text
+
+
+def _apply_fishing_shortcut_and_cursor_text(template_text: str) -> str:
+    """Use a registered rod for every fishing route and keep cursor math explicit."""
+    replacements = (
+        (
+            FISHING_REQUIREMENTS_CURRENT_BLOCK,
+            (FISHING_REQUIREMENTS_PREVIOUS_BLOCK, FISHING_REQUIREMENTS_LEGACY_BLOCK),
+            "主脚本缺少唯一的钓鱼运行要求块，拒绝修正",
+        ),
+        (
+            FISHING_TV_GUARD_CURRENT_BLOCK,
+            (FISHING_TV_GUARD_LEGACY_BLOCK,),
+            "主脚本缺少唯一的背包TV首轮保护块，拒绝修正",
+        ),
+        (
+            FISHING_TV_DISPATCH_CURRENT_BLOCK,
+            (FISHING_TV_DISPATCH_PREVIOUS_BLOCK, FISHING_TV_DISPATCH_LEGACY_BLOCK),
+            "主脚本缺少唯一的钓鱼TV分派块，拒绝修正",
+        ),
+        (
+            FISHING_SUMMARY_CURSOR_CURRENT_BLOCK,
+            (FISHING_SUMMARY_CURSOR_PREVIOUS_BLOCK, FISHING_SUMMARY_CURSOR_LEGACY_BLOCK),
+            "主脚本缺少唯一的钓鱼能力页光标分支，拒绝修正",
+        ),
+    )
+    for current, previous_blocks, error in replacements:
+        if current in template_text:
+            continue
+        matches = [previous for previous in previous_blocks if template_text.count(previous) == 1]
+        if len(matches) != 1:
+            raise ValueError(error)
+        template_text = template_text.replace(matches[0], current, 1)
+
+    function_text = FISHING_TV_FUNCTION_FORMAL
+    previous_functions = (
+        FISHING_TV_FUNCTION_PREVIOUS_FORMAL,
+        FISHING_TV_FUNCTION_LEGACY_FORMAL,
+    )
+    if "FUNC 执行时间轴等待到" in template_text:
+        function_text = FISHING_TV_FUNCTION_TIMELINE
+        previous_functions = (
+            FISHING_TV_FUNCTION_PREVIOUS_TIMELINE,
+            FISHING_TV_FUNCTION_LEGACY_TIMELINE,
+        )
+    if FISHING_TV_FUNCTION_MARKER not in template_text:
+        if template_text.count(FISHING_TV_FUNCTION_ANCHOR) != 1:
+            raise ValueError("主脚本缺少唯一的TV等待函数，拒绝注入钓鱼背包TV流程")
+        template_text = template_text.replace(
+            FISHING_TV_FUNCTION_ANCHOR,
+            function_text + FISHING_TV_FUNCTION_ANCHOR,
+            1,
+        )
+    elif function_text not in template_text:
+        matches = [previous for previous in previous_functions if template_text.count(previous) == 1]
+        if len(matches) != 1:
+            raise ValueError("主脚本背包TV退出函数不是受支持版本，拒绝修正")
+        template_text = template_text.replace(matches[0], function_text, 1)
+    return template_text
+
+
+def _apply_fishing_rod_shortcut_library_text(library_text: str) -> str:
+    """Use the rod shortcut and make Safari Bag-TV exits layer-safe."""
+    if FISHING_LIBRARY_CURRENT_BLOCK not in library_text:
+        if library_text.count(FISHING_LIBRARY_LEGACY_BLOCK) != 1:
+            raise ValueError("野生目标库缺少唯一的钓鱼取竿分支，拒绝修正")
+        library_text = library_text.replace(
+            FISHING_LIBRARY_LEGACY_BLOCK,
+            FISHING_LIBRARY_CURRENT_BLOCK,
+            1,
+        )
+    if ("FUNC 狩猎区执行TV等待" in library_text
+            and SAFARI_TV_EXIT_CURRENT_BLOCK not in library_text):
+        if library_text.count(SAFARI_TV_EXIT_PREVIOUS_BLOCK) != 1:
+            raise ValueError("野生目标库缺少唯一的狩猎区背包TV退出流程，拒绝修正")
+        library_text = library_text.replace(
+            SAFARI_TV_EXIT_PREVIOUS_BLOCK,
+            SAFARI_TV_EXIT_CURRENT_BLOCK,
+            1,
+        )
+    return library_text
+
+
+def _apply_standard_home_buffer_runtime_override_text(
+    template_text: str,
+    override_text: str,
+) -> str:
+    """Replace the standard 2.0 HOME_BUFFER controller idempotently."""
+    if STANDARD_HOME_BUFFER_OVERRIDE_MARKER in template_text:
+        start = template_text.index(STANDARD_HOME_BUFFER_OVERRIDE_MARKER)
+    else:
+        if template_text.count(EGG_HOME_BUFFER_ORIGINAL_FUNCTION) != 1:
+            raise ValueError("正式版模板缺少唯一的 HOME_BUFFER 函数，拒绝应用自适应覆盖")
+        start = template_text.index(EGG_HOME_BUFFER_ORIGINAL_FUNCTION)
+    if template_text.count(EGG_HOME_BUFFER_NEXT_FUNCTION) != 1:
+        raise ValueError("正式版模板缺少 HOME_BUFFER 后继函数，拒绝应用自适应覆盖")
+    end = template_text.index(EGG_HOME_BUFFER_NEXT_FUNCTION, start)
+    replacement = (
+        override_text.rstrip() + "\n\n"
+        + HOME_BUFFER_RECOVERY_PATH.read_text(encoding="utf-8").rstrip() + "\n\n"
+    )
+    return template_text[:start] + replacement + template_text[end:]
+
+
+def _apply_home_buffer_adaptive_classifier_text(
+    template_text: str,
+    classifier_text: str,
+    enabled: bool,
+) -> str:
+    """Install the shared classifier and set its opt-in switch."""
+    global_anchor = "$HOME_BUFFER当前错误退出_NS2 = 0\n"
+    missing_globals = []
+    for line in HOME_BUFFER_ADAPTIVE_GLOBALS.splitlines():
+        if not line:
+            continue
+        if line.startswith(f"${HOME_BUFFER_ADAPTIVE_SWITCH} ="):
+            if not re.search(
+                rf"(?m)^\${re.escape(HOME_BUFFER_ADAPTIVE_SWITCH)}\s*=",
+                template_text,
+            ):
+                missing_globals.append(line)
+        elif not re.search(rf"(?m)^{re.escape(line)}\r?$", template_text):
+            missing_globals.append(line)
+    if missing_globals:
+        if template_text.count(global_anchor) != 1:
+            raise ValueError("模板缺少唯一的 HOME_BUFFER 状态区，拒绝应用稳定低分自适应")
+        template_text = template_text.replace(
+            global_anchor,
+            global_anchor + "\n".join(missing_globals) + "\n",
+            1,
+        )
+
+    classifier = classifier_text.rstrip() + "\n\n"
+    controller_markers = (
+        STANDARD_HOME_BUFFER_OVERRIDE_MARKER,
+        EGG_HOME_BUFFER_OVERRIDE_MARKER,
+    )
+    if HOME_BUFFER_ADAPTIVE_CLASSIFIER_MARKER in template_text:
+        start = template_text.index(HOME_BUFFER_ADAPTIVE_CLASSIFIER_MARKER)
+        following = [
+            template_text.index(marker, start)
+            for marker in controller_markers
+            if marker in template_text[start + 1 :]
+        ]
+        if not following:
+            original_controller = re.search(
+                r"(?m)^FUNC HOME_BUFFER\s*$",
+                template_text[start + 1 :],
+            )
+            if original_controller:
+                following.append(start + 1 + original_controller.start())
+        if not following:
+            raise ValueError("HOME_BUFFER 自适应分类器缺少后继控制器")
+        end = min(following)
+        template_text = template_text[:start] + classifier + template_text[end:]
+    else:
+        anchors = [
+            template_text.index(marker)
+            for marker in controller_markers
+            if marker in template_text
+        ]
+        if not anchors:
+            original_controller = re.search(
+                r"(?m)^FUNC HOME_BUFFER\s*$",
+                template_text,
+            )
+            if original_controller:
+                anchors.append(original_controller.start())
+        if not anchors:
+            raise ValueError("模板缺少 HOME_BUFFER 控制器，拒绝插入自适应分类器")
+        start = min(anchors)
+        template_text = template_text[:start] + classifier + template_text[start:]
+
+    switch_pattern = re.compile(
+        rf"(?m)^\${re.escape(HOME_BUFFER_ADAPTIVE_SWITCH)}\s*=\s*[^\r\n]*$"
+    )
+    template_text, count = switch_pattern.subn(
+        f"${HOME_BUFFER_ADAPTIVE_SWITCH} = {1 if enabled else 0}",
+        template_text,
+    )
+    if count != 1:
+        raise ValueError("HOME_BUFFER 稳定低分自适应开关应出现 1 次")
+    return template_text
+
+
+def _apply_egg_home_buffer_runtime_override_text(
+    template_text: str,
+    override_text: str,
+) -> str:
+    """Replace HOME_BUFFER with a bounded, NX-specific bracket search."""
+    global_anchor = "$HOME_BUFFER当前错误退出_NS2 = 0\n"
+    missing_globals = [
+        line
+        for line in EGG_HOME_BUFFER_GLOBALS.splitlines()
+        if line and not re.search(rf"(?m)^{re.escape(line)}\r?$", template_text)
+    ]
+    if missing_globals:
+        if template_text.count(global_anchor) != 1:
+            raise ValueError("孵蛋模板缺少唯一的 HOME_BUFFER 状态区，拒绝应用窗口搜索覆盖")
+        template_text = template_text.replace(
+            global_anchor,
+            global_anchor + "\n".join(missing_globals) + "\n",
+            1,
+        )
+
+    if EGG_HOME_BUFFER_OVERRIDE_MARKER in template_text:
+        start = template_text.index(EGG_HOME_BUFFER_OVERRIDE_MARKER)
+    else:
+        if template_text.count(EGG_HOME_BUFFER_ORIGINAL_FUNCTION) != 1:
+            raise ValueError("孵蛋模板缺少唯一的 HOME_BUFFER 函数，拒绝应用窗口搜索覆盖")
+        start = template_text.index(EGG_HOME_BUFFER_ORIGINAL_FUNCTION)
+    if template_text.count(EGG_HOME_BUFFER_NEXT_FUNCTION) != 1:
+        raise ValueError("孵蛋模板缺少 HOME_BUFFER 后继函数，拒绝应用窗口搜索覆盖")
+    end = template_text.index(EGG_HOME_BUFFER_NEXT_FUNCTION, start)
+    replacement = (
+        override_text.rstrip() + "\n\n"
+        + HOME_BUFFER_RECOVERY_PATH.read_text(encoding="utf-8").rstrip() + "\n\n"
+    )
+    template_text = template_text[:start] + replacement + template_text[end:]
+
+    initial_restart = """\
+    CALL 孵蛋流程_重开下一轮
+
+    $孵蛋流程尝试次数 = 0
+"""
+    guarded_initial_restart = """\
+    CALL 孵蛋流程_重开下一轮
+    IF $孵蛋HOME_BUFFER失败 == 1
+        PRINT 孵蛋流程停止：HOME_BUFFER未找到当前主机的可用延迟
+        RETURN 0
+    ENDIF
+
+    $孵蛋流程尝试次数 = 0
+"""
+    loop_start = """\
+    FOR
+        $孵蛋流程尝试次数 += 1
+"""
+    guarded_loop_start = """\
+    FOR
+        IF $孵蛋HOME_BUFFER失败 == 1
+            PRINT 孵蛋流程停止：HOME_BUFFER未找到当前主机的可用延迟
+            RETURN 0
+        ENDIF
+        $孵蛋流程尝试次数 += 1
+"""
+    for original, guarded, description in (
+        (initial_restart, guarded_initial_restart, "首次 HOME_BUFFER 结果检查"),
+        (loop_start, guarded_loop_start, "重试 HOME_BUFFER 结果检查"),
+    ):
+        if guarded not in template_text:
+            if template_text.count(original) != 1:
+                raise ValueError(
+                    f"孵蛋模板缺少唯一的{description}位置，拒绝应用窗口搜索覆盖"
+                )
+            template_text = template_text.replace(original, guarded, 1)
+    return template_text
+
+
+def _apply_egg_settings_runtime_override_text(
+    library_text: str,
+    override_text: str,
+) -> str:
+    """Replace only the egg settings checker in a copied 2.0 runtime library."""
+    global_anchor = "$孵蛋库_设置结果 = 0\n"
+    if EGG_SETTINGS_GLOBALS not in library_text:
+        if library_text.count(global_anchor) != 1:
+            raise ValueError("孵蛋流程库缺少唯一的设置结果全局变量，拒绝应用运行时修正")
+        library_text = library_text.replace(
+            global_anchor,
+            global_anchor + EGG_SETTINGS_GLOBALS,
+            1,
+        )
+
+    if EGG_SETTINGS_OVERRIDE_MARKER in library_text:
+        start = library_text.index(EGG_SETTINGS_OVERRIDE_MARKER)
+    else:
+        original_function = "FUNC 孵蛋测试_检查校正并保存游戏设置"
+        if library_text.count(original_function) != 1:
+            raise ValueError("孵蛋流程库缺少唯一的游戏设置检查函数，拒绝应用运行时修正")
+        start = library_text.index(original_function)
+    if library_text.count(EGG_SETTINGS_NEXT_FUNCTION) != 1:
+        raise ValueError("孵蛋流程库缺少唯一的前置准备函数，拒绝应用运行时修正")
+    end = library_text.index(EGG_SETTINGS_NEXT_FUNCTION, start)
+    replacement = override_text.rstrip() + "\n\n"
+    return library_text[:start] + replacement + library_text[end:]
+
+
+def _apply_shortcut_registration_main_text(
+    template_text: str,
+    helper_text: str,
+) -> str:
+    """Add the flow-aware Key Items shortcut check to a main entry script."""
+    if SHORTCUT_REGISTRATION_MAIN_MARKER in template_text:
+        start = template_text.index(SHORTCUT_REGISTRATION_MAIN_MARKER)
+        if template_text.count(SHORTCUT_REGISTRATION_SETTINGS_FUNCTION) != 1:
+            raise ValueError("主脚本缺少唯一的游戏设置检查函数，拒绝更新快捷登记检查")
+        end = template_text.index(SHORTCUT_REGISTRATION_SETTINGS_FUNCTION, start)
+        existing = template_text[start:end].rstrip()
+        if existing != helper_text.rstrip():
+            template_text = (
+                template_text[:start]
+                + helper_text.rstrip()
+                + "\n\n"
+                + template_text[end:]
+            )
+    else:
+        if template_text.count(SHORTCUT_REGISTRATION_SETTINGS_FUNCTION) != 1:
+            raise ValueError("主脚本缺少唯一的游戏设置检查函数，拒绝注入快捷登记检查")
+        template_text = template_text.replace(
+            SHORTCUT_REGISTRATION_SETTINGS_FUNCTION,
+            helper_text.rstrip()
+            + "\n\n"
+            + SHORTCUT_REGISTRATION_SETTINGS_FUNCTION,
+            1,
+        )
+
+    if SHORTCUT_REGISTRATION_MAIN_CALL_BLOCK not in template_text:
+        call_source = SHORTCUT_REGISTRATION_MAIN_CALL_ANCHOR
+        if SHORTCUT_REGISTRATION_MAIN_CALL_PREVIOUS in template_text:
+            call_source = SHORTCUT_REGISTRATION_MAIN_CALL_PREVIOUS
+        elif template_text.count(SHORTCUT_REGISTRATION_MAIN_CALL_ANCHOR) != 1:
+            raise ValueError("主脚本缺少唯一的游戏设置初始化块，拒绝接入快捷登记检查")
+        template_text = template_text.replace(
+            call_source,
+            SHORTCUT_REGISTRATION_MAIN_CALL_BLOCK,
+            1,
+        )
+
+    if SHORTCUT_REGISTRATION_OPTIONS_CURRENT not in template_text:
+        if template_text.count(SHORTCUT_REGISTRATION_OPTIONS_ORIGINAL) != 1:
+            raise ValueError("主脚本缺少唯一的Options入口，拒绝修正快捷登记后的菜单光标")
+        template_text = template_text.replace(
+            SHORTCUT_REGISTRATION_OPTIONS_ORIGINAL,
+            SHORTCUT_REGISTRATION_OPTIONS_CURRENT,
+            1,
+        )
+
+    if SHORTCUT_REGISTRATION_REQUIREMENT_BLOCK not in template_text:
+        if template_text.count(SHORTCUT_REGISTRATION_REQUIREMENT_ANCHOR) != 1:
+            raise ValueError("主脚本缺少唯一的背包要求位置，拒绝补充快捷位顺序说明")
+        template_text = template_text.replace(
+            SHORTCUT_REGISTRATION_REQUIREMENT_ANCHOR,
+            SHORTCUT_REGISTRATION_REQUIREMENT_BLOCK,
+            1,
+        )
+    for old, new in SHORTCUT_REGISTRATION_REQUIREMENT_REPLACEMENTS:
+        template_text = template_text.replace(old, new)
+    return template_text
+
+
+def _apply_shortcut_registration_egg_text(
+    library_text: str,
+    helper_text: str,
+) -> str:
+    """Require the second Key Items row (Bicycle) before egg preparation."""
+    if SHORTCUT_REGISTRATION_EGG_MARKER in library_text:
+        start = library_text.index(SHORTCUT_REGISTRATION_EGG_MARKER)
+        if library_text.count(EGG_SETTINGS_NEXT_FUNCTION) != 1:
+            raise ValueError("孵蛋流程库缺少唯一的前置准备函数，拒绝更新自行车快捷检查")
+        end = library_text.index(EGG_SETTINGS_NEXT_FUNCTION, start)
+        existing = library_text[start:end].rstrip()
+        if existing != helper_text.rstrip():
+            library_text = (
+                library_text[:start]
+                + helper_text.rstrip()
+                + "\n\n"
+                + library_text[end:]
+            )
+    else:
+        if library_text.count(EGG_SETTINGS_NEXT_FUNCTION) != 1:
+            raise ValueError("孵蛋流程库缺少唯一的前置准备函数，拒绝注入自行车快捷检查")
+        library_text = library_text.replace(
+            EGG_SETTINGS_NEXT_FUNCTION,
+            helper_text.rstrip() + "\n\n" + EGG_SETTINGS_NEXT_FUNCTION,
+            1,
+        )
+
+    if SHORTCUT_REGISTRATION_EGG_CALL_MARKER not in library_text:
+        if library_text.count(SHORTCUT_REGISTRATION_EGG_CALL_ANCHOR) != 1:
+            raise ValueError("孵蛋流程库缺少唯一的游戏设置入口，拒绝接入自行车快捷检查")
+        library_text = library_text.replace(
+            SHORTCUT_REGISTRATION_EGG_CALL_ANCHOR,
+            SHORTCUT_REGISTRATION_EGG_CALL_BLOCK,
+            1,
+        )
+    return library_text
+
+
+def _shortcut_registration_main_helper_text(template_name: str) -> str:
+    """Return the shared shortcut helper with accurate stage-source metadata."""
+    helper_text = SHORTCUT_REGISTRATION_MAIN_PATH.read_text(encoding="utf-8")
+    return helper_text.replace(
+        f"|{STANDARD_TEMPLATE_NAME}|检查并校正快捷登记|",
+        f"|{template_name}|检查并校正快捷登记|",
+        1,
+    )
+
+
+def _apply_egg_restart_runtime_override_text(
+    library_text: str,
+    override_text: str,
+) -> str:
+    """Replace the whole egg restart helper with the audited original flow."""
+    global_anchor = "$孵蛋库_正在关闭匹配 = 0\n"
+    nx2_global = "$孵蛋库_HOME_BUFFER正确退出NS2匹配 = 0\n"
+    if nx2_global not in library_text:
+        if library_text.count(global_anchor) != 1:
+            raise ValueError("孵蛋流程库缺少唯一的关闭状态全局变量")
+        library_text = library_text.replace(global_anchor, global_anchor + nx2_global, 1)
+    if EGG_RESTART_GLOBALS not in library_text:
+        if library_text.count(global_anchor) != 1:
+            raise ValueError("孵蛋流程库缺少唯一的关闭状态全局变量，拒绝应用重启覆盖")
+        library_text = library_text.replace(
+            global_anchor,
+            global_anchor + EGG_RESTART_GLOBALS,
+            1,
+        )
+
+    if EGG_RESTART_OVERRIDE_MARKER in library_text:
+        start = library_text.index(EGG_RESTART_OVERRIDE_MARKER)
+    elif EGG_RESTART_LEGACY_OVERRIDE_MARKER in library_text:
+        start = library_text.index(EGG_RESTART_LEGACY_OVERRIDE_MARKER)
+    else:
+        if library_text.count(EGG_RESTART_ORIGINAL_FUNCTION) != 1:
+            raise ValueError("孵蛋流程库缺少唯一的关闭游戏函数，拒绝应用重启覆盖")
+        start = library_text.index(EGG_RESTART_ORIGINAL_FUNCTION)
+    if library_text.count(EGG_RESTART_NEXT_FUNCTION) != 1:
+        raise ValueError("孵蛋流程库缺少唯一的软重启函数，拒绝应用重启覆盖")
+    end = library_text.index(EGG_RESTART_NEXT_FUNCTION, start)
+    replacement = override_text.rstrip() + "\n\n"
+    return library_text[:start] + replacement + library_text[end:]
+
+
+def _apply_egg_home_resample_fix_text(library_text: str) -> str:
+    """Compatibility wrapper for the complete original-flow restart overlay."""
+    override_text = EGG_RESTART_OVERRIDE_PATH.read_text(encoding="utf-8")
+    return _apply_egg_restart_runtime_override_text(library_text, override_text)
+
+
+def apply_egg_settings_runtime_override(library_path: str | Path) -> dict[str, str]:
+    """Apply the GUI-only egg library overlays and return their fingerprints."""
+    library_path = Path(library_path)
+    restart_override_text = EGG_RESTART_OVERRIDE_PATH.read_text(encoding="utf-8")
+    settings_override_text = EGG_SETTINGS_OVERRIDE_PATH.read_text(encoding="utf-8")
+    party_slot_candy_override_text = EGG_PARTY_SLOT_CANDY_OVERRIDE_PATH.read_text(
+        encoding="utf-8"
+    )
+    surf_battle_override_text = EGG_SURF_BATTLE_OVERRIDE_PATH.read_text(
+        encoding="utf-8"
+    )
+    hatch_exit_override_text = EGG_HATCH_EXIT_OVERRIDE_PATH.read_text(
+        encoding="utf-8"
+    )
+    configured = _apply_egg_restart_runtime_override_text(
+        library_path.read_text(encoding="utf-8"),
+        restart_override_text,
+    )
+    configured = _apply_egg_settings_runtime_override_text(
+        configured,
+        settings_override_text,
+    )
+    configured = _apply_shortcut_registration_egg_text(
+        configured,
+        SHORTCUT_REGISTRATION_EGG_PATH.read_text(encoding="utf-8"),
+    )
+    configured = _apply_egg_party_slot_candy_runtime_override_text(
+        configured,
+        party_slot_candy_override_text,
+    )
+    configured = _apply_egg_surf_battle_runtime_override_text(
+        configured,
+        surf_battle_override_text,
+    )
+    configured = _apply_egg_hatch_exit_runtime_override_text(
+        configured,
+        hatch_exit_override_text,
+    )
+    configured = _apply_egg_pickup_parity_menu_text(configured)
+    configured = _apply_egg_pond_settle_delay_text(configured)
+    configured = _apply_seed_mode3_help_start_text(configured)
+    library_path.write_text(configured, encoding="utf-8")
+    return {
+        "egg_restart_original_flow_sha256": hashlib.sha256(
+            restart_override_text.encode("utf-8")
+        ).hexdigest(),
+        "egg_settings_retry_sha256": hashlib.sha256(
+            settings_override_text.encode("utf-8")
+        ).hexdigest(),
+        "egg_party_slot_candy_sha256": hashlib.sha256(
+            party_slot_candy_override_text.encode("utf-8")
+        ).hexdigest(),
+        "egg_surf_battle_retry_sha256": hashlib.sha256(
+            surf_battle_override_text.encode("utf-8")
+        ).hexdigest(),
+        "egg_hatch_exit_retry_sha256": hashlib.sha256(
+            hatch_exit_override_text.encode("utf-8")
+        ).hexdigest(),
+        "egg_pickup_parity_menu_sha256": hashlib.sha256(
+            (
+                EGG_PICKUP_PARITY_SIGNATURE_CURRENT
+                + EGG_PICKUP_PARITY_VALIDATION_CURRENT
+                + EGG_PICKUP_PARITY_ACTION_CURRENT
+            ).encode("utf-8")
+        ).hexdigest(),
+    }
+
+
+def materialize_easycon118_164a_fixes(source_dir: str | Path) -> dict[str, Any]:
+    """Bake reviewed 1.6.4-a fixes into both direct-run 2.0 entries."""
+    source_dir = Path(source_dir).resolve()
+    standard_path = source_dir / STANDARD_TEMPLATE_NAME
+    egg_path = source_dir / EGG_TEMPLATE_NAME
+    if not standard_path.is_file() or not egg_path.is_file():
+        raise FileNotFoundError("2.0 脚本包缺少正式版或时间轴版主脚本")
+
+    classifier_text = HOME_BUFFER_ADAPTIVE_CLASSIFIER_PATH.read_text(encoding="utf-8")
+    standard_configured = _apply_standard_home_buffer_runtime_override_text(
+        standard_path.read_text(encoding="utf-8"),
+        STANDARD_HOME_BUFFER_OVERRIDE_PATH.read_text(encoding="utf-8"),
+    )
+    standard_configured = _apply_home_buffer_adaptive_classifier_text(
+        standard_configured,
+        classifier_text,
+        False,
+    )
+    standard_configured = _apply_seed_hold_observation_window_text(
+        standard_configured
+    )
+    standard_configured = apply_calibration_trust_gates_text(standard_configured)
+    standard_configured = _apply_egg_parent_pairing_text(standard_configured)
+    standard_configured = _apply_seed_mode3_help_start_text(standard_configured)
+    standard_path.write_text(standard_configured, encoding="utf-8")
+
+    configured = _apply_egg_summary_fix_text(
+        egg_path.read_text(encoding="utf-8")
+    )
+    configured = _apply_egg_reverse_lookup_policy_text(configured)
+    configured = _apply_egg_prepared_254_runtime_override_text(configured, False)
+    configured = _apply_egg_home_buffer_runtime_override_text(
+        configured,
+        EGG_HOME_BUFFER_OVERRIDE_PATH.read_text(encoding="utf-8"),
+    )
+    configured = _apply_home_buffer_adaptive_classifier_text(
+        configured,
+        classifier_text,
+        False,
+    )
+    configured = _apply_egg_party_slot_main_runtime_override_text(
+        configured,
+        EGG_PARTY_SLOT_MAIN_OVERRIDE_PATH.read_text(encoding="utf-8"),
+    )
+    configured = _apply_seed_hold_observation_window_text(configured)
+    configured = apply_calibration_trust_gates_text(configured)
+    configured = _apply_egg_parent_pairing_text(configured)
+    configured = _apply_egg_seed_controller_runtime_override_text(
+        configured,
+        EGG_SEED_CONTROLLER_OVERRIDE_PATH.read_text(encoding="utf-8"),
+    )
+    configured = _apply_egg_formal_parity_runtime_override_text(
+        configured,
+        EGG_FORMAL_PARITY_OVERRIDE_PATH.read_text(encoding="utf-8"),
+    )
+    configured = _apply_egg_transient_retry_runtime_override_text(configured)
+    configured = _apply_egg_post_pickup_retry_policy_text(configured)
+    configured = _apply_egg_no_egg_evidence_policy_text(configured)
+    configured = _apply_egg_no_egg_seed_gate_text(configured)
+    configured = _apply_egg_wild_seed_fallback_text(configured)
+    configured = _apply_egg_terminal_stop_policy_text(configured)
+    configured = _apply_seed_mode3_help_start_text(configured)
+    egg_path.write_text(configured, encoding="utf-8")
+
+    party_summary_helper = PARTY_SUMMARY_NAVIGATION_PATH.read_text(
+        encoding="utf-8"
+    )
+    for template_path in (standard_path, egg_path):
+        configured = _apply_party_summary_navigation_text(
+            template_path.read_text(encoding="utf-8"),
+            party_summary_helper,
+        )
+        configured = _apply_roamer_menu_cursor_text(configured)
+        configured = _apply_fishing_shortcut_and_cursor_text(configured)
+        configured = _apply_shortcut_registration_main_text(
+            configured,
+            _shortcut_registration_main_helper_text(template_path.name),
+        )
+        template_path.write_text(configured, encoding="utf-8")
+
+    # The download package may also carry direct-run 1.70a mirrors. They are
+    # not generator mothers and therefore do not enter the 33-file corpus,
+    # but their round-zero settings check must honor the same shortcut labels.
+    for template_name in OPTIONAL_DIRECT_TEMPLATE_NAMES:
+        template_path = source_dir / template_name
+        if not template_path.is_file():
+            continue
+        configured = _apply_shortcut_registration_main_text(
+            template_path.read_text(encoding="utf-8"),
+            _shortcut_registration_main_helper_text(template_path.name),
+        )
+        template_path.write_text(configured, encoding="utf-8")
+
+    apply_wild_pid_retry_limit(standard_path)
+    apply_wild_pid_retry_limit(egg_path)
+    apply_ocr_runtime_fallback(source_dir / "lib" / OCR_NAME_LIBRARY_NAME)
+    apply_egg_settings_runtime_override(
+        source_dir / "lib" / EGG_SETTINGS_LIBRARY_NAME
+    )
+    wild_target_path = source_dir / "lib" / "17_获取_野生目标.ecs"
+    wild_target_path.write_text(
+        _apply_fishing_rod_shortcut_library_text(
+            wild_target_path.read_text(encoding="utf-8")
+        ),
+        encoding="utf-8",
+    )
+    static_target_path = source_dir / "lib" / "16_获取_静态目标.ecs"
+    static_target_text = _apply_togepi_hatch_cycle_override_text(
+        static_target_path.read_text(encoding="utf-8"),
+        TOGEPI_HATCH_CYCLE_OVERRIDE_PATH.read_text(encoding="utf-8"),
+    )
+    static_target_path.write_text(static_target_text, encoding="utf-8")
+    upgrade_easycon_seed_mode3_tables(source_dir / "lib")
+    apply_seed_common_regions(source_dir)
+    return inspect_script_corpus(source_dir)
+
+
+def write_configured_project(
+    source_dir: str | Path,
+    output_dir: str | Path,
+    plan: RunPlan,
+    options: EasyCon118Options | None = None,
+    *,
+    copy_assets: bool = True,
+    template_name: str | None = None,
+    precalibration_store_path: str | Path | None = None,
+) -> Path:
+    """Create an EasyCon CLI project with ``main.ecs``, ``lib`` and labels."""
+    options = options or EasyCon118Options()
+    source_dir = Path(source_dir).resolve()
+    output_dir = Path(output_dir).resolve()
+    script_corpus = inspect_script_corpus(source_dir)
+    if script_corpus["count"] != EXPECTED_SCRIPT_FILE_COUNT:
+        raise ValueError(
+            f"2.0 主脚本/lib 文件数应为 {EXPECTED_SCRIPT_FILE_COUNT}，"
+            f"当前为 {script_corpus['count']}"
+        )
+    if not is_supported_runtime_script_sha256(script_corpus["sha256"]):
+        print(
+            "警告：2.0 主脚本/lib 指纹未登记，仍继续生成："
+            + script_corpus["sha256"],
+            file=sys.stderr,
+        )
+    selected_template = _normalized_template_name(
+        template_name,
+        default=STANDARD_TEMPLATE_NAME,
+    )
+    template_path = source_dir / selected_template
+    if not template_path.is_file():
+        raise FileNotFoundError(f"2.0 脚本包缺少所选入口: {template_path}")
+    store_path = _precalibration_store_path(precalibration_store_path)
+    options, precalibration = _load_plan_precalibration(
+        plan,
+        options,
+        selected_template,
+        store_path,
+    )
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    configured = configure_template_text(
+        template_path.read_text(encoding="utf-8"),
+        plan,
+        options,
+    )
+    # The two audited entries share the rest of the generator, but their
+    # HOME_BUFFER controllers are intentionally different.  Applying the
+    # formal controller to the timeline entry leaves the timeline marker in
+    # place while replacing its implementation, which is exactly the stale
+    # mixed-controller state that makes direct timeline runs unreliable.
+    if selected_template == STANDARD_TEMPLATE_NAME:
+        configured = _apply_standard_home_buffer_runtime_override_text(
+            configured,
+            STANDARD_HOME_BUFFER_OVERRIDE_PATH.read_text(encoding="utf-8"),
+        )
+        home_buffer_controller = "FORMAL"
+    else:
+        configured = _apply_egg_home_buffer_runtime_override_text(
+            configured,
+            EGG_HOME_BUFFER_OVERRIDE_PATH.read_text(encoding="utf-8"),
+        )
+        home_buffer_controller = "TIMELINE"
+    classifier_text = HOME_BUFFER_ADAPTIVE_CLASSIFIER_PATH.read_text(
+        encoding="utf-8"
+    )
+    configured = _apply_home_buffer_adaptive_classifier_text(
+        configured,
+        classifier_text,
+        options.home_buffer_adaptive_threshold,
+    )
+    configured = _apply_seed_hold_observation_window_text(configured)
+    configured = apply_calibration_trust_gates_text(configured)
+    if options.japanese_starter:
+        configured = _apply_japanese_starter_runtime_text(configured)
+    if precalibration["enabled"]:
+        configured = _apply_regular_precalibration_runtime_text(
+            configured,
+            options,
+            precalibration,
+        )
+    main_path = output_dir / "main.ecs"
+    main_path.write_text(configured, encoding="utf-8")
+    wild_pid_retry_limit_sha256 = apply_wild_pid_retry_limit(main_path)
+
+    if copy_assets:
+        for directory in ("lib", "ImgLabel"):
+            source = source_dir / directory
+            if not source.is_dir():
+                raise FileNotFoundError(f"2.0 脚本包缺少 {directory} 目录")
+            target = output_dir / directory
+            if target.exists():
+                shutil.rmtree(target)
+            shutil.copytree(source, target)
+            if directory == "ImgLabel":
+                copy_easycon118_extension_labels(target)
+
+    apply_seed_common_regions(output_dir, ("main.ecs",))
+    seed_table_override = apply_easycon_seed_table_overrides(output_dir / "lib")
+    if options.japanese_starter:
+        japanese_tables = {}
+        for game_cn, game in (("火红", "fr"), ("叶绿", "lg")):
+            library_path = output_dir / "lib" / (
+                "02_Seed表_火红_NX.ecs" if game == "fr" else "03_Seed表_叶绿_NX.ecs"
+            )
+            configured_table = _apply_japanese_seed_mode10(library_path, game_cn, game)
+            library_path.write_text(configured_table, encoding="utf-8")
+            japanese_tables[game] = {
+                "mode": 10,
+                "source": "bundled " + ("fr_jpn_nx.bin" if game == "fr" else "lg_jpn_nx.bin"),
+                "sha256": hashlib.sha256(configured_table.encode("utf-8")).hexdigest(),
+            }
+        if seed_table_override is None:
+            seed_table_override = {}
+        seed_table_override["temporary_japanese_mode10"] = japanese_tables
+    _apply_seed_mode3_library_mapping(output_dir / "lib" / EGG_SETTINGS_LIBRARY_NAME)
+    ocr_fallback_sha256 = apply_ocr_runtime_fallback(
+        output_dir / "lib" / OCR_NAME_LIBRARY_NAME
+    )
+
+    manifest = {
+        "source": str(source_dir.resolve()),
+        "template": template_path.name,
+        "plan": plan.to_dict(),
+        "easycon118_options": asdict(options),
+        "precalibration": precalibration,
+        "labels": {
+            "expected_count": EXPECTED_LABEL_COUNT,
+            "expected_methods": EXPECTED_LABEL_METHODS,
+            "expected_sha256": EXPECTED_LABEL_SHA256,
+        },
+        "scripts": {
+            "expected_count": EXPECTED_SCRIPT_FILE_COUNT,
+            "expected_sha256": EXPECTED_SCRIPT_SHA256,
+        },
+        "runtime_overrides": {
+            "home_buffer_controller": home_buffer_controller,
+            "ocr_unavailable_fallback_sha256": ocr_fallback_sha256,
+            "wild_pid_retry_limit_sha256": wild_pid_retry_limit_sha256,
+            "home_buffer_adaptive_classifier_sha256": hashlib.sha256(
+                classifier_text.encode("utf-8")
+            ).hexdigest(),
+            "home_buffer_recovery_sha256": hashlib.sha256(
+                HOME_BUFFER_RECOVERY_PATH.read_bytes()
+            ).hexdigest(),
+            "seed_hold_observation_window_sha256": hashlib.sha256(
+                (
+                    SEED_HOLD_OBSERVATION_MIN_GLOBAL
+                    + SEED_SCHEME2_CONTINUATION_GLOBALS
+                    + SEED_LOCK_CONTROLLER_OVERRIDE_PATH.read_text(encoding="utf-8")
+                ).encode("utf-8")
+            ).hexdigest(),
+            "seed_tables": seed_table_override,
+            "temporary_japanese_starter": options.japanese_starter,
+        },
+        "backend": {
+            "name": EASYCON_BACKEND_NAME,
+            "expected_cli_version": EXPECTED_EZCON_VERSION,
+            "expected_cli_sha256": EXPECTED_EZCON_SHA256,
+        },
+    }
+    (output_dir / "plan.json").write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    return main_path
+
+
+def _select_egg_template_path(source_dir: Path) -> Path:
+    """Prefer the promoted formal WAIT entry and retain old-cache compatibility."""
+    formal_path = source_dir / STANDARD_TEMPLATE_NAME
+    if formal_path.is_file() and EGG_FORMAL_WAIT_MARKER in formal_path.read_text(
+        encoding="utf-8"
+    ):
+        return formal_path
+    return source_dir / EGG_TEMPLATE_NAME
+
+
+def write_configured_egg_project(
+    source_dir: str | Path,
+    output_dir: str | Path,
+    request: EggRunRequest,
+    *,
+    copy_assets: bool = True,
+    template_name: str | None = None,
+    precalibration_store_path: str | Path | None = None,
+) -> Path:
+    """Create a configured project for the experimental same-seed egg flow."""
+    request.validate()
+    source_dir = Path(source_dir).resolve()
+    output_dir = Path(output_dir).resolve()
+    script_corpus = inspect_script_corpus(source_dir)
+    if script_corpus["count"] != EXPECTED_SCRIPT_FILE_COUNT:
+        raise ValueError(
+            f"2.0 正式/孵蛋主脚本及 lib 文件数应为 {EXPECTED_SCRIPT_FILE_COUNT}，"
+            f"当前为 {script_corpus['count']}"
+        )
+    if not is_supported_runtime_script_sha256(script_corpus["sha256"]):
+        print(
+            "警告：2.0 孵蛋主脚本/lib 指纹未登记，仍继续生成："
+            + script_corpus["sha256"],
+            file=sys.stderr,
+        )
+    default_template = _select_egg_template_path(source_dir).name
+    selected_template = _normalized_template_name(
+        template_name,
+        default=default_template,
+    )
+    template_path = source_dir / selected_template
+    if not template_path.is_file():
+        raise FileNotFoundError(f"2.0 脚本包缺少所选入口: {template_path}")
+    store_path = _precalibration_store_path(precalibration_store_path)
+    request, precalibration = _load_egg_precalibration(
+        request,
+        selected_template,
+        store_path,
+    )
+    output_dir.mkdir(parents=True, exist_ok=True)
+    configured = configure_egg_template_text(
+        template_path.read_text(encoding="utf-8"), request
+    )
+    if EGG_FORMAL_WAIT_MARKER in configured:
+        if "$孵蛋使用绝对时间轴 = 0" not in configured:
+            raise ValueError("孵蛋正式模板没有固定选择普通WAIT模式")
+    configured = _apply_egg_prepared_254_runtime_override_text(
+        configured,
+        request.start_from_prepared_254,
+    )
+    home_buffer_override_text = EGG_HOME_BUFFER_OVERRIDE_PATH.read_text(
+        encoding="utf-8"
+    )
+    configured = _apply_egg_home_buffer_runtime_override_text(
+        configured,
+        home_buffer_override_text,
+    )
+    classifier_text = HOME_BUFFER_ADAPTIVE_CLASSIFIER_PATH.read_text(
+        encoding="utf-8"
+    )
+    configured = _apply_home_buffer_adaptive_classifier_text(
+        configured,
+        classifier_text,
+        request.home_buffer_adaptive_threshold,
+    )
+    party_slot_main_override_text = EGG_PARTY_SLOT_MAIN_OVERRIDE_PATH.read_text(
+        encoding="utf-8"
+    )
+    configured = _apply_egg_party_slot_main_runtime_override_text(
+        configured,
+        party_slot_main_override_text,
+    )
+    configured = _apply_seed_hold_observation_window_text(configured)
+    configured = apply_calibration_trust_gates_text(configured)
+    seed_controller_override_text = EGG_SEED_CONTROLLER_OVERRIDE_PATH.read_text(
+        encoding="utf-8"
+    )
+    configured = _apply_egg_seed_controller_runtime_override_text(
+        configured,
+        seed_controller_override_text,
+    )
+    formal_parity_override_text = ""
+    if selected_template == EGG_TEMPLATE_NAME:
+        formal_parity_override_text = EGG_FORMAL_PARITY_OVERRIDE_PATH.read_text(
+            encoding="utf-8"
+        )
+        configured = _apply_egg_formal_parity_runtime_override_text(
+            configured,
+            formal_parity_override_text,
+        )
+    configured = _apply_egg_transient_retry_runtime_override_text(configured)
+    configured = _apply_egg_post_pickup_retry_policy_text(configured)
+    configured = _apply_egg_no_egg_evidence_policy_text(configured)
+    configured = _apply_egg_no_egg_seed_gate_text(configured)
+    configured = _apply_egg_wild_seed_fallback_text(configured)
+    configured = _apply_egg_terminal_stop_policy_text(configured)
+    if precalibration["enabled"]:
+        configured = _apply_egg_precalibration_runtime_text(
+            configured,
+            request,
+            precalibration,
+        )
+    main_path = output_dir / "main.ecs"
+    main_path.write_text(configured, encoding="utf-8")
+    wild_pid_retry_limit_sha256 = apply_wild_pid_retry_limit(main_path)
+
+    if copy_assets:
+        for directory in ("lib", "ImgLabel"):
+            source = source_dir / directory
+            if not source.is_dir():
+                raise FileNotFoundError(f"2.0 脚本包缺少 {directory} 目录")
+            target = output_dir / directory
+            if target.exists():
+                shutil.rmtree(target)
+            shutil.copytree(source, target)
+            if directory == "ImgLabel":
+                copy_easycon118_extension_labels(target)
+
+    apply_seed_common_regions(output_dir, ("main.ecs",))
+    seed_table_override = apply_easycon_seed_table_overrides(output_dir / "lib")
+    ocr_fallback_sha256 = apply_ocr_runtime_fallback(
+        output_dir / "lib" / OCR_NAME_LIBRARY_NAME
+    )
+    runtime_overrides = apply_egg_settings_runtime_override(
+        output_dir / "lib" / EGG_SETTINGS_LIBRARY_NAME
+    )
+    runtime_overrides["ocr_unavailable_fallback_sha256"] = ocr_fallback_sha256
+    runtime_overrides["egg_home_buffer_refine_sha256"] = hashlib.sha256(
+        home_buffer_override_text.encode("utf-8")
+    ).hexdigest()
+    runtime_overrides["home_buffer_adaptive_classifier_sha256"] = hashlib.sha256(
+        classifier_text.encode("utf-8")
+    ).hexdigest()
+    runtime_overrides["home_buffer_recovery_sha256"] = hashlib.sha256(
+        HOME_BUFFER_RECOVERY_PATH.read_bytes()
+    ).hexdigest()
+    runtime_overrides["egg_party_slot_main_sha256"] = hashlib.sha256(
+        party_slot_main_override_text.encode("utf-8")
+    ).hexdigest()
+    runtime_overrides["egg_seed_controller_sha256"] = hashlib.sha256(
+        seed_controller_override_text.encode("utf-8")
+    ).hexdigest()
+    runtime_overrides["egg_cross_method_confirmation_sha256"] = hashlib.sha256(
+        (
+            EGG_REVERSE_LOOKUP_POLICY_MARKER
+            + "$孵蛋流程跨方法候选总数"
+            + "$孵蛋流程候选参考Held帧"
+            + "$孵蛋流程无蛋跳出估计落点"
+            + "$孵蛋流程无蛋预测Held帧 = $孵蛋流程无蛋跳出最佳预测落点"
+            + "$孵蛋流程无蛋跳出候选预测落点 % 2"
+        ).encode("utf-8")
+    ).hexdigest()
+    runtime_overrides["seed_hold_observation_window_sha256"] = hashlib.sha256(
+        (
+            SEED_HOLD_OBSERVATION_GLOBAL_ANCHOR
+            + SEED_HOLD_OBSERVATION_MIN_GLOBAL
+            + SEED_SCHEME2_CONTINUATION_GLOBALS
+            + SEED_LOCK_CONTROLLER_OVERRIDE_PATH.read_text(encoding="utf-8")
+        ).encode("utf-8")
+    ).hexdigest()
+    runtime_overrides["egg_formal_parity_main_sha256"] = (
+        hashlib.sha256(formal_parity_override_text.encode("utf-8")).hexdigest()
+        if formal_parity_override_text
+        else None
+    )
+    runtime_overrides["egg_transient_retry_main_sha256"] = hashlib.sha256(
+        "\n".join(
+            replacement
+            for _, replacement in EGG_TRANSIENT_RETRY_REPLACEMENTS
+        ).encode("utf-8")
+    ).hexdigest()
+    runtime_overrides["egg_post_pickup_retry_policy_sha256"] = hashlib.sha256(
+        (
+            EGG_POST_PICKUP_MISS_CURRENT
+            + EGG_POST_PICKUP_FAILURE_CURRENT
+        ).encode("utf-8")
+    ).hexdigest()
+    runtime_overrides["egg_no_egg_evidence_policy_sha256"] = hashlib.sha256(
+        (
+            EGG_NO_EGG_REQUEST_CHANGE_CURRENT
+            + EGG_NO_EGG_NON_TARGET_CURRENT
+        ).encode("utf-8")
+    ).hexdigest()
+    runtime_overrides["egg_terminal_stop_policy_sha256"] = hashlib.sha256(
+        "\n".join(
+            replacement
+            for _, replacement in EGG_TERMINAL_STOP_REPLACEMENTS
+        ).encode("utf-8")
+    ).hexdigest()
+    runtime_overrides["egg_no_egg_seed_gate_sha256"] = hashlib.sha256(
+        EGG_NO_EGG_SEED_GATE_CURRENT.encode("utf-8")
+    ).hexdigest()
+    runtime_overrides["egg_wild_seed_fallback_sha256"] = hashlib.sha256(
+        (EGG_WILD_SEED_WINDOW_INIT + EGG_WILD_SEED_SCAN_CURRENT).encode("utf-8")
+    ).hexdigest()
+    runtime_overrides["egg_prepared_254_start_sha256"] = hashlib.sha256(
+        _egg_prepared_254_override_text(request.start_from_prepared_254).encode(
+            "utf-8"
+        )
+    ).hexdigest()
+    runtime_overrides["wild_pid_retry_limit_sha256"] = wild_pid_retry_limit_sha256
+    runtime_overrides["seed_tables"] = seed_table_override
+    manifest = {
+        "source": str(source_dir),
+        "template": template_path.name,
+        "egg_request": request.to_dict(),
+        "precalibration": precalibration,
+        "experimental": True,
+        "egg_wait_mode": (
+            "formal_wait"
+            if EGG_FORMAL_WAIT_MARKER in configured
+            else "legacy_timeline"
+        ),
+        "runtime_overrides": runtime_overrides,
+        "labels": {
+            "expected_count": EXPECTED_LABEL_COUNT,
+            "expected_methods": EXPECTED_LABEL_METHODS,
+            "expected_sha256": EXPECTED_LABEL_SHA256,
+        },
+        "scripts": {
+            "expected_count": EXPECTED_SCRIPT_FILE_COUNT,
+            "expected_sha256": EXPECTED_SCRIPT_SHA256,
+        },
+        "backend": {
+            "name": EASYCON_BACKEND_NAME,
+            "expected_cli_version": EXPECTED_EZCON_VERSION,
+            "expected_cli_sha256": EXPECTED_EZCON_SHA256,
+        },
+    }
+    (output_dir / "plan.json").write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    return main_path
+
+
+def validate_runtime(
+    ezcon_path: str | Path,
+    project_main: str | Path,
+    *,
+    fingerprint_warning_only: bool = False,
+) -> EasyConRuntimeCheck:
+    ezcon_path = Path(ezcon_path).resolve()
+    project_main = Path(project_main).resolve()
+    errors: list[str] = []
+    warnings: list[str] = []
+
+    if not ezcon_path.is_file():
+        errors.append(f"找不到 ezcon.exe: {ezcon_path}")
+    else:
+        try:
+            ezcon_sha256 = hashlib.sha256(ezcon_path.read_bytes()).hexdigest()
+        except OSError as exc:
+            errors.append(f"无法读取 ezcon.exe: {exc}")
+        else:
+            if ezcon_sha256 != EXPECTED_EZCON_SHA256:
+                record_fingerprint_mismatch(
+                    "EasyCon 1.6.4a ezcon.exe 指纹不一致: " + ezcon_sha256,
+                    warning_only=fingerprint_warning_only,
+                    errors=errors,
+                    warnings=warnings,
+                )
+    if not project_main.is_file():
+        errors.append(f"找不到生成脚本: {project_main}")
+    project_dir = project_main.parent
+    if not (project_dir / "lib").is_dir():
+        errors.append("生成项目缺少 lib 目录")
+    label_dir = project_dir / "ImgLabel"
+    if not label_dir.is_dir():
+        errors.append("生成项目缺少 ImgLabel 目录")
+    else:
+        try:
+            corpus = inspect_label_corpus(label_dir)
+        except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
+            errors.append(f"2.0 标签清单读取失败: {exc}")
+        else:
+            if corpus["count"] != EXPECTED_LABEL_COUNT:
+                errors.append(
+                    f"2.0 标签数量应为 {EXPECTED_LABEL_COUNT}，当前为 {corpus['count']}"
+                )
+            if corpus["methods"] != EXPECTED_LABEL_METHODS:
+                errors.append(
+                    f"2.0 标签方法分布不一致: {corpus['methods']}"
+                )
+            override_check = validate_project_overrides(
+                label_dir,
+                EXPECTED_LABEL_SHA256,
+                fingerprint_warning_only=fingerprint_warning_only,
+            )
+            if override_check.recognized:
+                errors.extend(override_check.errors)
+                warnings.extend(override_check.warnings)
+            elif corpus["sha256"] != EXPECTED_LABEL_SHA256:
+                record_fingerprint_mismatch(
+                    "2.0 标签指纹不一致，可能不是已审计的完整标签包: "
+                    + corpus["sha256"],
+                    warning_only=fingerprint_warning_only,
+                    errors=errors,
+                    warnings=warnings,
+                )
+
+    tessdata_dir = ezcon_path.parent / "Tessdata"
+    for model, expected_sha256 in EXPECTED_TESSDATA_SHA256.items():
+        model_path = tessdata_dir / model
+        if not model_path.is_file():
+            errors.append(f"EasyCon Tessdata 缺少 {model}")
+            continue
+        try:
+            model_sha256 = hashlib.sha256(model_path.read_bytes()).hexdigest()
+        except OSError as exc:
+            errors.append(f"无法读取 EasyCon Tessdata/{model}: {exc}")
+            continue
+        if model_sha256 != expected_sha256:
+            record_fingerprint_mismatch(
+                f"EasyCon Tessdata/{model} 指纹不一致: {model_sha256}",
+                warning_only=fingerprint_warning_only,
+                errors=errors,
+                warnings=warnings,
+            )
+
+    if ezcon_path.is_file() and project_main.is_file() and not errors:
+        run_options = dict(
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        try:
+            version = subprocess.run(
+                [str(ezcon_path), "--version"], timeout=15, **run_options
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            errors.append(f"无法读取 EasyCon 版本: {exc}")
+        else:
+            version_text = (version.stdout + "\n" + version.stderr).strip()
+            version_line = version_text.splitlines()[-1] if version_text else "(无版本输出)"
+            if version.returncode != 0:
+                errors.append(f"EasyCon 版本检查失败，退出码 {version.returncode}")
+            elif version_line != EXPECTED_EZCON_VERSION:
+                errors.append(
+                    f"当前适配器只审计过 EasyCon {EXPECTED_EZCON_VERSION}；检测结果为: "
+                    + version_line
+                )
+            else:
+                warnings.append("EasyCon 版本: " + version_line)
+
+        if not errors:
+            try:
+                formatted = subprocess.run(
+                    [str(ezcon_path), "format", str(project_main)],
+                    cwd=str(project_main.parent),
+                    timeout=60,
+                    **run_options,
+                )
+            except (OSError, subprocess.SubprocessError) as exc:
+                errors.append(f"EasyCon 1.6.4a ECS 语法预检无法执行: {exc}")
+            else:
+                if formatted.returncode != 0:
+                    details = (formatted.stderr or formatted.stdout).strip()
+                    errors.append(
+                        "EasyCon 1.6.4a ECS 语法预检失败，退出码 "
+                        f"{formatted.returncode}: {details[-1000:]}"
+                    )
+
+    warnings.append(
+        "已固定使用 EasyCon 1.6.4a；正式长跑前仍需完成停止、重连和识别稳定性验收。"
+    )
+    return EasyConRuntimeCheck(not errors, tuple(errors), tuple(warnings))
+
+
+def build_run_command(
+    ezcon_path: str | Path,
+    project_main: str | Path,
+    *,
+    port: str,
+    video_device: int,
+    video_type: str = "DSHOW",
+    verbose: bool = False,
+    preview_port: int = 0,
+    incident_directory: str | Path | None = None,
+    run_id: str | None = None,
+    workflow: str | None = None,
+    capture_device_name: str | None = None,
+    label_supervision: bool = False,
+) -> list[str]:
+    if video_device < 0:
+        raise ValueError("采集卡序号不能为负数")
+    if not port or not port.strip():
+        raise ValueError("串口不能为空")
+    if video_type not in {"ANY", "DSHOW", "MSMF"}:
+        raise ValueError(f"不支持的视频类型: {video_type}")
+    if preview_port < 0 or preview_port > 65535:
+        raise ValueError("预览端口必须为 0 或 1-65535")
+    ezcon_path = Path(ezcon_path).resolve()
+    project_main = Path(project_main).resolve()
+    command = [
+        str(ezcon_path),
+        "run",
+        str(project_main),
+        "--port",
+        port,
+        "--device",
+        str(video_device),
+        "--videotype",
+        video_type,
+    ]
+    if verbose:
+        command.append("--verbose")
+    if preview_port:
+        command.extend(["--preview-port", str(preview_port)])
+    if label_supervision:
+        command.append("--label-supervision")
+    if label_supervision and incident_directory is not None:
+        command.extend(["--incident-dir", str(Path(incident_directory).resolve())])
+    if label_supervision and run_id:
+        command.extend(["--run-id", run_id])
+    if label_supervision and workflow:
+        command.extend(["--workflow", workflow])
+    if label_supervision and capture_device_name:
+        command.extend(["--capture-device-name", capture_device_name])
+    return command
+
+
+def prepare_compat_runner(
+    ezcon_path: str | Path,
+    runner_path: str | Path = DEFAULT_COMPAT_RUNNER_PATH,
+    *,
+    fingerprint_warning_only: bool = False,
+    fingerprint_warnings: list[str] | None = None,
+) -> Path:
+    """Validate the pinned latest-frame CLI and sync audited local-OCR assets.
+
+    EasyCon 1.6.4-a's GUI rounds image-label confidence upward with
+    ``Math.Ceiling`` and continuously drains the capture device.  Its bundled
+    ``ezcon.exe run`` truncates confidence and reads only when a label is
+    evaluated, which can return buffered DSHOW transition frames.  The
+    compatibility runner is built from the exact 1.6.4-a source commit and
+    adds latest-frame consumption plus the GUI's rounding behavior (and .NET 9
+    build-only compatibility).
+    """
+    ezcon_path = Path(ezcon_path).resolve()
+    runner_path = Path(runner_path).resolve()
+    if not ezcon_path.is_file():
+        raise FileNotFoundError(f"找不到原始 EasyCon 1.6.4-a ezcon.exe: {ezcon_path}")
+    warnings = fingerprint_warnings if fingerprint_warnings is not None else []
+    ezcon_sha256 = hashlib.sha256(ezcon_path.read_bytes()).hexdigest()
+    if ezcon_sha256 != EXPECTED_EZCON_SHA256:
+        record_fingerprint_mismatch(
+            f"原始 EasyCon 1.6.4-a ezcon.exe 指纹不一致: {ezcon_sha256}",
+            warning_only=fingerprint_warning_only,
+            warnings=warnings,
+        )
+    if not runner_path.is_file():
+        raise FileNotFoundError(
+            "缺少 EasyCon 1.6.4-a GUI 持续采帧兼容运行器；请先运行 "
+            "tools\\build_easycon164a_compat_runner.ps1"
+        )
+
+    manifest_path = runner_path.with_name("build-manifest.json")
+    if not manifest_path.is_file():
+        raise FileNotFoundError(f"兼容运行器缺少构建清单: {manifest_path}")
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"兼容运行器构建清单无法读取: {exc}") from exc
+    if manifest.get("source_commit") != EXPECTED_COMPAT_SOURCE_COMMIT:
+        raise ValueError("兼容运行器不是从已锁定的 EasyCon 1.6.4-a commit 构建")
+    if manifest.get("patch_id") != EXPECTED_COMPAT_PATCH_ID:
+        raise ValueError("兼容运行器补丁标识不一致")
+    runner_sha256 = hashlib.sha256(runner_path.read_bytes()).hexdigest()
+    if manifest.get("sha256") != runner_sha256:
+        record_fingerprint_mismatch(
+            f"兼容运行器指纹不一致: {runner_sha256}",
+            warning_only=fingerprint_warning_only,
+            warnings=warnings,
+        )
+
+    try:
+        version = subprocess.run(
+            [str(runner_path), "--version"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise RuntimeError(f"兼容运行器版本检查失败: {exc}") from exc
+    version_text = (version.stdout + "\n" + version.stderr).strip()
+    version_line = version_text.splitlines()[-1] if version_text else ""
+    if version.returncode != 0 or version_line != EXPECTED_EZCON_VERSION:
+        raise ValueError(
+            "兼容运行器版本不一致；期望 "
+            f"{EXPECTED_EZCON_VERSION}，实际 {version_line or '(无输出)'}"
+        )
+
+    source_tessdata = ezcon_path.parent / "Tessdata"
+    target_tessdata = runner_path.parent / "Tessdata"
+    target_tessdata.mkdir(parents=True, exist_ok=True)
+    for model, expected_sha256 in EXPECTED_TESSDATA_SHA256.items():
+        source = source_tessdata / model
+        if not source.is_file():
+            raise FileNotFoundError(f"原始 EasyCon Tessdata 缺少 {model}")
+        source_sha256 = hashlib.sha256(source.read_bytes()).hexdigest()
+        if source_sha256 != expected_sha256:
+            record_fingerprint_mismatch(
+                f"原始 EasyCon Tessdata/{model} 指纹不一致: {source_sha256}",
+                warning_only=fingerprint_warning_only,
+                warnings=warnings,
+            )
+        target = target_tessdata / model
+        if not target.is_file() or hashlib.sha256(target.read_bytes()).hexdigest() != expected_sha256:
+            shutil.copy2(source, target)
+    for relative_name, expected_sha256 in EXPECTED_COMPAT_OCR_NATIVE_SHA256.items():
+        relative_path = Path(relative_name)
+        native_path = runner_path.parent / relative_path
+        if not native_path.is_file():
+            raise FileNotFoundError(
+                f"兼容运行器缺少 OCR 原生依赖 {relative_name}；请重新构建 runner"
+            )
+        native_sha256 = hashlib.sha256(native_path.read_bytes()).hexdigest()
+        if native_sha256 != expected_sha256:
+            record_fingerprint_mismatch(
+                f"兼容运行器 OCR 原生依赖/{relative_name} 指纹不一致: {native_sha256}",
+                warning_only=fingerprint_warning_only,
+                warnings=warnings,
+            )
+    return runner_path
+
+
+def launch_project(**kwargs) -> subprocess.Popen:
+    """Launch only after the caller has shown and accepted preflight results."""
+    command = build_run_command(**kwargs)
+    return subprocess.Popen(command, cwd=str(Path(kwargs["project_main"]).parent))

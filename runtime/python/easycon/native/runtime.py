@@ -209,6 +209,12 @@ def _same_type(left: object, right: object) -> bool:
 
 def _binary_operation(operator: str, left: object, right: object, location: SourceLocation) -> object:
     try:
+        if operator == "in":
+            if isinstance(right, str) and isinstance(left, str):
+                return left in right
+            if isinstance(right, tuple):
+                return any(_same_type(left, item) and left == item for item in right)
+            raise TypeError("IN 需要字符串或同类型数组")
         if operator == "==":
             return _same_type(left, right) and left == right
         if operator == "!=":
@@ -732,7 +738,6 @@ class _Evaluator:
             locals_environment = _Environment(global_environment)
             for parameter, argument in zip(declaration.parameters, arguments, strict=True):
                 locals_environment.values[parameter.name] = _coerce_declared_type(argument, parameter.type_name)
-                locals_environment.readonly.add(parameter.name)
             try:
                 self.call_sites.append(location)
                 self._execute_statements(declaration.body, locals_environment)
@@ -892,18 +897,22 @@ class _Evaluator:
             step = _require_int(self._evaluate(statement.step, environment), statement.location, "FOR 步长")
             if step == 0:
                 raise ScriptRuntimeError("FOR 步长不能为 0", statement.location)
-            loop_environment = _Environment(
-                environment,
-                {statement.variable: current},
-                {statement.variable},
-                default_unassigned=environment.default_unassigned,
-            )
+            # FRLG scanners declare counters globally and read them from
+            # candidate functions. Reuse that binding instead of shadowing it.
+            counter_owner = environment.find(statement.variable)
+            loop_environment = _Environment(environment, default_unassigned=environment.default_unassigned)
+            if counter_owner is None:
+                counter_owner = loop_environment
+                counter_owner.values[statement.variable] = current
+                counter_owner.readonly.add(statement.variable)
+            else:
+                environment.assign(statement.variable, current, statement.location)
             total = max(0, (upper - current) // step + 1)
             iteration = 0
             while (step > 0 and current <= upper) or (step < 0 and current >= upper):
                 self._check_cancelled(statement.location)
                 iteration += 1
-                loop_environment.values[statement.variable] = current
+                counter_owner.values[statement.variable] = current
                 if self._execute_loop_body(
                     statement, loop_environment, LoopProgress(statement.location, iteration, total),
                     f"循环 · ${statement.variable} = {current}",

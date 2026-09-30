@@ -34,6 +34,10 @@ _LANGUAGE_ALIASES = {
     "chi_tra": "zh-Hant",
     "en": "en",
     "eng": "en",
+    # Original FRLG scripts name their recognition models as languages.
+    # Use the application's shared reader; their ECS candidate/label fallback remains intact.
+    "frlg_battle": "en",
+    "frlg_en_all": "en",
     "ja": "ja",
     "jpn": "ja",
 }

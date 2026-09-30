@@ -277,6 +277,7 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .frlg-source-badge { margin-top: 4px; color: var(--muted); font: 10px var(--mono); white-space: nowrap; }
 .frlg-run-toolbar { padding: 0; }
 .frlg-run-toolbar button { display: inline-flex; align-items: center; gap: 6px; }
+.frlg-run-log { max-height: 280px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
 .frlg-save-status { margin-left: auto; color: var(--muted); font-size: 11px; }
 .frlg-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .frlg-target-card { min-height: 263px; }

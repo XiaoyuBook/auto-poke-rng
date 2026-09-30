@@ -9,7 +9,7 @@ from script_host import normalize_preview_aliases
 
 root = Path(sys.argv[1])
 required = set()
-for script in root.rglob("*.txt"):
+for script in [*root.rglob("*.txt"), *root.glob("*.ecs")]:
     program = EasyConScriptEngine().compile(normalize_preview_aliases(script.read_text(encoding="utf-8-sig")), source=script.name, script_dir=script.parent)
     labels = load_image_labels([script.parent]) if program.external_labels else None
     for name in program.external_labels:

@@ -8,3 +8,11 @@ third_party/bdsp-automation-reference/** -text
 runtime/python/auto_bdsp_rng/**/*.py -text
 src/generated/bdsp-data.json text eol=lf
 runtime/generated/bdsp_data.hpp text eol=lf
+# Keep the pinned FRLG generator and extension hashes stable on Windows.
+runtime/python/frlg_planner/assets/easycon118_extensions/** -text
+runtime/python/frlg_planner/automation/easycon118.py -text
+runtime/python/frlg_planner/automation/precalibration.py -text
+runtime/python/frlg_planner/automation/calibration_trust_gates.py -text
+runtime/python/frlg_planner/automation/seed_common_regions.py -text
+runtime/python/frlg_planner/automation/starter_calibration.py -text
+runtime/python/frlg_planner/device_label_overrides.py -text

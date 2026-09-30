@@ -25,15 +25,15 @@
 
 相同请求下整个序列化结果逐字段一致。另对 Static 1 妙蛙种子筛选搜索作了相同对照，结果也一致（7422 / 25359，IV 合计 181）。耗时不是跨机器性能承诺；收紧搜索范围或筛选条件仍可能变慢。截图本身没有包含原版所有输入，因此不将不同输入下的 Seed 值强行改成截图中的 A62C。
 
-这里验证的是搜索、选优、参数映射和结果展示。当前 FRLG 页面尚未生成运行脚本、执行设备预检或接通运行按钮，因此只显示“规划完成”，禁用“开始运行”，详情明确说明脚本状态。这次不能被视为自动操作、OCR、捕获等实机流程全部验收通过。
+搜索对照验证的是搜索、选优、参数映射和结果展示。当前已另行接通生成、预检、公共执行器、捕获、反查校准与重试；验证范围和实机边界见 [完整执行接入](FRLG_EXECUTION_PARITY.md)。设备模拟和离线契约测试不能代替实际游戏画面的 OCR、捕获与时序验收。
 
 ## 回归与复核
 
 - `tests/fixtures/frlg-{golbat,starter}-plan.json`：从锚点原版的真实非指定搜索得到的扁平 JSON，同时供 Python 和前端测试使用。
 - `tests/frlg-rng-host.cjs`：独立临时工作目录中使用内置运行时，验证指定模式、普通野生筛选、带具体 IV/特性条件的筛选和静态筛选。
 - `src/components/FrlgAutomationWorkspace.test.tsx`：断言具体显示内容、默认 payload、真实特性名、指定模式、存档切换。将旧版组件代回时，扁平结果用例稳定失败并复现空字段；恢复修复后通过。
-- `npm run test:frlg:electron`：真实 Electron preload → IPC → Python → 推荐卡/详情；检查精灵资源加载和窄窗口布局，截图存入 `node_modules/.tmp/frlg-review/`。无硬件操作，其他模块服务仅提供空闲状态。
+- `npm run test:frlg:electron`：真实 Electron preload → IPC → Python → 推荐卡/详情；检查精灵资源加载和窄窗口布局，截图存入 `node_modules/.tmp/frlg-review/`。设置 `FRLG_SCRIPT_PACKAGE` 后还会安装真实脚本包、生成并启动公共执行器，使用模拟伊机控和视频验证停止及输入释放，不操作真实设备。
 - `node tools/compare-frlg-planner.cjs <原版目录> [--legacy-range]`：可选、只读的原版对照工具。原版目录只用于开发验证，不是运行时依赖。
 - `tools/generate-frlg-wild-data.py`：从内置快照重新生成遭遇与显示元数据；精灵资源单独附 SHA-256 来源清单。
 - `tests/frlg-compute-cases.py` / `tests/frlg-compute-regressions.py`：467 组原版计算对照、完整初始 Seed 索引与工作量回归，已纳入 `npm run test:rng`；来源说明见 `tests/fixtures/frlg-compute-reference.md`。
-- [计算性能与优化](FRLG_SEARCH_PERFORMANCE.md)：已落地的共用计算优化、实测前后对照、C++ 后续方向和未接入的实机校准边界。
+- [计算性能与优化](FRLG_SEARCH_PERFORMANCE.md)：已落地的共用计算优化、实测前后对照、C++ 后续方向和 ECS 反查性能边界。

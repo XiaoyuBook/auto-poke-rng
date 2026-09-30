@@ -29,6 +29,8 @@ sys.path.insert(0, str(SOURCE_ROOT))
 
 from automation.planner import AutoSearchRequest, search_best_plan  # noqa: E402
 
+_last_plan = None
+
 
 def _serialize(value):
     if isinstance(value, Enum):
@@ -49,12 +51,24 @@ def _request(payload: dict) -> AutoSearchRequest:
 
 
 def _dispatch(method: str, payload: dict):
+    global _last_plan
+    if method == 'prepare':
+        from frlg_execution import prepare
+        if _last_plan is None or payload.get('request') != _serialize(_last_plan.to_dict()['request']):
+            raise ValueError('方案已失效，请重新搜索')
+        return prepare(_last_plan, payload)
+    if method == 'finalize':
+        from frlg_execution import finalize
+        return finalize(payload)
     request = _request(payload)
     if method == "validate":
         request.validate()
         return {"valid": True, "source": str(SOURCE_ROOT)}
     if method == "search":
-        return _serialize(search_best_plan(request).to_dict())
+        _last_plan = None
+        result = search_best_plan(request)
+        _last_plan = result.plan
+        return _serialize(result.to_dict())
     raise ValueError(f"未知 FRLG RNG 方法：{method}")
 
 

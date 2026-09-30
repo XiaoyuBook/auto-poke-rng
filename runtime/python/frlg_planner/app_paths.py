@@ -16,18 +16,17 @@ def resource_root() -> Path:
 
 def data_root() -> Path:
     """Return the writable per-user directory used by packaged applications."""
-    if not getattr(sys, "frozen", False):
-        return resource_root()
-    local_app_data = os.environ.get("LOCALAPPDATA")
-    base = Path(local_app_data) if local_app_data else Path.home() / "AppData" / "Local"
-    return base / "FRLG-Auto-RNG"
+    return user_data_root()
 
 
 def user_data_root() -> Path:
     """Return persistent user data shared by source and frozen builds."""
+    configured = os.environ.get("AUTO_POKE_FRLG_DATA")
+    if configured:
+        return Path(configured).resolve()
     local_app_data = os.environ.get("LOCALAPPDATA")
     base = Path(local_app_data) if local_app_data else Path.home() / "AppData" / "Local"
-    return base / "FRLG-Auto-RNG"
+    return base / "auto-poke-rng" / "frlg"
 
 
 RESOURCE_ROOT = resource_root()

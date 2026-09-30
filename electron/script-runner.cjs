@@ -10,7 +10,7 @@ class ScriptRunner {
     this.cancelValidation = null;
   }
   async resolveScript(relative) {
-    if (typeof relative !== 'string' || !relative || relative.includes('\\') || relative.includes(':') || relative.split('/').some(part => !part || part === '..' || part === '.') || !/\.(txt|rng)$/i.test(relative)) throw new Error('脚本路径无效。');
+    if (typeof relative !== 'string' || !relative || relative.includes('\\') || relative.includes(':') || relative.split('/').some(part => !part || part === '..' || part === '.') || !/\.(txt|rng|ecs)$/i.test(relative)) throw new Error('脚本路径无效。');
     const root = path.resolve(typeof this.rootDirectory === 'function' ? this.rootDirectory() : this.rootDirectory);
     const aliases = await require('./script-paths.cjs').scriptAliases(root);
     let resolved = aliases[relative] || relative, absolute = path.resolve(root, resolved);

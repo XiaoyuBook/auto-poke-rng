@@ -6,6 +6,7 @@ const { registerDevices } = require('./devices.cjs');
 const { registerQQNotifications } = require('./qq-notifications.cjs');
 const { registerRng } = require('./rng-client.cjs');
 const { registerFrlgRng } = require('./frlg-rng-client.cjs');
+const { registerFrlgAutomation } = require('./frlg-automation.cjs');
 const { registerBlink } = require('./blink-client.cjs');
 const { registerAutomation } = require('./automation.cjs');
 const { createScriptGate, createScriptStorage } = require('./script-storage.cjs');
@@ -18,6 +19,7 @@ let devices;
 let notifications;
 let rng;
 let frlgRng;
+let frlgAutomation;
 let blink;
 let automation;
 let quitting = false;
@@ -48,9 +50,9 @@ function createWindow() {
     },
   });
   mainWindow = window;
-  window.webContents.on('render-process-gone', () => { void automation?.stop('主窗口已退出', true); void devices?.stopInputs().catch(() => {}); notifications?.cancel(); });
+  window.webContents.on('render-process-gone', () => { void automation?.stop('主窗口已退出', true); void frlgAutomation?.stop('主窗口已退出'); void devices?.stopInputs().catch(() => {}); notifications?.cancel(); });
   void loadWindow(window);
-  window.on('closed', () => { void automation?.stop('主窗口已关闭'); notifications?.cancel(); mainWindow = null; panels.closeAll(); void devices?.controllerOverlay?.close(); });
+  window.on('closed', () => { void automation?.stop('主窗口已关闭'); void frlgAutomation?.stop('主窗口已关闭'); notifications?.cancel(); mainWindow = null; panels.closeAll(); void devices?.controllerOverlay?.close(); });
 
   window.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
@@ -62,7 +64,7 @@ app.whenReady().then(async () => {
   // scripts/ is no longer shipped. Preserve an existing local folder from
   // older versions on first migration; otherwise create an empty user library.
   const storage = await createScriptStorage({ userData: app.getPath('userData'), legacyRoot: path.join(app.getAppPath(), 'scripts'), gate: scriptGate,
-    isBusy: () => !!devices?.runner.current || !!automation?.isBusy() });
+    isBusy: () => !!devices?.runner.current || !!automation?.isBusy() || !!frlgAutomation?.isBusy() });
   const rootDirectory = storage.getRoot;
   ipcMain.handle('app:metadata', () => ({ name: 'Auto Poke RNG', version: app.getVersion(), platform: process.platform }));
   panels = registerPanelWindows({ getMainWindow: () => mainWindow, loadWindow });
@@ -87,9 +89,12 @@ app.whenReady().then(async () => {
   automation = registerAutomation({ ipcMain, getMainWindow: () => mainWindow, getWindows: () => BrowserWindow.getAllWindows(), devices, rng, blink, userData: app.getPath('userData'),
     encodeNotificationImage: bytes => nativeImage.createFromBuffer(bytes).toJPEG(88), notifications });
   notifications.on('log', (message, level = 'info') => automation?.store.log(message, 'QQ通知', level));
+  frlgAutomation = registerFrlgAutomation({ ipcMain, getMainWindow: () => mainWindow, devices,
+    client: frlgRng.client, userData: app.getPath('userData'), notifications,
+    log: (...args) => automation.store.log(...args) });
   registerScriptRepository({ ipcMain, getMainWindow: () => mainWindow, dialog, storage, rootDirectory, userData: app.getPath('userData'), appVersion: app.getVersion(), gate: scriptGate,
     migrateScriptPaths: aliases => automation.store.migrateScriptPaths(aliases),
-    isBusy: () => !!devices.runner.current || automation.isBusy(), log: (message, level = 'info') => automation.store.log(message, '系统', level) });
+    isBusy: () => !!devices.runner.current || automation.isBusy() || frlgAutomation.isBusy(), log: (message, level = 'info') => automation.store.log(message, '系统', level) });
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -100,7 +105,7 @@ app.on('before-quit', event => {
   if (quitting || !devices) return;
   event.preventDefault(); quitting = true;
   notifications?.close();
-  void automation?.close().catch(() => {}).then(() => Promise.allSettled([devices.close(), rng?.close?.(), frlgRng?.close?.(), blink?.close(), scriptGate.drain()])).finally(() => app.quit());
+  void Promise.allSettled([automation?.close(), frlgAutomation?.close()]).then(() => Promise.allSettled([devices.close(), rng?.close?.(), frlgRng?.close?.(), blink?.close(), scriptGate.drain()])).finally(() => app.quit());
 });
 
 app.on('window-all-closed', () => {
