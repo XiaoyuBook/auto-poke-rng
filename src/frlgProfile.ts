@@ -1,0 +1,74 @@
+import { useEffect, useState } from 'react';
+import { FRLG_GAMES, type FrlgGame } from './frlgAutomation';
+
+export interface FrlgSaveProfile {
+  id: string;
+  name: string;
+  trainerName: string;
+  game: FrlgGame;
+  tid: number;
+  sid: number;
+  dexCompleted: boolean;
+}
+
+type FrlgSaveState = { activeId: string; profiles: FrlgSaveProfile[] };
+
+export const defaultFrlgSaveProfile: FrlgSaveProfile = {
+  id: 'frlg-save-1', name: '火叶存档 1', trainerName: '-', game: 'fr_nx', tid: 0, sid: 0, dexCompleted: false,
+};
+
+const storageKey = 'auto-poke-rng:frlg-saves-v1';
+
+const newId = () => {
+  try { return crypto.randomUUID(); } catch { return `frlg-save-${Date.now()}-${Math.random().toString(16).slice(2)}`; }
+};
+
+function validId(value: unknown) {
+  return Number.isInteger(value) && Number(value) >= 0 && Number(value) <= 65535;
+}
+
+function normalizeProfile(value: unknown, index: number): FrlgSaveProfile | null {
+  if (!value || typeof value !== 'object') return null;
+  const item = value as Partial<FrlgSaveProfile>;
+  if (typeof item.id !== 'string' || !item.id || typeof item.name !== 'string' || !FRLG_GAMES.includes(item.game as FrlgGame)
+    || !validId(item.tid) || !validId(item.sid)) return null;
+  return {
+    id: item.id,
+    name: item.name.trim() || `火叶存档 ${index + 1}`,
+    trainerName: typeof item.trainerName === 'string' ? item.trainerName : '-',
+    game: item.game as FrlgGame,
+    tid: Number(item.tid), sid: Number(item.sid), dexCompleted: item.dexCompleted === true,
+  };
+}
+
+function loadSaves(): FrlgSaveState {
+  try {
+    const value = JSON.parse(localStorage.getItem(storageKey) || 'null') as Partial<FrlgSaveState> | null;
+    const profiles = Array.isArray(value?.profiles) ? value.profiles.map(normalizeProfile).filter((item): item is FrlgSaveProfile => !!item) : [];
+    if (profiles.length) {
+      const activeId = profiles.some(item => item.id === value?.activeId) ? String(value?.activeId) : profiles[0].id;
+      return { activeId, profiles };
+    }
+  } catch { /* Invalid or unavailable storage falls back to one empty FireRed save. */ }
+  return { activeId: defaultFrlgSaveProfile.id, profiles: [{ ...defaultFrlgSaveProfile }] };
+}
+
+export function useFrlgSaves() {
+  const [state, setState] = useState<FrlgSaveState>(loadSaves);
+  useEffect(() => {
+    try { localStorage.setItem(storageKey, JSON.stringify(state)); } catch { /* The active save remains available for this session. */ }
+  }, [state]);
+  const active = state.profiles.find(item => item.id === state.activeId) || state.profiles[0] || defaultFrlgSaveProfile;
+  const select = (id: string) => setState(current => current.profiles.some(item => item.id === id) ? ({ ...current, activeId: id }) : current);
+  const save = (profile: FrlgSaveProfile) => setState(current => {
+    if (!current.profiles.some(item => item.id === profile.id)) return current;
+    return { ...current, profiles: current.profiles.map(item => item.id === profile.id ? { ...profile, name: profile.name.trim() || '未命名存档', trainerName: profile.trainerName.trim() || '-' } : item) };
+  });
+  const create = (copy?: FrlgSaveProfile) => {
+    const next: FrlgSaveProfile = { ...(copy || defaultFrlgSaveProfile), id: newId(), name: copy ? `${copy.name} 副本` : `火叶存档 ${state.profiles.length + 1}` };
+    setState(current => ({ activeId: next.id, profiles: [...current.profiles, next] }));
+    return next;
+  };
+  return { profiles: state.profiles, activeId: state.activeId, active, select, save, create };
+}
+

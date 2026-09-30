@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { FileClock, ListChecks, Play, SlidersHorizontal, Sparkles, Square } from 'lucide-react';
 import {
   FRLG_GAMES,
@@ -14,6 +14,7 @@ import {
   type FrlgStaticRequest,
 } from '../frlgAutomation';
 import { Dialog } from './Dialog';
+import type { FrlgSaveProfile } from '../frlgProfile';
 
 const gameLabels: Record<string, string> = {
   fr_nx: '火红 · 美版 · Switch 1', fr_nx2: '火红 · 美版 · Switch 2',
@@ -80,13 +81,24 @@ function FrlgTargetCard({ request, target, locked, onSettings }: {
   </section>;
 }
 
-export function FrlgAutomationWorkspace() {
-  const [request, setRequest] = useState<FrlgStaticRequest>(defaultFrlgStaticRequest);
+export function FrlgAutomationWorkspace({ profile }: { profile?: FrlgSaveProfile }) {
+  const [request, setRequest] = useState<FrlgStaticRequest>(() => {
+    const base = defaultFrlgStaticRequest();
+    return profile ? { ...base, game: profile.game, tid: profile.tid, sid: profile.sid } : base;
+  });
   const [result, setResult] = useState<PlanResult | null>(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const [targetSettingsOpen, setTargetSettingsOpen] = useState(false);
+  useEffect(() => {
+    if (!profile) return;
+    setRequest(current => {
+      const nextTargets = getFrlgStaticTargets(profile.game, current.category as any);
+      const pokemon = nextTargets.some(item => item.species === current.pokemon) ? current.pokemon : nextTargets[0]?.species || 'Bulbasaur';
+      return { ...current, game: profile.game, tid: profile.tid, sid: profile.sid, pokemon };
+    });
+  }, [profile]);
   const targets = useMemo(() => getFrlgStaticTargets(request.game, request.category as any), [request.game, request.category]);
   const target = targets.find(item => item.species === request.pokemon) || targets[0];
   const diagnostics = validateFrlgStaticRequest(request);
