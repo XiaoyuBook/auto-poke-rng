@@ -6,6 +6,8 @@ import {
   getFrlgStaticTargets,
   getFrlgWildLocations,
   getFrlgWildTargets,
+  getFrlgAbilities,
+  defaultFrlgStaticRequest,
   toFrlgPlannerPayload,
   validateFrlgStaticRequest,
   type FrlgStaticRequest,
@@ -22,6 +24,16 @@ const baseRequest = (overrides: Partial<FrlgStaticRequest> = {}): FrlgStaticRequ
 });
 
 describe('FRLG automation contract', () => {
+  it('uses the original GUI range so higher-IV reachable routes are not silently excluded', () => {
+    expect(toFrlgPlannerPayload(defaultFrlgStaticRequest())).toMatchObject({ min_advances: 3000, max_advances: 100000, initial_seed_result_count: 1, max_iv_combinations: 25000000 });
+  });
+
+  it('uses Gen 3 ability names accepted by the planner, with duplicate slots collapsed', () => {
+    expect(getFrlgAbilities('Golbat')).toEqual([{ english: 'Inner Focus', displayName: '精神力' }]);
+    expect(getFrlgAbilities('Bulbasaur')).toEqual([{ english: 'Overgrow', displayName: '茂盛' }]);
+    expect(getFrlgAbilities('Rattata').map(item => item.english)).toEqual(['Run Away', 'Guts']);
+    expect(validateFrlgStaticRequest(baseRequest({ ability: '0' }))).toContain('请选择该宝可梦在第三世代可用的特性');
+  });
   it('keeps the original 2.0 static category order', () => {
     expect(FRLG_STATIC_CATEGORIES).toEqual(['Starter', 'Fossil', 'Gift', 'GameCorner', 'Stationary', 'Legend', 'Event', 'Roaming']);
   });

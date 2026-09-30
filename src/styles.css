@@ -308,6 +308,7 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .frlg-plan-badge { padding: 5px 9px; border-radius: 5px; color: #d7e4ff; background: #526aa633; font-size: 11px; white-space: nowrap; }
 .frlg-recommendation-main { display: flex; align-items: center; gap: 16px; margin: 18px 0 14px; }
 .frlg-recommendation-emblem { display: grid; place-items: center; flex: 0 0 104px; width: 104px; height: 104px; border-radius: 14px; background: radial-gradient(circle, #8ba7ed2b, #8ba7ed07 70%); color: #cfdbff; font-size: 46px; }
+.frlg-sprite { width: 88%; height: 88%; object-fit: contain; image-rendering: pixelated; }
 .frlg-recommendation-identity { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .frlg-recommendation-identity strong { color: var(--text); font-size: 26px; line-height: 1.15; }
 .frlg-recommendation-identity small { color: var(--secondary); font-size: 12px; }

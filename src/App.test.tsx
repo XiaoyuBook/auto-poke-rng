@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import golbatPlan from '../tests/fixtures/frlg-golbat-plan.json';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
@@ -184,17 +185,7 @@ describe('workspace interactions', () => {
   });
 
   it('opens the isolated FRLG automation workspace without exposing BDSP pages', async () => {
-    const search = vi.fn(async () => ({
-      plan: {
-        request: { pokemon: 'Bulbasaur', category: 'Starter', method: 'Static 1', location: '' },
-        target: { pokemon: 'Bulbasaur', method: 'Static 1', level: 5, pid: '12345678', shiny: 'Star', nature: 'Jolly', ability: '0', gender: 'M', ivs: { hp: 31, attack: 30, defense: 29, sp_attack: 28, sp_defense: 27, speed: 26 }, target_seed: '0001' },
-        initial_seed: { seed: '0001', advances: 42, total_time: '00:01:00' },
-        selection: { iv_total: 171 },
-        execution: { seed_mode: 3 },
-        route_support: { summary: '2.0 定点流程基线', can_start: true },
-      },
-      search_summary: { matching_outcomes: 1, reachable_outcomes: 1, feasible_routes: 1 },
-    }));
+    const search = vi.fn(async () => golbatPlan);
     window.desktop!.frlgRng = { validate: vi.fn(async () => ({ valid: true, source: 'test' })), search, cancel: vi.fn(async () => {}) };
     await openApp();
     const nav = screen.getByRole('navigation', { name: '工作区' });
@@ -204,22 +195,25 @@ describe('workspace interactions', () => {
     expect(screen.getByRole('region', { name: '当前火叶目标与筛选条件' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '目标设置' }));
     expect(screen.getByRole('dialog', { name: '火叶目标与筛选条件' })).toBeTruthy();
+    fireEvent.change(within(screen.getByRole('dialog', { name: '火叶目标与筛选条件' })).getByLabelText('搜索方法'), { target: { value: 'All Wild Methods' } });
+    fireEvent.change(screen.getByLabelText('野生遭遇地点'), { target: { value: 'Cerulean Cave 1F' } });
+    fireEvent.change(screen.getByLabelText('火叶自动目标宝可梦'), { target: { value: 'Golbat' } });
     fireEvent.click(screen.getByRole('button', { name: '完成设置' }));
     expect(screen.queryByRole('button', { name: '定点数据' })).toBeNull();
-    fireEvent.change(screen.getByLabelText('TID'), { target: { value: '12345' } });
-    fireEvent.change(screen.getByLabelText('SID'), { target: { value: '54321' } });
-    fireEvent.change(screen.getByLabelText('Seed 模式'), { target: { value: '3' } });
-    fireEvent.click(screen.getByLabelText('指定 Seed / Advance'));
-    fireEvent.change(screen.getByLabelText('指定 Seed'), { target: { value: '11C7' } });
-    fireEvent.change(screen.getByLabelText('指定 Advance'), { target: { value: '42' } });
+    fireEvent.change(screen.getByLabelText('TID'), { target: { value: '0' } });
+    fireEvent.change(screen.getByLabelText('SID'), { target: { value: '38448' } });
     fireEvent.click(screen.getByRole('button', { name: '搜索并生成方案' }));
     await screen.findByText('方案已生成');
     expect(screen.getByRole('region', { name: '火叶推荐方案' })).toBeTruthy();
-    expect(search).toHaveBeenCalledWith(expect.objectContaining({ game: 'fr_nx', tid: 12345, sid: 54321, category: 'Starter', pokemon: 'Bulbasaur', seed_mode: 3, direct_mode: true, direct_seed: '11C7', direct_advances: 42 }));
+    const recommendation = screen.getByRole('region', { name: '火叶推荐方案' });
+    expect(within(recommendation).getByText('闪光大嘴蝠')).toBeTruthy();
+    expect(within(recommendation).getByText('7422')).toBeTruthy();
+    expect(within(recommendation).getByText('IV 30 / 28 / 31 / 31 / 31 / 30')).toBeTruthy();
+    expect(search).toHaveBeenCalledWith(expect.objectContaining({ game: 'fr_nx', tid: 0, sid: 38448, category: 'Grass', pokemon: 'Golbat', method: 'All Wild Methods', min_advances: 3000, max_advances: 100000 }));
   });
 
   it('exposes wild encounter method, location and targets in the isolated FRLG settings', async () => {
-    window.desktop!.frlgRng = { validate: vi.fn(async () => ({ valid: true, source: 'test' })), search: vi.fn(async () => ({})), cancel: vi.fn(async () => {}) };
+    window.desktop!.frlgRng = { validate: vi.fn(async () => ({ valid: true, source: 'test' })), search: vi.fn(async () => golbatPlan), cancel: vi.fn(async () => {}) };
     await openApp();
     const nav = screen.getByRole('navigation', { name: '工作区' });
     fireEvent.click(within(nav).getByRole('button', { name: '自动流程' }));

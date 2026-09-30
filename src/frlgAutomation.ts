@@ -1,4 +1,5 @@
 import { FRLG_WILD_ENCOUNTERS, FRLG_WILD_SPECIES, FRLG_WILD_LOCATION_LABELS } from './frlgWildData';
+import { FRLG_ABILITY_LABELS, FRLG_SPECIES_METADATA } from './frlgMetadata';
 
 export const FRLG_GAMES = ['fr_nx', 'fr_nx2', 'lg_nx', 'lg_nx2', 'fr_jpn_nx', 'fr_jpn_nx2', 'lg_jpn_nx', 'lg_jpn_nx2'] as const;
 export type FrlgGame = typeof FRLG_GAMES[number];
@@ -111,6 +112,43 @@ export type FrlgStaticRequest = {
   seedMode: number | null; directMode: boolean; directSeed: string; directAdvances: number | null;
 };
 
+export type FrlgPlannerRequest = {
+  game: string; tid: number; sid: number; method: string; category: string; location: string; pokemon: string;
+  max_advances: number; min_advances: number; iv_min: number[]; iv_max: number[];
+  shiny: string; nature: string; gender: string; ability: string; hidden_type: string;
+  initial_seed_result_count: number; max_iv_combinations: number; seed_mode: number | null;
+  direct_mode: boolean; direct_seed: string | null; direct_advances: number | null;
+  dunsparce_three_segment?: boolean;
+};
+
+export type FrlgPlannerTarget = {
+  target_seed: string; method: string; pokemon: string; level: number; pid: string; shiny: string;
+  nature: string; ability: string; ivs: { hp: number; attack: number; defense: number; sp_attack: number; sp_defense: number; speed: number };
+  hidden_type: string; hidden_power: number; gender: string;
+};
+
+export type FrlgPlannerResult = {
+  request: FrlgPlannerRequest;
+  target: FrlgPlannerTarget;
+  initial_seed: { seed: string; advances: number; total_frames: number; total_time: string; seed_time: number; settings: FrlgGameSettings };
+  selection: { iv_total: number; iv_average: number; rule: string };
+  execution: { seed_mode: number; game_settings: FrlgGameSettings };
+  route_support: { level: string; summary: string; can_start: boolean };
+  warnings: string[];
+  search_summary: { matching_outcomes: number; reachable_outcomes: number; feasible_routes: number };
+};
+
+export type FrlgGameSettings = { sound: string; button_mode: string; seed_button: string; extra_button: string };
+
+export type FrlgAbilityOption = { english: string; displayName: string };
+
+export function getFrlgAbilities(speciesName: string): FrlgAbilityOption[] {
+  const info = FRLG_SPECIES_METADATA[speciesName as keyof typeof FRLG_SPECIES_METADATA];
+  return (info?.abilities || []).map(english => ({ english, displayName: FRLG_ABILITY_LABELS[english as keyof typeof FRLG_ABILITY_LABELS] || english }));
+}
+
+export const getFrlgSpeciesLabel = (speciesName: string) => FRLG_SPECIES_METADATA[speciesName as keyof typeof FRLG_SPECIES_METADATA]?.label || speciesName;
+
 const error = (message: string) => message;
 const staticSpecies = new Map(FRLG_STATIC_TARGETS.concat(getFrlgStaticTargets('lg_nx', 'GameCorner')).map(target => [target.species, target.speciesId]));
 const wildSpeciesIds = new Map(Object.entries(wildSpecies).map(([speciesId, target]) => [target.species, Number(speciesId)]));
@@ -143,6 +181,7 @@ export function validateFrlgStaticRequest(request: FrlgStaticRequest): string[] 
   const wild = isWildMethod(request.method);
   const speciesId = wild ? wildSpeciesIds.get(request.pokemon) || staticSpecies.get(request.pokemon) : staticSpecies.get(request.pokemon);
   if (!speciesId || speciesId < 1 || speciesId > 386) errors.push('全国图鉴编号必须在 1-386 之间');
+  if (request.ability !== 'Any' && !getFrlgAbilities(request.pokemon).some(option => option.english === request.ability)) errors.push('请选择该宝可梦在第三世代可用的特性');
   if (wild) {
     if (!FRLG_WILD_CATEGORIES.includes(request.category as FrlgWildCategory)) errors.push(`不支持的野生遭遇类别: ${request.category}`);
     if (!request.location) errors.push('野生搜索必须选择遭遇地点');
@@ -169,12 +208,12 @@ export function validateFrlgStaticRequest(request: FrlgStaticRequest): string[] 
 
 export const defaultFrlgStaticRequest = (): FrlgStaticRequest => ({
   game: 'fr_nx', tid: 0, sid: 0, method: 'Static 1', category: 'Starter', pokemon: 'Bulbasaur', location: '',
-  maxAdvances: 10000, minAdvances: 0, ivMin: [0, 0, 0, 0, 0, 0], ivMax: [31, 31, 31, 31, 31, 31],
+  maxAdvances: 100000, minAdvances: 3000, ivMin: [0, 0, 0, 0, 0, 0], ivMax: [31, 31, 31, 31, 31, 31],
   shiny: 'Star/Square', nature: 'Any', gender: 'Any', ability: 'Any', hiddenType: 'Any', initialSeedResultCount: 1,
   maxIvCombinations: 25_000_000, seedMode: null, directMode: false, directSeed: '', directAdvances: null,
 });
 
-export const toFrlgPlannerPayload = (request: FrlgStaticRequest) => {
+export const toFrlgPlannerPayload = (request: FrlgStaticRequest): FrlgPlannerRequest => {
   const {
     minAdvances, maxAdvances, ivMin, ivMax, initialSeedResultCount,
     maxIvCombinations, seedMode, directMode, directSeed, directAdvances,

@@ -1,0 +1,87 @@
+const { app, BrowserWindow, ipcMain, safeStorage, nativeImage } = require('electron');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const { registerFrlgRng } = require('../electron/frlg-rng-client.cjs');
+const { registerDevices } = require('../electron/devices.cjs');
+const { registerPanelWindows } = require('../electron/panel-windows.cjs');
+const { registerScriptFiles } = require('../electron/script-files.cjs');
+const { registerQQNotifications } = require('../electron/qq-notifications.cjs');
+const expected = require('./fixtures/frlg-golbat-plan.json');
+const root = path.resolve(__dirname, '..');
+const output = path.join(root, 'node_modules/.tmp/frlg-review');
+fs.mkdirSync(output, { recursive: true });
+app.setPath('userData', fs.mkdtempSync(path.join(output, 'profile-')));
+app.commandLine.appendSwitch('disable-gpu');
+app.commandLine.appendSwitch('force-device-scale-factor', '1');
+let frlg, devices, notifications;
+const timer = setTimeout(() => { console.error('FRLG Electron test timed out'); app.exit(1); }, 55000);
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+app.whenReady().then(async () => {
+  ipcMain.handle('app:metadata', () => ({ name: 'Auto Poke RNG', version: 'test', platform: 'win32' }));
+  // Unrelated BDSP services stay idle; FRLG uses the real IPC/client/host.
+  ipcMain.handle('automation:state', () => null);
+  ipcMain.handle('blink:state', () => ({ status: 'idle', runId: null }));
+  const main = new BrowserWindow({ width: 1600, height: 1000, show: false, webPreferences: { preload: path.join(root, 'electron/preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false, offscreen: true } });
+  const loadWindow = (window, query = {}) => window.loadFile(path.join(root, 'dist/index.html'), { query });
+  registerPanelWindows({ getMainWindow: () => main, loadWindow });
+  const scriptRoot = fs.mkdtempSync(path.join(output, 'scripts-'));
+  registerScriptFiles({ getMainWindow: () => main, rootDirectory: scriptRoot });
+  devices = registerDevices({ ipcMain, getWindows: () => BrowserWindow.getAllWindows(), rootDirectory: scriptRoot, testMode: true });
+  frlg = registerFrlgRng({ ipcMain, getMainWindow: () => main });
+  notifications = registerQQNotifications({ ipcMain, getMainWindow: () => main, safeStorage, nativeImage, userData: app.getPath('userData') });
+  const js = code => main.webContents.executeJavaScript(code, true);
+  const screenshot = async name => {
+    await js('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
+    main.webContents.invalidate();
+    await delay(250);
+    fs.writeFileSync(path.join(output, name), (await main.webContents.capturePage()).toPNG());
+  };
+  const until = async (code, label) => {
+    for (let i = 0; i < 250; i++) { if (await js(code)) return; await delay(40); }
+    throw Error(label);
+  };
+  const click = text => js(`Array.from(document.querySelectorAll('button')).find(button => button.textContent === ${JSON.stringify(text)}).click()`);
+  const change = (label, value, select = false) => js(`(() => {
+    const input = document.querySelector('[aria-label=${JSON.stringify(label)}]');
+    Object.getOwnPropertyDescriptor(${select ? 'HTMLSelectElement' : 'HTMLInputElement'}.prototype, 'value').set.call(input, ${JSON.stringify(value)});
+    input.dispatchEvent(new Event('${select ? 'change' : 'input'}', { bubbles: true }));
+  })()`);
+  await loadWindow(main);
+  await until(`Boolean(document.querySelector('[title="自动流程"]'))`, 'app ready');
+  await js(`document.querySelector('[title="自动流程"]').click()`);
+  await change('SID', '38448');
+  await click('目标设置');
+  await change('搜索方法', 'All Wild Methods', true);
+  await change('野生遭遇地点', 'Cerulean Cave 1F', true);
+  await change('火叶自动目标宝可梦', 'Golbat', true);
+  await click('完成设置');
+  assert.equal(await js(`document.querySelector('[aria-label="最小 Advance"]').value`), '3000');
+  assert.equal(await js(`document.querySelector('[aria-label="最大 Advance"]').value`), '100000');
+  const start = Date.now();
+  await click('搜索并生成方案');
+  await until(`Boolean(document.querySelector('.frlg-recommendation-card'))`, 'real planner result rendered');
+  const seconds = (Date.now() - start) / 1000;
+  const text = await js(`document.querySelector('.frlg-recommendation-card').textContent`);
+  for (const value of ['闪光大嘴蝠', '华蓝洞窟1F · LV 46', '7422', '25,296', '181', 'IV 30 / 28 / 31 / 31 / 31 / 30', '勤奋 · 精神力 · 雌性']) assert.ok(text.includes(value), value);
+  assert.equal(await js(`Array.from(document.querySelectorAll('button')).find(button => button.textContent === '开始运行').disabled`), true);
+  await until(`Array.from(document.querySelectorAll('.frlg-sprite')).every(img => img.complete && img.naturalWidth > 0)`, 'bundled sprites loaded');
+  await js(`document.querySelector('.frlg-recommendation-card').scrollIntoView({ block: 'center' })`);
+  await screenshot('recommendation.png');
+  await click('查看方案详情');
+  const fields = await js(`Object.fromEntries(Array.from(document.querySelectorAll('dialog dl > div')).map(row => [row.querySelector('dt').textContent, row.querySelector('dd').textContent]))`);
+  assert.equal(fields.PID, expected.target.pid);
+  assert.equal(fields['目标 Seed'], expected.target.target_seed);
+  assert.equal(fields['Seed 模式'], '0');
+  assert.equal(fields.SOUND, '单声道 (mono)');
+  assert.equal(fields['BUTTON MODE'], '帮助 (h)');
+  assert.ok(Object.values(fields).every(value => value && value !== '—'));
+  main.setSize(1280, 900);
+  await screenshot('details-1280.png');
+  assert.equal(await js(`(() => { const d = document.querySelector('dialog'); return d.scrollWidth <= d.clientWidth && d.getBoundingClientRect().bottom <= innerHeight; })()`), true, 'details fit the viewport');
+  console.log(JSON.stringify({ passed: true, seconds, screenshots: output }));
+}).catch(error => { console.error(error); process.exitCode = 1; }).finally(async () => {
+  clearTimeout(timer);
+  await frlg?.close(); notifications?.close(); await devices?.close();
+  app.exit(process.exitCode || 0);
+});

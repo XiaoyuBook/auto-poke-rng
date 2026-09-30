@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { FileClock, ListChecks, Play, SlidersHorizontal, Sparkles, Square } from 'lucide-react';
 import {
   FRLG_GAMES,
@@ -13,13 +13,18 @@ import {
   getFrlgStaticTargets,
   getFrlgWildLocations,
   getFrlgWildTargets,
+  getFrlgAbilities,
   toFrlgPlannerPayload,
   validateFrlgStaticRequest,
   type FrlgStaticRequest,
   type FrlgStaticTarget,
   type FrlgWildTarget,
+  type FrlgPlannerResult,
 } from '../frlgAutomation';
 import { Dialog } from './Dialog';
+import { FrlgPlanSummary, FrlgPlanDetails } from './FrlgPlanResult';
+import { FrlgSprite } from './FrlgSprite';
+import { FRLG_ABILITY_LABELS, FRLG_NATURE_LABELS, FRLG_TYPE_LABELS } from '../frlgMetadata';
 import type { FrlgSaveProfile } from '../frlgProfile';
 
 const gameLabels: Record<string, string> = {
@@ -38,14 +43,12 @@ const methodLabels: Record<string, string> = {
   Wild: 'Wild', 'Wild 1': 'Wild 1', 'Wild 2': 'Wild 2', 'Wild 4': 'Wild 4', 'All Wild Methods': '全部野生方法',
 };
 const statLabels = ['HP', '攻击', '防御', '特攻', '特防', '速度'];
-const natureLabels: Record<string, string> = {
-  Hardy: '勤奋', Lonely: '怕寂寞', Brave: '勇敢', Adamant: '固执', Naughty: '顽皮', Bold: '大胆', Docile: '坦率', Relaxed: '悠闲', Impish: '淘气', Lax: '乐天',
-  Timid: '胆小', Hasty: '急躁', Serious: '认真', Jolly: '爽朗', Naive: '天真', Modest: '内敛', Mild: '温和', Quiet: '冷静', Bashful: '害羞', Rash: '马虎',
-  Calm: '温和', Gentle: '温顺', Sassy: '自大', Careful: '慎重', Quirky: '浮躁',
-};
+const natureLabels: Record<string, string> = FRLG_NATURE_LABELS;
+const abilityLabels: Record<string, string> = FRLG_ABILITY_LABELS;
+const typeLabels: Record<string, string> = FRLG_TYPE_LABELS;
 const shinyLabels: Record<string, string> = { None: '非闪光', Star: '星形闪光', Square: '方形闪光', 'Star/Square': '星形／方形闪光' };
 
-type PlanResult = Record<string, any>;
+type PlanResult = FrlgPlannerResult;
 type FrlgTarget = FrlgStaticTarget | FrlgWildTarget;
 
 const rangeText = (min: number, max: number) => min === max ? String(min) : `${min}–${max}`;
@@ -55,8 +58,8 @@ function targetTerms(request: FrlgStaticRequest) {
   if (request.shiny !== 'Any') terms.push({ text: shinyLabels[request.shiny] || request.shiny, shiny: true });
   if (request.nature !== 'Any') terms.push({ text: `性格 ${natureLabels[request.nature] || request.nature}` });
   if (request.gender !== 'Any') terms.push({ text: `性别 ${request.gender === 'M' ? '雄性' : request.gender === 'F' ? '雌性' : '无性别'}` });
-  if (request.ability !== 'Any') terms.push({ text: `特性 ${request.ability}` });
-  if (request.hiddenType !== 'Any') terms.push({ text: `隐藏属性 ${request.hiddenType}` });
+  if (request.ability !== 'Any') terms.push({ text: `特性 ${abilityLabels[request.ability] || request.ability}` });
+  if (request.hiddenType !== 'Any') terms.push({ text: `隐藏属性 ${typeLabels[request.hiddenType] || request.hiddenType}` });
   request.ivMin.forEach((min, index) => {
     const max = request.ivMax[index];
     if (min !== 0 || max !== 31) terms.push({ text: `${statLabels[index]} ${rangeText(min, max)}` });
@@ -65,11 +68,6 @@ function targetTerms(request: FrlgStaticRequest) {
 }
 
 const wildMethod = (method: string) => method.includes('Wild');
-const targetDisplayName = (target: FrlgTarget | undefined, species: string) => target?.displayName || species;
-const ivValues = (ivs: Record<string, number> | undefined) => ivs ? [ivs.hp, ivs.attack, ivs.defense, ivs.sp_attack, ivs.sp_defense, ivs.speed] : [];
-const ivText = (ivs: Record<string, number> | undefined) => ivValues(ivs).length === 6 ? ivValues(ivs).join(' / ') : '—';
-const genderText = (gender: string | undefined) => gender === 'M' ? '雄性' : gender === 'F' ? '雌性' : gender === '-' ? '无性别' : gender || '—';
-
 function FrlgTargetCard({ request, target, locked, onSettings }: {
   request: FrlgStaticRequest;
   target?: FrlgTarget;
@@ -83,7 +81,7 @@ function FrlgTargetCard({ request, target, locked, onSettings }: {
       <button type="button" className="automation-target-settings" disabled={locked} onClick={onSettings}><SlidersHorizontal size={14} aria-hidden="true" />目标设置</button>
     </header>
     <div className="automation-target-main">
-      <span className="frlg-target-emblem" aria-hidden="true">★</span>
+      <span className="frlg-target-emblem"><FrlgSprite species={request.pokemon} /></span>
       <div className="automation-target-identity">
         <strong>{target?.displayName || request.pokemon}</strong>
         <small>{target?.species || request.pokemon} · {gameLabels[request.game] || request.game}</small>
@@ -109,12 +107,28 @@ export function FrlgAutomationWorkspace({ profile }: { profile?: FrlgSaveProfile
   const [busy, setBusy] = useState(false);
   const [targetSettingsOpen, setTargetSettingsOpen] = useState(false);
   const [resultDetailOpen, setResultDetailOpen] = useState(false);
+  const searchGeneration = useRef(0);
+  const pendingSearch = useRef(false);
+  const invalidate = () => {
+    searchGeneration.current += 1;
+    setResult(null); setError(''); setNotice(''); setResultDetailOpen(false);
+    if (pendingSearch.current) {
+      pendingSearch.current = false;
+      void window.desktop?.frlgRng?.cancel().catch(() => {});
+      setBusy(false);
+    }
+  };
+  useEffect(() => () => {
+    searchGeneration.current += 1;
+    if (pendingSearch.current) void window.desktop?.frlgRng?.cancel().catch(() => {});
+  }, []);
   const requestTargets = (game: string, category: string, method: string, location: string): FrlgTarget[] => wildMethod(method)
     ? getFrlgWildTargets(game, category as typeof FRLG_WILD_CATEGORIES[number], location)
     : getFrlgStaticTargets(game, category as typeof FRLG_STATIC_CATEGORIES[number]);
   const requestLocations = (game: string, category: string, method: string) => wildMethod(method) ? getFrlgWildLocations(game, category) : [];
   useEffect(() => {
     if (!profile) return;
+    invalidate();
     setRequest(current => {
       const locations = requestLocations(profile.game, current.category, current.method);
       const location = wildMethod(current.method) && !locations.includes(current.location) ? locations[0] || '' : current.location;
@@ -122,13 +136,13 @@ export function FrlgAutomationWorkspace({ profile }: { profile?: FrlgSaveProfile
       const pokemon = nextTargets.some(item => item.species === current.pokemon) ? current.pokemon : nextTargets[0]?.species || 'Bulbasaur';
       return { ...current, game: profile.game, tid: profile.tid, sid: profile.sid, location, pokemon };
     });
-  }, [profile]);
+  }, [profile?.id, profile?.game, profile?.tid, profile?.sid]);
   const locations = useMemo(() => requestLocations(request.game, request.category, request.method), [request.game, request.category, request.method]);
   const targets = useMemo(() => requestTargets(request.game, request.category, request.method, request.location), [request.game, request.category, request.method, request.location]);
   const target = targets.find(item => item.species === request.pokemon) || targets[0];
   const diagnostics = validateFrlgStaticRequest(request);
   const update = <K extends keyof FrlgStaticRequest>(key: K, value: FrlgStaticRequest[K]) => {
-    setResult(null); setError(''); setNotice(''); setRequest(current => ({ ...current, [key]: value }));
+    invalidate(); setRequest(current => ({ ...current, [key]: value }));
   };
   const changeGame = (game: string) => {
     const nextLocations = requestLocations(game, request.category, request.method);
@@ -145,6 +159,10 @@ export function FrlgAutomationWorkspace({ profile }: { profile?: FrlgSaveProfile
     setResult(null); setError(''); setNotice('');
   };
   const changeMethod = (method: string) => {
+    if (wildMethod(method) === wildMethod(request.method)) {
+      update('method', method as FrlgStaticRequest['method']);
+      return;
+    }
     const nextCategory = wildMethod(method) ? FRLG_WILD_CATEGORIES[0] : FRLG_STATIC_CATEGORIES[0];
     const nextLocations = requestLocations(request.game, nextCategory, method);
     const location = wildMethod(method) ? nextLocations[0] || '' : '';
@@ -171,13 +189,19 @@ export function FrlgAutomationWorkspace({ profile }: { profile?: FrlgSaveProfile
     const api = window.desktop?.frlgRng;
     if (!api) { setError('请在桌面应用中使用火叶 RNG 服务。'); return; }
     setBusy(true);
+    pendingSearch.current = true;
+    const generation = ++searchGeneration.current;
     try {
       await api.validate(toFrlgPlannerPayload(request));
-      setResult(await api.search(toFrlgPlannerPayload(request)));
-    } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
-    finally { setBusy(false); }
+      if (generation !== searchGeneration.current) return;
+      const plan = await api.search(toFrlgPlannerPayload(request));
+      if (generation === searchGeneration.current) setResult(plan);
+    } catch (reason) { if (generation === searchGeneration.current) setError(reason instanceof Error ? reason.message : String(reason)); }
+    finally { if (generation === searchGeneration.current) { pendingSearch.current = false; setBusy(false); } }
   };
   const cancelSearch = async () => {
+    searchGeneration.current += 1;
+    pendingSearch.current = false;
     try { await window.desktop?.frlgRng?.cancel(); }
     finally { setBusy(false); setNotice('已取消 FRLG 方案搜索。'); }
   };
@@ -186,19 +210,24 @@ export function FrlgAutomationWorkspace({ profile }: { profile?: FrlgSaveProfile
     values[index] = raw === '' ? 0 : Number(raw);
     update(kind, values);
   };
-  const plan = result?.plan;
-  const support = plan?.route_support;
+  const support = result?.route_support;
   const summary = result?.search_summary;
+  const abilityOptions = useMemo(() => getFrlgAbilities(request.pokemon), [request.pokemon]);
+  useEffect(() => {
+    if (request.ability !== 'Any' && !abilityOptions.some(option => option.english === request.ability)) {
+      setRequest(current => ({ ...current, ability: 'Any' }));
+    }
+  }, [abilityOptions, request.ability]);
   return <section className="automation-workspace frlg-automation-workspace" aria-label="火叶自动流程工作区">
     <header className="automation-heading frlg-automation-heading">
-      <div><h2>火叶自动流程</h2><p>第三世代 FRLG 定点与野生乱数；复用公共伊机控、视频源、OCR、通知和日志服务。</p></div>
-      <span className="frlg-source-badge">FRLG · 原生伊机控</span>
+      <div><h2>火叶自动流程</h2><p>搜索定点与野生目标，查看具体个体和初始 Seed 方案。</p></div>
+      <span className="frlg-source-badge">FRLG · 方案搜索</span>
     </header>
     <div className="automation-toolbar automation-run-toolbar frlg-run-toolbar">
       <button type="button" className="button primary" disabled={busy || diagnostics.length > 0} onClick={() => void search()}><Play size={14} />{busy ? '搜索中…' : '搜索并生成方案'}</button>
       <button type="button" disabled={!busy} onClick={() => void cancelSearch()}><Square size={14} />停止</button>
-      <button type="button" disabled={busy} onClick={() => void validate()}><ListChecks size={14} />开始前检查</button>
-      <button type="button" disabled={!result || busy} title="完整 FRLG 原生脚本包接入后启用"><Play size={14} />开始运行</button>
+      <button type="button" disabled={busy} onClick={() => void validate()}><ListChecks size={14} />参数检查</button>
+      <button type="button" disabled title="尚未生成运行脚本；设备与脚本预检接入后启用"><Play size={14} />开始运行</button>
       <span className="frlg-save-status" role="status">{busy ? '正在搜索方案' : result ? '搜索完成' : '待命'}</span>
     </div>
     {(error || notice) && <p role={error ? 'alert' : 'status'} className={error ? 'panel-error' : 'automation-notice'}>{error || notice}</p>}
@@ -207,7 +236,7 @@ export function FrlgAutomationWorkspace({ profile }: { profile?: FrlgSaveProfile
       <section className="automation-status-card frlg-status-card" data-status={busy ? 'running' : error ? 'failed' : result ? 'completed' : 'idle'} aria-label="火叶方案状态">
         <div className="automation-status-heading"><span>当前流程状态</span><span className="automation-status-label">{busy ? '搜索中' : error ? '需要检查' : result ? '方案已生成' : '待命'}</span></div>
         <strong role="status">{error || (result ? support?.summary || '已返回原版 planner 结果。' : '设置目标后开始搜索')}</strong>
-        {result ? <dl><div><dt>匹配目标</dt><dd>{summary?.matching_outcomes ?? 0}</dd></div><div><dt>可达目标</dt><dd>{summary?.reachable_outcomes ?? 0}</dd></div><div><dt>可执行路线</dt><dd>{summary?.feasible_routes ?? 0}</dd></div></dl> : <p className="muted">搜索后会在下方显示 planner 选中的具体目标和执行参数。</p>}
+        {result ? <dl><div><dt>匹配目标</dt><dd>{summary?.matching_outcomes ?? 0}</dd></div><div><dt>可达目标</dt><dd>{summary?.reachable_outcomes ?? 0}</dd></div><div><dt>可达路线</dt><dd>{summary?.feasible_routes ?? 0}</dd></div></dl> : <p className="muted">搜索后会在下方显示 planner 选中的具体目标和执行参数。</p>}
         {result && <button type="button" className="frlg-result-detail" onClick={() => setResultDetailOpen(true)}><FileClock size={13} />查看目标与结果参数</button>}
       </section>
     </div>
@@ -232,18 +261,7 @@ export function FrlgAutomationWorkspace({ profile }: { profile?: FrlgSaveProfile
         </details>
       </fieldset>
     </section>
-    {result && <section className="frlg-recommendation-card" aria-label="火叶推荐方案">
-      <header className="frlg-recommendation-heading"><div><h3>推荐方案</h3><p>生成后在这里查看目标与关键参数。</p></div><span className="frlg-plan-badge">{support?.can_start === false ? '仅生成计划' : '预检通过'}</span></header>
-      <div className="frlg-recommendation-main">
-        <span className="frlg-recommendation-emblem" aria-hidden="true">★</span>
-        <div className="frlg-recommendation-identity"><strong>{targetDisplayName(target, plan?.target?.pokemon || plan?.request?.pokemon || request.pokemon)}</strong><small>{plan?.request?.location ? getFrlgLocationLabel(plan.request.location) : target && 'location' in target ? getFrlgLocationLabel(target.location) : categoryLabels[plan?.request?.category || request.category] || request.category} · LV {plan?.target?.level ?? '—'}</small><small>{categoryLabels[plan?.request?.category || request.category] || request.category} · {methodLabels[plan?.target?.method || plan?.request?.method || request.method] || plan?.target?.method || request.method}</small></div>
-      </div>
-      <div className="frlg-recommendation-metrics"><div><strong>{plan?.initial_seed?.seed || '—'}</strong><span>Seed</span></div><div><strong>{plan?.initial_seed?.advances ?? '—'}</strong><span>Advance</span></div><div><strong>{plan?.selection?.iv_total ?? '—'}</strong><span>个体合计</span></div></div>
-      <p className="frlg-recommendation-ivs">IV {ivText(plan?.target?.ivs)}</p>
-      <p className="frlg-recommendation-attributes">{natureLabels[plan?.target?.nature] || plan?.target?.nature || '—'} · {plan?.target?.ability && plan.target.ability !== 'Any' ? `特性 ${plan.target.ability}` : '特性不限'} · {genderText(plan?.target?.gender)}</p>
-      <button type="button" className="frlg-recommendation-detail" onClick={() => setResultDetailOpen(true)}>查看方案与预检详情</button>
-      {Array.isArray(plan?.warnings) && plan.warnings.length > 0 && <ul className="frlg-warnings">{plan.warnings.map((warning: string) => <li key={warning}>{warning}</li>)}</ul>}
-    </section>}
+    {result && <FrlgPlanSummary plan={result} onDetails={() => setResultDetailOpen(true)} />}
     {targetSettingsOpen && <Dialog title="火叶目标与筛选条件" close={() => setTargetSettingsOpen(false)} className="automation-target-dialog frlg-target-dialog">
       <div className="automation-target-dialog-body">
         <section className="frlg-dialog-section"><h3>目标</h3><div className="automation-fields frlg-fields">
@@ -257,19 +275,13 @@ export function FrlgAutomationWorkspace({ profile }: { profile?: FrlgSaveProfile
           <label>闪光<select aria-label="闪光筛选" value={request.shiny} disabled={busy} onChange={event => update('shiny', event.target.value as FrlgStaticRequest['shiny'])}><option value="Any">任意</option>{FRLG_SHININESS.map(value => <option key={value} value={value}>{shinyLabels[value]}</option>)}</select></label>
           <label>性格<select aria-label="性格筛选" value={request.nature} disabled={busy} onChange={event => update('nature', event.target.value as FrlgStaticRequest['nature'])}><option value="Any">任意</option>{FRLG_NATURES.map(value => <option key={value} value={value}>{natureLabels[value] || value}</option>)}</select></label>
           <label>性别<select aria-label="性别筛选" value={request.gender} disabled={busy} onChange={event => update('gender', event.target.value as FrlgStaticRequest['gender'])}><option value="Any">任意</option><option value="M">雄性</option><option value="F">雌性</option><option value="-">无性别</option></select></label>
-          <label>特性<select aria-label="特性筛选" value={request.ability} disabled={busy} onChange={event => update('ability', event.target.value)}><option value="Any">任意</option><option value="0">特性 0</option><option value="1">特性 1</option></select></label>
-          <label>隐藏属性<select aria-label="隐藏属性筛选" value={request.hiddenType} disabled={busy} onChange={event => update('hiddenType', event.target.value as FrlgStaticRequest['hiddenType'])}><option value="Any">任意</option>{FRLG_HIDDEN_TYPES.map(value => <option key={value} value={value}>{value}</option>)}</select></label>
+          <label>特性<select aria-label="特性筛选" value={request.ability} disabled={busy} onChange={event => update('ability', event.target.value)}><option value="Any">任意</option>{abilityOptions.map(option => <option key={option.english} value={option.english}>{option.displayName} · {option.english}</option>)}</select></label>
+          <label>隐藏属性<select aria-label="隐藏属性筛选" value={request.hiddenType} disabled={busy} onChange={event => update('hiddenType', event.target.value as FrlgStaticRequest['hiddenType'])}><option value="Any">任意</option>{FRLG_HIDDEN_TYPES.map(value => <option key={value} value={value}>{typeLabels[value] || value}</option>)}</select></label>
         </div><div className="automation-ivs frlg-ivs">{statLabels.map((label, index) => <label key={label}>{label}<input aria-label={`${label}最小IV`} type="number" min={0} max={31} value={request.ivMin[index]} disabled={busy} onChange={event => setIv(index, 'ivMin', event.target.value)} /><input aria-label={`${label}最大IV`} type="number" min={0} max={31} value={request.ivMax[index]} disabled={busy} onChange={event => setIv(index, 'ivMax', event.target.value)} /></label>)}</div></details>
         {diagnostics.length > 0 && <p className="panel-error" role="alert">{diagnostics[0]}</p>}
       </div>
       <div className="automation-target-dialog-actions"><span className="muted">{diagnostics.length ? '参数待检查' : '目标条件已更新'}</span><button type="button" className="button primary" onClick={() => setTargetSettingsOpen(false)}>完成设置</button></div>
     </Dialog>}
-    {resultDetailOpen && result && <Dialog title="火叶推荐方案详情" close={() => setResultDetailOpen(false)} className="automation-target-dialog frlg-target-dialog">
-      <div className="automation-target-dialog-body frlg-result-body">
-        <section className="frlg-dialog-section"><h3>具体目标</h3><dl className="automation-metrics"><div><dt>宝可梦</dt><dd>{targetDisplayName(target, plan?.target?.pokemon || request.pokemon)}</dd></div><div><dt>地点</dt><dd>{plan?.request?.location ? getFrlgLocationLabel(plan.request.location) : '定点目标'}</dd></div><div><dt>等级</dt><dd>{plan?.target?.level ?? '—'}</dd></div><div><dt>PID</dt><dd>{plan?.target?.pid || '—'}</dd></div><div><dt>闪光</dt><dd>{shinyLabels[plan?.target?.shiny] || plan?.target?.shiny || '—'}</dd></div><div><dt>性格</dt><dd>{natureLabels[plan?.target?.nature] || plan?.target?.nature || '—'}</dd></div><div><dt>特性</dt><dd>{plan?.target?.ability || '—'}</dd></div><div><dt>性别</dt><dd>{genderText(plan?.target?.gender)}</dd></div><div><dt>隐藏属性</dt><dd>{plan?.target?.hidden_type || '—'}</dd></div><div><dt>IV</dt><dd>{ivText(plan?.target?.ivs)}</dd></div></dl></section>
-        <section className="frlg-dialog-section"><h3>执行参数</h3><dl className="automation-metrics"><div><dt>目标 Seed</dt><dd>{plan?.target?.target_seed || '—'}</dd></div><div><dt>初始 Seed</dt><dd>{plan?.initial_seed?.seed || '—'}</dd></div><div><dt>Advance</dt><dd>{plan?.initial_seed?.advances ?? '—'}</dd></div><div><dt>Seed 模式</dt><dd>{plan?.execution?.seed_mode ?? '—'}</dd></div><div><dt>总等待</dt><dd>{plan?.initial_seed?.total_time || '—'}</dd></div><div><dt>路线状态</dt><dd className={plan?.route_support?.can_start ? 'frlg-support-ok' : ''}>{plan?.route_support?.summary || '—'}</dd></div></dl></section>
-      </div>
-      <div className="automation-target-dialog-actions"><span className="muted">匹配 {summary?.matching_outcomes ?? 0} · 可达 {summary?.reachable_outcomes ?? 0} · 路线 {summary?.feasible_routes ?? 0}</span><button type="button" className="button primary" onClick={() => setResultDetailOpen(false)}>关闭</button></div>
-    </Dialog>}
+    {resultDetailOpen && result && <FrlgPlanDetails plan={result} close={() => setResultDetailOpen(false)} />}
   </section>;
 }

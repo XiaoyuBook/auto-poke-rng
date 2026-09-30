@@ -1,5 +1,6 @@
 import type { LogEntry } from './workspace';
 import type { ScriptFilesApi } from './scriptLibrary';
+import type { FrlgPlannerResult } from './frlgAutomation';
 
 export type PanelTool = 'video' | 'logs';
 export type LogSource = '全部来源' | LogEntry['source'];
@@ -40,7 +41,7 @@ export interface StaticEngineApi {
 }
 export interface FrlgRngApi {
   validate: (request: Record<string, unknown>) => Promise<{ valid: boolean; source: string }>;
-  search: (request: Record<string, unknown>) => Promise<Record<string, unknown>>;
+  search: (request: Record<string, unknown>) => Promise<FrlgPlannerResult>;
   cancel: () => Promise<void>;
 }
 export interface IvCalculationRequest {
