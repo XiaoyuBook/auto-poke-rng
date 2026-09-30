@@ -194,6 +194,10 @@ describe('workspace interactions', () => {
     fireEvent.click(within(nav).getByRole('button', { name: '自动流程' }));
     expect(screen.getByRole('heading', { name: '火叶自动流程', level: 2 })).toBeTruthy();
     expect(screen.getByRole('region', { name: '火叶自动流程参数' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: '当前火叶目标与筛选条件' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '目标设置' }));
+    expect(screen.getByRole('dialog', { name: '火叶目标与筛选条件' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '完成设置' }));
     expect(screen.queryByRole('button', { name: '定点数据' })).toBeNull();
     fireEvent.change(screen.getByLabelText('TID'), { target: { value: '12345' } });
     fireEvent.change(screen.getByLabelText('SID'), { target: { value: '54321' } });
