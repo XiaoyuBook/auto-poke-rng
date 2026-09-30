@@ -11,6 +11,7 @@
 - 推荐方案直接占用目标卡右侧的位置；待命/搜索状态原位切换为具体方案，不再在基础设置下方重复展示。窄窗口自动纵向排列。
 - 指定 Seed/Advance 模式不计算个体属性；不将筛选条件伪装为结果。定点 planner 的 `level=0` 表示未提供等级，界面显示“定点目标”，不会显示 LV 0。
 - 切换存档会丢弃旧方案和迟到的旧搜索响应；同类方法之间切换不重置物种和地点。
+- 共用计算层已优化定点/野生 IV 反查、筛选、初始 Seed 索引及精确模式查询、IV 档位枚举。内置代码以原版为行为锚点，不再要求逐字节相同；返回内容、顺序、选优和工作量边界由对照与回归测试约束。
 
 ## 实测与边界
 
@@ -34,4 +35,5 @@
 - `npm run test:frlg:electron`：真实 Electron preload → IPC → Python → 推荐卡/详情；检查精灵资源加载和窄窗口布局，截图存入 `node_modules/.tmp/frlg-review/`。无硬件操作，其他模块服务仅提供空闲状态。
 - `node tools/compare-frlg-planner.cjs <原版目录> [--legacy-range]`：可选、只读的原版对照工具。原版目录只用于开发验证，不是运行时依赖。
 - `tools/generate-frlg-wild-data.py`：从内置快照重新生成遭遇与显示元数据；精灵资源单独附 SHA-256 来源清单。
-- [搜索性能评估](FRLG_SEARCH_PERFORMANCE.md)：冷/热计时、热点分析、局部优化及 C++ 内核的可行性与对齐验收要求。本次仅评估，没有替换搜索算法。
+- `tests/frlg-compute-cases.py` / `tests/frlg-compute-regressions.py`：467 组原版计算对照、完整初始 Seed 索引与工作量回归，已纳入 `npm run test:rng`；来源说明见 `tests/fixtures/frlg-compute-reference.md`。
+- [计算性能与优化](FRLG_SEARCH_PERFORMANCE.md)：已落地的共用计算优化、实测前后对照、C++ 后续方向和未接入的实机校准边界。

@@ -30,4 +30,10 @@ for (const [name, expected] of [['wild', fixture], ['static', require('../tests/
   assert.deepEqual(original, expected, 'fixture must be the original serialized result');
 }
 console.log('PASS: full serialized result matches the original and the UI fixture.');
-if (process.argv.includes('--legacy-range')) search('legacy-range', null, { ...fixture.request, min_advances: 0, max_advances: 10000 });
+if (process.argv.includes('--legacy-range')) {
+  const params = { ...fixture.request, min_advances: 0, max_advances: 10000 };
+  const bundled = search('legacy-range:bundled', null, params);
+  const original = search('legacy-range:reference', reference, params);
+  assert.deepEqual(bundled, original, 'slow restricted-range search must preserve the entire original result');
+  console.log('PASS: restricted-range serialized result also matches the original.');
+}

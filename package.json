@@ -16,7 +16,7 @@
     "test:blink:electron": "npm run build && node tests/run-electron.cjs blink-electron.cjs",
     "dev": "concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && electron .\"",
     "build": "node tools/generate-bdsp-data.mjs && tsc -b && vite build",
-    "test:rng": "node --test --test-concurrency=1 tests/pokefinder-native.cjs tests/pokefinder-iv.cjs tests/rng-client-regressions.cjs tests/frlg-rng-host.cjs",
+    "test:rng": "node --test --test-concurrency=1 tests/pokefinder-native.cjs tests/pokefinder-iv.cjs tests/rng-client-regressions.cjs tests/frlg-rng-host.cjs tests/frlg-compute.cjs",
     "test:rng:electron": "npm run build && node tests/run-electron.cjs pokefinder-electron.cjs",
     "test:frlg:electron": "npm run build && node tests/run-electron.cjs frlg-electron.cjs",
     "build:runtime": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/build-runtime.ps1",
