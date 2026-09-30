@@ -121,6 +121,11 @@ contextBridge.exposeInMainWorld('desktop', {
     cancel: () => ipcRenderer.invoke('rng:cancel'),
     calculateIvs: request => ipcRenderer.invoke('rng:iv-calculate', request),
   },
+  frlgRng: {
+    validate: request => ipcRenderer.invoke('frlg-rng:validate', request),
+    search: request => ipcRenderer.invoke('frlg-rng:search', request),
+    cancel: () => ipcRenderer.invoke('frlg-rng:cancel'),
+  },
   panels: {
     open: tool => ipcRenderer.invoke('panels:open', tool),
     getState: () => ipcRenderer.invoke('panels:get-state'),

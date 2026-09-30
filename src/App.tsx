@@ -21,6 +21,7 @@ import { ControllerOverlayApp } from './components/ControllerOverlayApp';
 import { KeyMappingDialog } from './components/KeyMappingDialog';
 import { OcrWorkspace } from './components/OcrWorkspace';
 import { AutomationWorkspace } from './components/AutomationWorkspace';
+import { FrlgAutomationWorkspace } from './components/FrlgAutomationWorkspace';
 import { automationBusy, useAutomation, type AutomationKind } from './automation';
 import { StaticDataWorkspace } from './components/StaticDataWorkspace';
 import { BlinkWorkspace } from './components/BlinkWorkspace';
@@ -304,7 +305,8 @@ export default function App({ connections = initialConnections }: { connections?
   };
 
   const navigateToPage = (next: Page) => {
-    if (['定点数据', '闪光反查区域', '眨眼捕获', '自动流程'].includes(next) && game !== 'bdsp') return;
+    if (next === '自动流程' && !['bdsp', 'frlg'].includes(game)) return;
+    if (['定点数据', '闪光反查区域', '眨眼捕获'].includes(next) && game !== 'bdsp') return;
     setPage(next);
     setVisitedPages(current => new Set(current).add(next));
     if (inlineLabelsOpen) setVideoLabelsOpen(false);
@@ -498,6 +500,8 @@ export default function App({ connections = initialConnections }: { connections?
       { label: '定点数据', keywords: 'static pokemon pokefinder encounter', icon: <Dices size={16} />, run: () => navigateToPage('定点数据') },
       { label: '闪光反查区域', keywords: 'ocr recognition shiny roi', icon: <ScanText size={16} />, run: () => navigateToPage('闪光反查区域') },
       { label: '眨眼捕获', keywords: 'blink seed project xs', icon: <Eye size={16} />, run: () => navigateToPage('眨眼捕获') },
+    ] : game === 'frlg' ? [
+      { label: '自动流程', keywords: 'FRLG automation static stationary encounter', icon: <Dices size={16} />, run: () => navigateToPage('自动流程') },
     ] : []),
     { label: '视频预览', keywords: 'video preview', icon: <MonitorPlay size={16} />, run: () => showPanel('video') },
     { label: '日志中心', keywords: 'logs history', icon: <FileClock size={16} />, run: () => showPanel('logs') },
@@ -532,7 +536,8 @@ export default function App({ connections = initialConnections }: { connections?
                   <button key={item.id} role="menuitemradio" aria-checked={item.id === game} className={'game-option ' + (item.id === game ? 'selected' : '')}
                     onClick={() => {
                       setGame(item.id); setGameMenuOpen(false); gameButton.current?.focus();
-                      if (item.id !== 'bdsp' && ['定点数据', '闪光反查区域', '眨眼捕获', '自动流程'].includes(page)) setPage('首页');
+                      if (item.id === 'swsh' && ['定点数据', '闪光反查区域', '眨眼捕获', '自动流程'].includes(page)) setPage('首页');
+                      if (item.id === 'frlg' && ['定点数据', '闪光反查区域', '眨眼捕获'].includes(page)) setPage('首页');
                       if (item.id !== game) addLog('已切换查看：' + item.label + '。');
                     }}>
                     <span className="game-mark" style={{ background: item.color }} />
@@ -550,7 +555,7 @@ export default function App({ connections = initialConnections }: { connections?
           <NavItem label="首页" icon={<Home size={16} />} active={page === '首页'} onClick={() => navigateToPage('首页')} />
           <NavItem label="脚本编辑" icon={<TerminalSquare size={16} />} active={page === '脚本编辑'} onClick={() => navigateToPage('脚本编辑')} />
           {game === 'bdsp' && <NavItem label="定点数据" icon={<Dices size={16} />} active={page === '定点数据'} onClick={() => navigateToPage('定点数据')} />}
-          {game === 'bdsp' && <NavItem label="自动流程" icon={<Dices size={16} />} active={page === '自动流程'} onClick={() => navigateToPage('自动流程')} />}
+          {['bdsp', 'frlg'].includes(game) && <NavItem label="自动流程" icon={<Dices size={16} />} active={page === '自动流程'} onClick={() => navigateToPage('自动流程')} />}
           {game === 'bdsp' && <NavItem label="闪光反查区域" icon={<ScanText size={16} />} active={page === '闪光反查区域'} onClick={() => navigateToPage('闪光反查区域')} />}
           {game === 'bdsp' && <NavItem label="眨眼捕获" icon={<Eye size={16} />} active={page === '眨眼捕获'} onClick={() => navigateToPage('眨眼捕获')} />}
         </nav>
@@ -593,8 +598,11 @@ export default function App({ connections = initialConnections }: { connections?
                   <span>{runningAutomationKind === 'tid' ? '自动 TID' : '自动定点'}正在运行，此页暂不能启动。</span>
                   <button type="button" onClick={() => selectAutomationTab(runningAutomationKind)}>返回运行页</button>
                 </div>}
-                {visitedAutomationTabs.has('static') && <div className="automation-page automation-hub-panel" id="automation-panel-static" hidden={automationTab !== 'static'}><AutomationWorkspace kind="static" profile={bdspProfile} blinkConfig={blink.config} blinkConfigs={blink.configs} openLogs={() => showPanel('logs')} onSwitchKind={() => selectAutomationTab('tid')} /></div>}
-                {visitedAutomationTabs.has('tid') && <div className="automation-page automation-hub-panel" id="automation-panel-tid" hidden={automationTab !== 'tid'}><AutomationWorkspace kind="tid" profile={bdspProfile} blinkConfig={blink.config} blinkConfigs={blink.configs} openLogs={() => showPanel('logs')} onSwitchKind={() => selectAutomationTab('static')} /></div>}
+                {game === 'bdsp' && <>
+                  {visitedAutomationTabs.has('static') && <div className="automation-page automation-hub-panel" id="automation-panel-static" hidden={automationTab !== 'static'}><AutomationWorkspace kind="static" profile={bdspProfile} blinkConfig={blink.config} blinkConfigs={blink.configs} openLogs={() => showPanel('logs')} onSwitchKind={() => selectAutomationTab('tid')} /></div>}
+                  {visitedAutomationTabs.has('tid') && <div className="automation-page automation-hub-panel" id="automation-panel-tid" hidden={automationTab !== 'tid'}><AutomationWorkspace kind="tid" profile={bdspProfile} blinkConfig={blink.config} blinkConfigs={blink.configs} openLogs={() => showPanel('logs')} onSwitchKind={() => selectAutomationTab('static')} /></div>}
+                </>}
+                {game === 'frlg' && <FrlgAutomationWorkspace />}
               </div>}
               {visitedPages.has('闪光反查区域') && <div hidden={page !== '闪光反查区域'}><OcrWorkspace overlayTarget={page === '闪光反查区域' ? ocrOverlayHost : null} previewTarget={page === '闪光反查区域' ? ocrPreviewHost : null} /></div>}
               {page === '定点数据' && <StaticDataWorkspace profile={bdspProfile} onLog={message => addLog(message, '系统', 'success')} />}
@@ -615,7 +623,7 @@ export default function App({ connections = initialConnections }: { connections?
               <VideoPreview previewOnly />
               <div ref={setOcrOverlayHost} className="video-roi-host" aria-hidden={!(page === '闪光反查区域' || page === '眨眼捕获' || page === '自动流程') || inlineLabelsOpen || undefined} hidden={!(page === '闪光反查区域' || page === '眨眼捕获' || page === '自动流程') || inlineLabelsOpen} />
               {page === '眨眼捕获' && !inlineLabelsOpen && <BlinkVideoOverlay blink={blink} video={devices.video} target={ocrOverlayHost} />}
-              {page === '自动流程' && !inlineLabelsOpen && <AutomationVideoOverlay state={automation.snapshot?.state} video={devices.video} target={ocrOverlayHost} />}
+              {page === '自动流程' && game === 'bdsp' && !inlineLabelsOpen && <AutomationVideoOverlay state={automation.snapshot?.state} video={devices.video} target={ocrOverlayHost} />}
               <button className="video-resize-handle" type="button" aria-label="调整视频预览大小" title="拖动调整视频大小，保持 16:9"
                 onPointerDown={startVideoResize} onPointerMove={resizeVideo} onPointerUp={finishVideoResize} onPointerCancel={finishVideoResize}
                 onLostPointerCapture={() => { videoResize.current = null; }} onKeyDown={nudgeVideoSize}><Maximize2 size={13} aria-hidden="true" /></button>

@@ -38,6 +38,11 @@ export interface StaticEngineApi {
   cancel: () => Promise<void>;
   calculateIvs: (request: IvCalculationRequest) => Promise<IvCalculationResult>;
 }
+export interface FrlgRngApi {
+  validate: (request: Record<string, unknown>) => Promise<{ valid: boolean; source: string }>;
+  search: (request: Record<string, unknown>) => Promise<Record<string, unknown>>;
+  cancel: () => Promise<void>;
+}
 export interface IvCalculationRequest {
   species: number; form: number; nature: number; characteristic: number; hiddenPower: number;
   entries: { level: number; stats: number[] }[];
@@ -78,4 +83,5 @@ export interface DesktopApi {
   panels: PanelWindowsApi;
   scripts: ScriptFilesApi;
   rng?: StaticEngineApi;
+  frlgRng?: FrlgRngApi;
 }

@@ -5,6 +5,7 @@ const { registerScriptFiles } = require('./script-files.cjs');
 const { registerDevices } = require('./devices.cjs');
 const { registerQQNotifications } = require('./qq-notifications.cjs');
 const { registerRng } = require('./rng-client.cjs');
+const { registerFrlgRng } = require('./frlg-rng-client.cjs');
 const { registerBlink } = require('./blink-client.cjs');
 const { registerAutomation } = require('./automation.cjs');
 const { createScriptGate, createScriptStorage } = require('./script-storage.cjs');
@@ -16,6 +17,7 @@ let panels;
 let devices;
 let notifications;
 let rng;
+let frlgRng;
 let blink;
 let automation;
 let quitting = false;
@@ -73,6 +75,12 @@ app.whenReady().then(async () => {
   devices = registerDevices({ ipcMain, getWindows: () => BrowserWindow.getAllWindows(), loadWindow, rootDirectory, testMode: testDevices, isScriptLibraryBusy: () => scriptGate.busy });
   notifications = registerQQNotifications({ ipcMain, getMainWindow: () => mainWindow, safeStorage, nativeImage, userData: app.getPath('userData') });
   rng = registerRng({ ipcMain, getMainWindow: () => mainWindow, isAutomationBusy: () => devices.isAutomationBusy() });
+  frlgRng = registerFrlgRng({
+    ipcMain,
+    getMainWindow: () => mainWindow,
+    sourceRoot: process.env.FRLG_AUTO_RNG_ROOT || path.resolve(app.getAppPath(), '..', 'frlg-auto-rng'),
+    isBusy: () => devices.isAutomationBusy(),
+  });
   blink = registerBlink({ ipcMain, getMainWindow: () => mainWindow, getVideo: () => devices.getState().video, isAutomationBusy: () => devices.isAutomationBusy() });
   automation = registerAutomation({ ipcMain, getMainWindow: () => mainWindow, getWindows: () => BrowserWindow.getAllWindows(), devices, rng, blink, userData: app.getPath('userData'),
     encodeNotificationImage: bytes => nativeImage.createFromBuffer(bytes).toJPEG(88), notifications });
@@ -90,7 +98,7 @@ app.on('before-quit', event => {
   if (quitting || !devices) return;
   event.preventDefault(); quitting = true;
   notifications?.close();
-  void automation?.close().catch(() => {}).then(() => Promise.allSettled([devices.close(), rng?.close?.(), blink?.close(), scriptGate.drain()])).finally(() => app.quit());
+  void automation?.close().catch(() => {}).then(() => Promise.allSettled([devices.close(), rng?.close?.(), frlgRng?.close?.(), blink?.close(), scriptGate.drain()])).finally(() => app.quit());
 });
 
 app.on('window-all-closed', () => {

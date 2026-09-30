@@ -166,14 +166,14 @@ describe('workspace interactions', () => {
   it('keeps the original navigation and lets the sidebar be reopened', async () => {
     await openApp();
     const nav = screen.getByRole('navigation', { name: '工作区' });
-    expect(within(nav).getAllByRole('button').map(button => button.textContent)).toEqual(['首页', '脚本编辑']);
+    expect(within(nav).getAllByRole('button').map(button => button.textContent)).toEqual(['首页', '脚本编辑', '自动流程']);
     expect(screen.queryByRole('button', { name: '定点数据' })).toBeNull();
     changeGame('珍钻复刻');
     expect(within(nav).getAllByRole('button').map(button => button.textContent)).toEqual(['首页', '脚本编辑', '定点数据', '自动流程', '闪光反查区域', '眨眼捕获']);
     fireEvent.click(screen.getByRole('button', { name: '首页' }));
     expect(screen.getByRole('region', { name: '存档信息' })).toBeTruthy();
     changeGame('火叶');
-    expect(within(nav).getAllByRole('button').map(button => button.textContent)).toEqual(['首页', '脚本编辑']);
+    expect(within(nav).getAllByRole('button').map(button => button.textContent)).toEqual(['首页', '脚本编辑', '自动流程']);
     expect(screen.queryByRole('region', { name: '存档信息' })).toBeNull();
     const globalTools = screen.getByRole('group', { name: '全局工具' });
     expect(within(globalTools).getAllByRole('button').map(button => button.getAttribute('aria-label'))).toEqual(['视频源：未尝试连接', '伊机控：未尝试连接', 'QQ 通知：未配置']);
@@ -181,6 +181,29 @@ describe('workspace interactions', () => {
     expect(document.querySelector('.app-shell')?.getAttribute('data-collapsed')).toBe('true');
     fireEvent.click(screen.getByRole('button', { name: '展开侧栏' }));
     expect(document.querySelector('.app-shell')?.getAttribute('data-collapsed')).toBe('false');
+  });
+
+  it('opens the isolated FRLG automation workspace without exposing BDSP pages', async () => {
+    const search = vi.fn(async () => ({
+      plan: { request: { pokemon: 'Bulbasaur' }, route_support: { summary: '2.0 定点流程基线', can_start: true } },
+      search_summary: { matching_outcomes: 1, reachable_outcomes: 1, feasible_routes: 1 },
+    }));
+    window.desktop!.frlgRng = { validate: vi.fn(async () => ({ valid: true, source: 'test' })), search, cancel: vi.fn(async () => {}) };
+    await openApp();
+    const nav = screen.getByRole('navigation', { name: '工作区' });
+    fireEvent.click(within(nav).getByRole('button', { name: '自动流程' }));
+    expect(screen.getByRole('heading', { name: '火叶自动流程', level: 2 })).toBeTruthy();
+    expect(screen.getByRole('region', { name: '火叶自动流程参数' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '定点数据' })).toBeNull();
+    fireEvent.change(screen.getByLabelText('TID'), { target: { value: '12345' } });
+    fireEvent.change(screen.getByLabelText('SID'), { target: { value: '54321' } });
+    fireEvent.change(screen.getByLabelText('Seed 模式'), { target: { value: '3' } });
+    fireEvent.click(screen.getByLabelText('指定 Seed / Advance'));
+    fireEvent.change(screen.getByLabelText('指定 Seed'), { target: { value: '11C7' } });
+    fireEvent.change(screen.getByLabelText('指定 Advance'), { target: { value: '42' } });
+    fireEvent.click(screen.getByRole('button', { name: '搜索并生成方案' }));
+    await screen.findByText('方案已生成');
+    expect(search).toHaveBeenCalledWith(expect.objectContaining({ game: 'fr_nx', tid: 12345, sid: 54321, category: 'Starter', pokemon: 'Bulbasaur', seed_mode: 3, direct_mode: true, direct_seed: '11C7', direct_advances: 42 }));
   });
 
   it('switches automation beside the current heading and keeps the selection', async () => {
