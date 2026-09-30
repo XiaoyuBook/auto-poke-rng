@@ -66,7 +66,17 @@ app.whenReady().then(async () => {
   for (const value of ['闪光大嘴蝠', '华蓝洞窟1F · LV 46', '7422', '25,296', '181', 'IV 30 / 28 / 31 / 31 / 31 / 30', '勤奋 · 精神力 · 雌性']) assert.ok(text.includes(value), value);
   assert.equal(await js(`Array.from(document.querySelectorAll('button')).find(button => button.textContent === '开始运行').disabled`), true);
   await until(`Array.from(document.querySelectorAll('.frlg-sprite')).every(img => img.complete && img.naturalWidth > 0)`, 'bundled sprites loaded');
-  await js(`document.querySelector('.frlg-recommendation-card').scrollIntoView({ block: 'center' })`);
+  const overviewFits = sideBySide => js(`(() => {
+    const overview = document.querySelector('.frlg-overview');
+    const target = overview.querySelector('.frlg-target-card');
+    const plan = overview.querySelector('.frlg-recommendation-card');
+    if (!target || !plan || document.querySelectorAll('.frlg-recommendation-card').length !== 1) return false;
+    const a = target.getBoundingClientRect(), b = plan.getBoundingClientRect();
+    const arranged = ${sideBySide} ? b.left >= a.right && Math.abs(a.top - b.top) < 1 : b.top >= a.bottom && Math.abs(a.left - b.left) < 1;
+    return arranged && b.left >= 0 && b.right <= innerWidth && plan.scrollWidth <= plan.clientWidth;
+  })()`);
+  assert.equal(await overviewFits(true), true, 'recommended plan sits beside the target without overflow');
+  await js(`document.querySelector('.frlg-overview').scrollIntoView({ block: 'center' })`);
   await screenshot('recommendation.png');
   await click('查看方案详情');
   const fields = await js(`Object.fromEntries(Array.from(document.querySelectorAll('dialog dl > div')).map(row => [row.querySelector('dt').textContent, row.querySelector('dd').textContent]))`);
@@ -79,6 +89,12 @@ app.whenReady().then(async () => {
   main.setSize(1280, 900);
   await screenshot('details-1280.png');
   assert.equal(await js(`(() => { const d = document.querySelector('dialog'); return d.scrollWidth <= d.clientWidth && d.getBoundingClientRect().bottom <= innerHeight; })()`), true, 'details fit the viewport');
+  await js(`document.querySelector('dialog').querySelector('.automation-target-dialog-actions button').click()`);
+  await screenshot('recommendation-1280.png');
+  assert.equal(await overviewFits(true), true, 'cards remain side by side at 1280px');
+  main.setSize(900, 900);
+  await screenshot('recommendation-900.png');
+  assert.equal(await overviewFits(false), true, 'cards stack without overflow in a narrow window');
   console.log(JSON.stringify({ passed: true, seconds, screenshots: output }));
 }).catch(error => { console.error(error); process.exitCode = 1; }).finally(async () => {
   clearTimeout(timer);

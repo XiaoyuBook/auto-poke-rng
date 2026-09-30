@@ -278,17 +278,13 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .frlg-run-toolbar { padding: 0; }
 .frlg-run-toolbar button { display: inline-flex; align-items: center; gap: 6px; }
 .frlg-save-status { margin-left: auto; color: var(--muted); font-size: 11px; }
-.frlg-overview { grid-template-columns: minmax(0, 1.1fr) minmax(300px, .9fr); }
+.frlg-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .frlg-target-card { min-height: 263px; }
 .frlg-target-emblem { display: grid; place-items: center; flex: 0 0 96px; width: 96px; height: 96px; border: 1px solid #bbcff833; border-radius: 12px; background: radial-gradient(circle, #bbcff81b, #bbcff803 68%); color: #c8d8ff; font-size: 42px; }
 .frlg-target-card .automation-target-main .automation-target-identity > strong { font-size: 21px; }
 .frlg-target-card .automation-target-main .automation-target-identity > small + small { color: var(--muted); }
 .frlg-status-card { justify-content: space-between; min-height: 263px; border-color: #3b484f; background: linear-gradient(145deg, #263137 0%, #20282d 48%, #1d2529 100%); }
 .frlg-status-card > strong { font-size: 15px; }
-.frlg-status-card dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 0; }
-.frlg-status-card dl dt { color: var(--muted); font-size: 10px; }
-.frlg-status-card dl dd { margin: 3px 0 0; color: var(--secondary); font: 12px var(--mono); }
-.frlg-result-detail { display: inline-flex; align-items: center; align-self: flex-start; gap: 5px; padding: 2px 0 !important; border: 0 !important; background: transparent !important; color: #bbcff8 !important; }
 .frlg-base-card { container-type: inline-size; }
 .frlg-base-fields { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .frlg-advanced-fields { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -301,23 +297,23 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .frlg-result-detail-card { padding: 0; overflow: hidden; background: #202525; }
 .frlg-result-detail-card > .automation-metrics, .frlg-result-detail-card > .frlg-warnings { margin: 14px; }
 .frlg-result-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.frlg-recommendation-card { padding: 18px; border: 1px solid #445467; border-radius: 8px; background: linear-gradient(145deg, #202936 0%, #1d252d 52%, #1b2229 100%); }
+.frlg-recommendation-card { min-width: 0; padding: 14px 17px; border: 1px solid #445467; border-radius: 9px; background: linear-gradient(145deg, #202936 0%, #1d252d 52%, #1b2229 100%); }
 .frlg-recommendation-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.frlg-recommendation-heading h3 { margin: 0; color: var(--text); font-size: 18px; }
-.frlg-recommendation-heading p { margin: 4px 0 0; color: var(--secondary); font-size: 12px; }
+.frlg-recommendation-heading h3 { margin: 0; color: var(--text); font-size: 14px; }
+.frlg-recommendation-heading p { margin: 4px 0 0; color: var(--secondary); font-size: 11px; line-height: 1.5; }
 .frlg-plan-badge { padding: 5px 9px; border-radius: 5px; color: #d7e4ff; background: #526aa633; font-size: 11px; white-space: nowrap; }
-.frlg-recommendation-main { display: flex; align-items: center; gap: 16px; margin: 18px 0 14px; }
-.frlg-recommendation-emblem { display: grid; place-items: center; flex: 0 0 104px; width: 104px; height: 104px; border-radius: 14px; background: radial-gradient(circle, #8ba7ed2b, #8ba7ed07 70%); color: #cfdbff; font-size: 46px; }
+.frlg-recommendation-main { display: flex; align-items: center; gap: 12px; margin: 10px 0; }
+.frlg-recommendation-emblem { display: grid; place-items: center; flex: 0 0 80px; width: 80px; height: 80px; border-radius: 12px; background: radial-gradient(circle, #8ba7ed2b, #8ba7ed07 70%); }
 .frlg-sprite { width: 88%; height: 88%; object-fit: contain; image-rendering: pixelated; }
 .frlg-recommendation-identity { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-.frlg-recommendation-identity strong { color: var(--text); font-size: 26px; line-height: 1.15; }
+.frlg-recommendation-identity strong { color: var(--text); font-size: 21px; line-height: 1.25; overflow-wrap: anywhere; }
 .frlg-recommendation-identity small { color: var(--secondary); font-size: 12px; }
-.frlg-recommendation-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.frlg-recommendation-metrics div { padding: 10px 12px; border: 1px solid #455365; border-radius: 7px; background: #1a222b; }
-.frlg-recommendation-metrics strong { display: block; color: var(--text); font: 700 20px var(--mono); }
+.frlg-recommendation-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.frlg-recommendation-metrics div { min-width: 0; padding: 8px; border: 1px solid #455365; border-radius: 7px; background: #1a222b; }
+.frlg-recommendation-metrics strong { display: block; color: var(--text); font: 700 18px var(--mono); overflow-wrap: anywhere; }
 .frlg-recommendation-metrics span { display: block; margin-top: 3px; color: var(--secondary); font-size: 11px; }
-.frlg-recommendation-ivs, .frlg-recommendation-attributes { margin: 13px 0 0; color: var(--secondary); font: 12px var(--mono); }
-.frlg-recommendation-detail { width: 100%; margin-top: 16px; border-color: #8299c6 !important; background: transparent !important; color: #d1dcfa !important; }
+.frlg-recommendation-ivs, .frlg-recommendation-attributes { margin: 9px 0 0; color: var(--secondary); font: 12px/1.5 var(--mono); }
+.frlg-recommendation-detail { width: 100%; margin-top: 12px; border-color: #8299c6 !important; background: transparent !important; color: #d1dcfa !important; }
 .frlg-wide-field { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; color: var(--secondary); font-size: 12px; }
 .frlg-checkbox-field { display: flex; flex-direction: row !important; align-items: center; justify-content: space-between; gap: 8px; }
 .frlg-checkbox-field input { width: 15px; height: 15px; accent-color: var(--accent); }

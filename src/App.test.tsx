@@ -203,7 +203,7 @@ describe('workspace interactions', () => {
     fireEvent.change(screen.getByLabelText('TID'), { target: { value: '0' } });
     fireEvent.change(screen.getByLabelText('SID'), { target: { value: '38448' } });
     fireEvent.click(screen.getByRole('button', { name: '搜索并生成方案' }));
-    await screen.findByText('方案已生成');
+    await screen.findByRole('region', { name: '火叶推荐方案' });
     expect(screen.getByRole('region', { name: '火叶推荐方案' })).toBeTruthy();
     const recommendation = screen.getByRole('region', { name: '火叶推荐方案' });
     expect(within(recommendation).getByText('闪光大嘴蝠')).toBeTruthy();

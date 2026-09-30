@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { FileClock, ListChecks, Play, SlidersHorizontal, Sparkles, Square } from 'lucide-react';
+import { ListChecks, Play, SlidersHorizontal, Sparkles, Square } from 'lucide-react';
 import {
   FRLG_GAMES,
   FRLG_HIDDEN_TYPES,
@@ -210,8 +210,6 @@ export function FrlgAutomationWorkspace({ profile }: { profile?: FrlgSaveProfile
     values[index] = raw === '' ? 0 : Number(raw);
     update(kind, values);
   };
-  const support = result?.route_support;
-  const summary = result?.search_summary;
   const abilityOptions = useMemo(() => getFrlgAbilities(request.pokemon), [request.pokemon]);
   useEffect(() => {
     if (request.ability !== 'Any' && !abilityOptions.some(option => option.english === request.ability)) {
@@ -233,12 +231,12 @@ export function FrlgAutomationWorkspace({ profile }: { profile?: FrlgSaveProfile
     {(error || notice) && <p role={error ? 'alert' : 'status'} className={error ? 'panel-error' : 'automation-notice'}>{error || notice}</p>}
     <div className="automation-overview frlg-overview">
       <FrlgTargetCard request={request} target={target} locked={busy} onSettings={() => setTargetSettingsOpen(true)} />
-      <section className="automation-status-card frlg-status-card" data-status={busy ? 'running' : error ? 'failed' : result ? 'completed' : 'idle'} aria-label="火叶方案状态">
-        <div className="automation-status-heading"><span>当前流程状态</span><span className="automation-status-label">{busy ? '搜索中' : error ? '需要检查' : result ? '方案已生成' : '待命'}</span></div>
-        <strong role="status">{error || (result ? support?.summary || '已返回原版 planner 结果。' : '设置目标后开始搜索')}</strong>
-        {result ? <dl><div><dt>匹配目标</dt><dd>{summary?.matching_outcomes ?? 0}</dd></div><div><dt>可达目标</dt><dd>{summary?.reachable_outcomes ?? 0}</dd></div><div><dt>可达路线</dt><dd>{summary?.feasible_routes ?? 0}</dd></div></dl> : <p className="muted">搜索后会在下方显示 planner 选中的具体目标和执行参数。</p>}
-        {result && <button type="button" className="frlg-result-detail" onClick={() => setResultDetailOpen(true)}><FileClock size={13} />查看目标与结果参数</button>}
-      </section>
+      {result ? <FrlgPlanSummary plan={result} onDetails={() => setResultDetailOpen(true)} /> :
+        <section className="automation-status-card frlg-status-card" data-status={busy ? 'running' : error ? 'failed' : 'idle'} aria-label="火叶方案状态">
+          <div className="automation-status-heading"><span>推荐方案</span><span className="automation-status-label">{busy ? '搜索中' : error ? '需要检查' : '待命'}</span></div>
+          <strong role="status">{error || (busy ? '正在搜索符合条件的目标' : '设置目标后开始搜索')}</strong>
+          <p className="muted">搜索完成后，这里将显示推荐的宝可梦个体、Seed 和 Advance。</p>
+        </section>}
     </div>
     <section className="automation-card automation-feature-card frlg-base-card" aria-label="火叶自动流程参数">
       <div className="automation-feature-heading"><strong>基础设置</strong><span className="automation-feature-status">必选</span></div>
@@ -261,7 +259,6 @@ export function FrlgAutomationWorkspace({ profile }: { profile?: FrlgSaveProfile
         </details>
       </fieldset>
     </section>
-    {result && <FrlgPlanSummary plan={result} onDetails={() => setResultDetailOpen(true)} />}
     {targetSettingsOpen && <Dialog title="火叶目标与筛选条件" close={() => setTargetSettingsOpen(false)} className="automation-target-dialog frlg-target-dialog">
       <div className="automation-target-dialog-body">
         <section className="frlg-dialog-section"><h3>目标</h3><div className="automation-fields frlg-fields">
