@@ -41,9 +41,12 @@ function runHost() {
   try {
     const env = { ...process.env };
     delete env.FRLG_AUTO_RNG_ROOT;
+    const wildRequest = { ...request, method: 'Wild 1', category: 'Grass', location: 'Route 1', pokemon: 'Pidgey' };
     const input = [
       { id: 1, method: 'validate', params: request },
       { id: 2, method: 'search', params: request },
+      { id: 3, method: 'validate', params: wildRequest },
+      { id: 4, method: 'search', params: wildRequest },
       { command: 'shutdown' },
     ].map(value => JSON.stringify(value)).join('\n') + '\n';
     const result = spawnSync(python, ['-u', host], {
@@ -64,7 +67,7 @@ function runHost() {
 
 test('FRLG planner validates and searches from the bundled runtime without a sibling project', () => {
   const messages = runHost();
-  assert.equal(messages.length, 2);
+  assert.equal(messages.length, 4);
   assert.deepEqual(messages[0].result, {
     valid: true,
     source: path.join(root, 'runtime', 'python', 'frlg_planner'),
@@ -72,4 +75,7 @@ test('FRLG planner validates and searches from the bundled runtime without a sib
   assert.equal(messages[1].ok, true);
   assert.equal(messages[1].result.search_summary.matching_outcomes, 1);
   assert.equal(messages[1].result.initial_seed.seed, '0000');
+  assert.deepEqual(messages[2].result.valid, true);
+  assert.equal(messages[3].result.target.pokemon, 'Pidgey');
+  assert.equal(messages[3].result.target.method, 'Wild 1');
 });

@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   FRLG_STATIC_CATEGORIES,
   FRLG_STATIC_TARGETS,
+  getFrlgLocationLabel,
   getFrlgStaticTargets,
+  getFrlgWildLocations,
+  getFrlgWildTargets,
   toFrlgPlannerPayload,
   validateFrlgStaticRequest,
   type FrlgStaticRequest,
@@ -34,6 +37,14 @@ describe('FRLG automation contract', () => {
     expect(FRLG_STATIC_TARGETS).toHaveLength(30);
   });
 
+  it('exposes the original wild encounter categories, locations and targets', () => {
+    const locations = getFrlgWildLocations('fr_nx', 'Grass');
+    expect(locations).toContain('Route 1');
+    expect(getFrlgLocationLabel('Route 1')).toBe('1号道路');
+    expect(getFrlgWildTargets('fr_nx', 'Grass', 'Route 1').map(target => target.species)).toContain('Pidgey');
+    expect(getFrlgWildTargets('lg_nx', 'Grass', 'Route 1').map(target => target.species)).toContain('Pidgey');
+  });
+
   it('accepts the ordinary static baseline and returns no diagnostics', () => {
     expect(validateFrlgStaticRequest(baseRequest())).toEqual([]);
   });
@@ -49,6 +60,11 @@ describe('FRLG automation contract', () => {
     expect(validateFrlgStaticRequest(baseRequest({ tid: 65536 }))).toContain('TID 必须在 0-65535 之间');
     expect(validateFrlgStaticRequest(baseRequest({ ivMin: [0, 0, 0, 8, 0, 0], ivMax: [31, 31, 31, 7, 31, 31] }))).toContain('每项个体值必须满足 0 <= 最小值 <= 最大值 <= 31');
     expect(validateFrlgStaticRequest(baseRequest({ method: 'Static 2', category: 'Roaming', pokemon: 'Raikou' }))).toContain('火红/叶绿游走兽不支持 Static 2，请使用 Static 1 或 Static 4');
+  });
+
+  it('accepts a concrete wild request and rejects an invalid wild location', () => {
+    expect(validateFrlgStaticRequest(baseRequest({ method: 'Wild 1', category: 'Grass', location: 'Route 1', pokemon: 'Pidgey', directMode: true, directSeed: '0000', directAdvances: 0 }))).toEqual([]);
+    expect(validateFrlgStaticRequest(baseRequest({ method: 'Wild 1', category: 'Grass', location: 'Route 999', pokemon: 'Pidgey' }))).toContain('该版本没有可用的野生地点: Route 999');
   });
 
   it('maps the full original planner parameter names without leaking UI aliases', () => {

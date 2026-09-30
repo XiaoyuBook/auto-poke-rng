@@ -1,10 +1,18 @@
+import { FRLG_WILD_ENCOUNTERS, FRLG_WILD_SPECIES, FRLG_WILD_LOCATION_LABELS } from './frlgWildData';
+
 export const FRLG_GAMES = ['fr_nx', 'fr_nx2', 'lg_nx', 'lg_nx2', 'fr_jpn_nx', 'fr_jpn_nx2', 'lg_jpn_nx', 'lg_jpn_nx2'] as const;
 export type FrlgGame = typeof FRLG_GAMES[number];
 
 export const FRLG_STATIC_CATEGORIES = ['Starter', 'Fossil', 'Gift', 'GameCorner', 'Stationary', 'Legend', 'Event', 'Roaming'] as const;
 export type FrlgStaticCategory = typeof FRLG_STATIC_CATEGORIES[number];
+export const FRLG_WILD_CATEGORIES = ['Grass', 'Surfing', 'OldRod', 'GoodRod', 'SuperRod', 'RockSmash'] as const;
+export type FrlgWildCategory = typeof FRLG_WILD_CATEGORIES[number];
+export const FRLG_CATEGORIES = [...FRLG_STATIC_CATEGORIES, ...FRLG_WILD_CATEGORIES] as const;
 export const FRLG_STATIC_METHODS = ['Static', 'Static 1', 'Static 2', 'Static 4'] as const;
 export type FrlgStaticMethod = typeof FRLG_STATIC_METHODS[number];
+export const FRLG_WILD_METHODS = ['Wild', 'Wild 1', 'Wild 2', 'Wild 4', 'All Wild Methods'] as const;
+export type FrlgWildMethod = typeof FRLG_WILD_METHODS[number];
+export const FRLG_METHODS = [...FRLG_STATIC_METHODS, ...FRLG_WILD_METHODS] as const;
 export const FRLG_NATURES = [
   'Hardy', 'Lonely', 'Brave', 'Adamant', 'Naughty', 'Bold', 'Docile', 'Relaxed', 'Impish', 'Lax',
   'Timid', 'Hasty', 'Serious', 'Jolly', 'Naive', 'Modest', 'Mild', 'Quiet', 'Bashful', 'Rash',
@@ -21,6 +29,14 @@ export type FrlgStaticTarget = {
   speciesId: number;
   displayName: string;
   category: FrlgStaticCategory;
+};
+
+export type FrlgWildTarget = {
+  species: string;
+  speciesId: number;
+  displayName: string;
+  category: FrlgWildCategory;
+  location: string;
 };
 
 const species = (category: FrlgStaticCategory, speciesName: string, speciesId: number, displayName: string): FrlgStaticTarget => ({
@@ -56,6 +72,32 @@ export const getFrlgStaticTargets = (game: string, category: FrlgStaticCategory 
   return category === 'all' ? targets : targets.filter(target => target.category === category);
 };
 
+type WildData = Record<string, Record<string, Record<string, readonly number[]>>>;
+const wildData = FRLG_WILD_ENCOUNTERS as WildData;
+const wildSpecies = FRLG_WILD_SPECIES as Record<string, { species: string; displayName: string }>;
+const wildFamily = (game: string): 'fr' | 'lg' | null => gameFamily(game);
+
+export const getFrlgWildLocations = (game: string, category: string): string[] => {
+  const family = wildFamily(game);
+  if (!family || !FRLG_WILD_CATEGORIES.includes(category as FrlgWildCategory)) return [];
+  return Object.keys(wildData[family]?.[category] || {});
+};
+
+export const getFrlgLocationLabel = (location: string): string => FRLG_WILD_LOCATION_LABELS[location as keyof typeof FRLG_WILD_LOCATION_LABELS] || location;
+
+export const getFrlgWildTargets = (game: string, category: FrlgWildCategory, location = ''): FrlgWildTarget[] => {
+  const family = wildFamily(game);
+  if (!family || !wildData[family]?.[category]) return [];
+  const locations = location ? [location] : Object.keys(wildData[family][category]);
+  const seen = new Set<string>();
+  return locations.flatMap(place => (wildData[family][category][place] || []).flatMap(speciesId => {
+    const key = String(speciesId);
+    if (seen.has(key) || !wildSpecies[key]) return [];
+    seen.add(key);
+    return [{ species: wildSpecies[key].species, speciesId, displayName: wildSpecies[key].displayName, category, location: place }];
+  }));
+};
+
 // The original planner's FireRed table is the canonical metadata snapshot for
 // the renderer.  Version-specific differences are returned by the function above.
 export const FRLG_STATIC_TARGETS = getFrlgStaticTargets('fr_nx');
@@ -71,6 +113,8 @@ export type FrlgStaticRequest = {
 
 const error = (message: string) => message;
 const staticSpecies = new Map(FRLG_STATIC_TARGETS.concat(getFrlgStaticTargets('lg_nx', 'GameCorner')).map(target => [target.species, target.speciesId]));
+const wildSpeciesIds = new Map(Object.entries(wildSpecies).map(([speciesId, target]) => [target.species, Number(speciesId)]));
+const isWildMethod = (method: string) => method.includes('Wild');
 
 export function validateFrlgStaticRequest(request: FrlgStaticRequest): string[] {
   const errors: string[] = [];
@@ -96,17 +140,23 @@ export function validateFrlgStaticRequest(request: FrlgStaticRequest): string[] 
   if (!(request.nature === 'Any' || FRLG_NATURES.includes(request.nature as typeof FRLG_NATURES[number]))) errors.push(`不支持的性格筛选: ${request.nature}`);
   if (!['Any', 'M', 'F', '-'].includes(request.gender)) errors.push(`不支持的性别筛选: ${request.gender}`);
   if (!(request.hiddenType === 'Any' || FRLG_HIDDEN_TYPES.includes(request.hiddenType as typeof FRLG_HIDDEN_TYPES[number]))) errors.push(`不支持的隐藏属性筛选: ${request.hiddenType}`);
-  const speciesId = staticSpecies.get(request.pokemon);
+  const wild = isWildMethod(request.method);
+  const speciesId = wild ? wildSpeciesIds.get(request.pokemon) || staticSpecies.get(request.pokemon) : staticSpecies.get(request.pokemon);
   if (!speciesId || speciesId < 1 || speciesId > 386) errors.push('全国图鉴编号必须在 1-386 之间');
-  if (request.method.startsWith('Wild') || request.method === 'All Wild Methods') {
+  if (wild) {
+    if (!FRLG_WILD_CATEGORIES.includes(request.category as FrlgWildCategory)) errors.push(`不支持的野生遭遇类别: ${request.category}`);
     if (!request.location) errors.push('野生搜索必须选择遭遇地点');
+    else if (!getFrlgWildLocations(request.game, request.category).includes(request.location)) errors.push(`该版本没有可用的野生地点: ${request.location}`);
+    else if (speciesId && !getFrlgWildTargets(request.game, request.category as FrlgWildCategory, request.location).some(target => target.species === request.pokemon)) {
+      errors.push(`2.0 不支持该版本的野生组合: ${request.category} / ${request.location} / ${request.pokemon}`);
+    }
   } else if (request.category === 'Roaming' && !request.directMode) {
     if (request.method === 'Static 2') errors.push('火红/叶绿游走兽不支持 Static 2，请使用 Static 1 或 Static 4');
     if (!['Star', 'Square', 'Star/Square'].includes(request.shiny)) errors.push('游走搜索必须选择星形闪光、方形闪光或星形/方形闪光');
     if (request.ivMin[1] > 7) errors.push('游走兽的攻击个体值只能是 0-7，请降低攻击最低值');
     if (request.ivMin.slice(2).some(value => value > 0)) errors.push('游走兽的防御、特攻、特防和速度个体值固定为 0');
   }
-  if (!request.method.includes('Wild') && !getFrlgStaticTargets(request.game, request.category as FrlgStaticCategory).some(target => target.species === request.pokemon)) {
+  if (!wild && !getFrlgStaticTargets(request.game, request.category as FrlgStaticCategory).some(target => target.species === request.pokemon)) {
     errors.push(`2.0 不支持该版本的静态组合: ${request.category} / ${request.pokemon}`);
   }
   if (request.directMode) {

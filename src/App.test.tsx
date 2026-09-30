@@ -185,7 +185,14 @@ describe('workspace interactions', () => {
 
   it('opens the isolated FRLG automation workspace without exposing BDSP pages', async () => {
     const search = vi.fn(async () => ({
-      plan: { request: { pokemon: 'Bulbasaur' }, route_support: { summary: '2.0 定点流程基线', can_start: true } },
+      plan: {
+        request: { pokemon: 'Bulbasaur', category: 'Starter', method: 'Static 1', location: '' },
+        target: { pokemon: 'Bulbasaur', method: 'Static 1', level: 5, pid: '12345678', shiny: 'Star', nature: 'Jolly', ability: '0', gender: 'M', ivs: { hp: 31, attack: 30, defense: 29, sp_attack: 28, sp_defense: 27, speed: 26 }, target_seed: '0001' },
+        initial_seed: { seed: '0001', advances: 42, total_time: '00:01:00' },
+        selection: { iv_total: 171 },
+        execution: { seed_mode: 3 },
+        route_support: { summary: '2.0 定点流程基线', can_start: true },
+      },
       search_summary: { matching_outcomes: 1, reachable_outcomes: 1, feasible_routes: 1 },
     }));
     window.desktop!.frlgRng = { validate: vi.fn(async () => ({ valid: true, source: 'test' })), search, cancel: vi.fn(async () => {}) };
@@ -207,7 +214,25 @@ describe('workspace interactions', () => {
     fireEvent.change(screen.getByLabelText('指定 Advance'), { target: { value: '42' } });
     fireEvent.click(screen.getByRole('button', { name: '搜索并生成方案' }));
     await screen.findByText('方案已生成');
+    expect(screen.getByRole('region', { name: '火叶推荐方案' })).toBeTruthy();
     expect(search).toHaveBeenCalledWith(expect.objectContaining({ game: 'fr_nx', tid: 12345, sid: 54321, category: 'Starter', pokemon: 'Bulbasaur', seed_mode: 3, direct_mode: true, direct_seed: '11C7', direct_advances: 42 }));
+  });
+
+  it('exposes wild encounter method, location and targets in the isolated FRLG settings', async () => {
+    window.desktop!.frlgRng = { validate: vi.fn(async () => ({ valid: true, source: 'test' })), search: vi.fn(async () => ({})), cancel: vi.fn(async () => {}) };
+    await openApp();
+    const nav = screen.getByRole('navigation', { name: '工作区' });
+    fireEvent.click(within(nav).getByRole('button', { name: '自动流程' }));
+    fireEvent.click(screen.getByRole('button', { name: '目标设置' }));
+    const dialog = screen.getByRole('dialog', { name: '火叶目标与筛选条件' });
+    fireEvent.change(within(dialog).getByLabelText('搜索方法'), { target: { value: 'Wild 1' } });
+    expect(within(dialog).getByLabelText('野生遭遇类别')).toBeTruthy();
+    const location = within(dialog).getByLabelText('野生遭遇地点') as HTMLSelectElement;
+    expect(location.options.length).toBeGreaterThan(0);
+    fireEvent.change(location, { target: { value: 'Route 1' } });
+    const pokemon = within(dialog).getByLabelText('火叶自动目标宝可梦') as HTMLSelectElement;
+    expect([...pokemon.options].some(option => option.value === 'Pidgey')).toBe(true);
+    fireEvent.click(within(dialog).getByRole('button', { name: '完成设置' }));
   });
 
   it('switches automation beside the current heading and keeps the selection', async () => {

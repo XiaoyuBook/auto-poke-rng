@@ -301,6 +301,22 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .frlg-result-detail-card { padding: 0; overflow: hidden; background: #202525; }
 .frlg-result-detail-card > .automation-metrics, .frlg-result-detail-card > .frlg-warnings { margin: 14px; }
 .frlg-result-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.frlg-recommendation-card { padding: 18px; border: 1px solid #445467; border-radius: 8px; background: linear-gradient(145deg, #202936 0%, #1d252d 52%, #1b2229 100%); }
+.frlg-recommendation-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.frlg-recommendation-heading h3 { margin: 0; color: var(--text); font-size: 18px; }
+.frlg-recommendation-heading p { margin: 4px 0 0; color: var(--secondary); font-size: 12px; }
+.frlg-plan-badge { padding: 5px 9px; border-radius: 5px; color: #d7e4ff; background: #526aa633; font-size: 11px; white-space: nowrap; }
+.frlg-recommendation-main { display: flex; align-items: center; gap: 16px; margin: 18px 0 14px; }
+.frlg-recommendation-emblem { display: grid; place-items: center; flex: 0 0 104px; width: 104px; height: 104px; border-radius: 14px; background: radial-gradient(circle, #8ba7ed2b, #8ba7ed07 70%); color: #cfdbff; font-size: 46px; }
+.frlg-recommendation-identity { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.frlg-recommendation-identity strong { color: var(--text); font-size: 26px; line-height: 1.15; }
+.frlg-recommendation-identity small { color: var(--secondary); font-size: 12px; }
+.frlg-recommendation-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.frlg-recommendation-metrics div { padding: 10px 12px; border: 1px solid #455365; border-radius: 7px; background: #1a222b; }
+.frlg-recommendation-metrics strong { display: block; color: var(--text); font: 700 20px var(--mono); }
+.frlg-recommendation-metrics span { display: block; margin-top: 3px; color: var(--secondary); font-size: 11px; }
+.frlg-recommendation-ivs, .frlg-recommendation-attributes { margin: 13px 0 0; color: var(--secondary); font: 12px var(--mono); }
+.frlg-recommendation-detail { width: 100%; margin-top: 16px; border-color: #8299c6 !important; background: transparent !important; color: #d1dcfa !important; }
 .frlg-wide-field { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; color: var(--secondary); font-size: 12px; }
 .frlg-checkbox-field { display: flex; flex-direction: row !important; align-items: center; justify-content: space-between; gap: 8px; }
 .frlg-checkbox-field input { width: 15px; height: 15px; accent-color: var(--accent); }
@@ -323,6 +339,9 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
   .frlg-save-status { width: 100%; margin-left: 0; }
   .frlg-fields, .frlg-base-fields, .frlg-advanced-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .frlg-ivs { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .frlg-recommendation-main { align-items: flex-start; }
+  .frlg-recommendation-emblem { flex-basis: 76px; width: 76px; height: 76px; font-size: 34px; }
+  .frlg-recommendation-identity strong { font-size: 20px; }
 }
 .automation-natures { display: grid; grid-template-columns: repeat(auto-fit, minmax(66px, 1fr)); gap: 7px; font-size: 12px; }
 .automation-natures label { display: flex; align-items: center; gap: 3px; }
