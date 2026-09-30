@@ -242,10 +242,12 @@ PREVIOUS_SCRIPT_SHA256S += (
     # Teachy TV opened from Bag, and explicit post-catch cursor navigation.
     "abc734a8f44ff152312bf3f62f5e8cc87194b13325bb3e2985f567a45325418b",
 )
-EXPECTED_SCRIPT_SHA256 = "eb18777c634b7c5ab10c0f5a930fe29d65b1fdca7d18edb10b461c733dd30bbb"
+EXPECTED_SCRIPT_SHA256 = "b4bef3a3fe178bb37eb6b66adada6bd1113a8f81d4efb8248143b1a62062f2e7"
 # Previously materialized 1.6.4-a corpora remain accepted as audited
 # compatibility inputs. This is not a general bypass for modified ECS files.
 SUPPORTED_RUNTIME_SCRIPT_SHA256S = (
+    # Published 0.0.1 package; its round-zero menu is corrected on generation.
+    "eb18777c634b7c5ab10c0f5a930fe29d65b1fdca7d18edb10b461c733dd30bbb",
     # Canonical corpus before the first/second/third Key Items shortcut
     # labels were checked and corrected during the round-zero settings pass.
     "95af0d033097233b4c273abeeaff96448fd9a8948532134f7f9b28031066f553",
@@ -604,7 +606,7 @@ SHORTCUT_REGISTRATION_OPTIONS_ORIGINAL = """\
     WAIT 500
     IF 是否御三家目标() == 1
 """
-SHORTCUT_REGISTRATION_OPTIONS_CURRENT = """\
+SHORTCUT_REGISTRATION_OPTIONS_LEGACY = """\
     X
     WAIT 500
     # 快捷登记检查会改变主菜单记忆位置，进入Options前统一夹到顶部。
@@ -613,6 +615,20 @@ SHORTCUT_REGISTRATION_OPTIONS_CURRENT = """\
         WAIT 100
     NEXT
     IF 是否御三家目标() == 1
+"""
+SHORTCUT_REGISTRATION_OPTIONS_CURRENT = """\
+    X
+    WAIT 500
+    # 没有快捷登记时沿用冷启动光标；快捷登记返回后光标已知停在背包。
+    IF $游戏设置快捷目标位 > 0
+        # 无论是否御三家，背包到Options都向下三次。
+        FOR 3
+            LS DOWN
+            WAIT 50
+            LS RESET
+            WAIT 100
+        NEXT
+    ELIF 是否御三家目标() == 1
 """
 SHORTCUT_REGISTRATION_EGG_CALL_MARKER = (
     "    $孵蛋库_快捷登记结果 = 孵蛋测试_检查并登记自行车快捷($识图阈值)\n"
@@ -4698,13 +4714,20 @@ def _apply_shortcut_registration_main_text(
         )
 
     if SHORTCUT_REGISTRATION_OPTIONS_CURRENT not in template_text:
-        if template_text.count(SHORTCUT_REGISTRATION_OPTIONS_ORIGINAL) != 1:
+        if SHORTCUT_REGISTRATION_OPTIONS_LEGACY in template_text:
+            template_text = template_text.replace(
+                SHORTCUT_REGISTRATION_OPTIONS_LEGACY,
+                SHORTCUT_REGISTRATION_OPTIONS_CURRENT,
+                1,
+            )
+        elif template_text.count(SHORTCUT_REGISTRATION_OPTIONS_ORIGINAL) != 1:
             raise ValueError("主脚本缺少唯一的Options入口，拒绝修正快捷登记后的菜单光标")
-        template_text = template_text.replace(
-            SHORTCUT_REGISTRATION_OPTIONS_ORIGINAL,
-            SHORTCUT_REGISTRATION_OPTIONS_CURRENT,
-            1,
-        )
+        else:
+            template_text = template_text.replace(
+                SHORTCUT_REGISTRATION_OPTIONS_ORIGINAL,
+                SHORTCUT_REGISTRATION_OPTIONS_CURRENT,
+                1,
+            )
 
     if SHORTCUT_REGISTRATION_REQUIREMENT_BLOCK not in template_text:
         if template_text.count(SHORTCUT_REGISTRATION_REQUIREMENT_ANCHOR) != 1:
@@ -5039,6 +5062,11 @@ def write_configured_project(
         template_path.read_text(encoding="utf-8"),
         plan,
         options,
+    )
+    # Also upgrade already-installed packages, without modifying their files.
+    configured = _apply_shortcut_registration_main_text(
+        configured,
+        _shortcut_registration_main_helper_text(selected_template),
     )
     # The two audited entries share the rest of the generator, but their
     # HOME_BUFFER controllers are intentionally different.  Applying the

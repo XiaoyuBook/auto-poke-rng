@@ -2,11 +2,53 @@ import sys
 from pathlib import Path
 import unittest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'runtime/python'))
+_root = Path(__file__).resolve().parents[1]
+sys.path[:0] = [str(_root / 'runtime/python'), str(_root / 'runtime/python/frlg_planner')]
 from easycon.native.engine import EasyConScriptEngine
 from easycon.native.errors import ScriptCompileError
 from easycon.native.image_labels import ImageLabel, ImageLabelError, SearchMethod
 import numpy as np
+import automation.easycon118 as frlg
+from frlg_menu_model import StartMenu
+
+
+class FrlgMenuNavigation(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.original = (_root / 'tests/fixtures/frlg-settings-menu-original.ecs').read_text(encoding='utf-8')
+        helper = frlg.SHORTCUT_REGISTRATION_MAIN_PATH.read_text(encoding='utf-8')
+        # Route choice is supplied separately; execute the real Bag helper.
+        cls.helper = frlg.SHORTCUT_REGISTRATION_MAIN_MARKER + '\n\n' + helper[helper.index('FUNC 检查并校正快捷登记'):]
+
+    def replay(self, text, starter, shortcut):
+        pad = StartMenu(starter, shortcut)
+        program = EasyConScriptEngine().compile(
+            f'$starter = {int(starter)}\n$shortcut = {shortcut}\n' + text)
+        program.run(gamepad=pad, waiter=lambda ms, cancel: None,
+                    external_getters={name: (lambda name=name: pad.score(name)) for name in program.external_labels})
+        return pad.opened
+
+    def test_original_and_fixed_cold_start_open_options(self):
+        fixed = frlg._apply_shortcut_registration_main_text(self.original, self.helper)
+        for starter in (False, True):
+            with self.subTest(starter=starter):
+                self.assertEqual(self.replay(self.original, starter, 0), ['OPTION'])
+                self.assertEqual(self.replay(fixed, starter, 0), ['OPTION'])
+
+    def test_shortcut_check_returns_from_bag_then_opens_options(self):
+        fixed = frlg._apply_shortcut_registration_main_text(self.original, self.helper)
+        for starter in (False, True):
+            for shortcut in (1, 2, 3):
+                with self.subTest(starter=starter, shortcut=shortcut):
+                    self.assertEqual(self.replay(fixed, starter, shortcut), ['BAG', 'OPTION'])
+
+    def test_old_clamp_reproduces_save_and_migration_is_idempotent(self):
+        legacy = self.original.replace(frlg.SHORTCUT_REGISTRATION_OPTIONS_ORIGINAL,
+                                       frlg.SHORTCUT_REGISTRATION_OPTIONS_LEGACY)
+        self.assertEqual(self.replay(legacy, False, 0), ['SAVE'])
+        fixed = frlg._apply_shortcut_registration_main_text(legacy, self.helper)
+        self.assertEqual(self.replay(fixed, False, 0), ['OPTION'])
+        self.assertEqual(frlg._apply_shortcut_registration_main_text(fixed, self.helper), fixed)
 
 
 class FrlgCompatibility(unittest.TestCase):

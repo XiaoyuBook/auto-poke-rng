@@ -1,0 +1,45 @@
+# Original Options entry from the user's working pre-shortcut ECS.
+# Keep this sequence frozen as the behavior anchor. Route choice is stubbed;
+# execution stops after opening Options, before image recognition/correction.
+$游戏设置识图阈值 = 95
+$游戏设置已修改 = 0
+$Seed模式 = 8
+
+FUNC 是否御三家目标(): INT
+    RETURN $starter
+ENDFUNC
+
+FUNC 取当前流程快捷登记目标(): INT
+    RETURN $shortcut
+ENDFUNC
+
+FUNC 检查并校正游戏设置(): INT
+    $游戏设置目标按键 = 0
+
+    # 模式0-9均使用HELP；模式3为STEREO/HELP/START；模式10为日版MONO/HELP/A。
+    X
+    WAIT 500
+    IF 是否御三家目标() == 1
+        # 开局尚无图鉴/宝可梦菜单，Options位于第4项。
+        FOR 3
+            LS DOWN
+            WAIT 50
+            LS RESET
+            WAIT 100
+        NEXT
+    ELSE
+        # 正常存档已有图鉴/宝可梦菜单，Options位于第6项。
+        FOR 5
+            LS DOWN
+            WAIT 50
+            LS RESET
+            WAIT 100
+        NEXT
+    ENDIF
+    A
+    WAIT 1500
+    RETURN 1
+ENDFUNC
+
+    PRINT 背包第一页第一格放神奇糖果，数量不限
+$result = 检查并校正游戏设置()

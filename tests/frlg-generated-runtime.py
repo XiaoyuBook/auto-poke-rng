@@ -6,7 +6,9 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+import shutil
 import numpy as np
+from frlg_menu_model import StartMenu
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / 'runtime/python'), str(ROOT / 'runtime/python/frlg_planner')]
@@ -18,6 +20,8 @@ from automation.planner import AutoSearchRequest, search_best_plan
 from automation.easycon118 import (EasyCon118Options, write_configured_project,
     validate_generated_project_consistency, inspect_script_corpus, inspect_label_corpus,
     EXPECTED_SCRIPT_SHA256, EXPECTED_LABEL_SHA256)
+from automation.easycon118 import (
+    SHORTCUT_REGISTRATION_OPTIONS_CURRENT, SHORTCUT_REGISTRATION_OPTIONS_LEGACY)
 from automation.precalibration import build_marker, update_from_manifest, read_record, PrecalibrationContext
 from frlg_execution import prepare
 
@@ -29,6 +33,57 @@ sys.argv = [sys.argv[0], *remaining]
 
 
 class GeneratedRuntime(unittest.TestCase):
+    def replay_settings(self, program, *, starter=False, shortcut=0):
+        first_flow = next(s.location.line for s in program.ast.main.statements
+                          if not isinstance(s, (Assignment, FunctionDeclaration, ImportStatement)))
+        declarations = tuple(s for s in program.ast.main.statements
+                             if isinstance(s, FunctionDeclaration) or s.location.line < first_flow)
+        # Use actual route selection: TV -> row 1, Safari west -> row 2,
+        # fishing -> row 3. The user's Pikachu setup requests no shortcut.
+        setup = f'''$目标全国图鉴编号 = {1 if starter else 25}
+$遭遇类型 = 2
+$遭遇方法 = {201 if shortcut == 3 else 101}
+$遭遇地点 = {57 if shortcut == 2 else 0}
+$进入TV = {int(shortcut == 1)}
+$Seed模式 = 8
+$游戏设置识图阈值 = 95
+$probe = 检查并校正游戏设置()
+PRINT "SETTINGS=" & $probe
+'''
+        ast = replace(program.ast, main=replace(program.ast.main,
+                      statements=declarations + parse_text(setup, '<menu-probe>').statements))
+        pad, output = StartMenu(starter, shortcut), []
+        replace(program, ast=ast).run(gamepad=pad, output=output.append, waiter=lambda ms, cancel: None,
+            external_getters={name: (lambda name=name: pad.score(name)) for name in program.external_labels})
+        self.assertIn('SETTINGS=1', ''.join(output).splitlines())
+        self.assertEqual(pad.opened, ['BAG', 'OPTION'] if shortcut else ['OPTION'])
+
+    def test_published_entries_open_options_for_cold_start_and_shortcuts(self):
+        for entry in ('NS火叶全自动一键乱数2.0.ecs', 'NS火叶全自动一键乱数2.0-时间轴.ecs'):
+            program = EasyConScriptEngine().load_file(CORPUS / entry)
+            for starter, shortcut in ((False, 0), (True, 0), (False, 1), (False, 2), (False, 3)):
+                with self.subTest(entry=entry, starter=starter, shortcut=shortcut):
+                    self.replay_settings(program, starter=starter, shortcut=shortcut)
+
+    def test_generation_migrates_installed_legacy_menu_without_modifying_source(self):
+        request = json.loads((ROOT / 'tests/fixtures/frlg-golbat-plan.json').read_text())['request']
+        request.update(game='fr_nx2', category='Grass', location='Power Plant', pokemon='Pikachu',
+                       seed_mode=8, direct_mode=True, direct_seed='B744', direct_advances=11985)
+        plan = search_best_plan(AutoSearchRequest(**request)).plan
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / 'legacy'
+            shutil.copytree(CORPUS, source)
+            for index, entry in enumerate(('NS火叶全自动一键乱数2.0.ecs', 'NS火叶全自动一键乱数2.0-时间轴.ecs')):
+                old = (source / entry).read_text(encoding='utf-8').replace(
+                    SHORTCUT_REGISTRATION_OPTIONS_CURRENT, SHORTCUT_REGISTRATION_OPTIONS_LEGACY)
+                (source / entry).write_text(old, encoding='utf-8')
+                before = (source / entry).read_bytes()
+                generated = prepare(plan, {'source': str(source), 'output': str(Path(temporary) / str(index)),
+                    'calibrationStore': str(Path(temporary) / 'save.json'),
+                    'options': {'entry': 'formal' if index == 0 else 'timeline'}})
+                self.replay_settings(EasyConScriptEngine().load_file(generated['main']))
+                self.assertEqual((source / entry).read_bytes(), before)
+
     def test_capture_observation_reverse_calibration_retry_and_exact_stop(self):
         program = EasyConScriptEngine().load_file(CORPUS / 'NS火叶全自动一键乱数2.0.ecs')
         first_flow = next(s.location.line for s in program.ast.main.statements

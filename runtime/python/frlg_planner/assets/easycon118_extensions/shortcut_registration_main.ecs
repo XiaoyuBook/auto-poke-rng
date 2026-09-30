@@ -34,15 +34,16 @@ FUNC 检查并校正快捷登记($目标位: INT, $识图阈值: INT): INT
     PRINT "FRLG_STAGE|BEGIN|settings.shortcut|settings.shortcut|20000|NS火叶全自动一键乱数2.0.ecs|检查并校正快捷登记|main.settings.shortcut|manual_prepare_then_restart|OR;快捷第一位.IL:>=:" & $识图阈值 & ",快捷第二位.IL:>=:" & $识图阈值 & ",快捷第三位.IL:>=:" & $识图阈值 & "|!"
     X
     WAIT 500
-    # 不依赖主菜单上次停留项，先夹到顶部再进入背包。
-    FOR 8
-        UP
-        WAIT 100
-    NEXT
-    FOR 2
-        DOWN
-        WAIT 150
-    NEXT
+    # 主菜单是循环菜单，不能用固定次数向上“夹顶”；按流程状态定位背包。
+    IF 是否御三家目标() == 0
+        # 普通存档从图鉴向下两次进入背包。
+        FOR 2
+            LS DOWN
+            WAIT 50
+            LS RESET
+            WAIT 100
+        NEXT
+    ENDIF
     A
     WAIT 1500
     RIGHT

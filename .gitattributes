@@ -16,3 +16,5 @@ runtime/python/frlg_planner/automation/calibration_trust_gates.py -text
 runtime/python/frlg_planner/automation/seed_common_regions.py -text
 runtime/python/frlg_planner/automation/starter_calibration.py -text
 runtime/python/frlg_planner/device_label_overrides.py -text
+# Unified diff context lines contain a required leading space on blank lines.
+tools/frlg-runtime-patches/*.patch text eol=lf whitespace=-blank-at-eol

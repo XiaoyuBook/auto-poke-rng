@@ -1,8 +1,11 @@
 {
   "repository": "https://github.com/axechaso/frlg-auto-rng",
   "revision": "5a5383ff226059cbf85f0b531c9de283f7b76c45",
+  "patches": {
+    "tools/frlg-runtime-patches/menu-navigation.patch": "10fc2ee4393ee6a95e40103f64a857fce1a0a0ffab08b3f9cf04b9a2a83448ce"
+  },
   "files": {
-    "automation/easycon118.py": "6df59e634593047c7cd836837c7d2806bd60f8da68a9353a9d1bf6c2c98a7e64",
+    "automation/easycon118.py": "febbdad6afaf0cd139f74048ebf0660ce754b86447f4901984057a8416834c57",
     "automation/precalibration.py": "f7555f3e5834e460425f1dc95cc3da0b95e5d6441a0029f07724950ade8b4e23",
     "automation/calibration_trust_gates.py": "51bcdf7a0d610e6f48f68d625d1b468cd25e7015398973743f0c571264af5861",
     "automation/seed_common_regions.py": "5d995e43c0ce4bd5842ba2b5fc6b1d2d21ba94f156748c22637e314cb8cfd705",
@@ -25,7 +28,7 @@
     "assets/easycon118_extensions/seed_common_regions.ecs": "5fa8e78546d8e1643e1875dabea43b8b268146d5349ec22d0a192b91da2af36f",
     "assets/easycon118_extensions/seed_lock_controller_main.ecs": "c6935e9842588b738907da9bd8e6375f3bd0752501837fd571b3f7614d32e6f5",
     "assets/easycon118_extensions/shortcut_registration_egg.ecs": "4cdf0f54d4336c54f16b738b71ee183daf2d5fb4f145c6376fef4542ae3d5e18",
-    "assets/easycon118_extensions/shortcut_registration_main.ecs": "da431d99ee1bef7805dc3a98dd0fc442d7649aa708fc7e3e9e8b32ee7a506fa5",
+    "assets/easycon118_extensions/shortcut_registration_main.ecs": "b65ec8431f29238d9f1af1be0ccd44e13d4a03b4d54cd585540281f00351d0cf",
     "assets/easycon118_extensions/sid_home_buffer_adaptive.ecs": "c875e323627939ff664c3521d4481063f1d29f0e79551b3876a160ec3cf4fb5b",
     "assets/easycon118_extensions/starter_calibration.ecs": "209aa6ba2997ebf23fcac1388bf74b761ff6263460dafdcff724e2911e07fe81",
     "assets/easycon118_extensions/togepi_hatch_cycle.ecs": "e383a4da21aa92f1b0d1a903223f8ba6910f9e4ffa908ae892d302659bff97b7",
