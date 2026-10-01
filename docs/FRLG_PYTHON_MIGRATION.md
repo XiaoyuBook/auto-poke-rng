@@ -98,3 +98,50 @@ ECS 的大小写和首次匹配规则。`script_host.py` 只在项目带对应�
 `孵蛋测试_查找Seed等待MS` 已绑定 `frlg_flow_runtime.py`；同文件中的按键、等待、OCR、
 识图和时间轴循环仍在 ECS。生成目录中的 `python_flow.json` 和 `lib/python_backup/`
 记录了这几个函数的原始签名与来源。
+
+## 第五阶段：主脚本通用反查（修补遗漏）
+
+前四阶段只迁移了库函数。主脚本内仍有 Seed/ADV 双重扫描和 PID 重试循环，
+因此即使 `RNG下一HI/LO` 已是 Python，界面依然会长时间显示
+`设置变量 $临RAND`。库函数的差分通过不能证明整条反查已经迁出 ECS。
+
+现在普通及孵蛋项目生成器都会在应用 GUI 覆盖后，调用
+`frlg_main_reverse_migration.materialize_python_main_reverse`。正式版和时间轴版
+共用的计算入口对应如下：
+
+| 原 main.ecs 函数 | `frlg_main_reverse_runtime.py` 中的实现 |
+| --- | --- |
+| `执行反查扫描` | `MainReverseSession.scan`：Seed/ADV 遍历、预消耗、三方法合并扫描 |
+| `临时RNG前进一次` | `step`；扫描内部直接计算 LCG，无逐步 EXTERN 调用 |
+| `按算法生成个体` | `generate`：Static/Wild 1/2/4、PID 性格锁定、游走 IV Bug |
+| `IV是否在范围`、`检查是否匹配` | Python 范围比较、`match`：物种/等级/性格/性别/IV |
+| `重置本轮候选状态` | `reset`：重置本轮结果，保留跨轮投票历史 |
+| `处理匹配候选` | `collect`：共同区、同 Seed/帧判断、离群优先、MSE 排序 |
+| `记录当前候选为最佳候选` | `record_best`：写入全部命中和候选评分字段 |
+
+原主脚本保存在生成目录的 `python_backup/main.ecs`（不会作为库自动加载）。
+`python_main_reverse.json` 记录原文件、逐函数 SHA-256、输入类型和写回字段。
+生成后的同名函数有迁移注释，只有状态传入、一次 Python 调用和结果写回；
+不会在 ECS 内循环扫描。预消耗用 LCG 复合跳步，保持与逐步推进相同的结果。
+函数内部的中文状态键对应原 ECS 变量，便于对照调试。
+
+每次进入都读取流程当下的 Seed、有效帧窗、当前野生槽表、观察结果和累计修正；
+因此扩窗或吃糖改变 IV 条件后不需要重新生成项目。返回前写回候选计数、命中结果、
+允许更新标志和所有原全局输出。投票与共同区复用宿主的同一个 `CalibrationVoteSession`。
+扫描每 128 帧、每个 Seed、每 64 次 PID 重试检查停止请求；停止后不继续写回结果。
+识图、喂糖、按键、等待和外层流程调度仍按原路径执行。
+
+验证：`npm run test:frlg:execution` 已接入差分测试，也可单独运行
+`python -X utf8 tests/frlg-main-reverse-migration.py`。需要同级
+`auto-poke-rng-scripts/bundles/frlg-automation/files` 审计语料，或用环境变量
+`FRLG_SCRIPT_CORPUS` 指定语料目录；npm 入口在缺少语料时会明确标记该项跳过。
+测试先在未修复版本中
+复现两个入口仍有 ECS 扫描循环，再比较新旧计算的全部全局输出，覆盖 7 种算法选项、
+扩窗/观察变化、两版本表边界、无候选、PID 耗尽、野生槽位和等级、游走 IV、
+TV 与共同区跨轮投票、停止请求，并实际调用 `script_host.run` 验证宿主绑定。
+扫描日志逐行比较；共同区提交时原库的诊断文字不在计算结果对比范围内（此前的
+`25` 迁移已省略该诊断打印）。测试不以耗时阈值判定通过，以免机器性能造成波动。
+
+旧 `.frlg-runs` 是不可自动更新的运行快照。更新应用运行时代码后，应重新启动应用、
+重新开始自动流程生成项目，才会使用这次补迁移；仅更新下载的 ECS 脚本包不够。
+本次完成的是上述通用反查计算链，不代表主脚本中所有其他计算入口也已迁移。

@@ -5,7 +5,7 @@ import unittest
 _root = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(_root / 'runtime/python'), str(_root / 'runtime/python/frlg_planner')]
 from easycon.native.engine import EasyConScriptEngine
-from easycon.native.errors import ScriptCompileError
+from easycon.native.errors import ScriptCancelled, ScriptCompileError
 from easycon.native.image_labels import ImageLabel, ImageLabelError, SearchMethod
 import numpy as np
 import automation.easycon118 as frlg
@@ -52,6 +52,16 @@ class FrlgMenuNavigation(unittest.TestCase):
 
 
 class FrlgCompatibility(unittest.TestCase):
+    def test_python_extern_cancellation_remains_cancellation(self):
+        program = EasyConScriptEngine().compile('''
+EXTERN FUNC scan(): INT FROM "python:test"
+$result = scan()
+''')
+        def stop():
+            raise ScriptCancelled('stopped during Python scan')
+        with self.assertRaises(ScriptCancelled):
+            program.run(extern_functions={'scan': stop})
+
     def test_reverse_loop_updates_declared_global_seen_by_candidate_function(self):
         program = EasyConScriptEngine().compile('''
 $frame = -1

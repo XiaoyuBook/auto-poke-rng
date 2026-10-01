@@ -13,7 +13,7 @@ from frlg_menu_model import StartMenu
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / 'runtime/python'), str(ROOT / 'runtime/python/frlg_planner')]
 from easycon.native.engine import EasyConScriptEngine
-from easycon.native.ast import Assignment, FunctionDeclaration, ImportStatement
+from easycon.native.ast import Assignment, ExternDeclaration, FunctionDeclaration, ImportStatement
 from easycon.native.parser import parse_text
 from easycon.native.image_labels import load_image_labels
 from automation.planner import AutoSearchRequest, search_best_plan
@@ -39,9 +39,9 @@ sys.argv = [sys.argv[0], *remaining]
 class GeneratedRuntime(unittest.TestCase):
     def replay_settings(self, program, *, starter=False, shortcut=0):
         first_flow = next(s.location.line for s in program.ast.main.statements
-                          if not isinstance(s, (Assignment, FunctionDeclaration, ImportStatement)))
+                          if not isinstance(s, (Assignment, ExternDeclaration, FunctionDeclaration, ImportStatement)))
         declarations = tuple(s for s in program.ast.main.statements
-                             if isinstance(s, FunctionDeclaration) or s.location.line < first_flow)
+                             if isinstance(s, (ExternDeclaration, FunctionDeclaration)) or s.location.line < first_flow)
         # Use actual route selection: TV -> row 1, Safari west -> row 2,
         # fishing -> row 3. The user's Pikachu setup requests no shortcut.
         setup = f'''$目标全国图鉴编号 = {1 if starter else 25}

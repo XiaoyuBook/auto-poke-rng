@@ -169,6 +169,7 @@ def run(config, program):
         seed_runtime = None
         data_runtime = None
         catalog_runtime = None
+        vote_session = None
         # 00_Seed表_入口.ecs and 01_Seed表_HEX转换.ecs are generated as
         # EXTERN declarations by the FRLG project builder.  Bind them once to
         # the sidecar snapshot materialized from the copied ECS tables; the
@@ -247,9 +248,8 @@ def run(config, program):
         if python_vote_snapshot.is_file():
             from frlg_planner.automation.frlg_vote_runtime import CalibrationVoteSession
 
-            extern_functions.update(
-                CalibrationVoteSession(seed_runtime=seed_runtime).extern_functions()
-            )
+            vote_session = CalibrationVoteSession(seed_runtime=seed_runtime)
+            extern_functions.update(vote_session.extern_functions())
         python_egg_snapshot = root / "python_egg_reverse.json"
         if python_egg_snapshot.is_file():
             from frlg_planner.automation.frlg_egg_reverse_runtime import EggReverseSession
@@ -281,6 +281,23 @@ def run(config, program):
                     emit=lambda message: emit({"event": "script.log", "message": str(message)}),
                 ).extern_functions()
             )
+        # main.ecs 的通用反查也必须整段进入 Python，不能只迁移 lib/11 的
+        # 单步 RNG。扫描前后由生成的状态桥同步全局变量；复用同一投票会话。
+        if (root / "python_main_reverse.json").is_file():
+            from frlg_planner.automation.frlg_main_reverse_runtime import MainReverseSession
+
+            if seed_runtime is None or vote_session is None:
+                raise RuntimeError("主脚本 Python 反查缺少 Seed 表或投票会话")
+
+            def reverse_checkpoint():
+                if cancelled.is_set():
+                    raise ScriptCancelled("脚本已取消")
+
+            extern_functions.update(MainReverseSession(
+                seed_runtime=seed_runtime, vote_session=vote_session,
+                emit=lambda message: emit({"event": "script.log", "message": str(message)}),
+                checkpoint=reverse_checkpoint,
+            ).extern_functions())
         ocr_reader = None
         ocr_runtime = None
         labels = None
@@ -438,6 +455,7 @@ def main():
             from frlg_planner.automation import frlg_wild_data_runtime  # noqa: F401
             from frlg_planner.automation import frlg_vote_runtime  # noqa: F401
             from frlg_planner.automation import frlg_egg_reverse_runtime  # noqa: F401
+            from frlg_planner.automation import frlg_main_reverse_runtime  # noqa: F401
             from frlg_planner.automation import frlg_bingo_runtime  # noqa: F401
             from frlg_planner.automation import frlg_flow_runtime  # noqa: F401
         except Exception as error:

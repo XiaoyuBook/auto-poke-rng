@@ -30,6 +30,7 @@ from .precalibration import (
     read_record as read_precalibration_record,
 )
 from .seed_common_regions import apply_seed_common_regions
+from .frlg_main_reverse_migration import materialize_python_main_reverse
 
 
 EXPECTED_LABEL_COUNT = 1154
@@ -6116,6 +6117,7 @@ def write_configured_project(
     # calls are routed through the host, while device and image flows remain ECS.
     python_bingo = materialize_python_bingo_lib(output_dir)
     python_flow = materialize_python_flow_helpers(output_dir)
+    python_main_reverse = materialize_python_main_reverse(output_dir)
     _apply_seed_mode3_library_mapping(output_dir / "lib" / EGG_SETTINGS_LIBRARY_NAME)
     ocr_fallback_sha256 = apply_ocr_runtime_fallback(
         output_dir / "lib" / OCR_NAME_LIBRARY_NAME
@@ -6163,6 +6165,7 @@ def write_configured_project(
             "python_stateful": python_stateful,
             "python_bingo": python_bingo,
             "python_flow": python_flow,
+            "python_main_reverse": python_main_reverse,
             "temporary_japanese_starter": options.japanese_starter,
         },
         "backend": {
@@ -6318,6 +6321,7 @@ def write_configured_egg_project(
     python_stateful = materialize_python_stateful_libs(output_dir)
     python_bingo = materialize_python_bingo_lib(output_dir)
     python_flow = materialize_python_flow_helpers(output_dir)
+    python_main_reverse = materialize_python_main_reverse(output_dir)
     ocr_fallback_sha256 = apply_ocr_runtime_fallback(
         output_dir / "lib" / OCR_NAME_LIBRARY_NAME
     )
@@ -6359,6 +6363,7 @@ def write_configured_egg_project(
     runtime_overrides["python_stateful"] = python_stateful
     runtime_overrides["python_bingo"] = python_bingo
     runtime_overrides["python_flow"] = python_flow
+    runtime_overrides["python_main_reverse"] = python_main_reverse
     runtime_overrides["seed_hold_observation_window_sha256"] = hashlib.sha256(
         (
             SEED_HOLD_OBSERVATION_GLOBAL_ANCHOR

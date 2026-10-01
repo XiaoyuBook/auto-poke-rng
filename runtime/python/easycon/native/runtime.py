@@ -771,6 +771,10 @@ class _Evaluator:
                 )
                 result = callback(*converted_arguments)
                 return _coerce_declared_type(result, declaration.return_type)
+            except ScriptCancelled:
+                # Long Python calculations are cooperative cancellation points,
+                # just like ECS loops; a user stop is not an EXTERN failure.
+                raise
             except Exception as exc:
                 raise ScriptRuntimeError(f"EXTERN 函数 {name} 调用失败: {exc}", location) from exc
         raise ScriptRuntimeError(f"找不到函数 {name}", location)
