@@ -22,6 +22,10 @@ from automation.easycon118 import (EasyCon118Options, write_configured_project,
     EXPECTED_SCRIPT_SHA256, EXPECTED_LABEL_SHA256)
 from automation.easycon118 import (
     SHORTCUT_REGISTRATION_OPTIONS_CURRENT, SHORTCUT_REGISTRATION_OPTIONS_LEGACY)
+from automation.frlg_bingo_runtime import BingoSession
+from automation.frlg_flow_runtime import EggFlowRuntime, FlowRuntime
+from automation.frlg_catalog_runtime import CatalogRuntime
+from automation.seed_table_runtime import SeedTableRuntime
 from automation.precalibration import build_marker, update_from_manifest, read_record, PrecalibrationContext
 from frlg_execution import prepare
 
@@ -53,8 +57,19 @@ PRINT "SETTINGS=" & $probe
         ast = replace(program.ast, main=replace(program.ast.main,
                       statements=declarations + parse_text(setup, '<menu-probe>').statements))
         pad, output = StartMenu(starter, shortcut), []
+        extern_functions = {}
+        generated_root = Path(program.source).resolve().parent
+        if (generated_root / 'python_bingo.json').is_file():
+            extern_functions.update(BingoSession().extern_functions())
+        if (generated_root / 'python_flow.json').is_file():
+            seed_runtime = SeedTableRuntime.from_project(generated_root)
+            catalog_runtime = CatalogRuntime.from_project(generated_root)
+            extern_functions.update(FlowRuntime().extern_functions())
+            extern_functions.update(EggFlowRuntime(seed_runtime=seed_runtime, catalog_runtime=catalog_runtime,
+                                                   emit=output.append).extern_functions())
         replace(program, ast=ast).run(gamepad=pad, output=output.append, waiter=lambda ms, cancel: None,
-            external_getters={name: (lambda name=name: pad.score(name)) for name in program.external_labels})
+            external_getters={name: (lambda name=name: pad.score(name)) for name in program.external_labels},
+            extern_functions=extern_functions)
         self.assertIn('SETTINGS=1', ''.join(output).splitlines())
         self.assertEqual(pad.opened, ['BAG', 'OPTION'] if shortcut else ['OPTION'])
 

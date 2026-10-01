@@ -9,7 +9,7 @@ import subprocess
 import sys
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 from assets.game_text import CATEGORY_EN_TO_ZH, location_to_zh
 from app_paths import RESOURCE_ROOT
@@ -71,6 +71,51 @@ OPTIONAL_DIRECT_TEMPLATE_NAMES = (
     "NS火叶全自动一键乱数2.0-正式版-170a.ecs",
     "NS火叶全自动一键乱数2.0-170a.ecs",
 )
+PYTHON_SEED_TABLE_JSON = "seed_tables.json"
+PYTHON_SEED_TABLE_MIGRATION_VERSION = 1
+PYTHON_SEED_TABLE_FILES = (
+    "00_Seed表_入口.ecs",
+    "01_Seed表_HEX转换.ecs",
+    "02_Seed表_火红_NX.ecs",
+    "03_Seed表_叶绿_NX.ecs",
+)
+PYTHON_COMPUTE_MIGRATION_VERSION = 1
+# These four libraries are deliberately limited to deterministic arithmetic.
+# OCR, image labels, controller input, waits and flow state remain ECS.
+PYTHON_COMPUTE_FILES = (
+    "11_计算_RNG基础.ecs",
+    "12_计算_IV范围.ecs",
+    "13_计算_自动校准.ecs",
+    "14_计算_等待参数.ecs",
+)
+PYTHON_DATA_MIGRATION_VERSION = 1
+PYTHON_DATA_FILES = (
+    "04_数据_宝可梦名称.ecs",
+    "05_数据_宝可梦种族值.ecs",
+    "06_数据_宝可梦性别阈值.ecs",
+)
+PYTHON_CATALOG_MIGRATION_VERSION = 1
+PYTHON_CATALOG_FILES = (
+    "07_数据_目标组合.ecs",
+    "08_输入_游戏版本.ecs",
+    "09_输入_遭遇方法.ecs",
+    "10_输入_遭遇地点.ecs",
+)
+PYTHON_TEXT_MIGRATION_VERSION = 1
+PYTHON_TEXT_FILES = ("23_显示_文本.ecs",)
+PYTHON_WILD_MIGRATION_VERSION = 1
+PYTHON_WILD_FILES = ("26_数据_野生遇敌槽.ecs",)
+PYTHON_STATEFUL_MIGRATION_VERSION = 1
+PYTHON_STATEFUL_FILES = ("25_校准_投票决策.ecs", "28_反查_孵蛋.ecs")
+PYTHON_BINGO_MIGRATION_VERSION = 1
+PYTHON_BINGO_FILES = ("24_显示_BINGO.ecs",)
+PYTHON_FLOW_MIGRATION_VERSION = 1
+PYTHON_FLOW_FILES = {
+    "15_获取_入口.ecs": ("目标获取是否支持",),
+    "17_获取_野生目标.ecs": ("是否狩猎地带",),
+    "27_孵蛋测试流程.ecs": ("孵蛋测试_查找Seed等待MS",),
+}
+RETAINED_ECS_MIGRATION_MARKER = "# PYTHON_MIGRATION_RETAINED_V1"
 PRECALIBRATION_RUNTIME_MARKER = "# GUI_PRECALIBRATION_V1"
 EXPECTED_SCRIPT_FILE_COUNT = 33
 EGG_PARENT_TYPES_COMMENT_OLD = (
@@ -2088,7 +2133,7 @@ def inspect_script_corpus(source_dir: str | Path) -> dict[str, Any]:
         (path.relative_to(source_dir).as_posix(), path)
         for path in sorted(
             item for item in lib_dir.rglob("*")
-            if item.is_file() and item.relative_to(lib_dir).parts[0] != "seed_backup"
+            if item.is_file() and item.relative_to(lib_dir).parts[0] not in {"seed_backup", "python_backup"}
         )
     )
     digest = hashlib.sha256()
@@ -2107,6 +2152,918 @@ def inspect_script_corpus(source_dir: str | Path) -> dict[str, Any]:
         "sha256": digest.hexdigest(),
         "template": STANDARD_TEMPLATE_NAME,
         "templates": [path.name for path in templates],
+    }
+
+
+def _ecs_array(text: str, variable: str, *, strings: bool) -> list[Any]:
+    """Read one generated ECS array before replacing its interpreter shim.
+
+    Seed tables are generated as one-line literals by ``tenlines_seed_updater``.
+    Parsing that exact representation here means downloaded table updates and
+    temporary Japanese tables are carried into Python without maintaining a
+    second copy of the data in source code.
+    """
+    match = re.search(
+        rf"(?m)^\s*\${re.escape(variable)}\s*=\s*\[(?P<values>[^\r\n]*)\]\s*$",
+        text,
+    )
+    if match is None:
+        raise ValueError(f"ECS 数据缺少数组: ${variable}")
+    try:
+        values = json.loads("[" + match.group("values") + "]")
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"ECS 数组无法解析: ${variable}") from exc
+    if not isinstance(values, list) or any(
+        (not isinstance(value, str) if strings else not isinstance(value, int))
+        for value in values
+    ):
+        raise ValueError(f"ECS 数组类型无效: ${variable}")
+    return values
+
+
+def _seed_table_from_ecs(path: Path, game_cn: str) -> dict[str, Any]:
+    text = path.read_text(encoding="utf-8-sig")
+    max_match = re.search(
+        rf"(?m)^FUNC 取Seed最大索引_{re.escape(game_cn)}\(\): INT\s*\n"
+        rf"\s+RETURN (?P<value>-?\d+)\s*\nENDFUNC",
+        text,
+    )
+    if max_match is None:
+        raise ValueError(f"Seed 表缺少最大索引函数: {path.name}")
+    max_index = int(max_match.group("value"))
+    ms = _ecs_array(text, f"Seed_MS_{game_cn}", strings=False)
+    raw_time = _ecs_array(text, f"Seed_Raw_{game_cn}", strings=False)
+    modes = [
+        _ecs_array(text, f"Seed_HEX_{game_cn}_m{mode}", strings=True)
+        for mode in range(11)
+    ]
+    expected_count = max_index + 1
+    if expected_count <= 0 or any(
+        len(values) != expected_count for values in (ms, raw_time, *modes)
+    ):
+        raise ValueError(f"Seed 表数组长度与最大索引不一致: {path.name}")
+    return {
+        "max_index": max_index,
+        "ms": ms,
+        "raw_time": raw_time,
+        "modes": modes,
+    }
+
+
+def materialize_python_seed_tables(project_dir: str | Path) -> dict[str, Any]:
+    """Move the pure 00/01/02/03 Seed lookup path out of ECS.
+
+    The four original files are copied to ``lib/seed_backup`` for human and
+    regression comparison.  The top-level files become small, auditable ECS
+    shims: 00/01 declare Python ``EXTERN`` functions and 02/03 retain only a
+    migration note.  ``script_host.py`` binds those declarations to the JSON
+    snapshot below.  This keeps hardware, OCR and timing functions in ECS while
+    removing the 2,300-row interpreted array assignments from every run.
+    """
+    root = Path(project_dir).resolve()
+    lib = root / "lib"
+    files = {
+        name: lib / name
+        for name in PYTHON_SEED_TABLE_FILES
+    }
+    if any(not path.is_file() for path in files.values()):
+        missing = ", ".join(name for name, path in files.items() if not path.is_file())
+        raise FileNotFoundError(f"Python Seed 表迁移缺少文件: {missing}")
+
+    original = {name: path.read_bytes() for name, path in files.items()}
+    games = {
+        "fr": _seed_table_from_ecs(files["02_Seed表_火红_NX.ecs"], "火红"),
+        "lg": _seed_table_from_ecs(files["03_Seed表_叶绿_NX.ecs"], "叶绿"),
+    }
+    backup = lib / "seed_backup"
+    backup.mkdir(parents=True, exist_ok=True)
+    for name, data in original.items():
+        (backup / name).write_bytes(data)
+
+    snapshot = {
+        "migration_version": PYTHON_SEED_TABLE_MIGRATION_VERSION,
+        "source": "generated from the copied 00/01/02/03 ECS files",
+        "files": {
+            name: {
+                "sha256": hashlib.sha256(data).hexdigest(),
+                "bytes": len(data),
+                "backup": f"lib/seed_backup/{name}",
+            }
+            for name, data in original.items()
+        },
+        "games": games,
+    }
+    (root / PYTHON_SEED_TABLE_JSON).write_text(
+        json.dumps(snapshot, ensure_ascii=False, separators=(",", ":")),
+        encoding="utf-8",
+    )
+
+    source_note = (
+        "# PYTHON_SEED_TABLE_MIGRATION_V1\n"
+        "# 原始 ECS 已保存到 lib/seed_backup/；当前运行时由 script_host.py\n"
+        "# 绑定 runtime/python/frlg_planner/automation/seed_table_runtime.py。\n"
+        "# 00/01 的公开函数名、参数、无效值哨兵与原 ECS 保持一致。\n"
+    )
+    files["00_Seed表_入口.ecs"].write_text(
+        source_note
+        + "# 原始：按游戏版本转发到 02/03 的取Seed最大索引、取MS、取RawTime、取SeedHEX。\n"
+        + 'EXTERN FUNC 取Seed最大索引($游戏版本: INT): INT FROM "python:frlg_seed_table"\n'
+        + 'EXTERN FUNC 取MS($游戏版本: INT, $idx: INT): INT FROM "python:frlg_seed_table"\n'
+        + 'EXTERN FUNC 取RawTime($游戏版本: INT, $idx: INT): INT FROM "python:frlg_seed_table"\n'
+        + 'EXTERN FUNC 取SeedHEX($游戏版本: INT, $idx: INT, $mode: INT): STRING FROM "python:frlg_seed_table"\n'
+        + 'EXTERN FUNC 取Seed最大索引_火红(): INT FROM "python:frlg_seed_table"\n'
+        + 'EXTERN FUNC 取MS_火红($idx: INT): INT FROM "python:frlg_seed_table"\n'
+        + 'EXTERN FUNC 取RawTime_火红($idx: INT): INT FROM "python:frlg_seed_table"\n'
+        + 'EXTERN FUNC 取SeedHEX_火红($idx: INT, $mode: INT): STRING FROM "python:frlg_seed_table"\n'
+        + 'EXTERN FUNC 取Seed最大索引_叶绿(): INT FROM "python:frlg_seed_table"\n'
+        + 'EXTERN FUNC 取MS_叶绿($idx: INT): INT FROM "python:frlg_seed_table"\n'
+        + 'EXTERN FUNC 取RawTime_叶绿($idx: INT): INT FROM "python:frlg_seed_table"\n'
+        + 'EXTERN FUNC 取SeedHEX_叶绿($idx: INT, $mode: INT): STRING FROM "python:frlg_seed_table"\n',
+        encoding="utf-8",
+    )
+    files["01_Seed表_HEX转换.ecs"].write_text(
+        source_note
+        + "# 原始 HEX字符值/HEX转十进制 的逐字符循环迁移为 Python；仍限制 16 位并返回 -1。\n"
+        + 'EXTERN FUNC HEX转十进制($s: STRING): INT FROM "python:frlg_seed_table"\n',
+        encoding="utf-8",
+    )
+    for name, game_cn in (
+        ("02_Seed表_火红_NX.ecs", "火红"),
+        ("03_Seed表_叶绿_NX.ecs", "叶绿"),
+    ):
+        files[name].write_text(
+            source_note
+            + f"# 原始 {game_cn} NX 数组仅作为 sidecar 的生成输入，不再由 ECS 解释器加载。\n"
+            + f"# 对照副本：lib/seed_backup/{name}\n",
+            encoding="utf-8",
+        )
+
+    return {
+        "migration_version": PYTHON_SEED_TABLE_MIGRATION_VERSION,
+        "snapshot": PYTHON_SEED_TABLE_JSON,
+        "backup_directory": "lib/seed_backup",
+        "files": snapshot["files"],
+        "games": {
+            game: {"max_index": table["max_index"], "count": table["max_index"] + 1}
+            for game, table in games.items()
+        },
+    }
+
+
+# The signatures below are intentionally written out instead of generated by
+# parsing the old files.  This makes the Python boundary reviewable in the
+# generated ECS itself: each line can be compared directly with the original
+# FUNC declaration kept in lib/python_backup/.
+_PYTHON_COMPUTE_EXTERN_DECLARATIONS = {
+    "11_计算_RNG基础.ecs": (
+        'EXTERN FUNC RNG下一LO($hi: INT, $lo: INT): INT FROM "python:frlg_compute"',
+        'EXTERN FUNC RNG下一HI($hi: INT, $lo: INT): INT FROM "python:frlg_compute"',
+        'EXTERN FUNC RNG前进N_HI($hi: INT, $lo: INT, $n: INT): INT FROM "python:frlg_compute"',
+        'EXTERN FUNC RNG前进N_LO($hi: INT, $lo: INT, $n: INT): INT FROM "python:frlg_compute"',
+        'EXTERN FUNC Static_PIDLO($hi: INT, $lo: INT): INT FROM "python:frlg_compute"',
+        'EXTERN FUNC Static_PIDHI($hi: INT, $lo: INT): INT FROM "python:frlg_compute"',
+        'EXTERN FUNC Static_IV1($hi: INT, $lo: INT): INT FROM "python:frlg_compute"',
+        'EXTERN FUNC Static_IV2($hi: INT, $lo: INT): INT FROM "python:frlg_compute"',
+        'EXTERN FUNC Static_性格($pidhi: INT, $pidlo: INT): INT FROM "python:frlg_compute"',
+        'EXTERN FUNC Static_未知图腾形态($pidhi: INT, $pidlo: INT): INT FROM "python:frlg_compute"',
+        'EXTERN FUNC Static_性别($pidlo: INT, $性别阈值: INT): INT FROM "python:frlg_compute"',
+        'EXTERN FUNC Static_HPIV($iv1: INT): INT FROM "python:frlg_compute"',
+        'EXTERN FUNC Static_ATKIV($iv1: INT): INT FROM "python:frlg_compute"',
+        'EXTERN FUNC Static_DEFIV($iv1: INT): INT FROM "python:frlg_compute"',
+        'EXTERN FUNC Static_SPEIV($iv2: INT): INT FROM "python:frlg_compute"',
+        'EXTERN FUNC Static_SPAIV($iv2: INT): INT FROM "python:frlg_compute"',
+        'EXTERN FUNC Static_SPDIV($iv2: INT): INT FROM "python:frlg_compute"',
+    ),
+    "12_计算_IV范围.ecs": (
+        'EXTERN FUNC 取性格倍率($性格: INT, $性格项: INT): INT FROM "python:frlg_compute"',
+        'EXTERN FUNC 计算HP能力值($基础: INT, $努力: INT, $等级: INT, $IV: INT): INT FROM "python:frlg_compute"',
+        'EXTERN FUNC 计算非HP能力值($基础: INT, $努力: INT, $等级: INT, $IV: INT, $性格: INT, $性格项: INT): INT FROM "python:frlg_compute"',
+        'EXTERN FUNC 计算HP_IV最小($基础: INT, $努力: INT, $等级: INT, $实数: INT): INT FROM "python:frlg_compute"',
+        'EXTERN FUNC 计算HP_IV最大($基础: INT, $努力: INT, $等级: INT, $实数: INT): INT FROM "python:frlg_compute"',
+        'EXTERN FUNC 计算非HP_IV最小($基础: INT, $努力: INT, $等级: INT, $实数: INT, $性格: INT, $性格项: INT): INT FROM "python:frlg_compute"',
+        'EXTERN FUNC 计算非HP_IV最大($基础: INT, $努力: INT, $等级: INT, $实数: INT, $性格: INT, $性格项: INT): INT FROM "python:frlg_compute"',
+    ),
+    "13_计算_自动校准.ecs": (
+        '$归一商 = 0',
+        'EXTERN FUNC 带符号整除四舍五入($分子: INT, $分母: INT): INT FROM "python:frlg_compute"',
+        'EXTERN FUNC 模周期归一($误差: INT, $周期: INT): INT FROM "python:frlg_compute"',
+        'EXTERN FUNC EWA更新中心($中心: INT, $测量: INT, $β定点: INT, $比例: INT): INT FROM "python:frlg_compute"',
+        'EXTERN FUNC 候选MSE评分($Seed距离: INT, $帧距离: INT, $权重Seed: INT, $权重帧: INT): INT FROM "python:frlg_compute"',
+        'EXTERN FUNC 累加实际执行修正量($当前实际执行修正量: INT, $本次新增修正量: INT): INT FROM "python:frlg_compute"',
+    ),
+    "14_计算_等待参数.ecs": (
+        'EXTERN FUNC 帧转60FPS毫秒($帧: INT): INT FROM "python:frlg_compute"',
+        'EXTERN FUNC 帧转120FPS毫秒($帧: INT): INT FROM "python:frlg_compute"',
+        'EXTERN FUNC 计算普通F2帧($目标消耗帧: INT, $消耗帧实际执行修正量: INT, $F1阶段脚本固定帧: INT, $F2阶段脚本固定帧: INT, $总消耗帧基础补偿: INT): INT FROM "python:frlg_compute"',
+        'EXTERN FUNC 计算TV帧($目标消耗帧: INT, $消耗帧实际执行修正量: INT, $F1阶段脚本固定帧: INT, $F2阶段脚本固定帧: INT, $总消耗帧基础补偿: INT, $TV单次消耗帧: INT): INT FROM "python:frlg_compute"',
+        'EXTERN FUNC 计算TV模式F2帧($目标消耗帧: INT, $消耗帧实际执行修正量: INT, $F1阶段脚本固定帧: INT, $F2阶段脚本固定帧: INT, $总消耗帧基础补偿: INT, $TV单次消耗帧: INT): INT FROM "python:frlg_compute"',
+        'EXTERN FUNC 奇偶修正后F1帧($F1帧: INT, $F2帧: INT): INT FROM "python:frlg_compute"',
+        'EXTERN FUNC 奇偶修正后F2帧($F2帧: INT): INT FROM "python:frlg_compute"',
+    ),
+}
+
+
+def materialize_python_compute_libs(project_dir: str | Path) -> dict[str, Any]:
+    """Move the four pure arithmetic ECS libraries to Python callbacks.
+
+    The original files are copied to ``lib/python_backup`` and replaced by
+    top-level EXTERN declarations.  The backup is intentionally in the
+    generated project, next to the declarations, so a user can diff an
+    installed script update without relying on a separate source checkout.
+    ``script_host.py`` binds the declarations only for projects carrying the
+    ``python_compute.json`` marker; ordinary scripts continue to use ECS.
+    """
+    root = Path(project_dir).resolve()
+    lib = root / "lib"
+    paths = {name: lib / name for name in PYTHON_COMPUTE_FILES}
+    missing = [name for name, path in paths.items() if not path.is_file()]
+    if missing:
+        raise FileNotFoundError("Python 计算迁移缺少文件: " + ", ".join(missing))
+
+    backup = lib / "python_backup"
+    backup.mkdir(parents=True, exist_ok=True)
+    files: dict[str, dict[str, Any]] = {}
+    for name, path in paths.items():
+        data = path.read_bytes()
+        (backup / name).write_bytes(data)
+        declarations = _PYTHON_COMPUTE_EXTERN_DECLARATIONS[name]
+        source_note = (
+            "# PYTHON_COMPUTE_MIGRATION_V1\n"
+            "# 纯计算已迁移至 runtime/python/frlg_planner/automation/"
+            "frlg_compute_runtime.py。\n"
+            "# 原始 ECS 保存在 lib/python_backup/，用于逐函数行为对照。\n"
+            "# 识图、OCR、按键、等待与流程状态仍由 ECS 执行。\n"
+        )
+        path.write_text(source_note + "\n".join(declarations) + "\n", encoding="utf-8")
+        files[name] = {
+            "sha256": hashlib.sha256(data).hexdigest(),
+            "bytes": len(data),
+            "backup": f"lib/python_backup/{name}",
+            "functions": [line.split("FUNC ", 1)[1].split("(", 1)[0]
+                          for line in declarations if line.startswith("EXTERN FUNC ")],
+        }
+
+    snapshot = {
+        "migration_version": PYTHON_COMPUTE_MIGRATION_VERSION,
+        "runtime": "runtime/python/frlg_planner/automation/frlg_compute_runtime.py",
+        "files": files,
+    }
+    (root / "python_compute.json").write_text(
+        json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    return snapshot
+
+
+_PYTHON_DATA_EXTERN_DECLARATIONS = {
+    "04_数据_宝可梦名称.ecs": (
+        'EXTERN FUNC 目标名称($游戏版本: INT, $目标全国图鉴编号: INT): STRING FROM "python:frlg_data"',
+        'EXTERN FUNC 目标中文名称($游戏版本: INT, $目标全国图鉴编号: INT): STRING FROM "python:frlg_data"',
+        'EXTERN FUNC 目标英文名称($目标全国图鉴编号: INT): STRING FROM "python:frlg_data"',
+        'EXTERN FUNC 英文名称查图鉴编号($抓捕对象名称结果: STRING): INT FROM "python:frlg_data"',
+        'EXTERN FUNC 目标宝可梦名称查图鉴编号($目标宝可梦输入名称: STRING): INT FROM "python:frlg_data"',
+    ),
+    "05_数据_宝可梦种族值.ecs": (
+        'EXTERN FUNC 取种族HP($游戏版本: INT, $目标全国图鉴编号: INT): INT FROM "python:frlg_data"',
+        'EXTERN FUNC 取种族ATK($游戏版本: INT, $目标全国图鉴编号: INT): INT FROM "python:frlg_data"',
+        'EXTERN FUNC 取种族DEF($游戏版本: INT, $目标全国图鉴编号: INT): INT FROM "python:frlg_data"',
+        'EXTERN FUNC 取种族SPA($游戏版本: INT, $目标全国图鉴编号: INT): INT FROM "python:frlg_data"',
+        'EXTERN FUNC 取种族SPD($游戏版本: INT, $目标全国图鉴编号: INT): INT FROM "python:frlg_data"',
+        'EXTERN FUNC 取种族SPE($游戏版本: INT, $目标全国图鉴编号: INT): INT FROM "python:frlg_data"',
+    ),
+    "06_数据_宝可梦性别阈值.ecs": (
+        'EXTERN FUNC 取性别阈值($目标全国图鉴编号: INT): INT FROM "python:frlg_data"',
+    ),
+}
+
+
+def _ecs_function_block(text: str, name: str) -> str:
+    match = re.search(
+        rf"(?ms)^FUNC {re.escape(name)}\([^\n]*\).*?^ENDFUNC",
+        text,
+    )
+    if match is None:
+        raise ValueError(f"FRLG 数据库缺少函数: {name}")
+    return match[0]
+
+
+def annotate_retained_stateful_ecs(project_dir: str | Path) -> None:
+    """Leave an in-source reason beside ECS libraries not yet sidecarized.
+
+    This is deliberately a comment-only edit in generated projects. It makes
+    the boundary visible to someone opening the project in EasyCon: 24/25/28 are
+    replaced by Python session callbacks below; 15-22/27/26-识图 directly
+    drive video, OCR or controller flow and therefore remain ECS.
+    """
+    root = Path(project_dir).resolve() / "lib"
+    notes = {
+        "15_获取_入口.ecs": "# 入口/设备流程保留 ECS：调用按键、等待和子流程。\n",
+        "16_获取_静态目标.ecs": "# 静态目标流程保留 ECS：包含识图、按键和等待。\n",
+        "17_获取_野生目标.ecs": "# 野生目标流程保留 ECS：包含识图、按键和等待。\n",
+        "18_获取_抓捕流程.ecs": "# 抓捕流程保留 ECS：包含识图、按键和等待。\n",
+        "19_OCR_GEN3战斗场景名称.ecs": "# OCR 适配保留 ECS：依赖运行时 OCR 外部函数。\n",
+        "20_识图_抓捕对象名称识别.ecs": "# 识图/闪光识别保留 ECS：依赖图像标签。\n",
+        "21_识图_数据读取.ecs": "# 识图数据读取保留 ECS：依赖图像标签。\n",
+        "22_反查_神奇糖果.ecs": "# 控制器流程保留 ECS：调用按键和等待。\n",
+        "25_校准_投票决策.ecs": "# 纯计算已迁移至 Python 会话：由 frlg_vote_runtime.CalibrationVoteSession 持有状态。\n",
+        "26_识图_候选数字.ecs": "# 识图候选数字保留 ECS：依赖图像标签和识别计数状态。\n",
+        "27_孵蛋测试流程.ecs": "# 孵蛋设备流程保留 ECS：包含识图、按键和等待。\n",
+        "28_反查_孵蛋.ecs": "# 纯计算已迁移至 Python 会话：由 frlg_egg_reverse_runtime.EggReverseSession 持有状态。\n",
+    }
+    backup = root / "python_backup"
+    backup.mkdir(parents=True, exist_ok=True)
+    for name, note in notes.items():
+        path = root / name
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8-sig")
+        if RETAINED_ECS_MIGRATION_MARKER in text:
+            continue
+        backup_path = backup / name
+        if not backup_path.exists():
+            backup_path.write_bytes(path.read_bytes())
+        path.write_text(RETAINED_ECS_MIGRATION_MARKER + "\n" + note + text, encoding="utf-8")
+
+
+def _ecs_value(token: str) -> Any:
+    token = token.strip()
+    if token.startswith('"'):
+        try:
+            return json.loads(token)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"FRLG 数据字符串无法解析: {token}") from exc
+    try:
+        return int(token)
+    except ValueError as exc:
+        raise ValueError(f"FRLG 数据返回值无法解析: {token}") from exc
+
+
+def _ecs_id_records(block: str, *, target_variable: str) -> dict[str, dict[str, Any]]:
+    """Extract ``species -> {default, games}`` from generated IF tables."""
+    matches = list(re.finditer(
+        rf"(?m)^\s*(?:IF|ELIF) \${re.escape(target_variable)} == (?P<id>\d+)\s*$",
+        block,
+    ))
+    records: dict[str, dict[str, Any]] = {}
+    for index, match in enumerate(matches):
+        end = matches[index + 1].start() if index + 1 < len(matches) else block.find("\nENDFUNC", match.end())
+        segment = block[match.start():end]
+        games: dict[str, Any] = {}
+        for game_match in re.finditer(
+            r"(?ms)^\s*(?:IF|ELIF) \$游戏版本 == (?P<game>\d+)\s*\n\s*RETURN (?P<value>[^\r\n]+)",
+            segment,
+        ):
+            games[game_match.group("game")] = _ecs_value(game_match.group("value"))
+        returns = [
+            _ecs_value(value)
+            for value in re.findall(r"(?m)^\s*RETURN (?P<value>[^\r\n]+)", segment)
+        ]
+        if not returns:
+            raise ValueError(f"FRLG 数据图鉴 {match.group('id')} 缺少 RETURN")
+        record: dict[str, Any] = {"default": returns[-1]}
+        if games:
+            # A version-specific branch is followed by its own fallback
+            # RETURN, then the function-level fallback.  Pick the first
+            # RETURN after the branch's ENDIF so 386 keeps its normal-form
+            # value (the last RETURN belongs to unknown species).
+            branch_default = re.search(
+                r"(?ms)^\s*ENDIF\s*\n\s*RETURN (?P<value>[^\r\n]+)",
+                segment,
+            )
+            if branch_default is not None:
+                record["default"] = _ecs_value(branch_default.group("value"))
+            record["games"] = games
+        else:
+            record["default"] = returns[0]
+        records[match.group("id")] = record
+    if not records:
+        raise ValueError(f"FRLG 数据函数没有图鉴记录: {target_variable}")
+    return records
+
+
+def _ecs_name_aliases(block: str) -> dict[str, int]:
+    aliases: dict[str, int] = {}
+    for value, species in re.findall(
+        r'(?m)^\s*(?:IF|ELIF) \$抓捕对象名称结果 == (?P<value>"(?:\\.|[^"])*")\s*\n\s*RETURN (?P<species>\d+)',
+        block,
+    ):
+        aliases[str(_ecs_value(value))] = int(species)
+    return aliases
+
+
+def _name_input_aliases(block: str) -> dict[str, int]:
+    """Extract the exact ordered arrays used by 04's input lookup function.
+
+    The display-name table intentionally contains species such as Porygon that
+    are not valid encounter targets. Inferring aliases from that table would
+    broaden the accepted input language, so this follows the original arrays
+    and preserves the first-match rule of the ECS loop.
+    """
+    ids = _ecs_array(block, "宝可梦名称图鉴表", strings=False)
+    chinese = _ecs_array(block, "宝可梦中文名称表", strings=True)
+    english = _ecs_array(block, "宝可梦英文名称表", strings=True)
+    slugs = _ecs_array(block, "宝可梦英文Slug表", strings=True)
+    if not (len(ids) == len(chinese) == len(english) == len(slugs)):
+        raise ValueError("FRLG 名称输入数组长度不一致")
+    aliases: dict[str, int] = {"尼多兰♀": 29, "尼多兰♂": 32}
+    for species, zh, en, slug in zip(ids, chinese, english, slugs):
+        for value in (zh, en, slug, f"{zh} / {en}"):
+            # ECS returns on the first matching row.
+            aliases.setdefault(str(value), int(species))
+    return aliases
+
+
+def materialize_python_data_libs(project_dir: str | Path) -> dict[str, Any]:
+    """Move generated species names, base stats and gender thresholds to Python."""
+    root = Path(project_dir).resolve()
+    lib = root / "lib"
+    paths = {name: lib / name for name in PYTHON_DATA_FILES}
+    missing = [name for name, path in paths.items() if not path.is_file()]
+    if missing:
+        raise FileNotFoundError("Python 数据迁移缺少文件: " + ", ".join(missing))
+
+    texts = {name: path.read_text(encoding="utf-8-sig") for name, path in paths.items()}
+    target = _ecs_id_records(_ecs_function_block(texts["04_数据_宝可梦名称.ecs"], "目标名称"), target_variable="目标全国图鉴编号")
+    zh = _ecs_id_records(_ecs_function_block(texts["04_数据_宝可梦名称.ecs"], "目标中文名称"), target_variable="目标全国图鉴编号")
+    en = _ecs_id_records(_ecs_function_block(texts["04_数据_宝可梦名称.ecs"], "目标英文名称"), target_variable="目标全国图鉴编号")
+    english_aliases = _ecs_name_aliases(_ecs_function_block(texts["04_数据_宝可梦名称.ecs"], "英文名称查图鉴编号"))
+    input_block = _ecs_function_block(texts["04_数据_宝可梦名称.ecs"], "目标宝可梦名称查图鉴编号")
+    stats: dict[str, Any] = {}
+    for function in ("取种族HP", "取种族ATK", "取种族DEF", "取种族SPA", "取种族SPD", "取种族SPE"):
+        records = _ecs_id_records(_ecs_function_block(texts["05_数据_宝可梦种族值.ecs"], function), target_variable="目标全国图鉴编号")
+        stats[function] = {"default": -1, "values": records}
+    gender_records = _ecs_id_records(_ecs_function_block(texts["06_数据_宝可梦性别阈值.ecs"], "取性别阈值"), target_variable="目标全国图鉴编号")
+    gender = {"default": -1, "values": {key: value["default"] for key, value in gender_records.items()}}
+
+    backup = lib / "python_backup"
+    backup.mkdir(parents=True, exist_ok=True)
+    files: dict[str, Any] = {}
+    for name, path in paths.items():
+        data = path.read_bytes()
+        (backup / name).write_bytes(data)
+        declarations = _PYTHON_DATA_EXTERN_DECLARATIONS[name]
+        path.write_text(
+            "# PYTHON_DATA_MIGRATION_V1\n"
+            "# 生成数据查表已迁移至 runtime/python/frlg_planner/automation/frlg_data_runtime.py。\n"
+            "# 原始 ECS 保存在 lib/python_backup/，用于逐项行为对照。\n"
+            "# 识图、OCR、按键、等待与流程状态仍由 ECS 执行。\n"
+            + "\n".join(declarations) + "\n",
+            encoding="utf-8",
+        )
+        files[name] = {
+            "sha256": hashlib.sha256(data).hexdigest(),
+            "bytes": len(data),
+            "backup": f"lib/python_backup/{name}",
+            "functions": [line.split("FUNC ", 1)[1].split("(", 1)[0]
+                          for line in declarations],
+        }
+
+    payload = {
+        "migration_version": PYTHON_DATA_MIGRATION_VERSION,
+        "runtime": "runtime/python/frlg_planner/automation/frlg_data_runtime.py",
+        "files": files,
+        "names": {
+            "target": target,
+            "zh": zh,
+            "en": {key: value["default"] for key, value in en.items()},
+            "english_to_id": english_aliases,
+            "input_to_id": _name_input_aliases(input_block),
+        },
+        "stats": stats,
+        "gender": gender,
+    }
+    (root / "python_data.json").write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    return {
+        "migration_version": PYTHON_DATA_MIGRATION_VERSION,
+        "snapshot": "python_data.json",
+        "backup_directory": "lib/python_backup",
+        "files": files,
+        "counts": {"species": len(target), "stats": len(stats), "gender": len(gender["values"])},
+    }
+
+
+_PYTHON_CATALOG_EXTERN_DECLARATIONS = {
+    "07_数据_目标组合.ecs": (
+        'EXTERN FUNC 是否游戏角目标($游戏版本: INT, $目标全国图鉴编号: INT, $遭遇方法: INT): INT FROM "python:frlg_catalog"',
+        'EXTERN FUNC 游戏角目标等级($游戏版本: INT, $目标全国图鉴编号: INT): INT FROM "python:frlg_catalog"',
+        'EXTERN FUNC 目标组合编码($游戏版本: INT, $目标全国图鉴编号: INT, $遭遇方法: INT, $遭遇地点: INT): INT FROM "python:frlg_catalog"',
+        'EXTERN FUNC 查找目标组合索引($游戏版本: INT, $目标全国图鉴编号: INT, $遭遇方法: INT, $遭遇地点: INT): INT FROM "python:frlg_catalog"',
+        'EXTERN FUNC 目标是否支持($游戏版本: INT, $目标全国图鉴编号: INT, $遭遇方法: INT, $遭遇地点: INT): INT FROM "python:frlg_catalog"',
+        'EXTERN FUNC 目标默认等级($游戏版本: INT, $目标全国图鉴编号: INT, $遭遇方法: INT, $遭遇地点: INT): INT FROM "python:frlg_catalog"',
+        'EXTERN FUNC 目标最低等级($游戏版本: INT, $目标全国图鉴编号: INT, $遭遇方法: INT, $遭遇地点: INT): INT FROM "python:frlg_catalog"',
+        'EXTERN FUNC 目标最高等级($游戏版本: INT, $目标全国图鉴编号: INT, $遭遇方法: INT, $遭遇地点: INT): INT FROM "python:frlg_catalog"',
+        'EXTERN FUNC 目标出现率($游戏版本: INT, $目标全国图鉴编号: INT, $遭遇方法: INT, $遭遇地点: INT): INT FROM "python:frlg_catalog"',
+        'EXTERN FUNC 目标默认计算方法($游戏版本: INT, $目标全国图鉴编号: INT, $遭遇方法: INT, $遭遇地点: INT): INT FROM "python:frlg_catalog"',
+        'EXTERN FUNC 调试_目标组合存在($游戏版本: INT, $目标全国图鉴编号: INT, $遭遇方法: INT, $遭遇地点: INT): INT FROM "python:frlg_catalog"',
+    ),
+    "08_输入_游戏版本.ecs": (
+        'EXTERN FUNC 规范化游戏版本($游戏版本文本: STRING): INT FROM "python:frlg_catalog"',
+        'EXTERN FUNC 游戏版本名称($游戏版本: INT): STRING FROM "python:frlg_catalog"',
+    ),
+    "09_输入_遭遇方法.ecs": (
+        'EXTERN FUNC 规范化遭遇方法($宝可梦遭遇方法: STRING): INT FROM "python:frlg_catalog"',
+        'EXTERN FUNC 目标遭遇方法名称($遭遇方法: INT): STRING FROM "python:frlg_catalog"',
+    ),
+    "10_输入_遭遇地点.ecs": (
+        'EXTERN FUNC 规范化遭遇地点($宝可梦遭遇地点: STRING): INT FROM "python:frlg_catalog"',
+        'EXTERN FUNC 目标遭遇地点名称($遭遇地点: INT): STRING FROM "python:frlg_catalog"',
+    ),
+}
+
+
+def _ecs_string_int_map(block: str, variable: str) -> dict[str, int]:
+    result: dict[str, int] = {}
+    condition = re.compile(
+        rf"(?m)^\s*(?:IF|ELIF) \${re.escape(variable)}\s*==\s*(?P<value>[^\n]+)\s*\n\s*RETURN (?P<result>-?\d+)"
+    )
+    for match in condition.finditer(block):
+        for value in re.findall(r'"(?:\\.|[^"])*"', match.group("value")):
+            # ECS evaluates ELIF from top to bottom; duplicate aliases keep
+            # the first branch rather than whichever generated row is last.
+            result.setdefault(str(_ecs_value(value)), int(match.group("result")))
+    return result
+
+
+def _ecs_int_string_map(block: str, variable: str) -> dict[str, str]:
+    result: dict[str, str] = {}
+    condition = re.compile(
+        rf"(?m)^\s*(?:IF|ELIF) \${re.escape(variable)}\s*==\s*(?P<value>-?\d+)\s*\n\s*RETURN (?P<result>\"(?:\\.|[^\"])*\")"
+    )
+    for match in condition.finditer(block):
+        result.setdefault(match.group("value"), str(_ecs_value(match.group("result"))))
+    return result
+
+
+def materialize_python_catalog_libs(project_dir: str | Path) -> dict[str, Any]:
+    """Move target combinations and input catalogs to a JSON/Python boundary."""
+    root = Path(project_dir).resolve()
+    lib = root / "lib"
+    paths = {name: lib / name for name in PYTHON_CATALOG_FILES}
+    missing = [name for name, path in paths.items() if not path.is_file()]
+    if missing:
+        raise FileNotFoundError("Python catalog 迁移缺少文件: " + ", ".join(missing))
+    texts = {name: path.read_text(encoding="utf-8-sig") for name, path in paths.items()}
+    target_text = texts["07_数据_目标组合.ecs"]
+    target_arrays = {
+        key: _ecs_array(target_text, key, strings=False)
+        for key in ("目标组合键表", "目标组合默认等级表", "目标组合最低等级表", "目标组合最高等级表", "目标组合出现率表", "目标组合计算方法表")
+    }
+    if any(len(values) != 2000 for values in target_arrays.values()):
+        raise ValueError("FRLG 目标组合数组必须与 ECS 的 0..1999 查询范围一致")
+    game_levels: dict[str, int] = {}
+    # The game-corner levels are a short explicit table and are easier to
+    # audit as key pairs than to infer from the large combination arrays.
+    corner_block = _ecs_function_block(target_text, "游戏角目标等级")
+    for game, species, level in re.findall(
+        r"(?m)^\s*(?:IF|ELIF) \$游戏版本 == (\d+) and \$目标全国图鉴编号 == (\d+)\s*\n\s*RETURN (-?\d+)",
+        corner_block,
+    ):
+        game_levels[f"{game}:{species}"] = int(level)
+    sections = {
+        "versions": {
+            "normalize": _ecs_string_int_map(_ecs_function_block(texts["08_输入_游戏版本.ecs"], "规范化游戏版本"), "游戏版本文本"),
+            "names": _ecs_int_string_map(_ecs_function_block(texts["08_输入_游戏版本.ecs"], "游戏版本名称"), "游戏版本"),
+        },
+        "methods": {
+            "normalize": _ecs_string_int_map(_ecs_function_block(texts["09_输入_遭遇方法.ecs"], "规范化遭遇方法"), "宝可梦遭遇方法"),
+            "names": _ecs_int_string_map(_ecs_function_block(texts["09_输入_遭遇方法.ecs"], "目标遭遇方法名称"), "遭遇方法"),
+        },
+        "locations": {
+            "normalize": _ecs_string_int_map(_ecs_function_block(texts["10_输入_遭遇地点.ecs"], "规范化遭遇地点"), "宝可梦遭遇地点"),
+            "names": _ecs_int_string_map(_ecs_function_block(texts["10_输入_遭遇地点.ecs"], "目标遭遇地点名称"), "遭遇地点"),
+        },
+        # Runtime uses stable English section keys; retain the original ECS
+        # variable names in this mapping so the generated JSON remains easy
+        # to audit against 07_数据_目标组合.ecs.
+        "targets": {
+            "keys": target_arrays["目标组合键表"],
+            "default_level": target_arrays["目标组合默认等级表"],
+            "min_level": target_arrays["目标组合最低等级表"],
+            "max_level": target_arrays["目标组合最高等级表"],
+            "rate": target_arrays["目标组合出现率表"],
+            "method": target_arrays["目标组合计算方法表"],
+            "game_corner_levels": game_levels,
+            "source_variables": {
+                "keys": "目标组合键表",
+                "default_level": "目标组合默认等级表",
+                "min_level": "目标组合最低等级表",
+                "max_level": "目标组合最高等级表",
+                "rate": "目标组合出现率表",
+                "method": "目标组合计算方法表",
+            },
+        },
+    }
+    backup = lib / "python_backup"
+    backup.mkdir(parents=True, exist_ok=True)
+    files: dict[str, Any] = {}
+    for name, path in paths.items():
+        data = path.read_bytes()
+        (backup / name).write_bytes(data)
+        declarations = _PYTHON_CATALOG_EXTERN_DECLARATIONS[name]
+        path.write_text(
+            "# PYTHON_CATALOG_MIGRATION_V1\n"
+            "# 目标/输入查表已迁移至 runtime/python/frlg_planner/automation/frlg_catalog_runtime.py。\n"
+            "# 原始 ECS 保存在 lib/python_backup/，用于逐项行为对照。\n"
+            "# 识图、OCR、按键、等待与流程状态仍由 ECS 执行。\n"
+            + "\n".join(declarations) + "\n",
+            encoding="utf-8",
+        )
+        files[name] = {
+            "sha256": hashlib.sha256(data).hexdigest(),
+            "bytes": len(data),
+            "backup": f"lib/python_backup/{name}",
+            "functions": [line.split("FUNC ", 1)[1].split("(", 1)[0] for line in declarations],
+        }
+    payload = {"migration_version": PYTHON_CATALOG_MIGRATION_VERSION, "runtime": "runtime/python/frlg_planner/automation/frlg_catalog_runtime.py", "files": files, **sections}
+    (root / "python_catalog.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {"migration_version": PYTHON_CATALOG_MIGRATION_VERSION, "snapshot": "python_catalog.json", "backup_directory": "lib/python_backup", "files": files, "counts": {"target_combinations": len(target_arrays["目标组合键表"]), "methods": len(sections["methods"]["normalize"]), "locations": len(sections["locations"]["normalize"])} }
+
+
+_PYTHON_TEXT_EXTERN_DECLARATIONS = (
+    'EXTERN FUNC 性别文本($性别: INT): STRING FROM "python:frlg_text"',
+    'EXTERN FUNC 性格文本($性格: INT): STRING FROM "python:frlg_text"',
+    'EXTERN FUNC 反查算法文本($算法: INT): STRING FROM "python:frlg_text"',
+    'EXTERN FUNC 雌性比例文本($性别阈值: INT): STRING FROM "python:frlg_text"',
+)
+
+
+def materialize_python_text_libs(project_dir: str | Path) -> dict[str, Any]:
+    """Move 23's constant display strings to a small auditable JSON table."""
+    root = Path(project_dir).resolve()
+    path = root / "lib" / PYTHON_TEXT_FILES[0]
+    if not path.is_file():
+        raise FileNotFoundError(f"Python 文本迁移缺少文件: {path.name}")
+    text = path.read_text(encoding="utf-8-sig")
+    tables: dict[str, dict[str, str]] = {}
+    for function, fallback in (("性别文本", "未知 / Unknown"), ("性格文本", "未知 / Unknown"), ("反查算法文本", "未知算法"), ("雌性比例文本", "未知")):
+        block = _ecs_function_block(text, function)
+        table: dict[str, str] = {}
+        for value, result in re.findall(r'(?m)^\s*(?:IF|ELIF) \$[^ ]+ == (-?\d+)\s*\n\s*RETURN ("(?:\\.|[^"])*")', block):
+            table.setdefault(value, str(_ecs_value(result)))
+        if not table:
+            raise ValueError(f"FRLG 文本函数没有分支: {function}")
+        tables[function] = table
+    backup = root / "lib" / "python_backup"
+    backup.mkdir(parents=True, exist_ok=True)
+    data = path.read_bytes()
+    (backup / path.name).write_bytes(data)
+    path.write_text(
+        "# PYTHON_TEXT_MIGRATION_V1\n"
+        "# 纯显示字符串迁移至 runtime/python/frlg_planner/automation/frlg_text_runtime.py。\n"
+        "# 原始 ECS 保存在 lib/python_backup/，用于逐分支对照。\n"
+        + "\n".join(_PYTHON_TEXT_EXTERN_DECLARATIONS) + "\n", encoding="utf-8"
+    )
+    files = {path.name: {"sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data), "backup": f"lib/python_backup/{path.name}", "functions": [line.split("FUNC ", 1)[1].split("(", 1)[0] for line in _PYTHON_TEXT_EXTERN_DECLARATIONS]}}
+    payload = {"migration_version": PYTHON_TEXT_MIGRATION_VERSION, "runtime": "runtime/python/frlg_planner/automation/frlg_text_runtime.py", "files": files, "tables": tables}
+    (root / "python_text.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {"migration_version": PYTHON_TEXT_MIGRATION_VERSION, "snapshot": "python_text.json", "backup_directory": "lib/python_backup", "files": files}
+
+
+_PYTHON_WILD_EXTERN_DECLARATIONS = (
+    'EXTERN FUNC 野生遇敌表编码($游戏版本: INT, $遭遇方法: INT, $遭遇地点: INT): INT FROM "python:frlg_wild_data"',
+    'EXTERN FUNC 查找野生遇敌表索引($游戏版本: INT, $遭遇方法: INT, $遭遇地点: INT): INT FROM "python:frlg_wild_data"',
+    'EXTERN FUNC 取野生遇敌槽打包值($野生遇敌表索引: INT, $野生遇敌槽: INT): INT FROM "python:frlg_wild_data"',
+    'EXTERN FUNC 野生遇敌槽编号($遭遇方法: INT, $野生遇敌值: INT): INT FROM "python:frlg_wild_data"',
+)
+
+
+def materialize_python_wild_data_libs(project_dir: str | Path) -> dict[str, Any]:
+    """Move 26's generated encounter arrays out of the ECS interpreter."""
+    root = Path(project_dir).resolve()
+    path = root / "lib" / PYTHON_WILD_FILES[0]
+    if not path.is_file():
+        raise FileNotFoundError(f"Python 野生遇敌迁移缺少文件: {path.name}")
+    text = path.read_text(encoding="utf-8-sig")
+    keys = _ecs_array(text, "野生遇敌表键", strings=False)
+    tables = [_ecs_array(text, f"野生遇敌槽打包表{i}", strings=False) for i in range(9)]
+    if len(keys) != 630 or [len(table) for table in tables] != [900] * 8 + [360]:
+        raise ValueError("FRLG 野生遇敌表数组尺寸与 ECS 查询边界不一致")
+    backup = root / "lib" / "python_backup"
+    backup.mkdir(parents=True, exist_ok=True)
+    data = path.read_bytes()
+    (backup / path.name).write_bytes(data)
+    path.write_text(
+        "# PYTHON_WILD_DATA_MIGRATION_V1\n"
+        "# 纯野生遇敌槽查表迁移至 runtime/python/frlg_planner/automation/frlg_wild_data_runtime.py。\n"
+        "# 原始 ECS 保存在 lib/python_backup/，用于逐项数组对照。\n"
+        "# 识图、OCR、按键、等待与流程状态仍由 ECS 执行。\n"
+        + "\n".join(_PYTHON_WILD_EXTERN_DECLARATIONS) + "\n", encoding="utf-8"
+    )
+    files = {path.name: {"sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data), "backup": f"lib/python_backup/{path.name}", "functions": [line.split("FUNC ", 1)[1].split("(", 1)[0] for line in _PYTHON_WILD_EXTERN_DECLARATIONS]}}
+    payload = {"migration_version": PYTHON_WILD_MIGRATION_VERSION, "runtime": "runtime/python/frlg_planner/automation/frlg_wild_data_runtime.py", "files": files, "keys": keys, "packed_tables": tables}
+    (root / "python_wild_data.json").write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    return {"migration_version": PYTHON_WILD_MIGRATION_VERSION, "snapshot": "python_wild_data.json", "backup_directory": "lib/python_backup", "files": files, "counts": {"keys": len(keys), "tables": len(tables)}}
+
+
+def _stateful_extern_declarations(source: str) -> list[str]:
+    """Create same-signature EXTERN declarations from the preserved ECS API.
+
+    25 and 28 contain many small getters/setters.  Reading the signatures from
+    the downloaded source prevents a hand-maintained declaration list from
+    drifting when 火叶 adds a function; all callbacks are INT except the two
+    explicitly string-valued HEX arguments in 28.
+    """
+    declarations: list[str] = []
+    for match in re.finditer(r"(?m)^FUNC\s+([^\s(]+)(?:\(([^)]*)\))?", source):
+        name, parameters = match.group(1), (match.group(2) or "").strip()
+        typed: list[str] = []
+        if parameters:
+            for parameter in parameters.split(","):
+                parameter = parameter.strip()
+                if not parameter:
+                    continue
+                typed.append(parameter)
+        if name == "孵蛋反查_执行HEX":
+            typed = [item.replace("$HeldSeed文本: STRING", "$HeldSeed文本: STRING").replace("$PickupSeed文本: STRING", "$PickupSeed文本: STRING") for item in typed]
+        declarations.append(
+            f'EXTERN FUNC {name}({", ".join(typed)}): INT FROM "python:frlg_stateful"'
+        )
+    return declarations
+
+
+def materialize_python_stateful_libs(project_dir: str | Path) -> dict[str, Any]:
+    """Move pure stateful calculations in 25/28 behind Python callbacks."""
+    root = Path(project_dir).resolve()
+    lib = root / "lib"
+    backup = lib / "python_backup"
+    backup.mkdir(parents=True, exist_ok=True)
+    files: dict[str, Any] = {}
+    for name in PYTHON_STATEFUL_FILES:
+        path = lib / name
+        if not path.is_file():
+            raise FileNotFoundError(f"Python 状态计算迁移缺少文件: {name}")
+        backup_path = backup / name
+        if backup_path.is_file():
+            source_data = backup_path.read_bytes()
+            source = source_data.decode("utf-8-sig")
+        else:
+            source_data = path.read_bytes()
+            source = source_data.decode("utf-8-sig")
+            backup_path.write_bytes(source_data)
+        declarations = _stateful_extern_declarations(source)
+        if not declarations:
+            raise ValueError(f"状态计算库没有可迁移函数: {name}")
+        module = "frlg_vote_runtime" if name.startswith("25_") else "frlg_egg_reverse_runtime"
+        path.write_text(
+            "# PYTHON_STATEFUL_MIGRATION_V1\n"
+            f"# 原 {name} 的跨函数状态与计算已迁移到 runtime/python/frlg_planner/automation/{module}.py。\n"
+            "# 本文件只保留同名 EXTERN 接口；原始 ECS 在 lib/python_backup/，用于逐函数差分。\n"
+            "# 设备、识图、OCR、按键和等待仍由 ECS 流程调用。\n"
+            + "\n".join(declarations) + "\n",
+            encoding="utf-8",
+        )
+        files[name] = {
+            "sha256": hashlib.sha256(source_data).hexdigest(),
+            "bytes": len(source_data),
+            "backup": f"lib/python_backup/{name}",
+            "runtime": f"runtime/python/frlg_planner/automation/{module}.py",
+            "functions": [line.split("FUNC ", 1)[1].split("(", 1)[0] for line in declarations],
+        }
+    payload = {"migration_version": PYTHON_STATEFUL_MIGRATION_VERSION, "runtime": {
+        "25": "runtime/python/frlg_planner/automation/frlg_vote_runtime.py",
+        "28": "runtime/python/frlg_planner/automation/frlg_egg_reverse_runtime.py",
+    }, "files": files}
+    (root / "python_vote.json").write_text(json.dumps({"migration_version": PYTHON_STATEFUL_MIGRATION_VERSION, "files": {"25_校准_投票决策.ecs": files["25_校准_投票决策.ecs"]}}, ensure_ascii=False, indent=2), encoding="utf-8")
+    (root / "python_egg_reverse.json").write_text(json.dumps({"migration_version": PYTHON_STATEFUL_MIGRATION_VERSION, "files": {"28_反查_孵蛋.ecs": files["28_反查_孵蛋.ecs"]}}, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {"migration_version": PYTHON_STATEFUL_MIGRATION_VERSION, "files": files, "runtime": payload["runtime"]}
+
+
+def materialize_python_bingo_lib(project_dir: str | Path) -> dict[str, Any]:
+    """Move 24's BINGO counters, dead-zone math and rendering to Python.
+
+    BINGO is diagnostic output, but its 9x9 counters and stable-cluster
+    decisions are still mutable calculations.  Keeping the source in a backup
+    and generating declarations here makes that boundary explicit while the
+    Python session sends the former PRINT lines through the host logger.
+    """
+    root = Path(project_dir).resolve()
+    path = root / "lib" / PYTHON_BINGO_FILES[0]
+    if not path.is_file():
+        raise FileNotFoundError(f"Python BINGO 迁移缺少文件: {path.name}")
+    backup = root / "lib" / "python_backup"
+    backup.mkdir(parents=True, exist_ok=True)
+    backup_path = backup / path.name
+    if backup_path.is_file():
+        source_data = backup_path.read_bytes()
+        source = source_data.decode("utf-8-sig")
+    else:
+        source_data = path.read_bytes()
+        source = source_data.decode("utf-8-sig")
+        backup_path.write_bytes(source_data)
+    declarations = _stateful_extern_declarations(source)
+    if not declarations:
+        raise ValueError("BINGO 库没有可迁移函数")
+    path.write_text(
+        "# PYTHON_BINGO_MIGRATION_V1\n"
+        "# 24_显示_BINGO.ecs 的计数、死区、稳定簇与文本输出已迁移到\n"
+        "# runtime/python/frlg_planner/automation/frlg_bingo_runtime.py。\n"
+        "# 原始 ECS 保存在 lib/python_backup/，用于逐函数差分。\n"
+        + "\n".join(declarations) + "\n",
+        encoding="utf-8",
+    )
+    files = {
+        path.name: {
+            "sha256": hashlib.sha256(source_data).hexdigest(),
+            "bytes": len(source_data),
+            "backup": f"lib/python_backup/{path.name}",
+            "runtime": "runtime/python/frlg_planner/automation/frlg_bingo_runtime.py",
+            "functions": [line.split("FUNC ", 1)[1].split("(", 1)[0] for line in declarations],
+        }
+    }
+    snapshot = {
+        "migration_version": PYTHON_BINGO_MIGRATION_VERSION,
+        "runtime": "runtime/python/frlg_planner/automation/frlg_bingo_runtime.py",
+        "files": files,
+    }
+    (root / "python_bingo.json").write_text(
+        json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    return {
+        "migration_version": PYTHON_BINGO_MIGRATION_VERSION,
+        "snapshot": "python_bingo.json",
+        "backup_directory": "lib/python_backup",
+        "files": files,
+    }
+
+
+def materialize_python_flow_helpers(project_dir: str | Path) -> dict[str, Any]:
+    """Replace pure helper functions inside mixed device-flow libraries.
+
+    The containing 15/17/27 files remain ECS because their other functions
+    press buttons, wait for timing and consume image labels.  Only the listed
+    deterministic functions become EXTERN callbacks; their original source is
+    preserved byte-for-byte in ``lib/python_backup``.
+    """
+    root = Path(project_dir).resolve()
+    lib = root / "lib"
+    backup = lib / "python_backup"
+    backup.mkdir(parents=True, exist_ok=True)
+    files: dict[str, Any] = {}
+    for name, function_names in PYTHON_FLOW_FILES.items():
+        path = lib / name
+        if not path.is_file():
+            raise FileNotFoundError(f"Python 混合流程迁移缺少文件: {name}")
+        backup_path = backup / name
+        if backup_path.is_file():
+            source_data = backup_path.read_bytes()
+            source = source_data.decode("utf-8-sig")
+        else:
+            source_data = path.read_bytes()
+            source = source_data.decode("utf-8-sig")
+            backup_path.write_bytes(source_data)
+        current = path.read_text(encoding="utf-8-sig")
+        declarations: list[str] = []
+        for function_name in function_names:
+            match = re.search(
+                rf"(?ms)^FUNC {re.escape(function_name)}\([^\n]*\).*?^ENDFUNC",
+                source,
+            )
+            if match is None:
+                raise ValueError(f"混合流程库缺少函数: {name}/{function_name}")
+            header = match.group(0).splitlines()[0]
+            declaration = header.replace("FUNC ", "EXTERN FUNC ", 1)
+            declaration = re.sub(
+                r"\)\s*:\s*(INT|STRING)\s*$",
+                r'):\1 FROM "python:frlg_flow"',
+                declaration,
+            )
+            declarations.append(declaration)
+            current, replacements = re.subn(
+                rf"(?ms)^FUNC {re.escape(function_name)}\([^\n]*\).*?^ENDFUNC",
+                declaration,
+                current,
+                count=1,
+            )
+            if replacements != 1:
+                raise ValueError(f"混合流程函数替换失败: {name}/{function_name}")
+        path.write_text(
+            "# PYTHON_FLOW_MIGRATION_V1\n"
+            "# 仅纯计算入口迁移到 runtime/python/frlg_planner/automation/frlg_flow_runtime.py。\n"
+            "# 同文件中的按键、等待、OCR、识图和流程状态仍由 ECS 执行。\n"
+            + current,
+            encoding="utf-8",
+        )
+        files[name] = {
+            "sha256": hashlib.sha256(source_data).hexdigest(),
+            "bytes": len(source_data),
+            "backup": f"lib/python_backup/{name}",
+            "runtime": "runtime/python/frlg_planner/automation/frlg_flow_runtime.py",
+            "functions": [line.split("FUNC ", 1)[1].split("(", 1)[0] for line in declarations],
+        }
+    snapshot = {
+        "migration_version": PYTHON_FLOW_MIGRATION_VERSION,
+        "runtime": "runtime/python/frlg_planner/automation/frlg_flow_runtime.py",
+        "files": files,
+    }
+    (root / "python_flow.json").write_text(
+        json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    return {
+        "migration_version": PYTHON_FLOW_MIGRATION_VERSION,
+        "snapshot": "python_flow.json",
+        "backup_directory": "lib/python_backup",
+        "files": files,
     }
 
 
@@ -5119,6 +6076,7 @@ def write_configured_project(
             if directory == "ImgLabel":
                 copy_easycon118_extension_labels(target)
 
+    annotate_retained_stateful_ecs(output_dir)
     apply_seed_common_regions(output_dir, ("main.ecs",))
     seed_table_override = apply_easycon_seed_table_overrides(output_dir / "lib")
     if options.japanese_starter:
@@ -5137,6 +6095,27 @@ def write_configured_project(
         if seed_table_override is None:
             seed_table_override = {}
         seed_table_override["temporary_japanese_mode10"] = japanese_tables
+    # The copied tables now include active-download and Japanese overrides.
+    # Materialize this exact state before replacing the ECS lookup libraries.
+    python_seed_tables = materialize_python_seed_tables(output_dir)
+    # 11-14 contain deterministic arithmetic only.  Keep the original ECS
+    # beside the generated EXTERN shims for per-function parity review.
+    python_compute = materialize_python_compute_libs(output_dir)
+    python_data = materialize_python_data_libs(output_dir)
+    # 07-10 are deterministic target/input catalogs. Their original ECS
+    # files are backed up and replaced by same-signature EXTERN declarations;
+    # device, OCR, controller, wait and flow-state libraries remain ECS.
+    python_catalog = materialize_python_catalog_libs(output_dir)
+    python_text = materialize_python_text_libs(output_dir)
+    python_wild_data = materialize_python_wild_data_libs(output_dir)
+    # 25/28 are algorithmic state machines.  Their mutable ECS globals are
+    # replaced by per-run Python session objects; preserved copies stay beside
+    # the generated project for exact source comparison.
+    python_stateful = materialize_python_stateful_libs(output_dir)
+    # 24's BINGO table is also stateful pure calculation/output.  Its logger
+    # calls are routed through the host, while device and image flows remain ECS.
+    python_bingo = materialize_python_bingo_lib(output_dir)
+    python_flow = materialize_python_flow_helpers(output_dir)
     _apply_seed_mode3_library_mapping(output_dir / "lib" / EGG_SETTINGS_LIBRARY_NAME)
     ocr_fallback_sha256 = apply_ocr_runtime_fallback(
         output_dir / "lib" / OCR_NAME_LIBRARY_NAME
@@ -5175,6 +6154,15 @@ def write_configured_project(
                 ).encode("utf-8")
             ).hexdigest(),
             "seed_tables": seed_table_override,
+            "python_seed_tables": python_seed_tables,
+            "python_compute": python_compute,
+            "python_data": python_data,
+            "python_catalog": python_catalog,
+            "python_text": python_text,
+            "python_wild_data": python_wild_data,
+            "python_stateful": python_stateful,
+            "python_bingo": python_bingo,
+            "python_flow": python_flow,
             "temporary_japanese_starter": options.japanese_starter,
         },
         "backend": {
@@ -5318,8 +6306,18 @@ def write_configured_egg_project(
             if directory == "ImgLabel":
                 copy_easycon118_extension_labels(target)
 
+    annotate_retained_stateful_ecs(output_dir)
     apply_seed_common_regions(output_dir, ("main.ecs",))
     seed_table_override = apply_easycon_seed_table_overrides(output_dir / "lib")
+    python_seed_tables = materialize_python_seed_tables(output_dir)
+    python_compute = materialize_python_compute_libs(output_dir)
+    python_data = materialize_python_data_libs(output_dir)
+    python_catalog = materialize_python_catalog_libs(output_dir)
+    python_text = materialize_python_text_libs(output_dir)
+    python_wild_data = materialize_python_wild_data_libs(output_dir)
+    python_stateful = materialize_python_stateful_libs(output_dir)
+    python_bingo = materialize_python_bingo_lib(output_dir)
+    python_flow = materialize_python_flow_helpers(output_dir)
     ocr_fallback_sha256 = apply_ocr_runtime_fallback(
         output_dir / "lib" / OCR_NAME_LIBRARY_NAME
     )
@@ -5352,6 +6350,15 @@ def write_configured_egg_project(
             + "$孵蛋流程无蛋跳出候选预测落点 % 2"
         ).encode("utf-8")
     ).hexdigest()
+    runtime_overrides["python_seed_tables"] = python_seed_tables
+    runtime_overrides["python_compute"] = python_compute
+    runtime_overrides["python_data"] = python_data
+    runtime_overrides["python_catalog"] = python_catalog
+    runtime_overrides["python_text"] = python_text
+    runtime_overrides["python_wild_data"] = python_wild_data
+    runtime_overrides["python_stateful"] = python_stateful
+    runtime_overrides["python_bingo"] = python_bingo
+    runtime_overrides["python_flow"] = python_flow
     runtime_overrides["seed_hold_observation_window_sha256"] = hashlib.sha256(
         (
             SEED_HOLD_OBSERVATION_GLOBAL_ANCHOR

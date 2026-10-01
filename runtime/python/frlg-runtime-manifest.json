@@ -5,7 +5,7 @@
     "tools/frlg-runtime-patches/menu-navigation.patch": "10fc2ee4393ee6a95e40103f64a857fce1a0a0ffab08b3f9cf04b9a2a83448ce"
   },
   "files": {
-    "automation/easycon118.py": "febbdad6afaf0cd139f74048ebf0660ce754b86447f4901984057a8416834c57",
+    "automation/easycon118.py": "7c06e90b109e5b1b433b56e8e4b47368ba071bd95dcdcfd9bfa44b24c524d3c7",
     "automation/precalibration.py": "f7555f3e5834e460425f1dc95cc3da0b95e5d6441a0029f07724950ade8b4e23",
     "automation/calibration_trust_gates.py": "51bcdf7a0d610e6f48f68d625d1b468cd25e7015398973743f0c571264af5861",
     "automation/seed_common_regions.py": "5d995e43c0ce4bd5842ba2b5fc6b1d2d21ba94f156748c22637e314cb8cfd705",

@@ -166,6 +166,121 @@ def run(config, program):
         preflight(program.ast)
         getters = {}
         extern_functions = {}
+        seed_runtime = None
+        data_runtime = None
+        catalog_runtime = None
+        # 00_Seed表_入口.ecs and 01_Seed表_HEX转换.ecs are generated as
+        # EXTERN declarations by the FRLG project builder.  Bind them once to
+        # the sidecar snapshot materialized from the copied ECS tables; the
+        # table's game/version/index/mode semantics stay identical while the
+        # 2,300-row interpreted arrays no longer execute inside ECS.
+        seed_table_snapshot = root / "seed_tables.json"
+        if seed_table_snapshot.is_file():
+            # The vendored planner keeps its legacy ``rng`` imports relative
+            # to frlg_planner/.  Add that directory only when binding the
+            # FRLG Seed adapter; ordinary ECS scripts do not need it.
+            planner_root = Path(__file__).resolve().parent / "frlg_planner"
+            if str(planner_root) not in sys.path:
+                sys.path.insert(0, str(planner_root))
+            from frlg_planner.automation.seed_table_runtime import SeedTableRuntime
+
+            seed_runtime = SeedTableRuntime.from_project(root)
+            extern_functions.update(seed_runtime.extern_functions())
+        # 11-14_计算_* are generated as pure-Python EXTERN shims.  Their
+        # original ECS files remain in lib/python_backup/ for behavior diffs;
+        # device/OCR/flow libraries stay interpreted by EasyCon as before.
+        python_compute_snapshot = root / "python_compute.json"
+        if python_compute_snapshot.is_file():
+            planner_root = Path(__file__).resolve().parent / "frlg_planner"
+            if str(planner_root) not in sys.path:
+                sys.path.insert(0, str(planner_root))
+            from frlg_planner.automation import frlg_compute_runtime
+
+            extern_functions.update(frlg_compute_runtime.extern_functions())
+        # Generated 04-06 data libraries use the same boundary.  The JSON
+        # snapshot is produced from the copied ECS files, so downloaded name
+        # or stat-table changes remain visible in the generated project's
+        # python_backup diff.
+        python_data_snapshot = root / "python_data.json"
+        if python_data_snapshot.is_file():
+            planner_root = Path(__file__).resolve().parent / "frlg_planner"
+            if str(planner_root) not in sys.path:
+                sys.path.insert(0, str(planner_root))
+            from frlg_planner.automation.frlg_data_runtime import DataRuntime
+
+            data_runtime = DataRuntime.from_project(root)
+            extern_functions.update(data_runtime.extern_functions())
+        # 07-10 target/input catalogs are deterministic tables. The generated
+        # project keeps lib/python_backup copies and same-name EXTERN shims so
+        # each callback can be compared with the original ECS branch order.
+        python_catalog_snapshot = root / "python_catalog.json"
+        if python_catalog_snapshot.is_file():
+            planner_root = Path(__file__).resolve().parent / "frlg_planner"
+            if str(planner_root) not in sys.path:
+                sys.path.insert(0, str(planner_root))
+            from frlg_planner.automation.frlg_catalog_runtime import CatalogRuntime
+
+            catalog_runtime = CatalogRuntime.from_project(root)
+            extern_functions.update(catalog_runtime.extern_functions())
+        python_text_snapshot = root / "python_text.json"
+        if python_text_snapshot.is_file():
+            planner_root = Path(__file__).resolve().parent / "frlg_planner"
+            if str(planner_root) not in sys.path:
+                sys.path.insert(0, str(planner_root))
+            from frlg_planner.automation.frlg_text_runtime import TextRuntime
+
+            extern_functions.update(TextRuntime.from_project(root).extern_functions())
+        python_wild_snapshot = root / "python_wild_data.json"
+        if python_wild_snapshot.is_file():
+            planner_root = Path(__file__).resolve().parent / "frlg_planner"
+            if str(planner_root) not in sys.path:
+                sys.path.insert(0, str(planner_root))
+            from frlg_planner.automation.frlg_wild_data_runtime import WildDataRuntime
+
+            extern_functions.update(WildDataRuntime.from_project(root).extern_functions())
+        # 25/28 are stateful calculations.  Each script run gets a distinct
+        # Python session; this is the explicit replacement for their former
+        # ECS file-scope arrays ($V_* / $C_* and $孵蛋反查_*).  The generated
+        # project keeps the originals in lib/python_backup for differential
+        # review, while these callbacks own all mutable calculation state.
+        python_vote_snapshot = root / "python_vote.json"
+        if python_vote_snapshot.is_file():
+            from frlg_planner.automation.frlg_vote_runtime import CalibrationVoteSession
+
+            extern_functions.update(
+                CalibrationVoteSession(seed_runtime=seed_runtime).extern_functions()
+            )
+        python_egg_snapshot = root / "python_egg_reverse.json"
+        if python_egg_snapshot.is_file():
+            from frlg_planner.automation.frlg_egg_reverse_runtime import EggReverseSession
+
+            extern_functions.update(
+                EggReverseSession(data_runtime=data_runtime).extern_functions()
+            )
+        # 24 is pure BINGO state/rendering.  The generated EXTERN callbacks
+        # use the same script-run lifetime as 25/28; PRINT output is routed
+        # through the normal script logger so the UI keeps the old diagnostics.
+        python_bingo_snapshot = root / "python_bingo.json"
+        if python_bingo_snapshot.is_file():
+            from frlg_planner.automation.frlg_bingo_runtime import BingoSession
+
+            extern_functions.update(
+                BingoSession(emit=lambda message: emit({"event": "script.log", "message": str(message)})).extern_functions()
+            )
+        # Mixed libraries keep their device/image functions in ECS, but these
+        # deterministic support and Seed-wait helpers are Python callbacks.
+        python_flow_snapshot = root / "python_flow.json"
+        if python_flow_snapshot.is_file():
+            from frlg_planner.automation.frlg_flow_runtime import EggFlowRuntime, FlowRuntime
+
+            extern_functions.update(FlowRuntime().extern_functions())
+            extern_functions.update(
+                EggFlowRuntime(
+                    seed_runtime=seed_runtime,
+                    catalog_runtime=catalog_runtime,
+                    emit=lambda message: emit({"event": "script.log", "message": str(message)}),
+                ).extern_functions()
+            )
         ocr_reader = None
         ocr_runtime = None
         labels = None
@@ -296,6 +411,38 @@ def main():
         else:
             emit({"event": "script.done", "status": "failed", "phase": "compile", "message": str(error), **error_details(error, config)})
         return
+    if command != "validate" and (
+        (Path(config["scriptDir"]) / "seed_tables.json").is_file()
+        or (Path(config["scriptDir"]) / "python_compute.json").is_file()
+        or (Path(config["scriptDir"]) / "python_data.json").is_file()
+        or (Path(config["scriptDir"]) / "python_catalog.json").is_file()
+        or (Path(config["scriptDir"]) / "python_text.json").is_file()
+        or (Path(config["scriptDir"]) / "python_wild_data.json").is_file()
+        or (Path(config["scriptDir"]) / "python_vote.json").is_file()
+        or (Path(config["scriptDir"]) / "python_egg_reverse.json").is_file()
+        or (Path(config["scriptDir"]) / "python_bingo.json").is_file()
+        or (Path(config["scriptDir"]) / "python_flow.json").is_file()
+    ):
+        # Import the vendored planner before the stdin reader starts.  Its
+        # package initializer imports NumPy; importing that from the worker
+        # while the main thread is blocked in Windows CRT stdin can deadlock.
+        planner_root = Path(__file__).resolve().parent / "frlg_planner"
+        if str(planner_root) not in sys.path:
+            sys.path.insert(0, str(planner_root))
+        try:
+            from frlg_planner.automation import seed_table_runtime  # noqa: F401
+            from frlg_planner.automation import frlg_compute_runtime  # noqa: F401
+            from frlg_planner.automation import frlg_data_runtime  # noqa: F401
+            from frlg_planner.automation import frlg_catalog_runtime  # noqa: F401
+            from frlg_planner.automation import frlg_text_runtime  # noqa: F401
+            from frlg_planner.automation import frlg_wild_data_runtime  # noqa: F401
+            from frlg_planner.automation import frlg_vote_runtime  # noqa: F401
+            from frlg_planner.automation import frlg_egg_reverse_runtime  # noqa: F401
+            from frlg_planner.automation import frlg_bingo_runtime  # noqa: F401
+            from frlg_planner.automation import frlg_flow_runtime  # noqa: F401
+        except Exception as error:
+            emit({"event": "script.done", "status": "failed", "phase": "compile", "message": str(error)})
+            return
     worker = threading.Thread(target=run, args=(config, program), daemon=True)
     worker.start()
     for line in sys.stdin:
