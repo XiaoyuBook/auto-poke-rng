@@ -76,7 +76,11 @@ PRINT "SETTINGS=" & $probe
     def test_published_entries_open_options_for_cold_start_and_shortcuts(self):
         for entry in ('NS火叶全自动一键乱数2.0.ecs', 'NS火叶全自动一键乱数2.0-时间轴.ecs'):
             program = EasyConScriptEngine().load_file(CORPUS / entry)
-            for starter, shortcut in ((False, 0), (True, 0), (False, 1), (False, 2), (False, 3)):
+            for starter, shortcut in (
+                (False, 0), (True, 0),
+                (False, 1), (False, 2), (False, 3),
+                (True, 1), (True, 2), (True, 3),
+            ):
                 with self.subTest(entry=entry, starter=starter, shortcut=shortcut):
                     self.replay_settings(program, starter=starter, shortcut=shortcut)
 

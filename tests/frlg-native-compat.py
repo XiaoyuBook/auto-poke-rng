@@ -42,13 +42,24 @@ class FrlgMenuNavigation(unittest.TestCase):
                 with self.subTest(starter=starter, shortcut=shortcut):
                     self.assertEqual(self.replay(fixed, starter, shortcut), ['BAG', 'OPTION'])
 
-    def test_old_clamp_reproduces_save_and_migration_is_idempotent(self):
-        legacy = self.original.replace(frlg.SHORTCUT_REGISTRATION_OPTIONS_ORIGINAL,
-                                       frlg.SHORTCUT_REGISTRATION_OPTIONS_LEGACY)
-        self.assertEqual(self.replay(legacy, False, 0), ['SAVE'])
-        fixed = frlg._apply_shortcut_registration_main_text(legacy, self.helper)
-        self.assertEqual(self.replay(fixed, False, 0), ['OPTION'])
-        self.assertEqual(frlg._apply_shortcut_registration_main_text(fixed, self.helper), fixed)
+    def test_old_menu_patches_migrate_without_reintroducing_cursor_guesses(self):
+        for old_block in (frlg.SHORTCUT_REGISTRATION_OPTIONS_LEGACY,
+                          frlg.SHORTCUT_REGISTRATION_OPTIONS_CURRENT):
+            with self.subTest(old_block=old_block):
+                legacy = self.original.replace(
+                    frlg.SHORTCUT_REGISTRATION_OPTIONS_ORIGINAL, old_block)
+                if old_block == frlg.SHORTCUT_REGISTRATION_OPTIONS_LEGACY:
+                    # The old UP8 clamp lands the normal cold-start route on
+                    # SAVE; this is the failure the canonical route removes.
+                    self.assertEqual(self.replay(legacy, False, 0), ['SAVE'])
+                fixed = frlg._apply_shortcut_registration_main_text(legacy, self.helper)
+                self.assertIn(frlg.SHORTCUT_REGISTRATION_OPTIONS_CURRENT, fixed)
+                self.assertNotIn(frlg.SHORTCUT_REGISTRATION_OPTIONS_LEGACY, fixed)
+                self.assertEqual(
+                    frlg._apply_shortcut_registration_main_text(fixed, self.helper),
+                    fixed,
+                )
+                self.assertEqual(self.replay(fixed, False, 0), ['OPTION'])
 
 
 class FrlgCompatibility(unittest.TestCase):

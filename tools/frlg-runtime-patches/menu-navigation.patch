@@ -1,8 +1,9 @@
 diff --git a/assets/easycon118_extensions/shortcut_registration_main.ecs b/assets/easycon118_extensions/shortcut_registration_main.ecs
-index b7a6435..9ac6e5b 100644
 --- a/assets/easycon118_extensions/shortcut_registration_main.ecs
 +++ b/assets/easycon118_extensions/shortcut_registration_main.ecs
-@@ -34,15 +34,16 @@ FUNC 检查并校正快捷登记($目标位: INT, $识图阈值: INT): INT
+@@ -32,19 +32,16 @@
+     $快捷登记结果 = 1
+ 
      PRINT "FRLG_STAGE|BEGIN|settings.shortcut|settings.shortcut|20000|NS火叶全自动一键乱数2.0.ecs|检查并校正快捷登记|main.settings.shortcut|manual_prepare_then_restart|OR;快捷第一位.IL:>=:" & $识图阈值 & ",快捷第二位.IL:>=:" & $识图阈值 & ",快捷第三位.IL:>=:" & $识图阈值 & "|!"
      X
      WAIT 500
@@ -15,19 +16,148 @@ index b7a6435..9ac6e5b 100644
 -        DOWN
 -        WAIT 150
 -    NEXT
-+    # 主菜单是循环菜单，不能用固定次数向上“夹顶”；按流程状态定位背包。
 +    IF 是否御三家目标() == 0
-+        # 普通存档从图鉴向下两次进入背包。
 +        FOR 2
-+            LS DOWN
-+            WAIT 50
-+            LS RESET
-+            WAIT 100
++            DOWN
++            WAIT 150
 +        NEXT
 +    ENDIF
      A
      WAIT 1500
      RIGHT
+     WAIT 1500
+ 
+@@ -58,24 +55,19 @@
+         $快捷登记目标分数 = $快捷登记第三分数
+     ENDIF
+     PRINT "快捷登记识别: 目标位=" & $目标位 & " 第一位=" & $快捷登记第一分数 & " 第二位=" & $快捷登记第二分数 & " 第三位=" & $快捷登记第三分数
+ 
+     IF $快捷登记目标分数 < $识图阈值
+-        # 重要道具光标也先夹到顶部，再选择固定的第1/2/3项。
+-        FOR 6
+-            UP
+-            WAIT 100
+-        NEXT
+         $快捷登记移动次数 = $目标位 - 1
+         IF $快捷登记移动次数 > 0
+             FOR $快捷登记移动索引 = 1 TO $快捷登记移动次数
+                 DOWN
+                 WAIT 150
+             NEXT
+         ENDIF
+         A
+-        WAIT 700
++        WAIT 1500
+         # 道具菜单固定为 USE / REGISTER / CANCEL，向下一项登记。
+         DOWN
+         WAIT 300
+         A
+         WAIT 1500
+@@ -96,11 +88,11 @@
+         NEXT
+         IF $快捷登记目标分数 < $识图阈值
+             PRINT "FRLG_STAGE|FAIL|settings.shortcut|快捷登记后目标位置仍未匹配|!"
+             PRINT "快捷登记检查失败: 目标位=" & $目标位 & " 匹配度=" & $快捷登记目标分数
+             B
+-            WAIT 700
++            WAIT 1500
+             B
+             WAIT 1000
+             RETURN 0
+         ENDIF
+         PRINT "快捷登记已修改为重要道具第" & $目标位 & "项"
+@@ -109,11 +101,11 @@
+         PRINT "快捷登记正确: 重要道具第" & $目标位 & "项"
+         $快捷登记结果 = 1
+     ENDIF
+ 
+     B
+-    WAIT 700
++    WAIT 1500
+     B
+     WAIT 1000
+     PRINT "FRLG_STAGE|END|settings.shortcut|!"
+     RETURN $快捷登记结果
+ ENDFUNC
+diff --git a/assets/easycon118_extensions/shortcut_registration_egg.ecs b/assets/easycon118_extensions/shortcut_registration_egg.ecs
+--- a/assets/easycon118_extensions/shortcut_registration_egg.ecs
++++ b/assets/easycon118_extensions/shortcut_registration_egg.ecs
+@@ -2,14 +2,10 @@
+ 
+ FUNC 孵蛋测试_检查并登记自行车快捷($识图阈值: INT): INT
+     PRINT "FRLG_STAGE|BEGIN|egg.settings.shortcut|egg.settings.shortcut|20000|lib/27_孵蛋测试流程.ecs|孵蛋测试_检查并登记自行车快捷|egg27.settings.shortcut|manual_prepare_then_restart|OR;快捷第一位.IL:>=:" & $识图阈值 & ",快捷第二位.IL:>=:" & $识图阈值 & ",快捷第三位.IL:>=:" & $识图阈值 & "|!"
+     X
+     WAIT 500
+-    FOR 8
+-        UP
+-        WAIT 100
+-    NEXT
+     FOR 2
+         DOWN
+         WAIT 150
+     NEXT
+     A
+@@ -20,18 +16,14 @@
+     $孵蛋库_快捷第一分数 = @快捷第一位
+     $孵蛋库_快捷第二分数 = @快捷第二位
+     $孵蛋库_快捷第三分数 = @快捷第三位
+     PRINT "孵蛋快捷登记识别: 第一位=" & $孵蛋库_快捷第一分数 & " 第二位=" & $孵蛋库_快捷第二分数 & " 第三位=" & $孵蛋库_快捷第三分数
+     IF $孵蛋库_快捷第二分数 < $识图阈值
+-        FOR 6
+-            UP
+-            WAIT 100
+-        NEXT
+         DOWN
+         WAIT 150
+         A
+-        WAIT 700
++        WAIT 1500
+         DOWN
+         WAIT 300
+         A
+         WAIT 1500
+ 
+@@ -45,22 +37,22 @@
+         NEXT
+         IF $孵蛋库_快捷第二分数 < $识图阈值
+             PRINT "FRLG_STAGE|FAIL|egg.settings.shortcut|登记自行车后第二位仍未匹配|!"
+             PRINT "孵蛋快捷登记检查失败: 第二位匹配度=" & $孵蛋库_快捷第二分数
+             B
+-            WAIT 700
++            WAIT 1500
+             B
+             WAIT 1000
+             RETURN 0
+         ENDIF
+         PRINT 孵蛋快捷登记已修改为重要道具第2项自行车
+     ELSE
+         PRINT 孵蛋快捷登记正确: 重要道具第2项自行车
+     ENDIF
+ 
+     B
+-    WAIT 700
++    WAIT 1500
+     B
+     WAIT 1000
+     PRINT "FRLG_STAGE|END|egg.settings.shortcut|!"
+     RETURN 1
+ ENDFUNC
+diff --git a/assets/easycon118_extensions/egg_settings_retry.ecs b/assets/easycon118_extensions/egg_settings_retry.ecs
+--- a/assets/easycon118_extensions/egg_settings_retry.ecs
++++ b/assets/easycon118_extensions/egg_settings_retry.ecs
+@@ -152,11 +152,11 @@
+     ENDIF
+ 
+     PRINT 【孵蛋准备】按 Seed模式检查游戏设置
+     X
+     WAIT 500
+-    FOR 5
++    FOR 3
+         DOWN
+         WAIT 150
+     NEXT
+     A
+     WAIT 2000
 diff --git a/automation/easycon118.py b/automation/easycon118.py
 index 2f14e5d..772ec53 100644
 --- a/automation/easycon118.py

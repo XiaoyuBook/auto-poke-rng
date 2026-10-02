@@ -118,6 +118,7 @@ PYTHON_FLOW_FILES = {
 }
 RETAINED_ECS_MIGRATION_MARKER = "# PYTHON_MIGRATION_RETAINED_V1"
 PRECALIBRATION_RUNTIME_MARKER = "# GUI_PRECALIBRATION_V1"
+ECS_LOG_POLICY_MARKER = "# GUI_ECS_LOG_POLICY_V1"
 EXPECTED_SCRIPT_FILE_COUNT = 33
 EGG_PARENT_TYPES_COMMENT_OLD = (
     '# 亲本A固定填写雌方或无性别方，亲本B固定填写雄方；性别填写 "雌" / "雄" / "无性别"。'
@@ -288,12 +289,20 @@ PREVIOUS_SCRIPT_SHA256S += (
     # Teachy TV opened from Bag, and explicit post-catch cursor navigation.
     "abc734a8f44ff152312bf3f62f5e8cc87194b13325bb3e2985f567a45325418b",
 )
-EXPECTED_SCRIPT_SHA256 = "b4bef3a3fe178bb37eb6b66adada6bd1113a8f81d4efb8248143b1a62062f2e7"
+PREVIOUS_SCRIPT_SHA256S += (
+    # September 27 source corpus before the October 1 four-file upstream sync.
+    "eb18777c634b7c5ab10c0f5a930fe29d65b1fdca7d18edb10b461c733dd30bbb",
+    # Local 5a5383 materialization used by earlier GUI builds.
+    "b4bef3a3fe178bb37eb6b66adada6bd1113a8f81d4efb8248143b1a62062f2e7",
+)
+EXPECTED_SCRIPT_SHA256 = "b0f0302037b778661ac5087c6d007ab03865f4030fcd6a680c9f2d450afa1392"
 # Previously materialized 1.6.4-a corpora remain accepted as audited
 # compatibility inputs. This is not a general bypass for modified ECS files.
 SUPPORTED_RUNTIME_SCRIPT_SHA256S = (
     # Published 0.0.1 package; its round-zero menu is corrected on generation.
     "eb18777c634b7c5ab10c0f5a930fe29d65b1fdca7d18edb10b461c733dd30bbb",
+    # October 1 materialization after the reviewed four-file upstream sync.
+    "04a0cdda3c9ded4dda8fb2192765ed76cc46ed6e963fc6cb737c18f8125ad994",
     # Canonical corpus before the first/second/third Key Items shortcut
     # labels were checked and corrected during the round-zero settings pass.
     "95af0d033097233b4c273abeeaff96448fd9a8948532134f7f9b28031066f553",
@@ -652,6 +661,8 @@ SHORTCUT_REGISTRATION_OPTIONS_ORIGINAL = """\
     WAIT 500
     IF 是否御三家目标() == 1
 """
+# Old 1.1.8/early-2.0 route: the fixed UP8 clamp runs before the source
+# starter/normal branches and is migrated during materialization.
 SHORTCUT_REGISTRATION_OPTIONS_LEGACY = """\
     X
     WAIT 500
@@ -662,6 +673,8 @@ SHORTCUT_REGISTRATION_OPTIONS_LEGACY = """\
     NEXT
     IF 是否御三家目标() == 1
 """
+# Flow-aware Options route: a shortcut check returns with the remembered menu
+# cursor on Bag, while target 0 still follows the source cold-start branches.
 SHORTCUT_REGISTRATION_OPTIONS_CURRENT = """\
     X
     WAIT 500
@@ -683,7 +696,7 @@ SHORTCUT_REGISTRATION_EGG_CALL_ANCHOR = """\
     PRINT 【孵蛋准备】按 Seed模式检查游戏设置
     X
     WAIT 500
-    FOR 5
+    FOR 3
 """
 SHORTCUT_REGISTRATION_EGG_CALL_BLOCK = """\
     PRINT 【孵蛋准备】按 Seed模式检查游戏设置
@@ -694,12 +707,7 @@ SHORTCUT_REGISTRATION_EGG_CALL_BLOCK = """\
 
     X
     WAIT 500
-    # 快捷登记检查会改变主菜单记忆位置，进入Options前统一夹到顶部。
-    FOR 8
-        UP
-        WAIT 100
-    NEXT
-    FOR 5
+    FOR 3
 """
 SHORTCUT_REGISTRATION_REQUIREMENT_ANCHOR = (
     "    PRINT 背包第一页第一格放神奇糖果，数量不限\n"
@@ -1868,7 +1876,10 @@ class EasyCon118Options:
     precalibration_context_kind: str | None = None
     # Runtime output and reverse-search controls exposed by the desktop tool.
     # ``None`` keeps the selected ECS template's own expansion defaults.
-    debug_log_output: int = 1
+    # Compact ECS output is the normal mode.  The complete mode remains
+    # available for diagnosing a route or comparing it with the original
+    # EasyCon script.
+    debug_log_output: int = 0
     frame_parity_scheme: int = 1
     reverse_expansion_layers: int | None = None
     reverse_expansion_seed_tolerances: tuple[int, int, int] | None = None
@@ -1924,7 +1935,7 @@ class EggRunRequest:
     precalibration_seed_ns2: int | None = None
     precalibration_held: int | None = None
     precalibration_pickup: int | None = None
-    debug_log_output: int = 1
+    debug_log_output: int = 0
     # Egg runs always use the menu-based parity adjustment.  Expansion
     # overrides remain optional because the pre-calibration wild reverse
     # search shares the ordinary reverse-search controller.
@@ -2114,7 +2125,7 @@ def copy_easycon118_extension_labels(label_dir: str | Path) -> None:
                 source = fallback
             else:
                 raise FileNotFoundError(f"仓库缺少 EasyCon 扩展标签: {name}")
-        (label_dir / name).write_bytes(source.read_bytes().rstrip(b"\r\n"))
+        (label_dir / name).write_bytes(source.read_bytes().rstrip(b"\n"))
 
 
 def inspect_script_corpus(source_dir: str | Path) -> dict[str, Any]:
@@ -2165,7 +2176,7 @@ def _ecs_array(text: str, variable: str, *, strings: bool) -> list[Any]:
     second copy of the data in source code.
     """
     match = re.search(
-        rf"(?m)^\s*\${re.escape(variable)}\s*=\s*\[(?P<values>[^\r\n]*)\]\s*$",
+        rf"(?m)^\s*\${re.escape(variable)}\s*=\s*\[(?P<values>[^\n]*)\]\s*$",
         text,
     )
     if match is None:
@@ -2510,13 +2521,13 @@ def _ecs_id_records(block: str, *, target_variable: str) -> dict[str, dict[str, 
         segment = block[match.start():end]
         games: dict[str, Any] = {}
         for game_match in re.finditer(
-            r"(?ms)^\s*(?:IF|ELIF) \$游戏版本 == (?P<game>\d+)\s*\n\s*RETURN (?P<value>[^\r\n]+)",
+            r"(?ms)^\s*(?:IF|ELIF) \$游戏版本 == (?P<game>\d+)\s*\n\s*RETURN (?P<value>[^\n]+)",
             segment,
         ):
             games[game_match.group("game")] = _ecs_value(game_match.group("value"))
         returns = [
             _ecs_value(value)
-            for value in re.findall(r"(?m)^\s*RETURN (?P<value>[^\r\n]+)", segment)
+            for value in re.findall(r"(?m)^\s*RETURN (?P<value>[^\n]+)", segment)
         ]
         if not returns:
             raise ValueError(f"FRLG 数据图鉴 {match.group('id')} 缺少 RETURN")
@@ -2527,7 +2538,7 @@ def _ecs_id_records(block: str, *, target_variable: str) -> dict[str, dict[str, 
             # RETURN after the branch's ENDIF so 386 keeps its normal-form
             # value (the last RETURN belongs to unknown species).
             branch_default = re.search(
-                r"(?ms)^\s*ENDIF\s*\n\s*RETURN (?P<value>[^\r\n]+)",
+                r"(?ms)^\s*ENDIF\s*\n\s*RETURN (?P<value>[^\n]+)",
                 segment,
             )
             if branch_default is not None:
@@ -2936,7 +2947,8 @@ def materialize_python_bingo_lib(project_dir: str | Path) -> dict[str, Any]:
     BINGO is diagnostic output, but its 9x9 counters and stable-cluster
     decisions are still mutable calculations.  Keeping the source in a backup
     and generating declarations here makes that boundary explicit while the
-    Python session sends the former PRINT lines through the host logger.
+    Python session sends the former PRINT lines through the host logger and
+    publishes a structured snapshot for the GUI BINGO panel.
     """
     root = Path(project_dir).resolve()
     path = root / "lib" / PYTHON_BINGO_FILES[0]
@@ -3244,7 +3256,7 @@ def _replace_function_block(text: str, signature: str, block: str) -> str:
 def _insert_precalibration_globals(text: str, lines: list[str]) -> str:
     if PRECALIBRATION_RUNTIME_MARKER in text:
         raise ValueError("生成脚本已经包含预校准运行时覆盖，拒绝重复注入")
-    pattern = re.compile(r"(?m)^(\$Seed预校准索引_NS2\s*=\s*[^\r\n]*)$")
+    pattern = re.compile(r"(?m)^(\$Seed预校准索引_NS2\s*=\s*[^\n]*)$")
     addition = "\n" + PRECALIBRATION_RUNTIME_MARKER + "\n" + "\n".join(lines)
     configured, count = pattern.subn(r"\1" + addition, text, count=1)
     if count != 1:
@@ -3267,7 +3279,7 @@ def _apply_seed_precalibration_globals(
         normalized = _validated_optional_int(name, value)
         if normalized is None:
             continue
-        pattern = re.compile(rf"(?m)^\${re.escape(name)}\s*=\s*[^\r\n]*$")
+        pattern = re.compile(rf"(?m)^\${re.escape(name)}\s*=\s*[^\n]*$")
         configured, count = pattern.subn(f"${name} = {normalized}", configured)
         if count != 1:
             raise ValueError(f"2.0 模板字段 ${name} 应出现 1 次，实际为 {count} 次")
@@ -3430,6 +3442,24 @@ def _validate_runtime_output_mode(value: int) -> int:
     if value not in {0, 1}:
         raise ValueError("输出日志模式只能是0（精简）或1（完整调试）")
     return value
+
+
+def _apply_ecs_log_policy_marker(template_text: str, mode: int) -> str:
+    """Tell the shared ECS host which PRINT policy the generated script uses.
+
+    The marker is part of the generated ECS source so this policy follows the
+    script when it is copied or run outside the FRLG workspace.  It has no
+    effect on controller, OCR, or flow behavior; it only controls diagnostic
+    PRINT delivery to the host logger.
+    """
+    mode = _validate_runtime_output_mode(mode)
+    marker_pattern = rf"(?m)^# {re.escape(ECS_LOG_POLICY_MARKER[2:])} mode=(?:compact|full)\s*$"
+    marker = f"{ECS_LOG_POLICY_MARKER} mode={'full' if mode else 'compact'}"
+    configured, count = re.subn(marker_pattern, marker, template_text)
+    if count:
+        return configured
+    # Keep the original ECS line numbers stable for progress diagnostics.
+    return configured.rstrip("\n") + "\n" + marker + "\n"
 
 
 def _validate_frame_parity_scheme(value: int) -> int:
@@ -3768,7 +3798,7 @@ def _ecs_literal(value: Any) -> str:
 def _configure_all_values(template_text: str, values: dict[str, Any]) -> str:
     configured = template_text
     for name, value in values.items():
-        pattern = re.compile(rf"(?m)^\s*\${re.escape(name)}\s*=\s*[^\r\n]*$")
+        pattern = re.compile(rf"(?m)^\s*\${re.escape(name)}\s*=\s*[^\n]*$")
         configured, count = pattern.subn(f"${name} = {_ecs_literal(value)}", configured)
         if count != 1:
             raise ValueError(f"2.0 模板字段 ${name} 应出现 1 次，实际为 {count} 次")
@@ -3823,10 +3853,11 @@ def configure_template_text(
     )
     all_values = reverse_expansion_to_ecs_values(options)
     all_values.update(shiny_values)
-    return _configure_all_values(
+    configured = _configure_all_values(
         configured,
         all_values,
     )
+    return _apply_ecs_log_policy_marker(configured, options.debug_log_output)
 
 
 def _configure_user_values(
@@ -3842,7 +3873,7 @@ def _configure_user_values(
         raise ValueError("2.0 模板缺少进阶设置分界标记，拒绝在未知版本中替换参数")
     configured = user_section
     for name, value in values.items():
-        pattern = re.compile(rf"(?m)^\s*\${re.escape(name)}\s*=\s*[^\r\n]*$")
+        pattern = re.compile(rf"(?m)^\s*\${re.escape(name)}\s*=\s*[^\n]*$")
         configured, count = pattern.subn(f"${name} = {_ecs_literal(value)}", configured)
         if count == 0 and name in optional_names:
             continue
@@ -3891,7 +3922,7 @@ def _assert_configured_all_values(
     for name, value in values.items():
         expected = _ecs_literal(value)
         matches = re.findall(
-            rf"(?m)^\s*\${re.escape(name)}\s*=\s*([^\r\n]*?)\s*$",
+            rf"(?m)^\s*\${re.escape(name)}\s*=\s*([^\n]*?)\s*$",
             text,
         )
         if matches != [expected]:
@@ -4370,7 +4401,7 @@ def configure_egg_template_text(template_text: str, request: EggRunRequest) -> s
         for name in availability_values
         if len(
             re.findall(
-                rf"(?m)^\s*\${re.escape(name)}\s*=\s*[^\r\n]*$",
+                rf"(?m)^\s*\${re.escape(name)}\s*=\s*[^\n]*$",
                 configured,
             )
         )
@@ -4387,7 +4418,8 @@ def configure_egg_template_text(template_text: str, request: EggRunRequest) -> s
         availability_values,
     )
     configured = _apply_egg_summary_fix_text(configured)
-    return _apply_egg_reverse_lookup_policy_text(configured)
+    configured = _apply_egg_reverse_lookup_policy_text(configured)
+    return _apply_ecs_log_policy_marker(configured, request.debug_log_output)
 
 
 def _apply_egg_parent_pairing_text(template_text: str) -> str:
@@ -5516,7 +5548,7 @@ def _apply_home_buffer_adaptive_classifier_text(
         template_text = template_text[:start] + classifier + template_text[start:]
 
     switch_pattern = re.compile(
-        rf"(?m)^\${re.escape(HOME_BUFFER_ADAPTIVE_SWITCH)}\s*=\s*[^\r\n]*$"
+        rf"(?m)^\${re.escape(HOME_BUFFER_ADAPTIVE_SWITCH)}\s*=\s*[^\n]*$"
     )
     template_text, count = switch_pattern.subn(
         f"${HOME_BUFFER_ADAPTIVE_SWITCH} = {1 if enabled else 0}",
@@ -5671,21 +5703,55 @@ def _apply_shortcut_registration_main_text(
             1,
         )
 
-    if SHORTCUT_REGISTRATION_OPTIONS_CURRENT not in template_text:
-        if SHORTCUT_REGISTRATION_OPTIONS_LEGACY in template_text:
-            template_text = template_text.replace(
-                SHORTCUT_REGISTRATION_OPTIONS_LEGACY,
-                SHORTCUT_REGISTRATION_OPTIONS_CURRENT,
-                1,
-            )
-        elif template_text.count(SHORTCUT_REGISTRATION_OPTIONS_ORIGINAL) != 1:
-            raise ValueError("主脚本缺少唯一的Options入口，拒绝修正快捷登记后的菜单光标")
-        else:
-            template_text = template_text.replace(
-                SHORTCUT_REGISTRATION_OPTIONS_ORIGINAL,
-                SHORTCUT_REGISTRATION_OPTIONS_CURRENT,
-                1,
-            )
+    # Preserve one canonical flow-aware Options route.  The helper closes the
+    # Bag before returning, so a shortcut-enabled call reopens the menu with
+    # the remembered cursor on Bag; target 0 keeps the source cold-start path.
+    # Known old GUI blocks are migrated to this route, and a fresh source
+    # prefix receives the same branch so both imported and generated projects
+    # have identical post-shortcut behavior.
+    legacy_count = template_text.count(SHORTCUT_REGISTRATION_OPTIONS_LEGACY)
+    flow_aware_count = template_text.count(SHORTCUT_REGISTRATION_OPTIONS_CURRENT)
+    original_count = template_text.count(SHORTCUT_REGISTRATION_OPTIONS_ORIGINAL)
+    # Accept an upstream flow-aware spelling that uses the same state variable
+    # but differs in comments, indentation, or stick timing.  It is already a
+    # route after the shortcut helper and must not receive a second branch.
+    options_state_route = "$游戏设置快捷目标位 > 0" in template_text
+    if flow_aware_count:
+        # This is already the canonical post-shortcut route.  It must remain
+        # stable on a second materialization pass, even when the surrounding
+        # source has no cold-start FOR 5 branch to use as a discriminator.
+        if flow_aware_count != 1 or legacy_count or original_count:
+            raise ValueError("主脚本Options入口存在重复或混合版本，拒绝迁移菜单光标")
+    elif legacy_count:
+        if legacy_count != 1 or original_count:
+            raise ValueError("主脚本Options入口存在重复或混合版本，拒绝迁移菜单光标")
+        old_block = SHORTCUT_REGISTRATION_OPTIONS_LEGACY
+        # The old 1.1.8/early-2.0 mother uses a cold-start route here.  After
+        # a shortcut check the helper has closed the Bag and the remembered
+        # cursor is Bag, so every known old route needs the explicit
+        # flow-aware branch before its original starter/normal body.
+        replacement = SHORTCUT_REGISTRATION_OPTIONS_CURRENT
+        template_text = template_text.replace(
+            old_block,
+            replacement,
+            1,
+        )
+    elif options_state_route and original_count == 0 and not legacy_count:
+        pass
+    elif original_count != 1:
+        raise ValueError("主脚本缺少唯一的Options入口，拒绝迁移未知菜单结构")
+    else:
+        # A fresh mother may still expose the original cold-start prefix.  The
+        # shortcut helper is now part of the same settings function, therefore
+        # the post-helper Bag cursor must be handled before the source's
+        # existing starter/normal branches.  This also makes the transformation
+        # independent of whether the normal branch says FOR 5, FOR 3, or uses
+        # a future equivalent loop.
+        template_text = template_text.replace(
+            SHORTCUT_REGISTRATION_OPTIONS_ORIGINAL,
+            SHORTCUT_REGISTRATION_OPTIONS_CURRENT,
+            1,
+        )
 
     if SHORTCUT_REGISTRATION_REQUIREMENT_BLOCK not in template_text:
         if template_text.count(SHORTCUT_REGISTRATION_REQUIREMENT_ANCHOR) != 1:
@@ -6113,8 +6179,9 @@ def write_configured_project(
     # replaced by per-run Python session objects; preserved copies stay beside
     # the generated project for exact source comparison.
     python_stateful = materialize_python_stateful_libs(output_dir)
-    # 24's BINGO table is also stateful pure calculation/output.  Its logger
-    # calls are routed through the host, while device and image flows remain ECS.
+    # 24's BINGO table is also stateful pure calculation/output.  Its text
+    # diagnostics and structured snapshots are routed through the host, while
+    # device and image flows remain ECS.
     python_bingo = materialize_python_bingo_lib(output_dir)
     python_flow = materialize_python_flow_helpers(output_dir)
     python_main_reverse = materialize_python_main_reverse(output_dir)
