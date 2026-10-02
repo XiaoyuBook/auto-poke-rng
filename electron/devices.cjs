@@ -3,6 +3,7 @@ const { OcrClient } = require('./ocr-client.cjs');
 const { ImageLabelMatcher } = require('./image-label-matcher.cjs');
 const { ScriptRunner, addSequenceApi } = require('./script-runner.cjs');
 const { registerControllerOverlay } = require('./controller-overlay.cjs');
+const { registerAudio } = require('./audio-devices.cjs');
 const path = require('node:path');
 const { EventEmitter } = require('node:events');
 
@@ -16,7 +17,7 @@ function registerDevices({ ipcMain, getWindows, loadWindow, rootDirectory = path
   const controller = addSequenceApi(new RuntimeClient({ role: 'controller', testMode }));
   const openWindow = loadWindow || ((window, query) => window.loadFile(path.join(__dirname, '..', 'dist', 'index.html'), { query }));
   const controllerOverlay = registerControllerOverlay({ controller, getMainWindow: () => getWindows().find(window => !window.isDestroyed()), getWindows, loadWindow: openWindow });
-  let state = { video: { status: 'idle' }, controller: { status: 'idle' } };
+  let state = { video: { status: 'idle' }, audio: { status: 'idle' }, controller: { status: 'idle' } };
   let snapshot = null;
   let connectTimer, frameTimer, healthBusy = false, closing = false, videoConnectInFlight = null;
   const broadcast = () => {
@@ -69,6 +70,13 @@ function registerDevices({ ipcMain, getWindows, loadWindow, rootDirectory = path
     }
   });
   const handle = (name, action) => ipcMain.handle(name, (event, args) => { requireWindow(event); return action(args); });
+  const audio = registerAudio({
+    client: new RuntimeClient({ role: 'audio', testMode }), handle,
+    publish: value => { state = { ...state, audio: value }; broadcast(); events.emit('audio-state', value); },
+    level: value => {
+      for (const window of getWindows()) if (!window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send('devices:audio-level', value);
+    },
+  });
   handle('devices:state', () => state);
   handle('controller:list', () => controller.call('controller.list'));
   handle('controller:connect', async args => {
@@ -166,7 +174,7 @@ function registerDevices({ ipcMain, getWindows, loadWindow, rootDirectory = path
     releaseAutomation: owner => { if (automationOwner === owner) { automationOwner = null; controllerOverlay.input.automationLocked = false; } },
     stopInputs: async () => { await runner.stop(); await controllerOverlay.suspend(); if (controller.child) await controller.call('controller.stop'); },
     controllerOverlay,
-    close: async () => { closing = true; matcher.close(); clearVideoTimers(); clearInterval(controllerTimer); ++runner.validationVersion; runner.cancelValidation?.(); await runner.stop().catch(() => {}); await controllerOverlay.close(); await Promise.allSettled([video.close(), controller.close(), ocr.close()]); },
+    close: async () => { closing = true; matcher.close(); clearVideoTimers(); clearInterval(controllerTimer); ++runner.validationVersion; runner.cancelValidation?.(); await runner.stop().catch(() => {}); await controllerOverlay.close(); await Promise.allSettled([video.close(), audio.close(), controller.close(), ocr.close()]); },
     getState: () => state,
   };
 }

@@ -6,7 +6,13 @@ export interface VideoState extends DeviceState {
   deviceId?: string; backend?: string; width?: number; height?: number; reportedFps?: number;
   session?: string; previewUrl?: string;
 }
-export interface DevicesState { video: VideoState; controller: DeviceState }
+export interface AudioDevice { id: string; name: string; backend: 'wasapi' }
+export interface AudioState extends DeviceState {
+  deviceId?: string; backend?: 'wasapi'; session?: string;
+  sampleRate?: number; channels?: number; format?: 'f32le'; baseUrl?: string; token?: string;
+}
+export interface AudioLevel { session: string; sequence: number; peak: number; rms: number; silent: boolean; discontinuity: boolean }
+export interface DevicesState { video: VideoState; audio: AudioState; controller: DeviceState }
 export interface Snapshot { url: string; session: string; sequence: string; width: number; height: number }
 export interface LabelMatchResult {
   score: number; scriptValue: number; matched: boolean; unit: 'score' | 'percent';
@@ -19,6 +25,12 @@ export interface DevicesApi {
   getState: () => Promise<DevicesState>;
   onState: (listener: (state: DevicesState) => void) => () => void;
   onEvent: (listener: (event: ScriptEvent) => void) => () => void;
+  audio: {
+    list: () => Promise<AudioDevice[]>;
+    connect: (config: { deviceId: string }) => Promise<void>;
+    disconnect: () => Promise<void>;
+    onLevel: (listener: (level: AudioLevel) => void) => () => void;
+  };
   controller: {
     list: () => Promise<{ id: string; name: string }[]>;
     connect: (port: string) => Promise<void>;

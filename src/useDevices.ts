@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { DevicesState } from './devices';
-export const initialDeviceState: DevicesState = { video: { status: 'idle' }, controller: { status: 'idle' } };
+export const initialDeviceState: DevicesState = { video: { status: 'idle' }, audio: { status: 'idle' }, controller: { status: 'idle' } };
 export function useDevices() {
   const [state, setState] = useState(initialDeviceState);
   useEffect(() => {

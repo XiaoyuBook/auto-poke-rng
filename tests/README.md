@@ -14,6 +14,8 @@
 | `npm run test:devices:regression` | 公共伊机控、视频源、Python 帧读取及测试启动器的审查回归 |
 | `npm run test:runtime` | OCR 适配器单测、CTest 核心测试、脚本/设备 Node 集成测试，以及全部设备审查回归 |
 | `npm run test:devices` | 构建界面后，在真实 Electron 中验证模拟设备接线 |
+| `npm run test:audio` | 独立音频输入、连续 PCM、Python 消费者、静音/断流、缓存缺块、重连、超时和组件验证 |
+| `npm run test:audio:electron` | 构建界面后，在真实 Electron 中验证音频选择、电平、窗口生命周期和布局 |
 | `npm run test:electron` | 桌面窗口、面板、脚本文件等集成验证 |
 | `npm run test:qq` | QQ 本地 HTTP／WebSocket 协议、密钥持久化、发送服务与配置组件测试 |
 | `npm run test:qq:electron` | 真实 Electron 下的 QQ 配置、系统加密、绑定、图文发送、窗口关闭与布局验证 |

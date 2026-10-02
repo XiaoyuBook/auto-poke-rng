@@ -58,6 +58,8 @@ $testFiles = @(
     'tests/runtime-integration.cjs'
     'tests/controller-integration.cjs'
     'tests/device-regressions.cjs'
+    'tests/audio-integration.cjs'
+    'tests/audio-supervisor.cjs'
     'tests/frame-reader-regressions.cjs'
     'tests/runtime-launcher-regressions.cjs'
     'tests/pokefinder-native.cjs'

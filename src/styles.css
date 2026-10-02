@@ -1212,6 +1212,16 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .device-form { display: grid; gap: 12px; margin-bottom: 16px; }
 .device-form label { display: grid; gap: 6px; color: var(--secondary); font-size: 12px; }
 .device-form select { width: 100%; padding: 7px; border: 1px solid #414949; border-radius: 4px; color: var(--text); background: #282d2d; }
+.video-source-dialog { max-height: calc(100dvh - 48px); }
+.video-source-dialog .dialog-body { overflow-y: auto; min-height: 0; max-height: calc(100dvh - 120px); }
+.audio-source { margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--line); }
+.audio-source h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 14px; }
+.audio-source .device-form { grid-template-columns: minmax(0, 1fr); }
+.audio-source .device-state > div { min-width: 0; overflow-wrap: anywhere; }
+.audio-input-level { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0; color: var(--secondary); font-size: 12px; }
+.audio-input-level meter { flex: 1; min-width: 100px; height: 14px; }
+.audio-input-level span { min-width: 112px; text-align: right; }
+.audio-input-level p { width: 100%; margin: 0; }
 .device-select-row { display: flex; gap: 8px; min-width: 0; }
 .device-select-row select { min-width: 0; }
 .device-error { color: #df9d94; font-size: 12px; line-height: 1.7; margin: 10px 0; overflow-wrap: anywhere; }

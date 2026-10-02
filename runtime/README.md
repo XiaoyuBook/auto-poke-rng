@@ -18,7 +18,7 @@ npm run dev
 ## 进程与所有权
 
 - Electron 主进程负责设备生命周期、调用授权、状态广播和超时回收。窗口只调用 preload 暴露的方法。
-- 同一个 C++ 可执行文件分别以 `--role video` 和 `--role controller` 运行。摄像头驱动挂死不会连带杀掉串口进程。控制消息使用继承的 stdin/stdout 管道，不额外暴露 TCP 控制接口。
+- 同一个 C++ 可执行文件分别以 `--role video`、`--role audio` 和 `--role controller` 运行。视频、音频驱动挂死不会连带杀掉串口进程。控制消息使用继承的 stdin/stdout 管道，不额外暴露 TCP 控制接口。
 - 采集线程是唯一 `VideoCapture` 所有者。Windows 命名互斥量阻止本软件两个实例同时采集；旧版软件和 OBS 等其他程序的占用由驱动打开结果报告。
 - 串口以 Windows 独占方式打开，遵循原版 `A5 A5 81 → 80` 握手、115200/9600 波特率尝试、Switch 报告编码和最短 30ms 报告间隔。脚本完成和停止均释放按键，串口保持连接。只有显式断开/进程退出才关闭它。
 - 脚本获取独占控制租约；手动按键、摇杆与另一个脚本不能插入当前脚本。停止会取消剩余动作，不会继续发送排队中的按键。
@@ -26,6 +26,8 @@ npm run dev
 - 打开采集卡最长等待 20 秒；无新帧会失败，独立的 Electron 健康检查也会回收卡在驱动读取里的进程。断开请求超时只回收本应用持有的子进程。不会自动重放脚本或重连后继续发送旧输入。
 
 ## 多消费者视频
+
+音频使用独立 WASAPI 采集进程和带游标的二进制读取接口，配置入口在“视频源 → 游戏音频”。使用方式、连续 PCM 协议及验证边界见 [游戏音频采集](../docs/AUDIO_CAPTURE.md)。
 
 每帧包含采集会话 UUID、递增序号、QPC 单调时间戳、宽高、stride 和 BGR24 像素。时间戳表示主机取得画面的时间，不是采集卡传感器时钟。驱动报告帧率与请求帧率分开，不承诺硬实时。
 
@@ -55,6 +57,7 @@ HTTP 只监听 `127.0.0.1` 随机端口，要求当前运行时 token。程序�
 | 范围 | 方法 |
 | --- | --- |
 | 视频 | `video.list / start / stop / status` |
+| 音频 | `audio.list / start / stop / status`（独立 `audio` 进程） |
 | 控制器 | `controller.list / connect / disconnect / status` |
 | 手柄 | `controller.key / stick / reset / stop` |
 | 脚本独占权 | `controller.acquire / release`，后续请求携带 owner |

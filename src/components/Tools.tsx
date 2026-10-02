@@ -12,7 +12,7 @@ export function ToolsDialog({ modal, close, onInput }: { modal: Modal; close: ()
   if (modal === 'notification') return <QQNotifications close={close} />;
   const titles: Record<Modal, string> = { video: '视频源', easycon: '伊机控连接', controller: '虚拟手柄', notification: '通知', mapping: '按键映射', help: '脚本编辑帮助', settings: '设置' };
   return (
-    <Dialog title={titles[modal]} close={close} className={modal === 'help' ? 'script-help-dialog' : ''}>
+    <Dialog title={titles[modal]} close={close} className={modal === 'help' ? 'script-help-dialog' : modal === 'video' ? 'video-source-dialog' : ''}>
       <div className="dialog-body">
         {modal === 'settings' && <OverlayScaleSetting />}
         {modal === 'video' && <VideoSource />}

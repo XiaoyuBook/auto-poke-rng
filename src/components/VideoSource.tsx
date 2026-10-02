@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { RefreshCw, Tv } from 'lucide-react';
 import { useDevices } from '../useDevices';
 import type { VideoDevice } from '../devices';
+import { AudioSource } from './AudioSource';
 
 export function VideoSource() {
   const { video } = useDevices();
@@ -46,5 +47,6 @@ export function VideoSource() {
     <div className="device-state"><Tv size={19} /><div><strong>{connected ? '视频源已连接' : connecting ? '正在连接视频源…' : video.status === 'failed' ? '视频源连接失败' : '尚未连接视频源'}</strong>{connected && <p>{video.name} · {video.width} × {video.height}</p>}</div><span className={'status-dot ' + (connected ? 'success' : 'warning')} /></div>
     {(error || video.message) && <p className="device-error" role="alert">{error || video.message}</p>}
     <button className="button primary" disabled={!api || busy || (!connected && !connecting && !selected)} onClick={() => void action()}>{connecting ? '取消连接' : connected ? '断开视频源' : '连接视频源'}</button>
+    <AudioSource />
   </>;
 }

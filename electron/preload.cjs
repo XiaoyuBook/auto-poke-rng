@@ -69,6 +69,12 @@ contextBridge.exposeInMainWorld('desktop', {
       validate: script => ipcRenderer.invoke('execution:validate', script),
       stop: () => ipcRenderer.invoke('execution:stop'),
     },
+    audio: {
+      list: () => ipcRenderer.invoke('audio:list'),
+      connect: config => ipcRenderer.invoke('audio:connect', config),
+      disconnect: () => ipcRenderer.invoke('audio:disconnect'),
+      onLevel: listener => subscribe('devices:audio-level', listener),
+    },
     video: {
       list: backend => ipcRenderer.invoke('video:list', { backend }),
       connect: config => ipcRenderer.invoke('video:connect', config),
