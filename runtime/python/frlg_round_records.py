@@ -52,6 +52,10 @@ class RoundRecorder:
                 patch["result"] = "无匹配个体"
             if line.startswith("本轮停止反查"):
                 patch["result"] = "反查中止"
+            if line.startswith(("本轮离群跳过", "本轮结果波动较大，参数保持不变")):
+                # These calibration branches return before the usual round
+                # summary. Record their real outcome without inventing a hit.
+                patch.update(result="校准跳过", note=line)
             if line.startswith(("目标获取未完成", "孵蛋Seed预校准反查失败", "本轮时间轴截止已错过")):
                 patch.update(result="继续重试", note=line)
             if patch:

@@ -78,6 +78,8 @@ HTTP 只监听 `127.0.0.1` 随机端口，要求当前运行时 token。程序�
 
 ## 验证
 
+自动流程的完整诊断保存在用户数据目录 `logs/runs/`，保留最近 30 **次流程**，每次包含全部轮次；界面继续精简。火叶名称纠错通过数据库索引减少编辑距离计算，再验证近似候选的普通/闪光图像。格式与上游同步要求见 [流程诊断说明](../docs/AUTOMATION_RUN_DIAGNOSTICS.md)。
+
 ```powershell
 npm run test:runtime
 npm run test:devices:regression

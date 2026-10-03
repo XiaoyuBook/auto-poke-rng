@@ -3,6 +3,7 @@ const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const { EventEmitter } = require('node:events');
 const { defaultFeatures, defaultDelay, normalizeFeatures } = require('./automation-config.cjs');
+const { AutomationRunLogs } = require('./automation-run-logs.cjs');
 
 const defaultFilter = () => ({ skip: false, shiny: 3, ability: 255, gender: 255, ivMin: [0,0,0,0,0,0], ivMax: [31,31,31,31,31,31], natures: Array(25).fill(true), heightMin: 0, heightMax: 255, weightMin: 0, weightMax: 255 });
 const regions = [
@@ -26,6 +27,8 @@ const clone = value => structuredClone(value);
 class AutomationStore extends EventEmitter {
   constructor(directory, { now = () => new Date() } = {}) {
     super(); this.directory = directory; this.now = now; this.logs = []; this.runs = []; this.error = '';
+    this.runLogs = new AutomationRunLogs(directory);
+    this.runLogs.onError = error => { this.error = '诊断日志写入失败：' + error.message; };
     this.data = { version: 3, config: defaults(), profiles: {}, logging: true, staticGroups: null };
     const file = path.join(directory, 'automation.json');
     try {
@@ -176,6 +179,7 @@ class AutomationStore extends EventEmitter {
     if (this.data.logging) try {
       const directory = path.join(this.directory, 'logs'); fs.mkdirSync(directory, { recursive: true });
       fs.appendFileSync(path.join(directory, `run_${dateKey(now)}.log`), JSON.stringify(row) + '\n', 'utf8');
+      this.runLogs.append(row.runId, row);
       const cutoff = new Date(now); cutoff.setDate(cutoff.getDate() - 6);
       if (this.lastCleanup !== dateKey(now)) {
         for (const file of fs.readdirSync(directory)) if (/^run_\d{4}-\d{2}-\d{2}\.log$/.test(file) && file.slice(4,14) < dateKey(cutoff)) fs.unlinkSync(path.join(directory, file));
@@ -185,9 +189,26 @@ class AutomationStore extends EventEmitter {
     this.emit('log', row); return row;
   }
   clearLogs() { this.logs = []; this.emit('change'); }
-  beginRun(id, kind, context = null) { this.runs.unshift({ id, kind, context: context ? clone(context) : null, startedAt: this.now().toISOString(), status: 'running', rounds: [] }); this.emit('change'); }
+  flushDiagnostics() {
+    try { this.runLogs.flush(); }
+    catch (error) { this.error = '诊断日志写入失败：' + error.message; }
+  }
+  diagnostic(id, data) {
+    if (!this.data.logging) return;
+    try { this.runLogs.append(id, { ...data, runId: id, timestamp: this.now().toISOString() }); }
+    catch (error) { this.error = '诊断日志写入失败：' + error.message; }
+  }
+  beginRun(id, kind, context = null) {
+    const run = { id, kind, context: context ? clone(context) : null, startedAt: this.now().toISOString(), status: 'running', rounds: [] };
+    this.runs.unshift(run);
+    if (this.data.logging) try {
+      this.runLogs.begin(run, kind === 'frlg' ? null : clone(this.data.config[kind] || {}));
+    } catch (error) { this.error = '诊断日志创建失败：' + error.message; }
+    this.emit('change');
+  }
   history(id, event, args) {
     const run = this.runs.find(item => item.id === id); if (!run) return;
+    this.diagnostic(id, { event: 'run.history', name: event, args });
     if (event === 'frlg_round') {
       const record = args[0];
       let round = run.rounds.find(item => item.number === record.number);
@@ -222,6 +243,8 @@ class AutomationStore extends EventEmitter {
     Object.assign(run, { status, message, endedAt: this.now().toISOString() });
     const round = run.rounds.at(-1); if (round?.outcome === '运行中') round.outcome = status === 'stopped' ? '已停止' : status === 'failed' ? '失败' : '已完成';
     if (round && !round.endedAt) round.endedAt = this.now().toISOString();
+    try { this.runLogs.finish(id, { event: 'run.finished', runId: id, timestamp: run.endedAt, status, message }); }
+    catch (error) { this.error = '诊断日志结束记录失败：' + error.message; }
     this.emit('change');
   }
   snapshot() { return clone({ ...this.data, logs: this.logs, runs: this.runs, error: this.error }); }

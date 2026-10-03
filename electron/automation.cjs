@@ -78,6 +78,10 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
     complete.catch(()=>{});
     const dispatch=message=>{
       if(message.runId!==id)return;
+      if(message.event==='script.diagnostic'||message.event==='script.image-result'){
+        const {runId:ignored,...data}=message;
+        store.diagnostic(run.id,{...data,scriptId:id,round:run.round,phase:name});
+      }
       if(message.event==='script.log'){
         store.log(message.message,'ECS','info',{runId:run.id,round:run.round,event:'script.log',phase:name||'ECS 输出'});
       }
@@ -90,7 +94,7 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
     const listener=message=>{if(!id)early.push(message);else dispatch(message);};
     devices.events.on('script',listener);
     try{
-      ({runId:id}=await devices.runner.start({text,path:selected.path,shouldStop:()=>script.stopped||run.stopped||closed||(active!==run&&auxiliary!==run)}));
+      ({runId:id}=await devices.runner.start({text,path:selected.path,diagnostics:true,shouldStop:()=>script.stopped||run.stopped||closed||(active!==run&&auxiliary!==run)}));
       for(const message of early)dispatch(message);
       if(run.stopped){await devices.runner.stop();throw Error('自动流程已停止');}
       if(script.stopped)await devices.runner.stop();
@@ -374,6 +378,6 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
     auxiliary=workerFactory({command:'tid-preview',...args});
     try{const result=await auxiliary.done;if(result.status!=='completed')throw Error(result.message);return result.result;}finally{auxiliary=null;}
   });
-  return {store,start,stop,getState:snapshot,close:async()=>{closed=true;await stop('程序关闭');clearTimeout(timer);devices.events.off('stop-automation',emergencyStop);store.removeAllListeners();},isBusy:()=>!!active||!!auxiliary};
+  return {store,start,stop,getState:snapshot,close:async()=>{closed=true;await stop('程序关闭');store.flushDiagnostics();clearTimeout(timer);devices.events.off('stop-automation',emergencyStop);store.removeAllListeners();},isBusy:()=>!!active||!!auxiliary};
 }
 module.exports={registerAutomation,validateParameters};

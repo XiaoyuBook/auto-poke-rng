@@ -6253,6 +6253,8 @@ def write_configured_project(
     ocr_fallback_sha256 = apply_ocr_runtime_fallback(
         output_dir / "lib" / OCR_NAME_LIBRARY_NAME
     )
+    from .frlg_ocr_names import materialize_ocr_names
+    python_ocr_names = materialize_ocr_names(output_dir)
 
     manifest = {
         "source": str(source_dir.resolve()),
@@ -6292,6 +6294,7 @@ def write_configured_project(
             "python_data": python_data,
             "python_catalog": python_catalog,
             "python_text": python_text,
+            "python_ocr_names": python_ocr_names,
             "python_wild_data": python_wild_data,
             "python_stateful": python_stateful,
             "python_bingo": python_bingo,
@@ -6456,10 +6459,13 @@ def write_configured_egg_project(
     ocr_fallback_sha256 = apply_ocr_runtime_fallback(
         output_dir / "lib" / OCR_NAME_LIBRARY_NAME
     )
+    from .frlg_ocr_names import materialize_ocr_names
+    python_ocr_names = materialize_ocr_names(output_dir)
     runtime_overrides = apply_egg_settings_runtime_override(
         output_dir / "lib" / EGG_SETTINGS_LIBRARY_NAME
     )
     runtime_overrides["ocr_unavailable_fallback_sha256"] = ocr_fallback_sha256
+    runtime_overrides["python_ocr_names"] = python_ocr_names
     runtime_overrides["egg_home_buffer_refine_sha256"] = hashlib.sha256(
         home_buffer_override_text.encode("utf-8")
     ).hexdigest()

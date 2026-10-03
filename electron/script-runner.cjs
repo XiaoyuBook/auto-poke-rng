@@ -77,7 +77,7 @@ class ScriptRunner {
     child.stdin.end(JSON.stringify({ command: 'validate', text, name: relative, scriptDir: path.dirname(absolute), rootDirectory: root }) + '\n');
     return result;
   }
-  async start({ text, path: relative, shouldStop = () => false, audioDiagnostic = false }) {
+  async start({ text, path: relative, shouldStop = () => false, audioDiagnostic = false, diagnostics = false }) {
     if (this.current) throw new Error('已有脚本正在运行。');
     if (typeof text !== 'string' || Buffer.byteLength(text, 'utf8') > 1024 * 1024 || !text.trim()) throw new Error('脚本内容无效。');
     const run = {
@@ -180,6 +180,7 @@ class ScriptRunner {
           phase: message.phase, source: message.source, line: message.line, column: message.column,
         });
         else if (message.event === 'script.log') this.emit({ ...message, runId: run.id });
+        else if (message.event === 'script.diagnostic') this.emit({ ...message, runId: run.id });
         else if (message.event === 'script.bingo') this.emit({ ...message, runId: run.id });
         else if (message.event === 'script.round') this.emit({ ...message, runId: run.id });
         else if (message.event === 'script.progress') this.emit({ ...message, runId: run.id });
@@ -187,7 +188,7 @@ class ScriptRunner {
       }
     });
     child.stdin.write(JSON.stringify({ text, name: relative, scriptDir: path.dirname(absolute), rootDirectory: root,
-      video: this.getVideo(), ...(audioDiagnostic ? { audioDiagnostic: true, audio: this.getAudio() } : {}) }) + '\n');
+      video: this.getVideo(), diagnostics, ...(audioDiagnostic ? { audioDiagnostic: true, audio: this.getAudio() } : {}) }) + '\n');
     return { runId: run.id };
   }
   async stop(failureReason = '') {

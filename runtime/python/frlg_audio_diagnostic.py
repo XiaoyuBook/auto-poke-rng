@@ -208,7 +208,19 @@ class AudioShinyDiagnostic:
         number, name, start, end, reason, _ = job
         result = evaluate_window(blocks, start, end, self.reference, reason or self.failure, self.comparison)
         labels = {"unknown": "无法判定", "candidate": "检出闪光音效候选", "not_detected": "未检出闪光音效"}
-        fields = [f"窗口={number}", f"遭遇={name}", "截止=名称识别前", labels[result["result"]]]
+        fields = [f"窗口={number}", f"遭遇={name}", "截止=名称识别前", labels[result["result"]],
+                  f"start_qpc_ns={start}", f"end_qpc_ns={end}",
+                  f"window_seconds={(end - start) / 1e9:.3f}"]
+        relevant = [b for b in blocks if b.timestamp_ns < end
+                    and b.timestamp_ns + b.frames * 1_000_000_000 // b.sample_rate > start]
+        fields.append(f"packet_count={len(relevant)}")
+        if relevant:
+            fields.extend((f"first_packet_qpc_ns={relevant[0].timestamp_ns}",
+                f"last_packet_end_qpc_ns={relevant[-1].timestamp_ns + relevant[-1].frames * 1_000_000_000 // relevant[-1].sample_rate}",
+                f"sample_rate={relevant[0].sample_rate}", f"channels={relevant[0].channels}",
+                f"skipped_packets={sum(b.skipped for b in relevant)}",
+                f"discontinuities={sum(bool(b.discontinuity) for b in relevant)}",
+                f"timestamp_errors={sum(bool(b.timestamp_error) for b in relevant)}"))
         fields.extend(f"{key}={value}" for key, value in result.items() if key != "result")
         self.output("【音频判闪·实验】" + "；".join(fields))
 

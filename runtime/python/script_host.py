@@ -6,9 +6,11 @@ never opens COM ports or capture devices; parent EOF cancels all pending work.
 from __future__ import annotations
 
 import json
+import hashlib
 import re
 import sys
 import threading
+import time
 from dataclasses import fields, is_dataclass
 from pathlib import Path
 
@@ -25,6 +27,15 @@ output_lock = threading.Lock()
 cancelled = threading.Event()
 pending = {}
 request_number = 0
+diagnostic_sink = lambda **data: None
+
+
+def make_diagnostic_emitter(config):
+    if config.get('diagnostics') is not True:
+        return lambda **data: None
+    return lambda **data: emit({'event': 'script.diagnostic',
+                               'hostTimestamp': time.time_ns() // 1_000_000,
+                               'monotonicNs': str(time.perf_counter_ns()), **data})
 
 
 # Generated FRLG ECS projects carry this marker in their source.  Keeping the
@@ -52,6 +63,7 @@ _COMPACT_ECS_KEEP_CONTAINS = (
     "开始", "完成", "正确", "准备", "重启", "重试", "继续", "校准成功",
     "可用", "候选命中", "观测采集完成", "最终候选", "唯一", "目标Seed:",
     "孵蛋方法", "BINGO稳定校准",
+    "本轮结果波动较大，参数保持不变", "本轮离群跳过",
 )
 _BINGO_GRAPH_SYMBOLS = "＠①②③④⑤⑥⑦⑧⑨ｘｏ．"
 
@@ -134,14 +146,20 @@ def _compact_ecs_line(line):
 
 def make_script_log_emitter(config):
     mode = _ecs_log_mode(config)
+    diagnostic = make_diagnostic_emitter(config)
     if mode is None:
-        return lambda message: emit({"event": "script.log", "message": str(message)})
+        def emit_plain(message):
+            diagnostic(kind='ecs.output', message=str(message))
+            emit({"event": "script.log", "message": str(message)})
+        return emit_plain
 
     from frlg_round_records import RoundRecorder
     recorder = RoundRecorder(lambda record: emit({"event": "script.round", **record}))
 
     def emit_compact(message):
+        # Preserve original PRINTs before the UI policy removes diagnostics.
         recorder.consume(message)
+        diagnostic(kind='ecs.output', message=str(message))
         if mode == "full":
             emit({"event": "script.log", "message": str(message)})
             return
@@ -201,12 +219,18 @@ def request(method, params):
     record = {"ready": ready}
     pending[identifier] = record
     emit({"event": "request", "id": identifier, "method": method, "params": params})
+    started = time.perf_counter_ns()
+    diagnostic_sink(kind='controller.request', requestId=identifier, method=method, params=params)
     try:
         while not ready.wait(0.05):
             if cancelled.is_set():
                 raise ScriptCancelled("脚本已停止")
         if "error" in record:
+            diagnostic_sink(kind='controller.reply', requestId=identifier, error=record['error'],
+                            elapsedMs=round((time.perf_counter_ns() - started) / 1e6, 3))
             raise RuntimeError(record["error"])
+        diagnostic_sink(kind='controller.reply', requestId=identifier,
+                        elapsedMs=round((time.perf_counter_ns() - started) / 1e6, 3))
         return record.get("result")
     finally:
         pending.pop(identifier, None)
@@ -253,14 +277,36 @@ def normalize_preview_aliases(text):
 
 
 def run(config, program):
+    global diagnostic_sink
+    diagnostic_sink = make_diagnostic_emitter(config)
     frames = None
     audio_diagnostic = None
+    phases = None
     script_log = make_script_log_emitter(config)
     script_bingo = make_script_bingo_emitter()
     trace = ExecutionTrace()
+    base_diagnostic = diagnostic_sink
+    def contextual_diagnostic(**data):
+        point = trace.snapshot().point
+        if point is not None:
+            data['location'] = {'source': source_name(point.location.source, config), 'line': point.location.line,
+                                'column': point.location.column, 'action': point.action}
+        base_diagnostic(**data)
+    diagnostic_sink = contextual_diagnostic
     finished = threading.Event()
     sources = {unit.source: unit.text.splitlines() for unit in (*program.ast.libraries, program.ast.main)}
     sources[config["name"]] = config["text"].splitlines()
+    runtime_root = Path(__file__).resolve().parent
+    runtime_files = [runtime_root / 'script_host.py', runtime_root / 'easycon/native/runtime.py',
+                     runtime_root / 'easycon/native/ocr.py', *sorted((runtime_root / 'frlg_planner/automation').glob('*runtime.py')),
+                     runtime_root / 'frlg_planner/automation/frlg_ocr_names.py']
+    diagnostic_sink(kind='script.preflight', name=config['name'],
+        sources=[{'source': source_name(source, config), 'sha256': hashlib.sha256('\n'.join(lines).encode()).hexdigest()}
+                 for source, lines in sources.items()],
+        runtimeFiles=[{'source': p.relative_to(runtime_root).as_posix(), 'sha256': hashlib.sha256(p.read_bytes()).hexdigest()}
+                      for p in runtime_files if p.is_file()],
+        video={k: config.get('video', {}).get(k) for k in ('status', 'session', 'width', 'height')},
+        audio={k: (config.get('audio') or {}).get(k) for k in ('status', 'session', 'sampleRate', 'channels')})
     last_point = None
 
     def publish_latest():
@@ -367,6 +413,9 @@ def run(config, program):
             from frlg_planner.automation.frlg_text_runtime import TextRuntime
 
             extern_functions.update(TextRuntime.from_project(root).extern_functions())
+        if (root / 'python_ocr_names.json').is_file():
+            from frlg_planner.automation.frlg_ocr_names import OcrNameRuntime
+            extern_functions.update(OcrNameRuntime.from_project(root, diagnostic_sink).extern_functions())
         python_wild_snapshot = root / "python_wild_data.json"
         if python_wild_snapshot.is_file():
             planner_root = Path(__file__).resolve().parent / "frlg_planner"
@@ -437,6 +486,7 @@ def run(config, program):
         ocr_reader = None
         ocr_runtime = None
         labels = None
+        video_frame = None
         if program.requires_video:
             from frames import Frames
             import numpy as np
@@ -447,11 +497,14 @@ def run(config, program):
             frames = Frames(descriptor)
 
             def read_frame():
+                nonlocal video_frame
                 # A label lookup may legitimately reuse a still-fresh latest frame.
                 frames.cursor = 0
                 frame = frames.read()
                 if frame is None:
                     raise RuntimeError("视频帧暂不可用")
+                video_frame = {'sequence': frame.sequence, 'timestampNs': str(frame.timestamp_ns),
+                               'width': frame.width, 'height': frame.height}
                 return np.frombuffer(frame.bgr, dtype=np.uint8).reshape(frame.height, frame.width, 3)
 
             if program.requires_image_search:
@@ -475,6 +528,9 @@ def run(config, program):
                 # Load dependencies and model before taking the controller lease.
                 # An unavailable model must never leave an acquired lease behind.
                 ocr_runtime = RapidOcrReader()
+                diagnostic_sink(kind='ocr.model', model='PP-OCRv6 small',
+                    files=[{'name': p.name, 'sha256': hashlib.sha256(p.read_bytes()).hexdigest()}
+                           for p in sorted(ocr_runtime.root.glob('*.onnx'))])
                 ocr_reader = lambda image: ocr_runtime.read(image)
 
                 def ocr_region(x, y, width, height, language):
@@ -486,9 +542,15 @@ def run(config, program):
                     frame_height, frame_width = frame.shape[:2]
                     if width <= 0 or height <= 0 or x < 0 or y < 0 or x + width > frame_width or y + height > frame_height:
                         raise RuntimeError(f"OCR 区域超出视频帧范围: {(x, y, width, height)} / {frame_width}x{frame_height}")
+                    started = time.perf_counter_ns()
+                    diagnostic_sink(kind='ocr.inference.begin', region=[x, y, width, height],
+                                    language=str(language), videoFrame=video_frame)
                     text, _confidence = ocr_runtime.read(
                         frame[y:y + height, x:x + width].copy(), language=str(language)
                     )
+                    diagnostic_sink(kind='ocr.inference.end', raw=text, confidence=_confidence,
+                        region=[x, y, width, height], videoFrame=video_frame,
+                        elapsedMs=round((time.perf_counter_ns() - started) / 1e6, 3))
                     return text
 
                 extern_functions["OCR"] = ocr_region
@@ -497,12 +559,15 @@ def run(config, program):
                 getters = labels.external_getters(read_frame, ocr_reader=ocr_reader,
                     result_callback=lambda match: emit({
                         'event': 'script.image-result', 'labelName': match.label_name,
+                        'hostTimestamp': time.time_ns() // 1_000_000, 'monotonicNs': str(time.perf_counter_ns()),
                         'score': match.score, 'scriptValue': match.script_value,
                         'location': match.location, 'rangeRect': match.range_rect, 'matchRect': match.match_rect,
+                        'videoFrame': video_frame,
                     }))
             # Fail before controller.acquire when a required video source has
             # not published a usable frame yet.
             first_frame = read_frame()
+            diagnostic_sink(kind='video.frame', videoFrame=video_frame)
             if labels is not None:
                 for name in sorted(program.external_labels):
                     labels.labels[name].preflight(first_frame)
@@ -528,6 +593,8 @@ def run(config, program):
 
         def observe(point):
             trace.record(point)
+            if phases is not None:
+                phases.observe(point)
             if audio_diagnostic is not None:
                 try:
                     audio_diagnostic.observe(point)
@@ -535,6 +602,9 @@ def run(config, program):
                     # Audio observation cannot fail a controller/RNG operation.
                     pass
 
+        if config.get('diagnostics') is True:
+            from frlg_diagnostics import PhaseDiagnostics
+            phases = PhaseDiagnostics(sources, diagnostic_sink)
         reporter = threading.Thread(target=report_progress, daemon=True)
         reporter.start()
         program.run(gamepad=RemoteGamepad(), waiter=RemoteWaiter(), external_getters=getters,
@@ -550,6 +620,8 @@ def run(config, program):
         if reporter is not None:
             reporter.join()
         publish_latest()
+        if phases is not None:
+            phases.close()
         if audio_diagnostic is not None:
             try:
                 audio_diagnostic.close()
@@ -603,6 +675,7 @@ def main():
         or (Path(config["scriptDir"]) / "python_data.json").is_file()
         or (Path(config["scriptDir"]) / "python_catalog.json").is_file()
         or (Path(config["scriptDir"]) / "python_text.json").is_file()
+        or (Path(config["scriptDir"]) / "python_ocr_names.json").is_file()
         or (Path(config["scriptDir"]) / "python_wild_data.json").is_file()
         or (Path(config["scriptDir"]) / "python_vote.json").is_file()
         or (Path(config["scriptDir"]) / "python_egg_reverse.json").is_file()
@@ -621,6 +694,7 @@ def main():
             from frlg_planner.automation import frlg_data_runtime  # noqa: F401
             from frlg_planner.automation import frlg_catalog_runtime  # noqa: F401
             from frlg_planner.automation import frlg_text_runtime  # noqa: F401
+            from frlg_planner.automation import frlg_ocr_names  # noqa: F401
             from frlg_planner.automation import frlg_wild_data_runtime  # noqa: F401
             from frlg_planner.automation import frlg_vote_runtime  # noqa: F401
             from frlg_planner.automation import frlg_egg_reverse_runtime  # noqa: F401

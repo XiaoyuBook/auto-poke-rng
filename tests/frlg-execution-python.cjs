@@ -10,6 +10,15 @@ test('shared native interpreter supports the FRLG OCR and calibration contracts'
 });
 
 const corpus = process.env.FRLG_SCRIPT_CORPUS || path.resolve(__dirname, '../../auto-poke-rng-scripts/bundles/frlg-automation/files');
+
+test('FRLG indexed OCR preserves reference scores and verifies sprite alternatives', {
+  skip: existsSync(corpus) ? false : 'Set FRLG_SCRIPT_CORPUS to the audited script bundle',
+}, () => {
+  const result = spawnSync(pythonPath(), ['-X', 'utf8', path.join(__dirname, 'frlg-ocr-names.py')], {
+    env: { ...process.env, FRLG_SCRIPT_CORPUS: corpus }, encoding: 'utf8', windowsHide: true, timeout: 30000,
+  });
+  assert.equal(result.status, 0, result.stdout + result.stderr + (result.error?.message || ''));
+});
 test('FRLG generated reverse scans execute in Python and preserve ECS results', {
   skip: existsSync(corpus) ? false : 'Set FRLG_SCRIPT_CORPUS to the audited script bundle to run differential tests',
 }, () => {

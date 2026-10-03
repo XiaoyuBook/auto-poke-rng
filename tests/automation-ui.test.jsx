@@ -5,6 +5,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { createRequire } from 'node:module';
 import { AutomationWorkspace } from '../src/components/AutomationWorkspace';
 import { AutomationLogs } from '../src/components/AutomationLogs';
+import { FrlgBingoBoard } from '../src/components/FrlgBingoBoard';
 import { OcrWorkspace } from '../src/components/OcrWorkspace';
 import { defaultBdspProfile } from '../src/bdspProfile';
 import { newBlinkConfig } from '../src/blink';
@@ -285,6 +286,9 @@ test('FRLG rounds default to latest, update live, and scope logs to round zero',
   await act(async()=>api.onState.mock.calls[0][0]({...snapshot,runs:[{...snapshot.runs[0],rounds:[...snapshot.runs[0].rounds,{number:2,outcome:'运行中',candidates:[],events:[],frlg:{request:{seedMs:1300}}}]}]}));
   expect(within(detail).getByText('1300 ms')).toBeTruthy();
   expect(within(detail).queryByText('7422')).toBeNull();
+  await act(async()=>api.onState.mock.calls[0][0]({...snapshot,runs:[{...snapshot.runs[0],rounds:[...snapshot.runs[0].rounds,{number:2,outcome:'校准跳过',endedAt:'2026-10-03T01:00:00Z',candidates:[],events:[],frlg:{result:'校准跳过',notes:['本轮结果波动较大，参数保持不变']}}]}]}));
+  expect(within(detail).getByText('本轮反查后跳过校准，未输出完整落点；具体原因见校准判断。')).toBeTruthy();
+  expect(within(detail).queryByText(/等待本轮捕获与反查结果/)).toBeNull();
   fireEvent.click(screen.getByRole('button',{name:/第 0 轮 · 已结束/}));
   fireEvent.click(screen.getByRole('button',{name:'查看火叶运行日志'}));
   expect(screen.getByText('第零轮环境检查')).toBeTruthy();
@@ -293,30 +297,25 @@ test('FRLG rounds default to latest, update live, and scope logs to round zero',
 });
 
 test('BINGO renders an interactive distribution and explicitly shows out-of-chart hits',async()=>{
-  const {snapshot}=fixture();
-  snapshot.runs=[{id:'frlg-1',kind:'frlg',startedAt:'2026-10-03T02:00:00Z',status:'running',rounds:[{number:0,candidates:[],events:[]},{number:19,candidates:[],events:[]}]}];
   const axis=[-4,-3,-2,-1,0,1,2,3,4];
   const state={status:'running',runId:'frlg-1',profileId:'save-a',message:'执行中',logs:[],bingo:{version:1,observed:true,axis,seedText:[],grid:axis.map(seed=>axis.map(frame=>({seed,frame,count:seed===1&&frame===-1?12:0,marker:'．'}))),prediction:{seed:1,seedRadius:1,frame:-1,frameRadius:1},current:{seed:1,frame:-1,hitSeed:1,hitFrame:-1,inRange:true,inDeadZone:false},context:{enterTv:false},stable:{result:false},count:12,tv:{enabled:false}}};
-  const onState=vi.fn(()=>()=>{});
-  window.desktop.frlgAutomation={getState:vi.fn(async()=>state),onState};
-  render(<AutomationLogs/>);
-  fireEvent.click(await screen.findByRole('button',{name:'BINGO 状态'}));
+  const {rerender}=render(<FrlgBingoBoard key="frlg-1" state={state.bingo} startedRounds={19}/>);
   await screen.findByText('本轮已计入');
   expect(screen.queryByRole('table')).toBeNull();
   const point=screen.getByRole('button',{name:'Seed 偏差 +1，帧偏差 -1，累计命中 12 次，本轮落点'});
   fireEvent.keyDown(point,{key:'Enter'});
   expect(screen.getByText('选中落点 · Seed +1 / 帧 -1 · 累计 12 次')).toBeTruthy();
-  await act(async()=>onState.mock.calls[0][0]({...state,bingo:{...state.bingo,current:{...state.bingo.current,seed:7,hitSeed:7,inRange:false}}}));
+  rerender(<FrlgBingoBoard key="frlg-1" state={{...state.bingo,current:{...state.bingo.current,seed:7,hitSeed:7,inRange:false}}} startedRounds={19}/>);
   expect(screen.getByText(/本轮落点在图外/)).toBeTruthy();
   expect(screen.queryByRole('button',{name:/本轮落点$/})).toBeNull();
   const tvBingo={...state.bingo,grid:axis.map(seed=>axis.map(frame=>({seed,frame,count:seed===1&&frame===0?6:0,marker:'．'}))),context:{enterTv:true,tvFrameCost:314},current:{...state.bingo.current,frame:0,hitFrame:314},tv:{enabled:true,current:1,prediction:1,radius:2,cells:axis.map(frame=>({frame,count:frame===0?9:frame===1?8:0,marker:'．'}))}};
-  await act(async()=>onState.mock.calls[0][0]({...state,bingo:tvBingo}));
+  rerender(<FrlgBingoBoard key="frlg-1" state={tvBingo} startedRounds={19}/>);
   expect(screen.getByText('本次运行已开始 19 轮（含当前轮）')).toBeTruthy();
   expect(screen.getByText('有效样本 17 次')).toBeTruthy();
   expect(screen.getByText(/样本数有重叠，不能相加作为总轮数/)).toBeTruthy();
   expect(screen.getByText(/本轮帧偏差拆分：\+314 帧 = \+1 周期 × 314 帧 \+ \(0 帧\)/)).toBeTruthy();
   expect(screen.getByRole('button',{name:'Seed 偏差 +1，剩余帧偏差 0，累计命中 6 次，本轮落点'})).toBeTruthy();
-  await act(async()=>onState.mock.calls[0][0]({...state,runId:'different-run',bingo:tvBingo}));
+  rerender(<FrlgBingoBoard key="different-run" state={tvBingo}/>);
   expect(screen.queryByText('本次运行已开始 19 轮（含当前轮）')).toBeNull();
 });
 

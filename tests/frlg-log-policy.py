@@ -21,6 +21,39 @@ _BINGO_SPEC.loader.exec_module(_BINGO_MODULE)
 
 
 class FrlgLogPolicy(unittest.TestCase):
+    def test_complete_file_channel_preserves_ocr_and_calibration_before_ui_filter(self):
+        events = []
+        original_emit = script_host.emit
+        try:
+            script_host.emit = events.append
+            logger = script_host.make_script_log_emitter({'text': '# GUI_ECS_LOG_POLICY_V1 mode=compact', 'diagnostics': True})
+            for message in ('OCR原文:HAGNEHITE', '后处理:MAGNEMITE', 'Seed可信度:0，帧数冻结', '已命中目标'):
+                logger(message)
+            self.assertEqual([x['message'] for x in events if x['event'] == 'script.log'], ['已命中目标'])
+            archive = [x for x in events if x['event'] == 'script.diagnostic']
+            self.assertEqual(len(archive), 4)
+            self.assertEqual(archive[0]['message'], 'OCR原文:HAGNEHITE')
+            self.assertTrue(all(x['monotonicNs'] and x['hostTimestamp'] for x in archive))
+        finally:
+            script_host.emit = original_emit
+
+    def test_outlier_skip_survives_compact_logs_and_records_real_outcome(self):
+        events = []
+        original_emit = script_host.emit
+        try:
+            script_host.emit = events.append
+            logger = script_host.make_script_log_emitter({"text": "# GUI_ECS_LOG_POLICY_V1 mode=compact"})
+            logger("第8轮开始\n")
+            logger("本轮结果波动较大，参数保持不变\n")
+            logger("第9轮开始\n")
+            skip = next(event for event in events if event["event"] == "script.round" and event.get("data", {}).get("result") == "校准跳过")
+            self.assertEqual(skip["number"], 8)
+            self.assertNotIn("hitSeed", skip["data"])
+            self.assertIn("参数保持不变", skip["data"]["note"])
+            self.assertTrue(any(event["event"] == "script.log" and "本轮结果波动较大" in event["message"] for event in events))
+        finally:
+            script_host.emit = original_emit
+
     def test_round_data_survives_compact_filter_and_ignores_setup_instructions(self):
         events = []
         original_emit = script_host.emit

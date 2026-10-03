@@ -47,7 +47,8 @@ function registerFrlgAutomation({ ipcMain, getMainWindow, devices, client, userD
   };
   const beginStoredRun = run => {
     if (!store?.beginRun) return;
-    store.beginRun(run.id, 'frlg', { game: 'frlg', profileId: run.profileId, target: run.request.pokemon });
+    store.beginRun(run.id, 'frlg', { game: 'frlg', profileId: run.profileId, target: run.request.pokemon,
+      request: run.request, options: run.options });
   };
   const finishStoredRun = (run, status, message) => {
     if (run.storeFinished || !store?.finishRun) return;
@@ -68,6 +69,12 @@ function registerFrlgAutomation({ ipcMain, getMainWindow, devices, client, userD
         request: run.request, options: run.options, source: path.join(root, '火红叶绿', '自动流程'), output, calibrationStore,
       });
       checkStopped(run);
+      try {
+        const manifest = JSON.parse(await readFile(generated.manifest, 'utf8'));
+        store?.diagnostic?.(run.id, { event: 'frlg.plan', main: generated.main, manifestPath: generated.manifest, manifest });
+      } catch (error) {
+        store?.diagnostic?.(run.id, { event: 'frlg.plan-unavailable', manifestPath: generated.manifest, message: error.message });
+      }
       const relative = path.relative(root, generated.main).split(path.sep).join('/');
       const text = await readFile(generated.main, 'utf8'); checkStopped(run);
       const validation = await devices.runner.validate({ text, path: relative }); checkStopped(run);
@@ -81,6 +88,17 @@ function registerFrlgAutomation({ ipcMain, getMainWindow, devices, client, userD
       const completion = new Promise(resolve => { resolveScript = resolve; });
       const dispatch = message => {
         if (message.runId !== scriptId) return;
+        if (message.event === 'script.diagnostic' || message.event === 'script.image-result') {
+          const { runId: ignored, ...data } = message;
+          if (message.event === 'script.image-result') {
+            const key = JSON.stringify([message.labelName, message.scriptValue, message.location, message.rangeRect]);
+            const previous = run.imageLog?.get(message.labelName);
+            const now = Date.now();
+            if (previous?.key === key && now - previous.time < 1000) return;
+            (run.imageLog ||= new Map()).set(message.labelName, { key, time: now });
+          }
+          store?.diagnostic?.(run.id, { ...data, scriptId, round: run.round });
+        }
         if (message.event === 'script.round' && Number.isInteger(message.number) && message.number >= 0) {
           run.round = message.number;
           store?.history?.(run.id, 'frlg_round', [{ number: message.number, data: message.data }]);
@@ -96,7 +114,10 @@ function registerFrlgAutomation({ ipcMain, getMainWindow, devices, client, userD
           });
           if (String(message.message).includes('PRECALIBRATION_UPDATE|')) logLines.push(String(message.message));
         }
-        if (message.event === 'script.bingo') update({ bingo: message.state || null });
+        if (message.event === 'script.bingo') {
+          store?.diagnostic?.(run.id, { event: 'script.bingo', round: run.round, state: message.state });
+          update({ bingo: message.state || null });
+        }
         if (message.event === 'script.progress') {
           run.phase = message.action || message.source || 'ECS 执行';
           update({ progress: message });
@@ -117,7 +138,7 @@ function registerFrlgAutomation({ ipcMain, getMainWindow, devices, client, userD
       listener = message => { if (!scriptId) early.push(message); else dispatch(message); };
       devices.events.on('script', listener);
       ({ runId: scriptId } = await devices.runner.start({ text, path: relative, shouldStop: () => run.stopped || closed,
-        audioDiagnostic: true }));
+        audioDiagnostic: true, diagnostics: true }));
       run.scriptId = scriptId;
       for (const message of early) dispatch(message);
       if (run.stopped || closed) await devices.runner.stop();
