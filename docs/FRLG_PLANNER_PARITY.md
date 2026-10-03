@@ -27,6 +27,8 @@
 
 搜索对照验证的是搜索、选优、参数映射和结果展示。当前已另行接通生成、预检、公共执行器、捕获、反查校准与重试；验证范围和实机边界见 [完整执行接入](FRLG_EXECUTION_PARITY.md)。设备模拟和离线契约测试不能代替实际游戏画面的 OCR、捕获与时序验收。
 
+2026-10-03 增加 Switch 2 Blackout R 的本地启动时序覆盖：R 提前 1000ms，并补回保持时间以维持总 Seed 等待；模式 8 非 TV 案例已有用户实机成功反馈。此项不属于搜索算法或 Seed 表差异，上游同步时需单独保留或验证等效替代，详见 [本地修复与同步维护要求](FRLG_EXECUTION_PARITY.md#switch-2-blackout-r-本地时序修复2026-10-03)。
+
 ## 回归与复核
 
 - `tests/fixtures/frlg-{golbat,starter}-plan.json`：从锚点原版的真实非指定搜索得到的扁平 JSON，同时供 Python 和前端测试使用。

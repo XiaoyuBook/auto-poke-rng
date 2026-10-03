@@ -6,7 +6,10 @@ import { createHash } from 'node:crypto';
 const revision = '5a5383ff226059cbf85f0b531c9de283f7b76c45';
 const root = resolve('runtime/python/frlg_planner');
 const manifestPath = resolve('runtime/python/frlg-runtime-manifest.json');
-const patches = ['tools/frlg-runtime-patches/menu-navigation.patch'];
+// Keep local overrides after upstream import; review changed startup timing against
+// docs/FRLG_EXECUTION_PARITY.md before dropping/rebasing the Blackout R patch.
+const patches = ['tools/frlg-runtime-patches/menu-navigation.patch',
+  'tools/frlg-runtime-patches/blackout-r-nx2-early-press.patch'];
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 if (process.argv.includes('--check')) {
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));

@@ -2,10 +2,11 @@
   "repository": "https://github.com/axechaso/frlg-auto-rng",
   "revision": "5a5383ff226059cbf85f0b531c9de283f7b76c45",
   "patches": {
-    "tools/frlg-runtime-patches/menu-navigation.patch": "c6e11b0c5a3e655629a666a15f0687f7bc2df75ed5fa60abf5e6f4e608928284"
+    "tools/frlg-runtime-patches/menu-navigation.patch": "c6e11b0c5a3e655629a666a15f0687f7bc2df75ed5fa60abf5e6f4e608928284",
+    "tools/frlg-runtime-patches/blackout-r-nx2-early-press.patch": "b5e6194313bcab7d483a6cc5f6f5e169b1efbcc8320fb5d5cf9c495db09b5e40"
   },
   "files": {
-    "automation/easycon118.py": "a7a304da11a2fc53692ad3e38d14f758d845f7595046d78b25ea24629225e212",
+    "automation/easycon118.py": "e545352275a1dde8a0a361f1fef892492cb78362d60e556bccbbf4b1080f12da",
     "automation/precalibration.py": "f7555f3e5834e460425f1dc95cc3da0b95e5d6441a0029f07724950ade8b4e23",
     "automation/calibration_trust_gates.py": "51bcdf7a0d610e6f48f68d625d1b468cd25e7015398973743f0c571264af5861",
     "automation/seed_common_regions.py": "5d995e43c0ce4bd5842ba2b5fc6b1d2d21ba94f156748c22637e314cb8cfd705",

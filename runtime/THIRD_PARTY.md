@@ -15,6 +15,8 @@
 | Windows SDK | 系统依赖 | MF/DirectShow 设备枚举、COM、命名共享内存/互斥量、串口、父进程句柄 |
 | [auto-bdsp-rng](https://github.com/XiaoyuBook/auto-bdsp-rng) 自动流程 | `494793ed467cd1a2ef376d5886d0add5924b620f`，GPL-3.0 | 定点/TID 状态机、delay 策略、OCR 规则、脚本与测试；固定快照、LICENSE 和逐文件 SHA-256 见 `third_party/bdsp-automation-reference/`。业务包迁入 `runtime/python/auto_bdsp_rng/`，Electron/React 接口重新适配，OCR 使用现有 PP-OCRv6 服务，未引入 Qt 界面或第二个硬件所有者 |
 
+FRLG 本地执行覆盖另包含 `tools/frlg-runtime-patches/blackout-r-nx2-early-press.patch`：2026-10-03 经模式 8 实机反馈确认，Switch 2 Blackout R 提前 1000ms，并补回保持时间，保留松开和总 Seed 等待时点。此项是本项目维护的时序调整，不应标成上游原样代码；生成器和补丁指纹记录在 `python/frlg-runtime-manifest.json`，适用范围及后续同步要求见 [执行接入文档](../docs/FRLG_EXECUTION_PARITY.md#switch-2-blackout-r-本地时序修复2026-10-03)。
+
 运行时新增适配代码及 EasyCon 派生部分按 GPL-3.0 提供，完整文本见 `LICENSE.GPL-3.0.txt`。第三方组件保留各自版权和许可证；发布二进制时需携带对应许可证与源代码信息。原有前端整体许可证由项目另行确定，不通过本文件改写。
 
 源码快照无需旧项目在部署机器上存在。没有把本机另一个开发中的 SDK 当作已发布依赖。OpenCV 和头文件的下载 URL、校验值固定在构建脚本/CMake 中；Python 图像依赖固定在 requirements.txt。

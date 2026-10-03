@@ -24,6 +24,7 @@ from automation.seed_table_runtime import SeedTableRuntime
 from automation.frlg_vote_runtime import CalibrationVoteSession
 from automation.frlg_bingo_runtime import BingoSession
 from automation.frlg_compute_runtime import extern_functions as compute_functions
+from automation.easycon118 import _apply_blackout_r_nx2_early_press_text
 
 CORPUS = Path(os.environ.get('FRLG_SCRIPT_CORPUS',
                             ROOT.parent / 'auto-poke-rng-scripts/bundles/frlg-automation/files'))
@@ -63,6 +64,104 @@ class MainReverseMigration(unittest.TestCase):
         ast = replace(program.ast, main=replace(program.ast.main,
                       statements=declarations + parse_text(setup, '<reverse-probe>').statements))
         return replace(program, ast=ast)
+
+    def startup_timing(self, text, mode, offset, scheme=0, seed_ms=65000):
+        start = text.index('FUNC 执行RNG启动与目标获取(): INT\n')
+        end = text.index('    $time_OP = TIME()\n', start)
+        setup = f'''$Seed模式 = {mode}
+$NXSeed平台偏移MS = {offset}
+$SeedMS = {seed_ms}
+$Seed启动方案 = {scheme}
+$循环计数 = 1
+$time_start = 0
+EXTERN FUNC 执行时间轴等待到($origin: INT, $duration: INT): INT FROM "python:startup-test"
+FUNC 准备Seed启动原点
+ENDFUNC
+'''
+        program = EasyConScriptEngine().compile(
+            setup + text[start:end] + '    RETURN 0\nENDFUNC\n$result = 执行RNG启动与目标获取()\n')
+
+        class Pad:
+            elapsed = 0
+
+            def __init__(self):
+                self.events = []
+
+            def press_buttons(self, key):
+                self.events.append((key, True, self.elapsed))
+
+            def release_buttons(self, key):
+                self.events.append((key, False, self.elapsed))
+
+            def click_buttons(self, key, duration, cancel=None):
+                self.press_buttons(key)
+                self.wait(duration, cancel)
+                self.release_buttons(key)
+
+            def wait(self, ms, cancel=None):
+                self.elapsed += ms
+
+        pad = Pad()
+        def absolute_wait(origin, duration):
+            pad.wait(max(0, duration - pad.elapsed))
+            return 1
+
+        program.run(gamepad=pad, waiter=pad, output=lambda _: None,
+                    extern_functions={'执行时间轴等待到': absolute_wait})
+        return pad.events, pad.elapsed
+
+    def test_blackout_r_nx2_starts_1000ms_earlier_without_moving_release_or_seed(self):
+        original = (CORPUS / 'NS火叶全自动一键乱数2.0.ecs').read_text(encoding='utf-8')
+        updated = _apply_blackout_r_nx2_early_press_text(original)
+        for mode in (4, 6, 8):
+            for scheme in (0, 1):
+                with self.subTest(mode=mode, scheme=scheme):
+                    before, old_total = self.startup_timing(original, mode, -750, scheme)
+                    after, new_total = self.startup_timing(updated, mode, -750, scheme)
+                    old_r = [e for e in before if e[0] == 'R']
+                    new_r = [e for e in after if e[0] == 'R']
+                    self.assertEqual(new_r[0][2], old_r[0][2] - 1000)
+                    self.assertEqual(new_r[1], old_r[1])
+                    self.assertEqual(new_r[1][2] - new_r[0][2], 26070)
+                    self.assertEqual(new_total, old_total)
+                    self.assertEqual([e for e in after if e[0] != 'R'],
+                                     [e for e in before if e[0] != 'R'])
+
+    def test_blackout_adjustment_preserves_nx1_l_and_nonblackout_startups(self):
+        original = (CORPUS / 'NS火叶全自动一键乱数2.0.ecs').read_text(encoding='utf-8')
+        updated = _apply_blackout_r_nx2_early_press_text(original)
+        for offset in (0, -750):
+            for mode in range(10):
+                if offset == -750 and mode in (4, 6, 8):
+                    continue
+                with self.subTest(mode=mode, offset=offset):
+                    self.assertEqual(self.startup_timing(updated, mode, offset),
+                                     self.startup_timing(original, mode, offset))
+
+    def test_blackout_minimum_seed_guard_still_rejects_before_any_buttons(self):
+        original = (CORPUS / 'NS火叶全自动一键乱数2.0.ecs').read_text(encoding='utf-8')
+        updated = _apply_blackout_r_nx2_early_press_text(original)
+        for mode in range(4, 10):
+            for offset in (0, -750):
+                minimum = 4700 + 25820 + offset
+                with self.subTest(mode=mode, offset=offset):
+                    self.assertEqual(self.startup_timing(updated, mode, offset, seed_ms=minimum-1), ([], 0))
+                    self.assertEqual(self.startup_timing(updated, mode, offset, seed_ms=minimum)[1],
+                                     self.startup_timing(original, mode, offset, seed_ms=minimum)[1])
+
+    def test_blackout_generator_covers_both_entries_and_patch_is_idempotent(self):
+        for name in ('NS火叶全自动一键乱数2.0.ecs', 'NS火叶全自动一键乱数2.0-时间轴.ecs'):
+            with self.subTest(entry=name):
+                original = (CORPUS / name).read_text(encoding='utf-8')
+                updated = _apply_blackout_r_nx2_early_press_text(original)
+                self.assertEqual(_apply_blackout_r_nx2_early_press_text(updated), updated)
+                before, total = self.startup_timing(original, 8, -750)
+                after, updated_total = self.startup_timing(updated, 8, -750)
+                self.assertEqual(after[-2][2], before[-2][2] - 1000)
+                self.assertEqual(after[-1], before[-1])
+                self.assertEqual(updated_total, total)
+        self.assertIn('# BLACKOUT_R_NX2_EARLY_PRESS_V1',
+                      (self.generated_root / 'main.ecs').read_text(encoding='utf-8'))
 
     def bindings(self, output, checkpoint=lambda: None):
         seed = SeedTableRuntime.from_project(self.generated_root)

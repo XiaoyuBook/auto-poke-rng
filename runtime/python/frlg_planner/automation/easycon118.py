@@ -5923,6 +5923,68 @@ def apply_egg_settings_runtime_override(library_path: str | Path) -> dict[str, s
     }
 
 
+def _apply_blackout_r_nx2_early_press_text(template_text: str) -> str:
+    """Preserve the local NX2 Blackout R fix confirmed on 2026-10-03.
+
+    Mode 8 / B744 / ADV 11985 failed reverse lookup with the upstream 4700ms
+    press delay; the user reported success after advancing R by 1000ms.
+    NX2 R modes 4/6/8 share this adjustment; hardware feedback covers mode 8.
+    Adding the same 1000ms to the hold keeps release and total Seed wait fixed:
+    (4700 - advance) + (25820 + platform_offset + advance) = 30520 + offset.
+
+    Apply only to newly generated wild/static runs, leaving installed source
+    scripts and Seed tables intact. Retain/review this override when syncing
+    upstream; see docs/FRLG_EXECUTION_PARITY.md and the matching vendor patch.
+    Unknown upstream timing structures must be reviewed, not blindly replaced.
+    """
+    marker = "# BLACKOUT_R_NX2_EARLY_PRESS_V1"
+    match = re.search(
+        r"^FUNC 执行RNG启动与目标获取\(\): INT\n.*?^ENDFUNC",
+        template_text,
+        re.MULTILINE | re.DOTALL,
+    )
+    if match is None:
+        raise ValueError("主脚本缺少RNG启动函数，无法调整Blackout R时机")
+    startup = match.group(0)
+    if marker in startup:
+        return template_text
+    original = (
+        "    $SeedBlackout肩键保持MS = 25820 + $NXSeed平台偏移MS\n"
+        "    $SeedBlackout最短MS = 4700 + $SeedBlackout肩键保持MS\n"
+    )
+    updated = """\
+    # BLACKOUT_R_NX2_EARLY_PRESS_V1
+    # 本地修复（2026-10-03，模式8实机反馈成功）：NX2的R在开场暗转期间提前按下。
+    # 提前1000ms同时补回保持时间：3700+26070=原来的4700+25070=29770ms。
+    # 只改变R按下时机；R松开、封面确认总Seed等待不变；NX1、Blackout L沿用原时序。
+    # 上游同步须保留或重新验证本覆盖；不能只改WAIT而不补保持时间。
+    # 维护说明：docs/FRLG_EXECUTION_PARITY.md；勿将此标记当成上游已有修复。
+    $SeedBlackoutR提前MS = 0
+    IF ($Seed模式 == 4 or $Seed模式 == 6 or $Seed模式 == 8) and $NXSeed平台偏移MS < 0
+        $SeedBlackoutR提前MS = 1000
+    ENDIF
+    $SeedBlackout起始等待MS = 4700 - $SeedBlackoutR提前MS
+    $SeedBlackout肩键保持MS = 25820 + $NXSeed平台偏移MS + $SeedBlackoutR提前MS
+    $SeedBlackout最短MS = $SeedBlackout起始等待MS + $SeedBlackout肩键保持MS
+"""
+    if startup.count(original) != 1 or startup.count("        WAIT 4700\n") != 1:
+        raise ValueError("Blackout启动时序不符合已知结构，拒绝调整未知等待")
+    startup = startup.replace(original, updated, 1).replace(
+        "        WAIT 4700\n", "        WAIT $SeedBlackout起始等待MS\n", 1
+    )
+    anchor = "    CALL 准备Seed启动原点\n"
+    if startup.count(anchor) != 1:
+        raise ValueError("Blackout启动原点不唯一，无法添加测试时序记录")
+    startup = startup.replace(
+        anchor,
+        '    IF $SeedBlackoutR提前MS > 0\n'
+        '        PRINT "Blackout R启动测试: 提前 " & $SeedBlackoutR提前MS & " ms；起始等待 " & $SeedBlackout起始等待MS & " ms；保持 " & $SeedBlackout肩键保持MS & " ms"\n'
+        '    ENDIF\n' + anchor,
+        1,
+    )
+    return template_text[:match.start()] + startup + template_text[match.end():]
+
+
 def materialize_easycon118_164a_fixes(source_dir: str | Path) -> dict[str, Any]:
     """Bake reviewed 1.6.4-a fixes into both direct-run 2.0 entries."""
     source_dir = Path(source_dir).resolve()
@@ -6127,6 +6189,8 @@ def write_configured_project(
             options,
             precalibration,
         )
+    # Local startup timing override: preserve it across formal/timeline source updates.
+    configured = _apply_blackout_r_nx2_early_press_text(configured)
     main_path = output_dir / "main.ecs"
     main_path.write_text(configured, encoding="utf-8")
     wild_pid_retry_limit_sha256 = apply_wild_pid_retry_limit(main_path)

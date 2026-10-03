@@ -40,6 +40,30 @@ OCR 使用本应用已有 PP-OCR，支持原版 `frlg_battle` / `FRLG_EN_ALL` �
 
 `tools/vendor-frlg-runtime.mjs` 对内置快照执行 `--check` 指纹校验；`runtime/python/frlg-runtime-manifest.json` 同时记录已核对的参考仓库最新提交。`tools/import-frlg-release.py` 校验完整发布包 SHA-256，执行原版 materializer 并检查脚本、标签和模型。脚本库 `tools/import-frlg.cjs` 再次验指纹后导入；构建时同样校验并保留原版权属。修改发布包必须提升版本，已发布 ZIP 不覆盖。
 
+## Switch 2 Blackout R 本地时序修复（2026-10-03）
+
+这是应用侧的本地执行覆盖，不代表上游已经修复，也不改变 planner、初始 Seed 表或 TV 过帧规则。问题在 Switch 2、皮卡丘、模式 8（MONO / HELP / START / Blackout R）、`B744 / ADV 11985` 的非 TV 流程中复现：多次扩大 Seed 和帧数反查仍无结果，而无 Blackout 的模式 1 可以正常运行。录像显示固定 4700ms 的 R 按下延迟可能错过版权文字消失后的开场暗转窗口。提前 1000ms 后用户反馈修复成功；带覆盖标记的同一配置运行日志已恢复反查，例如 `124D / ADV 11998`、Seed 索引偏差 `+8`、帧偏差 `+13`。这证明本案例恢复了反查，不等同于所有机型、Seed 模式和路线都已实机验收。
+
+覆盖由 [`_apply_blackout_r_nx2_early_press_text`](../runtime/python/frlg_planner/automation/easycon118.py) 在 `write_configured_project()` 写入新运行工程前应用，正式与时间轴入口共用。生成脚本的标记是 `BLACKOUT_R_NX2_EARLY_PRESS_V1`；仅当平台偏移为负（当前 NX2 为 `-750ms`）且模式为 4、6、8 时提前 R。NX1、Blackout L 和不使用 Blackout 的模式保留原动作时序。模式 4、6 已有离线动作回放，当前实机反馈仅覆盖模式 8。独立孵蛋共享库、安装的脚本母本和已有 `.frlg-runs` 工程不在此覆盖范围内。
+
+| Switch 2 Blackout R 时段 | 原时序 | 本地修复 |
+| --- | ---: | ---: |
+| 开始等待 | 4700ms | 3700ms |
+| R 保持 | 25070ms | 26070ms |
+| 上述两段合计／松开时点 | 29770ms | 29770ms |
+| 松开后剩余 Seed 等待 | `SeedMS - 29770` | `SeedMS - 29770` |
+
+必须同时减少开始等待、增加保持时间；只改 `WAIT 4700` 会改变总 Seed 等待并混入另一项时序偏差。时间轴入口的绝对 Seed 截止时间同样保留。日志中的历史诊断名称 `Blackout R启动测试: 提前 1000 ms` 继续保留，用于确认生成覆盖已经生效。
+
+### 上游同步时的维护要求
+
+1. 保留 [`blackout-r-nx2-early-press.patch`](../tools/frlg-runtime-patches/blackout-r-nx2-early-press.patch) 及 [`vendor-frlg-runtime.mjs`](../tools/vendor-frlg-runtime.mjs) 的补丁注册。导入上游生成器后，菜单补丁与本地 Blackout R 补丁按注册顺序应用，不能只覆盖 `easycon118.py` 而丢掉本地覆盖。
+2. 若上游改变启动函数、4700ms 等待、平台偏移、肩键保持、计时原点或绝对截止时间，先对比新旧时序。当前转换对已知旧结构做唯一性检查，未知结构会拒绝生成；应人工迁移并验证，不能放宽检查来强行套用，也不能在上游等效提前后再重复提前。只有确认上游覆盖等效行为并完成复测，才移除此覆盖及对应补丁、标记、测试和文档。
+3. 更新本地覆盖后同步更新补丁内容、`frlg-runtime-manifest.json` 中生成器和补丁的 SHA-256；确认补丁可重放、转换幂等、正式／时间轴新工程均含标记。已生成的旧工程不会自动更新；重启应用工作进程并重新生成方案。
+4. 设置 `FRLG_SCRIPT_CORPUS` 为实际脚本包目录，运行 `node --test tests/frlg-execution.cjs tests/frlg-execution-python.cjs`。其中 `tests/frlg-main-reverse-migration.py` 回放验证 R 提前 1000ms、松开和总等待保持原值、NX1／L／非 Blackout 动作保持原值、最短 Seed 拒绝边界和两种入口。另运行 `node tools/vendor-frlg-runtime.mjs --check`，并复测模式 8 非 TV 的启动视频及反查结果。
+
+此次执行回归通过。全量资源指纹检查仍有三处既有差异（`egg_settings_retry.ecs`、`shortcut_registration_egg.ecs`、`shortcut_registration_main.ecs`），与修改前 HEAD 一致；本地 Blackout R 生成器和补丁指纹已单独核对。同步维护时应按来源复核这些差异，不应为消除报错批量重写所有指纹。
+
 ## 第0轮菜单定位修复（0.0.2）
 
 参考仓库最新同步已经移除快捷登记阶段和重要道具列表中的连续 `UP` 夹顶，统一使用已知起点的 `DOWN`，并把登记返回等待从 700ms 改为 1500ms；孵蛋设置入口由 5 次下移改为 3 次。应用生成器会把新母本的 Options 冷启动前缀统一接入“快捷检查返回 Bag 后向下 3 次、目标位为 0 时沿用原冷启动分支”的条件路由；已存在的等价上游路由保持不变，旧 `UP8` 和旧 GUI 动态片段迁移到同一入口，避免再次丢失普通冷启动路径。
