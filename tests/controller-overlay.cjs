@@ -7,11 +7,17 @@ const { registerDevices } = require('../electron/devices.cjs');
 
 const root = path.resolve(__dirname, '..');
 const dpi = process.env.AUTO_POKE_TEST_DPI;
-const output = path.join(root, 'node_modules/.tmp/controller-overlay-review', dpi ? 'dpi-' + dpi : '');
+const output = path.join(process.env.AUTO_POKE_OVERLAY_OUTPUT || path.join(root, 'node_modules/.tmp/controller-overlay-review'), dpi ? 'dpi-' + dpi : '');
 fs.mkdirSync(output, { recursive: true });
 app.setPath('userData', path.join(output, 'profile'));
 if (dpi) app.commandLine.appendSwitch('force-device-scale-factor', dpi);
 let devices;
+const rendererErrors = [];
+app.on('web-contents-created', (_event, contents) => {
+  contents.on('console-message', details => {
+    if (details.level === 'error') rendererErrors.push(details.message);
+  });
+});
 const timeout = setTimeout(() => { console.error('Overlay rendering test timed out'); app.exit(1); }, 45000);
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function until(action, message) {
@@ -32,8 +38,21 @@ app.whenReady().then(async () => {
   // Visual mode is a fixture; this test never installs a global keyboard hook.
   await command('window.desktop.overlay.setScale(1.6)');
   await command('window.desktop.overlay.show()');
-  const overlay = BrowserWindow.getAllWindows().find(window => window !== bridge);
+  let overlay = BrowserWindow.getAllWindows().find(window => window !== bridge);
+  const reopen = async (toggle = false) => {
+    await command(toggle ? 'window.desktop.overlay.toggle()' : 'window.desktop.overlay.show()');
+    overlay = BrowserWindow.getAllWindows().find(window => window !== bridge);
+    await until(() => js(overlay, 'Boolean(document.querySelector(".joycon-graphic"))'), 'reopened renderer loaded');
+    // React installs subscriptions after the first paint. Wait for startup
+    // effects and their IPC replies before retiring this widget again.
+    await js(overlay, 'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
+    await js(overlay, 'Promise.all([window.desktop.devices.getState(), window.desktop.overlay.getState()])');
+  };
   await until(() => js(overlay, 'Boolean(document.querySelector(".joycon-graphic"))'), 'SVG overlay loaded');
+  assert.match(overlay.webContents.getURL(), /window=controller-overlay/);
+  assert.equal(await js(overlay, 'document.title'), 'Auto Poke RNG');
+  assert.equal(await js(overlay, 'Boolean(document.querySelector("vite-error-overlay"))'), false);
+  assert.equal(await js(overlay, 'Boolean(document.querySelector(".controller-overlay-close"))'), false);
   assert.equal(overlay.getContentBounds().width, 160, 'saved size applies on first open');
   devices.controllerOverlay.input.setState({ active: true, mode: 'active' });
   await until(() => js(overlay, 'Boolean(document.querySelector(".controller-overlay.active"))'), 'active presentation');
@@ -56,14 +75,17 @@ app.whenReady().then(async () => {
   const checkNeutral = async () => {
     await until(() => js(overlay, '!document.querySelector("[data-pressed=true], [data-moved=true]")'), 'no stuck highlights');
     const g = await geometry();
+    // The SVG uses xMidYMid meet: its 100-unit square follows the smaller
+    // viewport dimension when fractional DPI rounds one edge differently.
+    const graphicSize = Math.min(g.svg.width, g.svg.height);
     for (const stick of g.sticks) {
       assert.ok(Math.abs(stick.knob.x - stick.ring.x) < .01, 'neutral stick centers share X');
       assert.ok(Math.abs(stick.knob.y - stick.ring.y) < .01, 'neutral stick centers share Y');
-      assert.ok(Math.abs(stick.knob.width / g.svg.width - .15) < .001, 'knob is 15/100 units');
+      assert.ok(Math.abs(stick.knob.width / graphicSize - .15) < .001, 'knob is 15/100 units');
     }
-    assert.ok(Math.abs(g.face.width / g.svg.width - .09) < .001, 'face keys are 9/100 units');
-    assert.ok(Math.abs(g.hat.width / g.svg.width - .06) < .001, 'D-pad keys are 6/100 units');
-    for (let i = 1; i < 4; i++) assert.ok(Math.abs((g.lights[i].y - g.lights[i - 1].y) / g.svg.height - .1) < .001, 'light spacing is 10/100 units');
+    assert.ok(Math.abs(g.face.width / graphicSize - .09) < .001, 'face keys are 9/100 units');
+    assert.ok(Math.abs(g.hat.width / graphicSize - .06) < .001, 'D-pad keys are 6/100 units');
+    for (let i = 1; i < 4; i++) assert.ok(Math.abs((g.lights[i].y - g.lights[i - 1].y) / graphicSize - .1) < .001, 'light spacing is 10/100 units');
   };
   const snapshot = async name => {
     await js(overlay, 'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
@@ -171,10 +193,104 @@ app.whenReady().then(async () => {
   assert.equal(await js(overlay, 'document.querySelector(".joycon-lights").dataset.running'), 'true');
   await input.controller.call('controller.release', { owner });
   await checkNeutral();
+
+  const configuredSize = Math.round(100 * (await command('window.desktop.overlay.getState()')).scale);
+  for (let sample = 0; sample < 300; sample++) {
+    await command(`window.desktop.overlay.moveDrag(${sample % 100}, ${sample % 80}, 'size-drag')`);
+    const bounds = overlay.getContentBounds();
+    assert.deepEqual([bounds.width, bounds.height], [configuredSize, configuredSize], 'drag preserves configured size at sample ' + sample);
+  }
+
+  // Deliver real Chromium mouse events to exercise capture, renderer handlers,
+  // preload and native movement together; keep the cursor's screen point fixed
+  // after the window moves by adjusting the final local coordinate.
+  for (const button of ['left', 'right']) {
+    overlay.setPosition(200, 200);
+    overlay.webContents.sendInputEvent({ type: 'mouseDown', button, x: 50, y: 50, globalX: 250, globalY: 250 });
+    overlay.webContents.sendInputEvent({ type: 'mouseMove', x: 74, y: 66, globalX: 274, globalY: 266, modifiers: [button + 'ButtonDown'] });
+    await until(() => overlay.getPosition()[0] === 224 && overlay.getPosition()[1] === 216, button + ' drag moves native window');
+    overlay.webContents.sendInputEvent({ type: 'mouseUp', button, x: 50, y: 50, globalX: 274, globalY: 266 });
+    await delay(40);
+    assert.deepEqual(overlay.getPosition(), [224, 216], button + ' release preserves final position');
+    assert.equal(input.getState().active, false, 'drag does not toggle keyboard capture');
+  }
+
+  // Total displacement stays anchored, including repeated samples and DPI.
+  const origin = overlay.getPosition();
+  for (const delta of [10, 20, 20, 35]) await command(`window.desktop.overlay.moveDrag(${delta}, 12, 'drag-test')`);
+  assert.deepEqual(overlay.getPosition(), [origin[0] + 35, origin[1] + 12]);
+  await command('window.desktop.overlay.moveDrag(-10, -12, "next-drag")');
+  assert.deepEqual(overlay.getPosition(), [origin[0] + 25, origin[1]]);
+
+  // Ctrl+Escape travels directly through the input manager, not the hide IPC.
+  // The real native window must disappear even while serial cleanup is stuck.
+  let finishReset;
+  input.pending = new Promise(resolve => { finishReset = resolve; });
+  try {
+    input.handleKey({ vk: 0x1b, down: true, control: true });
+    assert.equal(input.getState().visible, false);
+    assert.equal(overlay.isDestroyed(), true, 'Ctrl+Escape discards the native window immediately');
+  } finally { finishReset(); await input.pending; }
+
+  // An old hide completion must not hide a subsequent show.
+  await reopen();
+  let finishHide;
+  input.pending = new Promise(resolve => { finishHide = resolve; });
+  const oldWindow = overlay;
+  const previousPosition = overlay.getPosition();
+  const hiding = devices.controllerOverlay.hide();
+  assert.equal(oldWindow.isDestroyed(), true, 'hide IPC retires the widget before serial reset');
+  await reopen();
+  assert.notEqual(overlay, oldWindow, 'reopen creates a fresh native widget');
+  assert.deepEqual(overlay.getPosition(), previousPosition, 'reopen restores position');
+  finishHide(); await hiding;
+  assert.equal(overlay.isVisible(), true, 'new show survives old hide completion');
+  assert.equal(devices.controllerOverlay.getState().visible, true);
+
+  // Keep OS keyboard capture out of this native-window test; its lifecycle
+  // has separate tests. Use the toolbar's actual toggle IPC after each close.
+  input.ensureChild = async () => {};
+  for (let cycle = 1; cycle <= 10; cycle++) {
+    if (cycle > 1) await reopen(true);
+    assert.equal(overlay.getContentBounds().width, 160, 'reopen preserves configured size');
+    assert.equal(overlay.getContentBounds().height, 160, 'reopen preserves configured height');
+    const activeBeforeDrag = input.getState().active;
+    // Drag after every reopen, rather than checking only the first widget.
+    const start = overlay.getPosition();
+    const button = cycle % 2 ? 'right' : 'left';
+    overlay.webContents.sendInputEvent({ type: 'mouseDown', button, x: 50, y: 50, globalX: start[0] + 50, globalY: start[1] + 50 });
+    overlay.webContents.sendInputEvent({ type: 'mouseMove', x: 62, y: 58, globalX: start[0] + 62, globalY: start[1] + 58, modifiers: [button + 'ButtonDown'] });
+    await until(() => overlay.getPosition()[0] === start[0] + 12 && overlay.getPosition()[1] === start[1] + 8, 'reopened drag on cycle ' + cycle);
+    overlay.webContents.sendInputEvent({ type: 'mouseUp', button, x: 50, y: 50, globalX: start[0] + 62, globalY: start[1] + 58 });
+    await delay(30);
+    assert.equal(overlay.getContentBounds().width, 160, 'drag does not grow widget on cycle ' + cycle);
+    assert.equal(input.getState().active, activeBeforeDrag, 'drag does not toggle activation on cycle ' + cycle);
+    overlay.webContents.sendInputEvent({ type: 'mouseDown', button: 'middle', x: 50, y: 50 });
+    await delay(40);
+    assert.equal(overlay.isVisible(), true, 'middle down keeps widget alive for physical release');
+    overlay.webContents.sendInputEvent({ type: 'mouseUp', button: 'middle', x: 50, y: 50 });
+    await until(() => overlay.isDestroyed(), 'middle release closes native overlay on cycle ' + cycle);
+  }
+
+  await reopen();
+  overlay.emit('unresponsive');
+  assert.equal(overlay.isDestroyed(), true, 'unresponsive overlay stops input and retires its widget');
+  await input.pending;
+  await reopen();
+  overlay.webContents.forcefullyCrashRenderer();
+  await until(() => overlay.isDestroyed(), 'crashed renderer window is discarded');
+  await command('window.desktop.overlay.show()');
+  const replacement = BrowserWindow.getAllWindows().find(window => window !== bridge);
+  assert.notEqual(replacement, overlay, 'show creates a fresh overlay after a renderer crash');
+  await until(() => js(replacement, 'Boolean(document.querySelector(".joycon-graphic"))'), 'replacement renderer loads');
+  await js(replacement, 'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
+  await js(replacement, 'Promise.all([window.desktop.devices.getState(), window.desktop.overlay.getState()])');
+
   await command('window.desktop.devices.controller.disconnect()');
   await until(async () => !(await command('window.desktop.overlay.getState()')).visible, 'disconnect hides overlay');
+  assert.deepEqual(rendererErrors, [], 'renderers have no console errors');
   await devices.close();
   clearTimeout(timeout);
-  console.log('PASS: overlay pixels at 80/100/120/160; movement, buttons, hats, immediate WASD/key feedback during serial delay, renderer reload, release and standby.');
+  console.log('PASS: overlay pixels at 80/100/120/160; 300 moves without growth; 10 reopen/drag/middle-release cycles; Ctrl+Escape, immediate close during serial delay, reopen race, keyboard feedback and renderer crash recovery.');
   app.exit(0);
 }).catch(async error => { console.error(error); if (devices) await devices.close(); clearTimeout(timeout); app.exit(1); });

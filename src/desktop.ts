@@ -67,6 +67,7 @@ export interface ControllerOverlayApi {
   setMapping: (mapping: Record<string, string | null>) => Promise<ControllerOverlayState>;
   resetPosition: () => Promise<void>;
   moveBy: (dx: number, dy: number) => Promise<void>;
+  moveDrag?: (dx: number, dy: number, dragId: string) => Promise<void>;
   setScale: (scale: number) => Promise<ControllerOverlayState>;
   onState: (listener: (state: ControllerOverlayState) => void) => () => void;
   onInput: (listener: (event: unknown) => void) => () => void;

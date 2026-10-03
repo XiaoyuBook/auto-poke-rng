@@ -99,6 +99,7 @@ contextBridge.exposeInMainWorld('desktop', {
     setMapping: mapping => ipcRenderer.invoke('controller-overlay:set-mapping', { mapping }),
     resetPosition: () => ipcRenderer.invoke('controller-overlay:reset-position'),
     moveBy: (dx, dy) => ipcRenderer.invoke('controller-overlay:move-by', { dx, dy }),
+    moveDrag: (dx, dy, dragId) => ipcRenderer.invoke('controller-overlay:move-by', { dx, dy, dragId }),
     setScale: scale => ipcRenderer.invoke('controller-overlay:set-scale', { scale }),
     onState: listener => subscribe('controller-overlay:state', listener),
     onInput: listener => subscribe('controller-overlay:input', listener),

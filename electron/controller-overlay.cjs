@@ -6,7 +6,38 @@ function registerControllerOverlay({ getMainWindow, getWindows, loadWindow, cont
   let overlay = null;
   let state = { visible: false, active: false, mode: 'off', scale: 1 };
   let mappingRestore = null;
-  const input = new ControllerInputManager({ controller, broadcast: value => { state = { ...state, ...value }; broadcast(); } });
+  let moveOrigin = null;
+  let lastPosition = null;
+  const resizeWindow = (window, size) => {
+    // Windows pins a non-resizable window to its current native size. Unlock
+    // only for this synchronous resize, then constrain and lock the new size.
+    window.setResizable(true);
+    window.setMinimumSize(0, 0);
+    window.setMaximumSize(0, 0);
+    window.setContentSize(size, size);
+    window.setMinimumSize(size, size);
+    window.setMaximumSize(size, size);
+    window.setResizable(false);
+  };
+  const disposeWindow = () => {
+    const window = overlay;
+    if (!window || window.isDestroyed()) return;
+    lastPosition = window.getPosition();
+    // Retire the native widget and its mouse capture state, instead of
+    // reusing a hidden transparent Windows surface on the next open.
+    overlay = null;
+    moveOrigin = null;
+    window.destroy();
+  };
+  const input = new ControllerInputManager({ controller, broadcast: value => {
+    state = { ...state, ...value };
+    // Escape and disconnect also change visibility directly in the input
+    // manager. Retire the widget before waiting for serial cleanup.
+    if (!state.visible && overlay && !overlay.isDestroyed()) {
+      disposeWindow();
+    }
+    broadcast();
+  } });
   const broadcast = () => {
     for (const window of getWindows()) if (!window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send('controller-overlay:state', state);
   };
@@ -18,43 +49,67 @@ function registerControllerOverlay({ getMainWindow, getWindows, loadWindow, cont
     for (const window of getWindows()) if (!window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send('controller-overlay:input', event);
   });
   input.on('disconnected', () => {
-    if (overlay && !overlay.isDestroyed()) overlay.hide();
+    disposeWindow();
     state = { ...state, visible: false, active: false, mode: 'off' };
     broadcast();
   });
 
   const ensureWindow = () => {
     if (overlay && !overlay.isDestroyed()) return overlay;
-    overlay = new BrowserWindow({
-      width: Math.round(100 * state.scale), height: Math.round(100 * state.scale), show: false, frame: false, transparent: true, resizable: false,
+    const size = Math.round(100 * state.scale);
+    const window = new BrowserWindow({
+      width: size, height: size,
+      show: false, frame: false, transparent: true, resizable: false,
       movable: true, focusable: false, skipTaskbar: true, hasShadow: false, backgroundColor: '#00000000',
       alwaysOnTop: true, webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false },
     });
-    overlay.setAlwaysOnTop(true, 'floating');
-    overlay.on('closed', () => { overlay = null; state = { ...state, visible: false, active: false, mode: 'off' }; void input.hide(); broadcast(); });
-    void loadWindow(overlay, { window: 'controller-overlay' });
-    return overlay;
+    overlay = window;
+    resizeWindow(window, size);
+    window.setAlwaysOnTop(true, 'floating');
+    window.on('unresponsive', () => { if (overlay === window) void input.hide(); });
+    window.webContents.on('render-process-gone', () => {
+      // Destroy first: the closed handler stops input and broadcasts only to
+      // surviving windows, never to the crashed renderer's disposed frame.
+      if (overlay === window && !window.isDestroyed()) window.destroy();
+    });
+    window.on('closed', () => {
+      if (overlay !== window) return;
+      overlay = null;
+      state = { ...state, visible: false, active: false, mode: 'off' };
+      void input.hide(); broadcast();
+    });
+    void loadWindow(window, { window: 'controller-overlay' }).catch(error => {
+      // Closing while navigation is still loading is expected. Only report
+      // failures of the window that is still current.
+      if (overlay !== window || window.isDestroyed()) return;
+      input.emit('error', error);
+      void input.hide();
+    });
+    return window;
   };
   const show = async () => {
     if (mappingRestore) return state;
     const window = ensureWindow();
     await input.show();
     state = input.getState();
+    if (overlay !== window || window.isDestroyed()) return state;
     if (!state.visible) {
-      window.hide();
+      disposeWindow();
       broadcast();
       return state;
     }
     window.showInactive();
+    resizeWindow(window, Math.round(100 * state.scale));
+    const position = lastPosition || window.getPosition();
+    positionWindow(position[0], position[1]);
     window.setAlwaysOnTop(true, 'floating');
     broadcast();
     return state;
   };
   const hide = async () => {
     await input.hide();
-    if (overlay && !overlay.isDestroyed()) overlay.hide();
-    state = { ...state, visible: false, active: false, mode: 'off' };
-    broadcast();
+    // A new show may have completed while the old reset was pending. The
+    // input manager publishes the authoritative state synchronously above.
     return state;
   };
   const toggle = async () => {
@@ -63,8 +118,12 @@ function registerControllerOverlay({ getMainWindow, getWindows, loadWindow, cont
     const window = ensureWindow();
     await input.toggle();
     state = input.getState();
-    if (!state.visible) { window.hide(); broadcast(); return state; }
+    if (overlay !== window || window.isDestroyed()) return state;
+    if (!state.visible) { disposeWindow(); broadcast(); return state; }
     window.showInactive();
+    resizeWindow(window, Math.round(100 * state.scale));
+    const position = lastPosition || window.getPosition();
+    positionWindow(position[0], position[1]);
     window.setAlwaysOnTop(true, 'floating');
     broadcast();
     return state;
@@ -106,24 +165,41 @@ function registerControllerOverlay({ getMainWindow, getWindows, loadWindow, cont
   };
   const resetPosition = () => {
     if (!overlay || overlay.isDestroyed()) return;
+    moveOrigin = null;
     const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
     const area = display.workArea;
-    overlay.setPosition(Math.round(area.x + area.width / 2 - overlay.getBounds().width / 2), Math.round(area.y + area.height / 2 - overlay.getBounds().height / 2));
+    const size = Math.round(100 * state.scale);
+    positionWindow(Math.round(area.x + area.width / 2 - size / 2), Math.round(area.y + area.height / 2 - size / 2));
   };
   const setScale = value => {
     const scale = Math.min(2, Math.max(0.8, Number(value) || 1));
     input.setState({ scale });
     if (overlay && !overlay.isDestroyed()) {
-      // Windows pins a non-resizable window to its current size. Unlock only
-      // for this synchronous programmatic resize, then restore the tool policy.
-      overlay.setResizable(true);
-      overlay.setSize(Math.round(100 * scale), Math.round(100 * scale));
-      overlay.setResizable(false);
+      resizeWindow(overlay, Math.round(100 * scale));
+      const position = overlay.getPosition();
+      positionWindow(position[0], position[1]);
     }
     broadcast();
     return state;
   };
-  const moveBy = (dx, dy) => { if (overlay && !overlay.isDestroyed()) { const position = overlay.getPosition(); overlay.setPosition(position[0] + Number(dx || 0), position[1] + Number(dy || 0)); } };
+  const positionWindow = (x, y) => {
+    if (!overlay || overlay.isDestroyed()) return;
+    const size = Math.round(100 * state.scale);
+    // setPosition round-trips the existing native bounds. On Windows with
+    // fractional DPI that can grow the window by a pixel on every move.
+    // Always supply the configured size, constrained in both directions.
+    overlay.setBounds({ x, y, width: size, height: size });
+  };
+  const moveBy = (dx, dy, dragId) => {
+    if (!overlay || overlay.isDestroyed() || !state.visible) return;
+    if (!Number.isFinite(dx) || !Number.isFinite(dy)) return;
+    const position = overlay.getPosition();
+    if (dragId && moveOrigin?.id !== dragId) moveOrigin = { id: dragId, position };
+    const origin = dragId ? moveOrigin.position : position;
+    // Each drag sends total displacement from its start, avoiding accumulated
+    // rounding and backlogs of relative moves at fractional Windows scaling.
+    positionWindow(Math.round(origin[0] + dx), Math.round(origin[1] + dy));
+  };
   const validSender = event => getWindows().some(window => window && !window.isDestroyed() && window.webContents === event.sender);
   const handle = (name, action) => ipcMain.handle(name, (event, args) => { if (!validSender(event)) throw new Error('Unknown controller overlay sender'); return action(args); });
   handle('controller-overlay:state', () => input.getState());
@@ -136,7 +212,7 @@ function registerControllerOverlay({ getMainWindow, getWindows, loadWindow, cont
   handle('controller-overlay:resume', resumeAfterMapping);
   handle('controller-overlay:set-mapping', args => { input.setMapping(args?.mapping || {}); return input.getState(); });
   handle('controller-overlay:reset-position', resetPosition);
-  handle('controller-overlay:move-by', args => moveBy(args?.dx, args?.dy));
+  handle('controller-overlay:move-by', args => moveBy(args?.dx, args?.dy, args?.dragId));
   handle('controller-overlay:set-scale', args => setScale(args?.scale));
   handle('controller-overlay:input-state', () => input.getState());
 
@@ -149,7 +225,7 @@ function registerControllerOverlay({ getMainWindow, getWindows, loadWindow, cont
     toggleActive,
     setMapping: mapping => input.setMapping(mapping),
     suspend: () => input.suspend(),
-    close: async () => { await input.close(); if (overlay && !overlay.isDestroyed()) overlay.close(); overlay = null; state = { visible: false, active: false, mode: 'off', scale: state.scale }; broadcast(); },
+    close: async () => { await input.close(); disposeWindow(); state = { visible: false, active: false, mode: 'off', scale: state.scale }; broadcast(); },
     handleScriptState: stateValue => {
       if (stateValue?.running || stateValue?.owned) void input.setActive(false);
     },
