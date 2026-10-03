@@ -25,6 +25,8 @@
     "test:runtime": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/test-runtime.ps1",
     "test:devices": "npm run build && node tests/run-electron.cjs electron-devices.cjs",
     "test:devices:regression": "node --test --test-concurrency=1 tests/device-regressions.cjs tests/audio-integration.cjs tests/audio-supervisor.cjs tests/frame-reader-regressions.cjs tests/runtime-launcher-regressions.cjs",
+    "test:devices:reconnect": "node --test tests/device-reconnect.cjs && vitest run src/components/ConnectionNotice.test.tsx --maxWorkers=1",
+    "test:devices:reconnect:electron": "npm run build && node tests/run-device-reconnect.cjs",
     "test:audio": "node --test --test-concurrency=1 tests/audio-integration.cjs tests/audio-supervisor.cjs && vitest run src/components/AudioSource.test.tsx --maxWorkers=1",
     "test:audio:electron": "npm run build && node tests/run-electron.cjs audio-electron.cjs",
     "test:controller-mock": "npm run build && node tests/run-electron.cjs controller-mock.cjs",

@@ -4,10 +4,11 @@ const { ImageLabelMatcher } = require('./image-label-matcher.cjs');
 const { ScriptRunner, addSequenceApi } = require('./script-runner.cjs');
 const { registerControllerOverlay } = require('./controller-overlay.cjs');
 const { registerAudio } = require('./audio-devices.cjs');
+const { createDeviceReconnect } = require('./device-reconnect.cjs');
 const path = require('node:path');
 const { EventEmitter } = require('node:events');
 
-function registerDevices({ ipcMain, getWindows, loadWindow, rootDirectory = path.join(__dirname, '..', 'scripts'), testMode = false, isScriptLibraryBusy = () => false }) {
+function registerDevices({ ipcMain, getWindows, loadWindow, userData, rootDirectory = path.join(__dirname, '..', 'scripts'), testMode = false, isScriptLibraryBusy = () => false }) {
   const video = new RuntimeClient({ role: 'video', testMode });
   const ocr = new OcrClient();
   const matcher = new ImageLabelMatcher();
@@ -18,6 +19,7 @@ function registerDevices({ ipcMain, getWindows, loadWindow, rootDirectory = path
   const openWindow = loadWindow || ((window, query) => window.loadFile(path.join(__dirname, '..', 'dist', 'index.html'), { query }));
   const controllerOverlay = registerControllerOverlay({ controller, getMainWindow: () => getWindows().find(window => !window.isDestroyed()), getWindows, loadWindow: openWindow });
   let state = { video: { status: 'idle' }, audio: { status: 'idle' }, controller: { status: 'idle' } };
+  let reconnect;
   let snapshot = null;
   let connectTimer, frameTimer, healthBusy = false, closing = false, videoConnectInFlight = null;
   const broadcast = () => {
@@ -32,16 +34,16 @@ function registerDevices({ ipcMain, getWindows, loadWindow, rootDirectory = path
   let controllerTimer;
   controller.on('offline', error => {
     clearInterval(controllerTimer);
-    if (!closing) { state = { ...state, controller: { status: 'failed', message: error.message } }; broadcast(); }
+    if (!closing) { state = { ...state, controller: { status: 'failed', message: error.message } }; reconnect?.observe('controller', state.controller); broadcast(); }
   });
   controller.on('event', message => {
     if (message.event === 'controller.state') {
-      state = { ...state, controller: message.state }; broadcast();
+      state = { ...state, controller: message.state }; reconnect?.observe('controller', state.controller); broadcast();
       controllerOverlay.handleScriptState(message.state);
       if (message.state.status !== 'connected') clearInterval(controllerTimer);
     }
   });
-  const updateVideo = value => { state = { ...state, video: value }; broadcast(); runner.handleVideoState(value); };
+  const updateVideo = value => { state = { ...state, video: value }; reconnect?.observe('video', value); broadcast(); runner.handleVideoState(value); };
   const requireWindow = event => {
     if (!getWindows().some(window => !window.isDestroyed() && window.webContents === event.sender)
       || event.senderFrame !== event.sender.mainFrame) throw new Error('Unknown device sender');
@@ -70,10 +72,22 @@ function registerDevices({ ipcMain, getWindows, loadWindow, rootDirectory = path
       }, 1000);
     }
   });
-  const handle = (name, action) => ipcMain.handle(name, (event, args) => { requireWindow(event); return action(args); });
+  const actions = new Map();
+  const handle = (name, action) => {
+    const [kind, command] = name.split(':');
+    const invoke = args => {
+      if (['video', 'audio', 'controller'].includes(kind)) {
+        if (command === 'connect') return reconnect.trackConnect(kind, args, () => action(args));
+        if (command === 'disconnect') reconnect.cancel(kind);
+      }
+      return action(args);
+    };
+    actions.set(name, invoke);
+    ipcMain.handle(name, (event, args) => { requireWindow(event); return invoke(args); });
+  };
   const audio = registerAudio({
     client: new RuntimeClient({ role: 'audio', testMode }), handle,
-    publish: value => { state = { ...state, audio: value }; broadcast(); events.emit('audio-state', value); },
+    publish: value => { state = { ...state, audio: value }; reconnect?.observe('audio', value); broadcast(); events.emit('audio-state', value); },
     level: value => {
       for (const window of getWindows()) if (!window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send('devices:audio-level', value);
     },
@@ -162,6 +176,21 @@ function registerDevices({ ipcMain, getWindows, loadWindow, rootDirectory = path
     for (const window of getWindows()) if (!window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send('video:snapshot-updated', snapshot);
     return snapshot;
   });
+  reconnect = createDeviceReconnect({
+    userData, getState: () => state,
+    isBusy: () => !!automationOwner || !!runner.current || executionStarting || !!state.controller.running || !!state.controller.owned,
+    list: (kind, config) => actions.get(kind + ':list')(kind === 'video' ? { backend: config.backend } : undefined),
+    connect: (kind, config) => actions.get(kind + ':connect')(kind === 'controller' ? { port: config.port } : config),
+    failDevice: (kind, error) => {
+      if (state[kind].status === 'connected') return;
+      if (kind === 'video') updateVideo({ status: 'failed', message: error.message, code: error.code });
+      else { state = { ...state, [kind]: { status: 'failed', message: error.message, code: error.code } }; reconnect?.observe(kind, state[kind]); broadcast(); }
+    },
+    publish: value => { for (const window of getWindows()) if (!window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send('devices:connections', value); },
+  });
+  handle('devices:connections', () => reconnect.getState());
+  handle('devices:reconnect', () => reconnect.reconnect());
+  handle('devices:connection-preferences', args => reconnect.savePreferences(args));
   return {
     events, runner, ocr, controller,
     isAutomationBusy: () => !!automationOwner,
@@ -175,7 +204,8 @@ function registerDevices({ ipcMain, getWindows, loadWindow, rootDirectory = path
     releaseAutomation: owner => { if (automationOwner === owner) { automationOwner = null; controllerOverlay.input.automationLocked = false; } },
     stopInputs: async () => { await runner.stop(); await controllerOverlay.suspend(); if (controller.child) await controller.call('controller.stop'); },
     controllerOverlay,
-    close: async () => { closing = true; matcher.close(); clearVideoTimers(); clearInterval(controllerTimer); ++runner.validationVersion; runner.cancelValidation?.(); await runner.stop().catch(() => {}); await controllerOverlay.close(); await Promise.allSettled([video.close(), audio.close(), controller.close(), ocr.close()]); },
+    startReconnect: () => reconnect.start(),
+    close: async () => { closing = true; reconnect.close(); matcher.close(); clearVideoTimers(); clearInterval(controllerTimer); ++runner.validationVersion; runner.cancelValidation?.(); await runner.stop().catch(() => {}); await controllerOverlay.close(); await Promise.allSettled([video.close(), audio.close(), controller.close(), ocr.close()]); },
     getState: () => state,
   };
 }

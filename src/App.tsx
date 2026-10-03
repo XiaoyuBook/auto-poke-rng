@@ -35,7 +35,9 @@ import { useFrlgSaves } from './frlgProfile';
 import type { FrlgTargetIntent } from './frlgDex';
 import { loadControllerMapping, type MappingAction } from './controllerMapping';
 import { useDevices } from './useDevices';
-import type { ScriptProgress } from './devices';
+import { useDeviceConnections } from './useDeviceConnections';
+import { ConnectionNotice } from './components/ConnectionNotice';
+import type { ReconnectResult, ScriptProgress } from './devices';
 import { useScriptValidation } from './useScriptValidation';
 import { useQQState } from './notifications';
 
@@ -58,8 +60,21 @@ export default function App({ connections = initialConnections }: { connections?
     return <div className="controller-overlay-root"><ControllerOverlayApp /></div>;
   }
   const devices = useDevices();
+  const deviceConnections = useDeviceConnections();
   const automation = useAutomation();
-  const actualConnections = window.desktop?.devices ? { video: devices.video.status, controller: devices.controller.status } : connections;
+  const actualConnections = window.desktop?.devices ? { video: devices.audio?.status === 'failed' ? 'failed' as const : devices.video.status, controller: devices.controller.status } : connections;
+  const [connectionNotice, setConnectionNotice] = useState<ReconnectResult | null>(null);
+  const [reconnectPending, setReconnectPending] = useState(false);
+  const reconnectStarting = useRef(false);
+  const lastConnectionResult = useRef(0);
+  const reconnectBusy = reconnectPending || deviceConnections.state.busy;
+  const closeConnectionNotice = useCallback(() => setConnectionNotice(null), []);
+  useEffect(() => {
+    const result = deviceConnections.state.result;
+    if (!result || result.id === lastConnectionResult.current) return;
+    lastConnectionResult.current = result.id;
+    setConnectionNotice(result.failures.length || result.message ? result : null);
+  }, [deviceConnections.state.result]);
   const [page, setPage] = useState<Page>('脚本编辑');
   const [visitedPages, setVisitedPages] = useState<Set<Page>>(() => new Set(['脚本编辑']));
   const [automationTab, setAutomationTab] = useState<AutomationKind>('static');
@@ -76,6 +91,14 @@ export default function App({ connections = initialConnections }: { connections?
   const currentRun = useRef<{ runId?: string; started: number } | null>(null);
   const startingRun = useRef<Promise<unknown> | null>(null);
   const [recording, setRecording] = useState(false);
+  const reconnectDevices = () => {
+    if (!deviceConnections.api || reconnectStarting.current || deviceConnections.state.busy) return;
+    if (recording) { setConnectionNotice({ id: Date.now(), failures: [], message: '正在录制手柄输入，请结束录制后重连。' }); return; }
+    reconnectStarting.current = true; setReconnectPending(true); setConnectionNotice(null);
+    void deviceConnections.api.reconnect().catch(error => {
+      setConnectionNotice({ id: Date.now(), failures: [], message: error instanceof Error ? error.message : String(error) });
+    }).finally(() => { reconnectStarting.current = false; setReconnectPending(false); });
+  };
   const [elapsed, setElapsed] = useState(0);
   const library = useScriptLibrary();
   const { save: saveScript } = library;
@@ -553,7 +576,9 @@ export default function App({ connections = initialConnections }: { connections?
               </div>
             )}
           </div>
-          <GlobalTools connections={actualConnections} notificationStatus={notificationError ? 'failed' : notificationState?.status || 'unconfigured'} open={openModal} />
+          <GlobalTools connections={actualConnections} notificationStatus={notificationError ? 'failed' : notificationState?.status || 'unconfigured'} open={openModal}
+            reconnect={reconnectDevices} reconnectBusy={reconnectBusy} reconnectAvailable={Boolean(deviceConnections.api)}
+            messages={{ video: devices.audio?.status === 'failed' ? (devices.video.status === 'connected' ? '视频已连接，游戏音频失败：' : '游戏音频失败：') + devices.audio.message : devices.video.status === 'failed' ? devices.video.message : undefined, controller: devices.controller.status === 'failed' ? devices.controller.message : undefined }} />
         </div>
 
         <nav className="sidebar-nav" aria-label="工作区">
@@ -670,6 +695,7 @@ export default function App({ connections = initialConnections }: { connections?
         </>}
       </div>}
       {(toast || panelError) && <div className="toast" role="status"><Check size={15} />{toast || panelError}</div>}
+      {connectionNotice && <ConnectionNotice notice={connectionNotice} close={closeConnectionNotice} retry={reconnectDevices} busy={reconnectBusy} />}
     </div>
   );
 }

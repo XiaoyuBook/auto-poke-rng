@@ -7,6 +7,7 @@ import { Controller } from './Controller';
 import { EasyConConnection } from './EasyConConnection';
 import { ScriptHelp } from './ScriptHelp';
 import { QQNotifications } from './QQNotifications';
+import { useDeviceConnections } from '../useDeviceConnections';
 
 export function ToolsDialog({ modal, close, onInput }: { modal: Modal; close: () => void; onInput: (key: string) => void }) {
   if (modal === 'notification') return <QQNotifications close={close} />;
@@ -14,7 +15,7 @@ export function ToolsDialog({ modal, close, onInput }: { modal: Modal; close: ()
   return (
     <Dialog title={titles[modal]} close={close} className={modal === 'help' ? 'script-help-dialog' : modal === 'video' ? 'video-source-dialog' : ''}>
       <div className="dialog-body">
-        {modal === 'settings' && <OverlayScaleSetting />}
+        {modal === 'settings' && <><ConnectionSetting /><OverlayScaleSetting /></>}
         {modal === 'video' && <VideoSource />}
         {modal === 'easycon' && <EasyConConnection />}
         {modal === 'controller' && <Controller onInput={onInput} />}
@@ -22,6 +23,24 @@ export function ToolsDialog({ modal, close, onInput }: { modal: Modal; close: ()
       </div>
     </Dialog>
   );
+}
+
+function ConnectionSetting() {
+  const { state, api, ready } = useDeviceConnections();
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const save = async (autoReconnect: boolean) => {
+    if (!api) return;
+    setSaving(true); setError('');
+    try { await api.save({ autoReconnect }); }
+    catch (error) { setError(error instanceof Error ? error.message : String(error)); }
+    finally { setSaving(false); }
+  };
+  return <section className="connection-setting" aria-label="设备重连设置"><h3>设备连接</h3><p>成功连接后记住设备与参数，左上角插头图标可一键重连。</p>
+    <label><input type="checkbox" checked={state.preferences.autoReconnect} disabled={!api || !ready || saving} onChange={event => void save(event.target.checked)} />启动时自动重连</label>
+    <small>恢复上次的设备连接，脚本由你手动开始。</small>
+    {error && <p className="device-error" role="alert">{error}</p>}
+  </section>;
 }
 
 function OverlayScaleSetting() {

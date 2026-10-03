@@ -74,7 +74,7 @@ app.whenReady().then(async () => {
   // packaged production builds remain real-device only unless explicitly
   // launched with the test flag.
   const testDevices = !app.isPackaged || process.env.AUTO_POKE_TEST_DEVICES === '1';
-  devices = registerDevices({ ipcMain, getWindows: () => BrowserWindow.getAllWindows(), loadWindow, rootDirectory, testMode: testDevices, isScriptLibraryBusy: () => scriptGate.busy });
+  devices = registerDevices({ ipcMain, getWindows: () => BrowserWindow.getAllWindows(), loadWindow, userData: app.getPath('userData'), rootDirectory, testMode: testDevices, isScriptLibraryBusy: () => scriptGate.busy });
   notifications = registerQQNotifications({ ipcMain, getMainWindow: () => mainWindow, safeStorage, nativeImage, userData: app.getPath('userData') });
   rng = registerRng({ ipcMain, getMainWindow: () => mainWindow, isAutomationBusy: () => devices.isAutomationBusy() });
   frlgRng = registerFrlgRng({
@@ -97,6 +97,7 @@ app.whenReady().then(async () => {
     migrateScriptPaths: aliases => automation.store.migrateScriptPaths(aliases),
     isBusy: () => !!devices.runner.current || automation.isBusy() || frlgAutomation.isBusy(), log: (message, level = 'info') => automation.store.log(message, '系统', level) });
   createWindow();
+  devices.startReconnect();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });

@@ -1,10 +1,13 @@
 import { RefreshCw, Usb } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useDevices } from '../useDevices';
+import { useDeviceConnections } from '../useDeviceConnections';
 
 export function EasyConConnection() {
   const { controller } = useDevices();
   const api = window.desktop?.devices?.controller;
+  const { state: connections, ready } = useDeviceConnections();
+  const initialized = useRef(false);
   const [ports, setPorts] = useState<{ id: string; name: string }[]>([]);
   const [port, setPort] = useState('');
   const [busy, setBusy] = useState(false);
@@ -15,6 +18,13 @@ export function EasyConConnection() {
   const statusClass = connected ? 'success' : controller.status === 'failed' ? 'failed' : 'warning';
 
   useEffect(() => {
+    if (!ready || initialized.current) return;
+    initialized.current = true;
+    const saved = connections.preferences.controller;
+    if (saved) setPort(connected ? controller.name || saved.port : saved.port);
+  }, [ready, connections.preferences.controller, connected, controller.name]);
+
+  useEffect(() => {
     if (!api) return;
     let active = true;
     setBusy(true);
@@ -22,7 +32,7 @@ export function EasyConConnection() {
     void api.list().then(items => {
       if (!active) return;
       setPorts(items);
-      setPort(current => items.some(item => item.id === current) ? current : items[0]?.id || '');
+      setPort(current => current || items[0]?.id || '');
     }).catch(value => {
       if (active) setError(value instanceof Error ? value.message : String(value));
     }).finally(() => {
@@ -52,7 +62,8 @@ export function EasyConConnection() {
       <label>串口
         <div className="device-select-row">
           <select aria-label="伊机控串口" value={port} disabled={busy || connected || connecting} onChange={event => setPort(event.target.value)}>
-            {!ports.length && <option value="">未发现串口</option>}
+            {port && !ports.some(item => item.id === port) && <option value={port}>{port}（未找到）</option>}
+            {!ports.length && !port && <option value="">未发现串口</option>}
             {ports.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
           </select>
           <button className="icon-button" aria-label="刷新串口" disabled={busy || connected || connecting} onClick={() => setRefresh(value => value + 1)}><RefreshCw size={14} /></button>
@@ -68,7 +79,7 @@ export function EasyConConnection() {
       <span className={'status-dot ' + statusClass} />
     </div>
     {(error || controller.message) && <p className="device-error" role="alert">{error || controller.message}</p>}
-    <button className="button primary" disabled={!api || busy || (!connected && !connecting && !port)} onClick={() => void action()}>
+    <button className="button primary" disabled={!api || busy || (!connected && !connecting && !ports.some(item => item.id === port))} onClick={() => void action()}>
       {connecting ? '取消连接' : connected ? '断开伊机控' : '连接伊机控'}
     </button>
   </>;

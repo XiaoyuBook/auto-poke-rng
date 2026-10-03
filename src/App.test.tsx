@@ -177,7 +177,7 @@ describe('workspace interactions', () => {
     expect(within(nav).getAllByRole('button').map(button => button.textContent)).toEqual(['首页', '脚本编辑', '自动流程']);
     expect(screen.queryByRole('region', { name: '存档信息' })).toBeNull();
     const globalTools = screen.getByRole('group', { name: '全局工具' });
-    expect(within(globalTools).getAllByRole('button').map(button => button.getAttribute('aria-label'))).toEqual(['视频源：未尝试连接', '伊机控：未尝试连接', 'QQ 通知：未配置']);
+    expect(within(globalTools).getAllByRole('button').map(button => button.getAttribute('aria-label'))).toEqual(['视频源：未尝试连接', '伊机控：未尝试连接', '按上次重连', 'QQ 通知：未配置']);
     fireEvent.click(screen.getByRole('button', { name: '收起侧栏' }));
     expect(document.querySelector('.app-shell')?.getAttribute('data-collapsed')).toBe('true');
     fireEvent.click(screen.getByRole('button', { name: '展开侧栏' }));

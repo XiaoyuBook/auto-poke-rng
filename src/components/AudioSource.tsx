@@ -1,11 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AudioLines, RefreshCw } from 'lucide-react';
 import { useDevices } from '../useDevices';
 import type { AudioDevice, AudioLevel } from '../devices';
+import { useDeviceConnections } from '../useDeviceConnections';
 
 export function AudioSource() {
   const { audio = { status: 'idle' } } = useDevices();
   const api = window.desktop?.devices?.audio;
+  const { state: connections, ready } = useDeviceConnections();
+  const initialized = useRef(false);
   const [devices, setDevices] = useState<AudioDevice[]>([]);
   const [selected, setSelected] = useState(audio.deviceId || '');
   const [refresh, setRefresh] = useState(0);
@@ -14,14 +17,18 @@ export function AudioSource() {
   const [error, setError] = useState('');
   const [level, setLevel] = useState<AudioLevel | null>(null);
   useEffect(() => {
+    if (!ready || initialized.current) return;
+    initialized.current = true;
+    if (connections.preferences.audio) setSelected(audio.deviceId || connections.preferences.audio.deviceId);
+  }, [ready, connections.preferences.audio, audio.deviceId]);
+  useEffect(() => {
     if (!api) return;
     let active = true;
     setLoading(true); setError('');
     void api.list().then(items => {
       if (!active) return;
       setDevices(items);
-      // Never silently pick the laptop microphone as a game's audio source.
-      setSelected(current => items.some(item => item.id === current) ? current : '');
+      // Preserve the explicit or saved choice, even when the device is unplugged.
     }).catch(error => { if (active) setError(error.message); }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [api, refresh]);
@@ -46,6 +53,7 @@ export function AudioSource() {
       <label>音频输入<div className="device-select-row">
         <select aria-label="音频输入" value={connected || connecting ? audio.deviceId || selected : selected} disabled={!api || loading || acting || connected || connecting} onChange={event => setSelected(event.target.value)}>
           <option value="">{loading ? '正在查找音频设备…' : devices.length ? '请选择采集卡音频输入' : '未发现音频输入'}</option>
+          {selected && !devices.some(item => item.id === selected) && <option value={selected}>{audio.name || connections.preferences.audio?.name || '上次的音频输入'}（未找到）</option>}
           {devices.map(device => <option key={device.id} value={device.id}>{device.name}</option>)}
         </select>
         <button className="icon-button" aria-label="刷新音频设备" disabled={!api || loading || acting || connected || connecting} onClick={() => setRefresh(value => value + 1)}><RefreshCw size={14} /></button>
@@ -62,7 +70,7 @@ export function AudioSource() {
       {level?.discontinuity && <p role="status">音频出现不连续，请检查设备连接。</p>}
     </div>}
     {(error || audio.message) && <p className="device-error" role="alert">{error || audio.message}</p>}
-    <button className="button primary" disabled={!api || acting || (!connected && !connecting && (loading || !selected))} onClick={() => void action()}>
+    <button className="button primary" disabled={!api || acting || (!connected && !connecting && (loading || !devices.some(item => item.id === selected)))} onClick={() => void action()}>
       {connecting ? '取消音频连接' : connected ? '断开音频源' : '连接音频源'}
     </button>
   </section>;

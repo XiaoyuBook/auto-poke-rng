@@ -54,6 +54,12 @@ contextBridge.exposeInMainWorld('desktop', {
     getState: () => ipcRenderer.invoke('devices:state'),
     onState: listener => subscribe('devices:state', listener),
     onEvent: listener => subscribe('devices:event', listener),
+    connections: {
+      getState: () => ipcRenderer.invoke('devices:connections'),
+      onState: listener => subscribe('devices:connections', listener),
+      reconnect: () => ipcRenderer.invoke('devices:reconnect'),
+      save: preferences => ipcRenderer.invoke('devices:connection-preferences', preferences),
+    },
     controller: {
       list: () => ipcRenderer.invoke('controller:list'),
       connect: port => ipcRenderer.invoke('controller:connect', { port }),

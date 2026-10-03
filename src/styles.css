@@ -63,6 +63,26 @@ h1, h2, h3, p { margin: 0; }
 .icon-button:hover .tool-status-dot, .icon-button.active .tool-status-dot { outline-color: var(--hover); }
 .tool-status-dot.failed { background: var(--red); }
 .tool-status-dot.connected { background: var(--green); }
+.tool-status-dot.connecting { background: var(--yellow); }
+.connection-spinning { animation: connection-spin 1s linear infinite; }
+@keyframes connection-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .connection-spinning { animation: none; } }
+.connection-notice { position: fixed; z-index: 50; bottom: 24px; right: 24px; width: min(390px, calc(100vw - 32px)); padding: 12px 14px; border: 1px solid #454c4c; border-radius: 7px; background: #252c2c; color: var(--text); box-shadow: 0 8px 24px #0004; font-size: 12px; }
+.connection-notice-heading { display: flex; align-items: center; gap: 8px; }
+.connection-notice-heading > svg { color: var(--red); }
+.connection-notice-heading > strong { font-weight: 500; }
+.connection-notice-heading .icon-button { margin-left: auto; width: 25px; height: 25px; }
+.connection-notice p { margin-top: 8px; overflow-wrap: anywhere; }
+.connection-notice p > strong { font-weight: 500; }
+.connection-notice-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.connection-notice-actions > span { color: var(--secondary); font-size: 11px; }
+.connection-notice-actions .text-button { display: flex; align-items: center; gap: 5px; }
+.connection-setting { margin-bottom: 22px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+.connection-setting h3 { font-size: 13px; font-weight: 500; }
+.connection-setting p { margin: 6px 0 12px; color: var(--secondary); font-size: 12px; }
+.connection-setting label { display: flex; align-items: center; gap: 8px; }
+.connection-setting input { accent-color: var(--accent); }
+.connection-setting small { display: block; margin-top: 6px; color: var(--muted); font-size: 11px; }
 
 .game-menu { position: absolute; z-index: 20; top: calc(100% + 8px); left: 0; width: 240px; padding: 5px; border: 1px solid #3b3d3d; border-radius: 8px; background: #202121; box-shadow: 0 10px 30px #0006; }
 .menu-label { padding: 7px 9px; color: var(--muted); font-size: 12px; }

@@ -13,6 +13,21 @@ export interface AudioState extends DeviceState {
 }
 export interface AudioLevel { session: string; sequence: number; peak: number; rms: number; silent: boolean; discontinuity: boolean }
 export interface DevicesState { video: VideoState; audio: AudioState; controller: DeviceState }
+export interface VideoConnectionConfig { deviceId: string; backend: string; width: number; height: number; fps: number; name?: string }
+export interface ConnectionPreferences {
+  version: 1; autoReconnect: boolean;
+  video?: VideoConnectionConfig;
+  controller?: { port: string; name?: string };
+  audio?: { deviceId: string; name?: string };
+}
+export interface ReconnectResult { id: number; failures: { device: 'video' | 'controller' | 'audio'; name: string; message: string }[]; message?: string }
+export interface DeviceConnectionsState { preferences: ConnectionPreferences; busy: boolean; result: ReconnectResult | null }
+export interface DeviceConnectionsApi {
+  getState: () => Promise<DeviceConnectionsState>;
+  onState: (listener: (state: DeviceConnectionsState) => void) => () => void;
+  reconnect: () => Promise<ReconnectResult | null>;
+  save: (preferences: { autoReconnect: boolean }) => Promise<DeviceConnectionsState>;
+}
 export interface Snapshot { url: string; session: string; sequence: string; width: number; height: number }
 export interface LabelMatchResult {
   score: number; scriptValue: number; matched: boolean; unit: 'score' | 'percent';
@@ -22,6 +37,7 @@ export interface ScriptDiagnostic { message: string; source?: string; line?: num
 export interface ScriptProgress { source: string; line: number; column: number; action: string; text: string; caller?: { source: string; line: number } | null; loops?: { source: string; line: number; column: number; iteration: number; total?: number | null }[] }
 export interface ScriptEvent extends Partial<ScriptProgress> { event: string; runId: string; status?: string; message?: string; phase?: string }
 export interface DevicesApi {
+  connections?: DeviceConnectionsApi;
   getState: () => Promise<DevicesState>;
   onState: (listener: (state: DevicesState) => void) => () => void;
   onEvent: (listener: (event: ScriptEvent) => void) => () => void;
