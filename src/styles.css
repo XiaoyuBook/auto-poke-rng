@@ -602,11 +602,12 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .frlg-target-dialog .frlg-attribute-fields { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 .frlg-attribute-fields > label { grid-column: span 2; }
 .frlg-attribute-fields > label:nth-child(n+4) { grid-column: span 3; }
-.frlg-iv-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 7px; }
+.frlg-iv-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 9px 12px; margin-bottom: 7px; }
 .frlg-iv-heading h3 { margin: 0; }
-.frlg-iv-heading > div { display: flex; gap: 5px; }
-.frlg-target-dialog .frlg-iv-heading button { border: 0; background: transparent; padding: 3px 7px; color: #c6bee4; font-size: 11px; }
-.frlg-target-dialog .frlg-iv-heading button:hover:not(:disabled) { background: #aaa2cc16; }
+.frlg-iv-heading > div { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-left: auto; }
+.frlg-target-dialog .frlg-iv-heading button { min-width: 43px; border: 1px solid #aaa2cc44; border-radius: 999px; background: #aaa2cc07; padding: 4px 11px; color: #bdb8d1; font-size: 11px; font-weight: 600; }
+.frlg-target-dialog .frlg-iv-heading button:hover:not(:disabled) { background: #aaa2cc18; border-color: #aaa2cc88; }
+.frlg-target-dialog .frlg-iv-heading button[aria-pressed="true"] { color: #e3ddf3; background: #aaa2cc24; border-color: #aaa2ccaa; }
 .frlg-iv-matrix { width: 100%; table-layout: fixed; border-spacing: 5px; margin: 0 -5px; }
 .frlg-iv-matrix th { font-size: 11px; font-weight: 500; color: var(--secondary); }
 .frlg-iv-matrix thead th { padding-bottom: 3px; text-align: center; }

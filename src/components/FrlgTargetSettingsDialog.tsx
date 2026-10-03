@@ -4,6 +4,7 @@ import {
 } from '../frlgAutomation';
 import { categoryLabels, gameLabels, methodLabels, natureLabels, shinyLabels, statLabels, typeLabels } from '../frlgLabels';
 import type { FrlgSaveProfile } from '../frlgProfile';
+import { FRLG_IV_PRESETS, type FrlgIvPreset } from '../frlgIvPresets';
 import { Dialog } from './Dialog';
 import { FrlgSprite } from './FrlgSprite';
 
@@ -14,12 +15,13 @@ type Props = {
   onChange: <K extends keyof FrlgStaticRequest>(key: K, value: FrlgStaticRequest[K]) => void;
   onMethod: (method: string) => void; onCategory: (category: string) => void; onLocation: (location: string) => void;
   onIv: (index: number, kind: 'ivMin' | 'ivMax', raw: string) => void;
-  onIvPreset: (perfect: boolean) => void;
+  onIvPreset: (preset: FrlgIvPreset) => void;
   onClose: () => void; onSearch: () => void; onCancelSearch: () => void;
 };
 
 export function FrlgTargetSettingsDialog({ request, profile, target, targets, locations, abilities, busy, diagnostics, error, notice, onChange, onMethod, onCategory, onLocation, onIv, onIvPreset, onClose, onSearch, onCancelSearch }: Props) {
   const wild = request.method.includes('Wild');
+  const selectedPreset = FRLG_IV_PRESETS.find(preset => preset.min.every((value, index) => value === request.ivMin[index]) && preset.max.every((value, index) => value === request.ivMax[index]))?.label;
   return <Dialog title="火叶目标与筛选条件" close={onClose} className="automation-target-dialog frlg-target-dialog">
     <div className="automation-target-dialog-body">
       <div className="frlg-search-identity" aria-label="当前搜索目标">
@@ -49,7 +51,7 @@ export function FrlgTargetSettingsDialog({ request, profile, target, targets, lo
             </div>
           </section>
           <section className="frlg-search-section" aria-labelledby="frlg-iv-heading">
-            <div className="frlg-iv-heading"><h3 id="frlg-iv-heading">个体值范围</h3><div><button type="button" onClick={() => onIvPreset(false)}>不限</button><button type="button" onClick={() => onIvPreset(true)}>全部 31</button></div></div>
+            <div className="frlg-iv-heading"><h3 id="frlg-iv-heading">个体值范围</h3><div role="group" aria-label="个体值预设">{FRLG_IV_PRESETS.map(preset => <button type="button" key={preset.label} title={preset.description} aria-pressed={selectedPreset === preset.label} onClick={() => onIvPreset(preset)}>{preset.label}</button>)}</div></div>
             <table className="frlg-iv-matrix" aria-label="个体值范围"><thead><tr><td/><th scope="col">HP</th>{statLabels.slice(1).map(label => <th scope="col" key={label}>{label}</th>)}</tr></thead><tbody>{(['ivMin', 'ivMax'] as const).map(kind => <tr key={kind}><th scope="row">{kind === 'ivMin' ? '最低' : '最高'}</th>{statLabels.map((label, index) => <td key={label}><input aria-label={`${label}${kind === 'ivMin' ? '最小' : '最大'}IV`} type="number" min={0} max={31} value={request[kind][index]} onChange={event => onIv(index, kind, event.target.value)}/></td>)}</tr>)}</tbody></table>
           </section>
         </fieldset>

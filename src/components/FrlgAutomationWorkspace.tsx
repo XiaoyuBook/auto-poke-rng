@@ -263,7 +263,7 @@ export function FrlgAutomationWorkspace({ profile = defaultFrlgSaveProfile, onOp
     <details className="frlg-run-settings-fold" key={profileId}><summary><strong>运行与反查校准</strong><span>{options.entry === 'timeline' ? '时间轴入口' : '正式入口'} · 设置随存档保存</span></summary><FrlgRunSettings options={options} onChange={saveOptions} locked={locked} wild={wildMethod(request.method)} /></details>
     {targetSettingsOpen && !running && <FrlgTargetSettingsDialog request={request} profile={profile} target={target} targets={targets} locations={locations} abilities={abilityOptions} busy={busy} diagnostics={diagnostics} error={error} notice={notice}
       onChange={update} onMethod={changeMethod} onCategory={changeCategory} onLocation={changeLocation} onIv={setIv}
-      onIvPreset={perfect => { invalidate(); setRequest(current => ({ ...current, ivMin: Array(6).fill(perfect ? 31 : 0), ivMax: Array(6).fill(31) })); }}
+      onIvPreset={preset => { invalidate(); setRequest(current => ({ ...current, ivMin: [...preset.min], ivMax: [...preset.max] })); }}
       onClose={() => setTargetSettingsOpen(false)} onSearch={() => void search()} onCancelSearch={() => void cancelSearch()}/>}
     {resultDetailOpen && result && <FrlgPlanDetails plan={result} close={() => setResultDetailOpen(false)} />}
   </section>;

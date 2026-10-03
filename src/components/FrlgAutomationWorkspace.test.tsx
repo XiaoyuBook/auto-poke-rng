@@ -151,12 +151,13 @@ describe('real FRLG planner result contract', () => {
     const api = mockApi(); render(<FrlgAutomationWorkspace profile={profile}/>);
     chooseGolbat();
     change('性格筛选', 'Timid');
-    fireEvent.click(screen.getByRole('button', {name:'全部 31'}));
+    fireEvent.click(screen.getByRole('button', {name:'6V'}));
     for (const label of ['HP','攻击','防御','特攻','特防','速度']) {
       expect((screen.getByLabelText(`${label}最小IV`) as HTMLInputElement).value).toBe('31');
       expect((screen.getByLabelText(`${label}最大IV`) as HTMLInputElement).value).toBe('31');
     }
     change('HP最大IV', '30');
+    expect(screen.getByRole('button', {name:'6V'}).getAttribute('aria-pressed')).toBe('false');
     expect(screen.getByRole('alert').textContent).toContain('每项个体值');
     expect((searchButton() as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(screen.getByRole('button', {name:'不限'}));
@@ -164,10 +165,19 @@ describe('real FRLG planner result contract', () => {
     expect((screen.getByLabelText('HP最小IV') as HTMLInputElement).value).toBe('0');
     expect((screen.getByLabelText('HP最大IV') as HTMLInputElement).value).toBe('31');
     expect((screen.getByLabelText('性格筛选') as HTMLSelectElement).value).toBe('Timid');
-    fireEvent.click(screen.getByRole('button', {name:'全部 31'}));
+    for (const [name, values] of [
+      ['0A', [31,0,31,31,31,31]], ['0S', [31,31,31,31,31,0]], ['0A0S', [31,0,31,31,31,0]],
+    ] as const) {
+      fireEvent.click(screen.getByRole('button', {name}));
+      expect(screen.getByRole('button', {name}).getAttribute('aria-pressed')).toBe('true');
+      for (const [index, label] of ['HP','攻击','防御','特攻','特防','速度'].entries()) {
+        expect((screen.getByLabelText(`${label}最小IV`) as HTMLInputElement).value).toBe(String(values[index]));
+        expect((screen.getByLabelText(`${label}最大IV`) as HTMLInputElement).value).toBe(String(values[index]));
+      }
+    }
     fireEvent.click(searchButton());
     await screen.findByRole('region', {name:'火叶推荐方案'});
-    expect(api.search).toHaveBeenCalledWith(expect.objectContaining({iv_min:[31,31,31,31,31,31],iv_max:[31,31,31,31,31,31],nature:'Timid'}));
+    expect(api.search).toHaveBeenCalledWith(expect.objectContaining({iv_min:[31,0,31,31,31,0],iv_max:[31,0,31,31,31,0],nature:'Timid'}));
   });
 
   it('invalidates completed and in-flight results when the active save changes', async () => {
