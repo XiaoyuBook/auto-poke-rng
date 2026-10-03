@@ -164,7 +164,7 @@ class QQNotificationService extends EventEmitter {
     return !this.closed && Boolean(policy) && this.settings.attachImage === true && this.settings[policy] === true && this.snapshot().ready;
   }
 
-  notifyTask(runId, task, outcome, { target = '', detail = '', image } = {}) {
+  notifyTask(runId, task, outcome, { target = '', detail = '', image, result = '' } = {}) {
     const policy = { completed: 'notifyCompleted', failed: 'notifyFailed', stopped: 'notifyStopped' }[outcome];
     if (this.closed || !policy || this.settings[policy] === false || (outcome === 'stopped' && this.settings[policy] !== true)
       || this.notificationRuns.has(runId) || !this.snapshot().ready) return Promise.resolve(false);
@@ -175,13 +175,15 @@ class QQNotificationService extends EventEmitter {
     this.notificationRuns.add(runId);
     if (this.notificationRuns.size > 400) this.notificationRuns = new Set([...this.notificationRuns].slice(-200));
     const labels = { completed: '任务完成', failed: '任务异常', stopped: '手动停止' };
-    const lines = [`${task} · ${labels[outcome]}`, `结果：${outcome === 'completed' ? '已完成' : outcome === 'failed' ? '失败' : '已停止'}`];
+    const observed = outcome === 'completed' && typeof result === 'string' ? result.trim().slice(0, 80) : '';
+    const event = observed || labels[outcome];
+    const lines = [`${task} · ${event}`, `结果：${observed || (outcome === 'completed' ? '已完成' : outcome === 'failed' ? '失败' : '已停止')}`];
     if (target) lines.push(`目标：${String(target).slice(0, 240)}`);
     if (detail) lines.push(`详情：${String(detail).slice(0, 800)}`);
     lines.push('结束时间：' + new Date().toLocaleString('zh-CN', { hour12: false }));
     return new Promise(resolve => {
-      this.notificationQueue.push({ runId, event: labels[outcome], text: lines.join('\n'), image: this.settings.attachImage === true ? image : undefined, resolve });
-      this.emit('log', `${task}：已加入 QQ 通知队列（${labels[outcome]}）。`, 'info');
+      this.notificationQueue.push({ runId, event, text: lines.join('\n'), image: this.settings.attachImage === true ? image : undefined, resolve });
+      this.emit('log', `${task}：已加入 QQ 通知队列（${event}）。`, 'info');
       this.drainNotifications();
     });
   }

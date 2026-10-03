@@ -214,6 +214,25 @@ describe('QQ settings and standalone service', () => {
     expect(fixture.requests.filter(request => request.path === '/v2/users/USER/messages' && request.body.msg_type === 0)).toHaveLength(1);
   });
 
+  it('sends confirmed FRLG shininess with its game image and preserves failure policies', async () => {
+    const { service } = serviceFixture(); service.settings.userOpenId = 'USER';
+    const frame = Buffer.from('confirmed-game-snapshot');
+    expect(await service.notifyTask('frlg-shiny', '火叶自动乱数', 'completed', {
+      target: 'Pikachu', result: '目标出闪', detail: '第 3 轮目标出闪（图鉴编号 25）', image: frame,
+    })).toBe(true);
+    const message = fixture.requests.find(row => row.path === '/v2/users/USER/messages' && row.body.msg_type === 0);
+    expect(message.body.content).toContain('火叶自动乱数 · 目标出闪\n结果：目标出闪');
+    expect(message.body.content).toContain('第 3 轮目标出闪');
+    expect(fixture.requests.filter(row => row.path === '/v2/users/USER/messages' && row.body.msg_type === 7)).toHaveLength(1);
+    expect(Buffer.concat(fixture.requests.filter(row => row.method === 'PUT').map(row => row.body))).toEqual(frame);
+    expect(await service.notifyTask('frlg-shiny', '火叶自动乱数', 'completed')).toBe(false);
+    expect(await service.notifyTask('frlg-failed', '火叶自动乱数', 'failed', { result: '目标出闪', detail: '停止前发现闪光' })).toBe(true);
+    const failed = fixture.requests.filter(row => row.path === '/v2/users/USER/messages' && row.body.msg_type === 0).at(-1);
+    expect(failed.body.content).toContain('任务异常\n结果：失败');
+    service.update({ notifyCompleted: false });
+    expect(await service.notifyTask('frlg-disabled', '火叶自动乱数', 'completed', { result: '目标出闪', image: frame })).toBe(false);
+  });
+
   it('rejects other windows and subframes at the IPC boundary; secrets stay out of state', () => {
     const handlers = new Map(), sender = { mainFrame: {}, send() {}, isDestroyed: () => false };
     const service = registerQQNotifications({ ipcMain: { handle: (name, action) => handlers.set(name, action) },

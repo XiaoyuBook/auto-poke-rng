@@ -20,6 +20,16 @@ class RoundRecorder:
                 self.publish({"number": self.number, "start": True})
                 continue
             patch = {}
+            # These are positive detector outcomes, independent of the optional
+            # pre-calibration marker. Setup/threshold logs never count as a shiny.
+            if line in ("已识别到闪光个体", "已识别到出闪，脚本停止", "时差检测到出闪",
+                        "狩猎区闪光已确认，继续投球；仅在抓获成功后停止"):
+                patch.update(result="发现闪光", shiny=True)
+            if line == "已在孵化蛋能力页识别到闪光，目标命中并结束反查":
+                patch.update(result="目标出闪", shiny=True)
+            non_target = re.fullmatch(r"遇到非目标闪光：图鉴\s*(\d+)，目标\s*(\d+)；按配置停止脚本", line)
+            if non_target and 1 <= int(non_target[1]) <= 386 and 1 <= int(non_target[2]) <= 386 and int(non_target[1]) != int(non_target[2]):
+                patch.update(result="非目标出闪", shiny=True, observedDex=int(non_target[1]))
             if line.startswith("PRECALIBRATION_UPDATE|") and "|EVIDENCE=TARGET_SHINY|" in line:
                 fields = dict(part.split("=", 1) for part in line.split("|")[1:] if "=" in part)
                 try:

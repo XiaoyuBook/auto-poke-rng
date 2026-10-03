@@ -1,6 +1,6 @@
 # QQ 通知
 
-左上角铃铛打开通知设置。QQ 通知只在主进程中发送，渲染层不能直接调用机器人接口；自动定点和自动 TID 在结束时按设置发送一次通知，默认附带任务结束时的视频截图。默认通知任务完成和任务失败，手动停止默认关闭，可在“自动流程通知”中调整截图和结果开关。截图抓取或上传失败时保留文字通知，并写入“QQ通知”日志；通知失败不改变自动流程结果。
+左上角铃铛打开通知设置。QQ 通知只在主进程中发送，渲染层不能直接调用机器人接口；自动定点、自动 TID 和火叶自动乱数在结束时按设置发送一次通知，默认附带游戏视频截图。火叶识别到闪光时立即保存该时刻的画面，结束时发送这张图片；有目标证据时标题和结果显示“目标出闪”，非目标闪光显示“非目标出闪”，只有闪光证据而没有物种确认时显示“发现闪光”。仅有搜索方案中的预测闪光或普通流程完成不能当成实际出闪。默认通知任务完成和任务失败，手动停止默认关闭，可在“自动流程通知”中调整截图和结果开关。截图抓取或上传失败时保留文字通知，并写入“QQ通知”日志；通知失败不改变自动流程结果。
 
 ## 配置与验证
 
@@ -31,13 +31,15 @@ AppSecret 默认仅保留在当前主进程内存中。勾选“记住密钥”�
 - `src/components/QQNotifications.tsx`：接入设置、图文测试、记录及离线说明。
 - `src/components/QQGuide.tsx`、`src/qqGuide.ts`、`src/assets/qq-guide/`：分步图文教程、原图缩放和本地图片资源。
 
-自动流程通过主进程调用 `QQNotificationService.notifyTask(runId, task, outcome, { target, detail, image })`。服务按运行 ID 去重，最多排队 20 条，串行发送并复用现有令牌缓存；配置、绑定和图文测试正在进行时会等待空闲。自动流程只在任务结束时抓取一次视频帧，不把高频进度刷到 QQ；关闭“附带任务截图”后自动通知仍发送文字。截图失败会降级为文字通知并记录原因，图片上传失败时发送记录会分别显示文字和图片结果。手动测试仍通过 `send({ event, text, image })` 执行，任意业务发送未暴露给渲染层。
+自动流程通过主进程调用 `QQNotificationService.notifyTask(runId, task, outcome, { target, detail, image, result })`。`outcome` 保留完成／失败／停止语义与通知开关，`result` 只用于完成通知中的实际观测结果；失败和停止不会被出闪记录改写成成功。服务按运行 ID 去重，最多排队 20 条，串行发送并复用现有令牌缓存；配置、绑定和图文测试正在进行时会等待空闲。
+
+截图读取共用的视频源并编码为 JPEG，不截取桌面或设置窗口。火叶每轮首次确认闪光时抓取画面，后续同轮的目标确认和录像日志复用该画面；未检测到闪光的结束通知使用结束时的视频帧。图片数据随对应运行固定下来，排队或开始下一次任务不会换成新任务的画面。截图与发送不会阻塞火叶停止或设备释放；关闭“附带任务截图”后仍发送文字。截图失败会降级为文字通知并记录原因，图片上传失败时发送记录会分别显示文字和图片结果。手动测试仍通过 `send({ event, text, image })` 执行，任意业务发送未暴露给渲染层。
 
 自动流程日志继续由 `AutomationStore.log` 统一写入内存和 `userData/automation/logs/run_YYYY-MM-DD.log`，保留最近 7 天文件和最近 10000 条内存记录。流程阶段与最终结果使用“自动定点”／“自动TID”来源，QQ 排队、提交和失败使用“QQ通知”来源；日志中不写入 AppSecret、访问令牌或接收方 OpenID。
 
 ## 验证与来源
 
-运行 `npm run test:qq` 和 `npm run test:qq:electron`。测试使用本地 HTTP／WebSocket 模拟 QQ 接口，覆盖实际网络协议、图文分片、错误与取消、密钥保存以及桌面交互，不替代真实机器人账号的收件验证。
+运行 `npm run test:qq` 和 `npm run test:qq:electron`。火叶出闪通知可单独运行 `npm run test:frlg:notification`，验证 Python 观测记录 → 游戏帧截图 → Electron JPEG 编码 → QQ 排队图文上传，并检查关闭图片开关后的行为。测试使用本地 HTTP／WebSocket 模拟 QQ 接口，覆盖实际网络协议、图文分片、错误与取消、密钥保存以及桌面交互，不替代真实机器人账号的收件验证。
 
 QQ 客户端与通知服务参考 [auto-bdsp-rng](https://github.com/XiaoyuBook/auto-bdsp-rng) 的 `src/auto_bdsp_rng/notifications/qq_client.py`、`qq_service.py`，由 Python／Qt 适配为 Electron／Node。其协议实现参考 BetterGI 的 `QqNotifier`、`QqWebSocketHelper`，提交 `f29966868c6e2d5b8798bb6a4f3df201ec4a5f95`。相关适配文件按 GPL-3.0-or-later 提供，许可证正文见 [GPL-3.0](../runtime/LICENSE.GPL-3.0.txt)。WebSocket 依赖 `ws` 使用 MIT 许可证。
 

@@ -1,6 +1,7 @@
 const path = require('node:path');
 const fs = require('node:fs/promises');
 const { randomUUID } = require('node:crypto');
+const { captureTaskImage } = require('./notification-image.cjs');
 
 const isDiagnosticStageLog = message => {
   const text = String(message).trim();
@@ -13,7 +14,7 @@ const isDiagnosticStageLog = message => {
 
 // FRLG owns its lifecycle and calibration. Hardware, interpreter, OCR and notifications are shared.
 function registerFrlgAutomation({ ipcMain, getMainWindow, devices, client, userData,
-  log = () => {}, notifications, store, readFile = fs.readFile, makeDirectory = fs.mkdir }) {
+  log = () => {}, notifications, store, captureImage, encodeNotificationImage, readFile = fs.readFile, makeDirectory = fs.mkdir }) {
   let active = null, lastDone = Promise.resolve(), closed = false;
   let state = { status: 'idle', runId: null, profileId: null, message: '等待开始', progress: null, logs: [], logEntries: [], bingo: null };
   let uiLogs = [], uiEntries = [], ecsUiTimer = null;
@@ -56,6 +57,24 @@ function registerFrlgAutomation({ ipcMain, getMainWindow, devices, client, userD
     store.finishRun(run.id, status, message);
   };
   const checkStopped = run => { if (closed || run.stopped || active !== run) throw Error('火叶流程已停止'); };
+  const captureNotificationImage = (run, outcome, round = run.round) => captureTaskImage({
+    notifications, outcome, getVideo: () => devices.getState().video, captureImage, encodeImage: encodeNotificationImage,
+    onError: message => log(message, 'QQ通知', 'warning', { runId: run.id, round }),
+  });
+  const rememberShiny = (run, number, data) => {
+    if (data?.shiny !== true) return;
+    const previous = run.shiny?.round === number ? run.shiny : null;
+    const result = data.result === '目标出闪' ? '目标出闪'
+      : data.result === '非目标出闪' ? '非目标出闪' : previous?.result || '发现闪光';
+    const captureOutcome = ['completed', 'failed', 'stopped'].find(outcome => notifications?.wantsTaskImage?.(outcome));
+    run.shiny = { ...previous, round: number, result,
+      ...(Number.isInteger(data.observedDex) && { observedDex: data.observedDex }),
+      // Start on the confirmed observation, before recording/capture scripts move the game on.
+      image: previous?.image || (captureOutcome ? captureNotificationImage(run, captureOutcome, number) : undefined),
+    };
+  };
+  const shinyDetail = run => run.shiny ? `第 ${run.shiny.round} 轮${run.shiny.result}`
+    + (run.shiny.observedDex ? `（图鉴编号 ${run.shiny.observedDex}）` : '') + '；请在游戏中确认捕获情况。' : '';
   const execute = async run => {
     let claimed = false, listener;
     try {
@@ -101,6 +120,7 @@ function registerFrlgAutomation({ ipcMain, getMainWindow, devices, client, userD
         }
         if (message.event === 'script.round' && Number.isInteger(message.number) && message.number >= 0) {
           run.round = message.number;
+          rememberShiny(run, message.number, message.data);
           store?.history?.(run.id, 'frlg_round', [{ number: message.number, data: message.data }]);
           log(`第 ${message.number} 轮结构化记录`, '火叶', 'info', {
             runId: run.id, round: message.number, event: 'frlg.round', detailOnly: true,
@@ -157,13 +177,15 @@ function registerFrlgAutomation({ ipcMain, getMainWindow, devices, client, userD
           : '没有目标出闪或完整命中记录，预校准未更新。';
         record(run, message, calibrationUpdated ? 'success' : 'warning', { phase: '预校准' });
       }
-      const message = '流程已结束；请核对日志中的实际捕获结果。';
+      const message = shinyDetail(run) || '流程已结束；请核对日志中的实际捕获结果。';
+      run.finalStatus = 'completed'; run.finalMessage = message;
       finishStoredRun(run, 'completed', message);
       record(run, message, 'success', { phase: '完成' });
       update({ status: 'completed', message, calibrationUpdated });
     } catch (error) {
       const stopped = run.stopped || closed;
       const message = stopped ? '火叶流程已停止' : String(error.message || error);
+      run.finalStatus = stopped ? 'stopped' : 'failed'; run.finalMessage = message;
       update({ status: stopped ? 'stopped' : 'failed', message });
       finishStoredRun(run, stopped ? 'stopped' : 'failed', message);
       record(run, message, stopped ? 'info' : 'error', { phase: stopped ? '停止' : '失败' });
@@ -173,9 +195,14 @@ function registerFrlgAutomation({ ipcMain, getMainWindow, devices, client, userD
       if (claimed) devices.releaseAutomation(run.id);
       if (active === run) active = null;
       // Delivery must not delay stop/close after controller release.
-      const outcome = state.status, detail = state.message;
-      Promise.resolve().then(() => notifications?.notifyTask(run.id, '火叶自动乱数', outcome, {
-        target: run.request.pokemon, detail,
+      const outcome = run.finalStatus;
+      const detail = run.finalMessage + (outcome !== 'completed' && run.shiny ? '；' + shinyDetail(run) : '');
+      // Retain this run's bytes while the queue waits; never capture a later task's screen.
+      const image = notifications?.wantsTaskImage?.(outcome)
+        ? run.shiny?.image || captureNotificationImage(run, outcome) : Promise.resolve(undefined);
+      Promise.resolve(image).then(image => notifications?.notifyTask(run.id, '火叶自动乱数', outcome, {
+        target: run.request.pokemon, detail, ...(image && { image }),
+        ...(outcome === 'completed' && run.shiny && { result: run.shiny.result }),
       })).catch(error => log('QQ 通知失败：' + error.message, 'QQ通知', 'warning', { runId: run.id }));
     }
   };

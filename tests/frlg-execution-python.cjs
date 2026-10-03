@@ -4,6 +4,10 @@ const { spawnSync } = require('node:child_process');
 const path = require('node:path');
 const { pythonPath } = require('../electron/frlg-rng-client.cjs');
 const { existsSync } = require('node:fs');
+test('FRLG confirmed shiny observations survive compact logging without pre-calibration', () => {
+  const result = spawnSync(pythonPath(), ['-X', 'utf8', path.join(__dirname, 'frlg-log-policy.py')], { encoding: 'utf8', windowsHide: true, timeout: 30000 });
+  assert.equal(result.status, 0, result.stdout + result.stderr + (result.error?.message || ''));
+});
 test('shared native interpreter supports the FRLG OCR and calibration contracts', () => {
   const result = spawnSync(pythonPath(), ['-X', 'utf8', path.join(__dirname, 'frlg-native-compat.py')], { encoding: 'utf8', windowsHide: true });
   assert.equal(result.status, 0, result.stdout + result.stderr);

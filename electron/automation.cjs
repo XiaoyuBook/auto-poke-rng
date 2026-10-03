@@ -5,6 +5,7 @@ const { AutomationStore, defaultFilter, defaults } = require('./automation-store
 const { projectStaticConfig } = require('./automation-config.cjs');
 const { startWorker } = require('./automation-worker.cjs');
 const { createFlow, advanceFlow, isStaleFlowProgress } = require('./automation-flow.cjs');
+const { captureTaskImage } = require('./notification-image.cjs');
 const { validateConfig: validateBlink } = require('./blink-client.cjs');
 const data = require('../src/generated/bdsp-data.json');
 const reverseGroups = [['Articuno','Zapdos','Moltres'],['Raikou','Entei','Suicune'],['Regirock','Regice','Registeel'],['Latias','Latios']];
@@ -134,21 +135,8 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
     if(devices.getState().video.session!==source.session)throw Error('视频源已切换');
     return bytes.toString('base64');
   });
-  const captureNotificationImage=async run=>{
-    if (typeof notifications?.wantsTaskImage!=='function' || !notifications.wantsTaskImage(run.finalStatus)) return undefined;
-    try {
-      const frame=await image();
-      const encoded=Buffer.isBuffer(frame)?frame:typeof frame==='string'?
-        Buffer.from(frame.startsWith('data:')?frame.slice(frame.indexOf(',')+1):frame,'base64'):null;
-      if (!encoded?.length) throw Error('截图数据为空');
-      const result=encodeNotificationImage?await encodeNotificationImage(encoded):encoded;
-      if (!Buffer.isBuffer(result)||!result.length) throw Error('截图编码结果为空');
-      return result;
-    } catch(error) {
-      store.log('QQ通知截图失败：'+String(error?.message||error),'QQ通知','warning',{runId:run.id,round:run.round});
-      return undefined;
-    }
-  };
+  const captureNotificationImage=run=>captureTaskImage({notifications,outcome:run.finalStatus,captureImage:image,encodeImage:encodeNotificationImage,
+    onError:message=>store.log(message,'QQ通知','warning',{runId:run.id,round:run.round})});
   const ocrRequest=async(params,rows=store.data.config.ocr)=>devices.ocr.read(params.imageBase64||await image(),'',{...params,regions:Object.fromEntries(rows.map(row=>[row.id,['x','y','width','height'].map(key=>row.rect[key])]))});
   const effectiveInput=input=>{
     if(input?.kind!=='static')return input;

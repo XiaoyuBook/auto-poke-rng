@@ -3,8 +3,14 @@ const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
 const { registerFrlgAutomation } = require('../electron/frlg-automation.cjs');
 const plan = require('./fixtures/frlg-golbat-plan.json');
+const notificationsOf = h => h.calls.filter(Array.isArray);
+async function until(action) {
+  for (let i = 0; i < 100; ++i) { if (action()) return; await new Promise(setImmediate); }
+  assert.fail('notification did not settle');
+}
 
-function harness({ beforePrepare, outcome = 'completed', immediateDone = false, connected = true, store, calibrationResult = { calibrationUpdated: true } } = {}) {
+function harness({ beforePrepare, outcome = 'completed', immediateDone = false, connected = true, store, calibrationResult = { calibrationUpdated: true },
+  captureImage, encodeNotificationImage, wantsTaskImage = () => false } = {}) {
   const handlers = new Map(), events = new EventEmitter(), sent = [], logs = [], logRows = [], calls = [];
   const sender = { mainFrame: {}, send: (channel, state) => sent.push([channel, state]) };
   const event = { sender, senderFrame: sender.mainFrame };
@@ -23,7 +29,8 @@ function harness({ beforePrepare, outcome = 'completed', immediateDone = false, 
   const service = registerFrlgAutomation({
     ipcMain: { handle: (name, action) => handlers.set(name, action) }, getMainWindow: () => ({ webContents: sender }),
     devices, client: { call: async (method, args) => { calls.push(method); if (method === 'prepare') { await beforePrepare?.(); return { main: 'D:/test-library/generated/main.ecs', manifest: 'manifest.json' }; } calls.push({ finalize: args }); return calibrationResult; }, close: () => {} },
-    userData: 'D:/test-data', store, log: (...args) => { logs.push(args[0]); logRows.push(args); }, notifications: { notifyTask: async (...args) => calls.push(args) },
+    userData: 'D:/test-data', store, log: (...args) => { logs.push(args[0]); logRows.push(args); }, notifications: { wantsTaskImage, notifyTask: async (...args) => calls.push(args) },
+    captureImage, encodeNotificationImage,
     readFile: async file => file === 'manifest.json' ? JSON.stringify({ plan }) : 'PRINT test', makeDirectory: async () => {},
   });
   const invoke = (name, args) => handlers.get('frlg-automation:' + name)(event, args);
@@ -179,4 +186,102 @@ test('FRLG run is available in the shared run history with its own source labels
   assert.equal(stored.runs[0].context.profileId, 'save-c');
   assert.equal(stored.runs[0].status, 'completed');
   assert.ok(h.logRows.some(row => row[0] === 'ECS 反查诊断' && row[1] === 'ECS'));
+});
+
+test('target shiny retains its detection frame through recording, calibration and final notification', async () => {
+  const frames = [];
+  const h = harness({ wantsTaskImage: () => true, captureImage: async () => { frames.push('battle'); return Buffer.from('battle'); },
+    encodeNotificationImage: bytes => Buffer.concat([Buffer.from('jpeg:'), bytes]) });
+  await h.invoke('start', { request: { ...plan.request, pokemon: 'Pikachu' }, profileId: 'save-a', options: { update_precalibration: false } });
+  h.events.emit('script', { event: 'script.round', runId: 'other-script', number: 3, data: { shiny: true } });
+  assert.equal(frames.length, 0);
+  h.events.emit('script', { event: 'script.round', runId: 'script1', number: 3, data: { result: '发现闪光', shiny: true } });
+  assert.deepEqual(frames, ['battle'], 'snapshot starts at observation, before the script finishes');
+  h.events.emit('script', { event: 'script.log', runId: 'script1', message: '闪光录像：长按CAPTURE保存最近约30秒录像' });
+  h.events.emit('script', { event: 'script.round', runId: 'script1', number: 3, data: { result: '目标出闪', shiny: true, observedDex: 25 } });
+  h.done(); await h.service.settled(); await until(() => notificationsOf(h).length === 1);
+  const notice = notificationsOf(h)[0];
+  assert.deepEqual(notice.slice(1, 3), ['火叶自动乱数', 'completed']);
+  assert.equal(notice[3].target, 'Pikachu'); assert.equal(notice[3].result, '目标出闪');
+  assert.match(notice[3].detail, /第 3 轮目标出闪.*25/);
+  assert.deepEqual(notice[3].image, Buffer.from('jpeg:battle'));
+  assert.equal(frames.length, 1); assert.equal(h.calls.includes('finalize'), false);
+  assert.match((await h.invoke('state')).message, /目标出闪/);
+});
+
+test('a shiny without species evidence remains a shiny observation, and non-target evidence is explicit', async () => {
+  const h = harness();
+  await h.invoke('start', { request: plan.request, profileId: 'save-a' });
+  h.events.emit('script', { event: 'script.round', runId: 'script1', number: 1, data: { result: '发现闪光', shiny: true } });
+  h.events.emit('script', { event: 'script.round', runId: 'script1', number: 1, data: { result: '非目标出闪', shiny: true, observedDex: 19 } });
+  h.done(); await h.service.settled(); await until(() => notificationsOf(h).length === 1);
+  assert.equal(notificationsOf(h)[0][3].result, '非目标出闪');
+  assert.match(notificationsOf(h)[0][3].detail, /图鉴编号 19/);
+  const unknown = harness();
+  await unknown.invoke('start', { request: plan.request, profileId: 'save-a' });
+  unknown.events.emit('script', { event: 'script.round', runId: 'script1', number: 1, data: { result: '发现闪光', shiny: true } });
+  unknown.done(); await unknown.service.settled(); await until(() => notificationsOf(unknown).length === 1);
+  assert.equal(notificationsOf(unknown)[0][3].result, '发现闪光');
+});
+
+test('ordinary completion captures its end frame but never reports predicted shininess as observed', async () => {
+  let captures = 0;
+  const h = harness({ wantsTaskImage: () => true, captureImage: async () => { captures++; return Buffer.from('end-frame'); } });
+  await h.invoke('start', { request: { ...plan.request, shiny: 'Star/Square' }, profileId: 'save-a' });
+  h.events.emit('script', { event: 'script.log', runId: 'script1', message: '【出闪检测】' });
+  h.events.emit('script', { event: 'script.round', runId: 'script1', number: 1, data: { result: '已反查' } });
+  assert.equal(captures, 0);
+  h.done(); await h.service.settled(); await until(() => notificationsOf(h).length === 1);
+  assert.equal(captures, 1); assert.equal(notificationsOf(h)[0][3].result, undefined);
+  assert.deepEqual(notificationsOf(h)[0][3].image, Buffer.from('end-frame'));
+});
+
+test('screenshot failure preserves the shiny result and text delivery with a diagnostic', async () => {
+  const h = harness({ wantsTaskImage: () => true, captureImage: async () => { throw Error('camera disconnected'); } });
+  await h.invoke('start', { request: plan.request, profileId: 'save-a' });
+  h.events.emit('script', { event: 'script.round', runId: 'script1', number: 2, data: { result: '目标出闪', shiny: true } });
+  h.done(); await h.service.settled(); await until(() => notificationsOf(h).length === 1);
+  assert.equal(notificationsOf(h)[0][3].image, undefined);
+  assert.equal(notificationsOf(h)[0][3].result, '目标出闪');
+  assert.ok(h.logRows.some(row => row[1] === 'QQ通知' && /截图失败.*camera disconnected/.test(row[0]) && row[3].round === 2));
+  assert.equal((await h.invoke('state')).status, 'completed');
+});
+
+test('disabling task images avoids capture while retaining observed results', async () => {
+  const h = harness({ captureImage: () => { assert.fail('disabled screenshot accessed the camera'); } });
+  await h.invoke('start', { request: plan.request, profileId: 'save-a' });
+  h.events.emit('script', { event: 'script.round', runId: 'script1', number: 1, data: { result: '目标出闪', shiny: true } });
+  h.done(); await h.service.settled(); await until(() => notificationsOf(h).length === 1);
+  assert.equal(notificationsOf(h)[0][3].result, '目标出闪');
+  assert.equal(notificationsOf(h)[0][3].image, undefined);
+});
+
+test('failure-only notifications retain a detected shiny frame without claiming task success', async () => {
+  const h = harness({ outcome: 'failed', wantsTaskImage: outcome => outcome === 'failed', captureImage: () => Buffer.from('shiny-before-error') });
+  await h.invoke('start', { request: plan.request, profileId: 'save-a' });
+  h.events.emit('script', { event: 'script.round', runId: 'script1', number: 1, data: { result: '目标出闪', shiny: true } });
+  h.done(); await h.service.settled(); await until(() => notificationsOf(h).length === 1);
+  assert.equal(notificationsOf(h)[0][2], 'failed');
+  assert.equal(notificationsOf(h)[0][3].result, undefined);
+  assert.deepEqual(notificationsOf(h)[0][3].image, Buffer.from('shiny-before-error'));
+  assert.match(notificationsOf(h)[0][3].detail, /执行失败.*目标出闪/);
+});
+
+test('a slow screenshot never delays stop or mixes a subsequent run into the old notification', async () => {
+  let resolveFrame, captures = 0;
+  const frame = new Promise(resolve => { resolveFrame = resolve; });
+  const h = harness({ wantsTaskImage: () => true, captureImage: () => ++captures === 1 ? frame : Buffer.from('next-run') });
+  await h.invoke('start', { request: { ...plan.request, pokemon: 'Pikachu' }, profileId: 'save-a' });
+  h.events.emit('script', { event: 'script.round', runId: 'script1', number: 3, data: { result: '目标出闪', shiny: true } });
+  await h.invoke('stop');
+  assert.equal(h.locked(), false); assert.equal(notificationsOf(h).length, 0);
+  await h.invoke('start', { request: plan.request, profileId: 'save-b' });
+  h.done(); await h.service.settled(); await until(() => notificationsOf(h).length === 1);
+  resolveFrame(Buffer.from('old-shiny'));
+  await until(() => notificationsOf(h).length === 2);
+  const old = notificationsOf(h).find(row => row[3].target === 'Pikachu');
+  assert.equal(old[2], 'stopped'); assert.equal(old[3].result, undefined);
+  assert.match(old[3].detail, /已停止.*目标出闪/);
+  assert.deepEqual(old[3].image, Buffer.from('old-shiny'));
+  assert.deepEqual(notificationsOf(h).find(row => row[3].target === 'Golbat')[3].image, Buffer.from('next-run'));
 });

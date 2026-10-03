@@ -21,6 +21,27 @@ _BINGO_SPEC.loader.exec_module(_BINGO_MODULE)
 
 
 class FrlgLogPolicy(unittest.TestCase):
+    def test_positive_shiny_observation_survives_without_precalibration(self):
+        from frlg_round_records import RoundRecorder
+        records = []
+        recorder = RoundRecorder(records.append)
+        recorder.consume("第 3 轮开始\n【出闪检测】\n已识别到闪光个体\n闪光录像：长按CAPTURE保存最近约30秒录像\n")
+        observations = [x for x in records if x.get('data', {}).get('shiny')]
+        self.assertEqual(observations, [{'number': 3, 'data': {'result': '发现闪光', 'shiny': True}}])
+        recorder.consume("遇到非目标闪光：图鉴19，目标25；按配置停止脚本\n")
+        self.assertEqual(records[-1]['data'], {'result': '非目标出闪', 'shiny': True, 'observedDex': 19})
+        recorder.consume("已在孵化蛋能力页识别到闪光，目标命中并结束反查\n")
+        self.assertEqual(records[-1]['data'], {'result': '目标出闪', 'shiny': True})
+
+    def test_detection_headers_thresholds_and_failure_logs_do_not_invent_a_shiny(self):
+        from frlg_round_records import RoundRecorder
+        records = []
+        recorder = RoundRecorder(records.append)
+        for line in ('【出闪检测】', '闪光匹配度:99', '未找到对应普通/闪光标签，图鉴编号:25',
+                     '出闪后继续抓捕', '遇到非目标闪光：图鉴25，目标25；按配置停止脚本'):
+            recorder.consume(line)
+        self.assertEqual(records, [])
+
     def test_complete_file_channel_preserves_ocr_and_calibration_before_ui_filter(self):
         events = []
         original_emit = script_host.emit
