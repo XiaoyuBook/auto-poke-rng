@@ -17,6 +17,8 @@
 
 FRLG 本地执行覆盖另包含 `tools/frlg-runtime-patches/blackout-r-nx2-early-press.patch`：2026-10-03 经模式 8 实机反馈确认，Switch 2 Blackout R 提前 1000ms，并补回保持时间，保留松开和总 Seed 等待时点。此项是本项目维护的时序调整，不应标成上游原样代码；生成器和补丁指纹记录在 `python/frlg-runtime-manifest.json`，适用范围及后续同步要求见 [执行接入文档](../docs/FRLG_EXECUTION_PARITY.md#switch-2-blackout-r-本地时序修复2026-10-03)。
 
+火叶音频判闪实验的两份 WAV 由用户于 2026-10-03 提供，保存在 `assets/frlg-audio/`；原始版含背景音乐，背景抑制版是处理实验，不是上游项目的纯净音效资源。具体用途、采样窗口和实验边界见 [音频采集文档](../docs/AUDIO_CAPTURE.md#火叶普通野生音频判闪实验2026-10-03)。
+
 运行时新增适配代码及 EasyCon 派生部分按 GPL-3.0 提供，完整文本见 `LICENSE.GPL-3.0.txt`。第三方组件保留各自版权和许可证；发布二进制时需携带对应许可证与源代码信息。原有前端整体许可证由项目另行确定，不通过本文件改写。
 
 源码快照无需旧项目在部署机器上存在。没有把本机另一个开发中的 SDK 当作已发布依赖。OpenCV 和头文件的下载 URL、校验值固定在构建脚本/CMake 中；Python 图像依赖固定在 requirements.txt。

@@ -116,7 +116,8 @@ function registerFrlgAutomation({ ipcMain, getMainWindow, devices, client, userD
       };
       listener = message => { if (!scriptId) early.push(message); else dispatch(message); };
       devices.events.on('script', listener);
-      ({ runId: scriptId } = await devices.runner.start({ text, path: relative, shouldStop: () => run.stopped || closed }));
+      ({ runId: scriptId } = await devices.runner.start({ text, path: relative, shouldStop: () => run.stopped || closed,
+        audioDiagnostic: true }));
       run.scriptId = scriptId;
       for (const message of early) dispatch(message);
       if (run.stopped || closed) await devices.runner.stop();

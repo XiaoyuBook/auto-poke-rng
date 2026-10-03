@@ -254,6 +254,7 @@ def normalize_preview_aliases(text):
 
 def run(config, program):
     frames = None
+    audio_diagnostic = None
     script_log = make_script_log_emitter(config)
     script_bingo = make_script_bingo_emitter()
     trace = ExecutionTrace()
@@ -513,12 +514,33 @@ def run(config, program):
             "requiresVideo": program.requires_video,
             "videoSession": config.get("video", {}).get("session") if program.requires_video else None,
         })
+        if config.get("audioDiagnostic") is True:
+            # Log-only FRLG experiment. It consumes the existing audio owner's
+            # PCM; never opens a device, changes ECS or waits for a verdict.
+            try:
+                from frlg_audio_diagnostic import AudioShinyDiagnostic
+                audio_diagnostic = AudioShinyDiagnostic(sources, config.get("audio"),
+                    Path(__file__).resolve().parents[1] / "assets/frlg-audio/shiny-effect-original.wav",
+                    script_log,
+                    comparison_path=Path(__file__).resolve().parents[1] / "assets/frlg-audio/shiny-effect-enhanced.wav")
+            except Exception:
+                script_log("【音频判闪·实验】无法启动检测；继续原有图像判闪流程")
+
+        def observe(point):
+            trace.record(point)
+            if audio_diagnostic is not None:
+                try:
+                    audio_diagnostic.observe(point)
+                except Exception:
+                    # Audio observation cannot fail a controller/RNG operation.
+                    pass
+
         reporter = threading.Thread(target=report_progress, daemon=True)
         reporter.start()
         program.run(gamepad=RemoteGamepad(), waiter=RemoteWaiter(), external_getters=getters,
                     extern_functions=extern_functions,
                     cancel_event=cancelled, output=script_log,
-                    trace=trace.record)
+                    trace=observe)
     except ScriptCancelled:
         result["status"] = "cancelled"
     except Exception as error:
@@ -528,6 +550,11 @@ def run(config, program):
         if reporter is not None:
             reporter.join()
         publish_latest()
+        if audio_diagnostic is not None:
+            try:
+                audio_diagnostic.close()
+            except Exception:
+                pass
         emit(result)
         if frames is not None:
             frames.close()
@@ -542,6 +569,13 @@ def main():
         if command == "validate":
             emit(validation_result(config))
             return
+        if config.get("audioDiagnostic") is True:
+            # As with image/OCR dependencies below, initialize NumPy before
+            # the Windows CRT stdin reader can block its native import.
+            try:
+                import numpy  # noqa: F401
+            except ImportError:
+                pass  # Optional audio diagnostics must not reject the script.
         if program.requires_image_search or program.requires_ocr:
             # Native extension initialization can flush C stdio on Windows. Import
             # before another thread blocks on stdin, which otherwise holds its CRT

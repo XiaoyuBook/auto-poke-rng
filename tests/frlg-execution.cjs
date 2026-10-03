@@ -16,7 +16,7 @@ function harness({ beforePrepare, outcome = 'completed', immediateDone = false, 
     runner: {
       rootDirectory: 'D:/test-library',
       validate: async () => ({ valid: true }),
-      start: async () => { running = true; if (immediateDone) events.emit('script', { event: 'script.done', runId: 'script1', status: outcome }); return { runId: 'script1' }; },
+      start: async args => { calls.push({ scriptStart: args }); running = true; if (immediateDone) events.emit('script', { event: 'script.done', runId: 'script1', status: outcome }); return { runId: 'script1' }; },
       stop: async () => { if (running) { running = false; events.emit('script', { event: 'script.done', runId: 'script1', status: 'cancelled' }); } },
     },
   };
@@ -88,6 +88,7 @@ test('disconnected device fails preflight without running or saving calibration'
 test('FRLG runs through shared runner, logs, calibration, notification and releases ownership', async () => {
   const h = harness();
   await h.invoke('start', { request: plan.request, profileId: 'save-a', options: { update_precalibration: true } });
+  assert.equal(h.calls.find(call => call?.scriptStart)?.scriptStart.audioDiagnostic, true);
   assert.equal(h.locked(), true);
   h.events.emit('script', { event: 'script.log', runId: 'script1', message: '阶段开始：wild.data.candidate_range' });
   h.events.emit('script', { event: 'script.log', runId: 'script1', message: '反查完成' });

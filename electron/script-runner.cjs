@@ -3,8 +3,9 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 
 class ScriptRunner {
-  constructor({ controller, rootDirectory, getVideo, emit }) {
-    Object.assign(this, { controller, rootDirectory, getVideo: getVideo || (() => ({ status: 'idle' })), emit });
+  constructor({ controller, rootDirectory, getVideo, getAudio, emit }) {
+    Object.assign(this, { controller, rootDirectory, getVideo: getVideo || (() => ({ status: 'idle' })),
+      getAudio: getAudio || (() => ({ status: 'idle' })), emit });
     this.current = null;
     this.validationVersion = 0;
     this.cancelValidation = null;
@@ -76,7 +77,7 @@ class ScriptRunner {
     child.stdin.end(JSON.stringify({ command: 'validate', text, name: relative, scriptDir: path.dirname(absolute), rootDirectory: root }) + '\n');
     return result;
   }
-  async start({ text, path: relative, shouldStop = () => false }) {
+  async start({ text, path: relative, shouldStop = () => false, audioDiagnostic = false }) {
     if (this.current) throw new Error('已有脚本正在运行。');
     if (typeof text !== 'string' || Buffer.byteLength(text, 'utf8') > 1024 * 1024 || !text.trim()) throw new Error('脚本内容无效。');
     const run = {
@@ -185,7 +186,8 @@ class ScriptRunner {
         else if (message.event === 'script.image-result') this.emit({ ...message, runId: run.id });
       }
     });
-    child.stdin.write(JSON.stringify({ text, name: relative, scriptDir: path.dirname(absolute), rootDirectory: root, video: this.getVideo() }) + '\n');
+    child.stdin.write(JSON.stringify({ text, name: relative, scriptDir: path.dirname(absolute), rootDirectory: root,
+      video: this.getVideo(), ...(audioDiagnostic ? { audioDiagnostic: true, audio: this.getAudio() } : {}) }) + '\n');
     return { runId: run.id };
   }
   async stop(failureReason = '') {

@@ -27,7 +27,8 @@ function registerDevices({ ipcMain, getWindows, loadWindow, rootDirectory = path
     events.emit('script', message);
     for (const window of getWindows()) if (!window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send('devices:event', message);
   };
-  const runner = new ScriptRunner({ controller, rootDirectory, getVideo: () => state.video, emit: scriptEvent });
+  const runner = new ScriptRunner({ controller, rootDirectory, getVideo: () => state.video,
+    getAudio: () => state.audio, emit: scriptEvent });
   let controllerTimer;
   controller.on('offline', error => {
     clearInterval(controllerTimer);
