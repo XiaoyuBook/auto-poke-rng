@@ -20,6 +20,17 @@ class RoundRecorder:
                 self.publish({"number": self.number, "start": True})
                 continue
             patch = {}
+            if line.startswith("PRECALIBRATION_UPDATE|") and "|EVIDENCE=TARGET_SHINY|" in line:
+                fields = dict(part.split("=", 1) for part in line.split("|")[1:] if "=" in part)
+                try:
+                    target, observed = int(fields["TARGET_DEX"]), int(fields["OBSERVED_DEX"])
+                    if 1 <= target <= 386 and target == observed:
+                        patch.update(result="目标出闪", shiny=True, observedDex=observed,
+                                     executionCorrection={"seedIndex": int(fields["SEED_INDEX"]),
+                                                          "frame": int(fields["FRAME_PRE"])},
+                                     note="已识别目标闪光；保存当前执行修正，未反查实际 Seed / 帧")
+                except (KeyError, ValueError):
+                    pass
             request = re.search(r"^(本轮请求|下轮请求):\s*Seed\s*(-?\d+)\s*ms[，,]\s*F1\s*(-?\d+)[，,]\s*TV\s*(-?\d+)[，,]\s*F2\s*(-?\d+)[，,]\s*菜单\s*(-?\d+)", line)
             if request:
                 patch["request" if request[1] == "本轮请求" else "nextRequest"] = dict(zip(("seedMs", "f1", "tv", "f2", "menu"), map(int, request.groups()[1:])))

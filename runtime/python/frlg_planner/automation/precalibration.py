@@ -1,6 +1,8 @@
 """Persistent, context-scoped pre-calibration values for 2.0 runs.
 
-The ECS scripts only emit a small, ASCII marker after a complete target hit.
+The ECS scripts emit an ASCII marker after a reverse-confirmed target hit or
+an observed target shiny. The latter saves working execution corrections,
+without claiming that its actual Seed, frame or PID was reverse-confirmed.
 This module owns the durable side of that handshake.  TID/SID code does not
 import it, so identity calibration remains independent from 2.0 values.
 """
@@ -37,6 +39,8 @@ _INT_FIELDS = {
     "FRAME_ENABLED",
     "HELD_PRE",
     "PICKUP_PRE",
+    "TARGET_DEX",
+    "OBSERVED_DEX",
 }
 _RECORD_FIELDS = {
     "seed_ns1",
@@ -227,7 +231,23 @@ def _validate_record(record: Mapping[str, Any], context: PrecalibrationContext) 
         raise ValueError("预校准记录更新时间格式无效")
     if isinstance(record.get("updated_at"), str):
         result["updated_at"] = record["updated_at"]
+    if "evidence" in record:
+        result["evidence"] = _validate_evidence(record["evidence"])
     return result
+
+
+def _validate_evidence(value: object) -> dict[str, Any]:
+    if not isinstance(value, dict) or value.get("kind") not in {
+        "full_target_hit", "target_shiny", "user_confirmed_target_shiny",
+    }:
+        raise ValueError("预校准来源记录无效")
+    try:
+        encoded = json.dumps(value, ensure_ascii=False, allow_nan=False)
+        if len(encoded.encode("utf-8")) > 32768:
+            raise ValueError("来源记录过长")
+        return json.loads(encoded)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("预校准来源记录无效") from exc
 
 
 def _validate_value(name: str, value: object) -> None:
@@ -261,6 +281,8 @@ def update_record(
     path: str | Path,
     context: PrecalibrationContext | Mapping[str, object],
     updates: Mapping[str, object],
+    *,
+    evidence: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Merge validated values and atomically persist the context record."""
     normalized = normalize_context(context)
@@ -283,6 +305,8 @@ def update_record(
             continue
         _validate_value(name, value)
         record[name] = int(value)
+    if evidence is not None:
+        record["evidence"] = _validate_evidence(evidence)
     record["updated_at"] = datetime.now(timezone.utc).isoformat()
     payload["records"][key] = record
     if legacy_key is not None and legacy_key != key:
@@ -292,13 +316,16 @@ def update_record(
 
 
 def parse_marker(text: str) -> dict[str, Any] | None:
-    """Parse the first complete marker from an EasyCon log."""
+    """Prefer reverse confirmation, otherwise use the latest target shiny marker."""
     if not isinstance(text, str):
         return None
     clean = _ANSI_RE.sub("", text)
-    match = _MARKER_RE.search(clean)
-    if match is None:
+    matches = list(_MARKER_RE.finditer(clean))
+    if not matches:
         return None
+    # A later capture/reverse confirmation is stronger than a shiny observation.
+    # Otherwise preserve the latest observed target shiny's working parameters.
+    match = next((m for m in reversed(matches) if "|EVIDENCE=TARGET_SHINY" not in m.group()), matches[-1])
     parts = match.group(0).split("|")
     if not parts or parts[0] != MARKER_PREFIX:
         return None
@@ -318,6 +345,12 @@ def parse_marker(text: str) -> dict[str, Any] | None:
             marker[key] = value.strip()
     if marker.get("V") != SCHEMA_VERSION:
         return None
+    if "EVIDENCE" in marker:
+        if marker["EVIDENCE"] != "TARGET_SHINY":
+            return None
+        target, observed = marker.get("TARGET_DEX"), marker.get("OBSERVED_DEX")
+        if not isinstance(target, int) or not 1 <= target <= 386 or observed != target:
+            return None
     required = {"GAME", "NX", "MODE", "ENTRY", "KIND", "SEED_INDEX", "FRAME_ENABLED"}
     if not required.issubset(marker):
         return None
@@ -395,7 +428,7 @@ def update_from_log(
     context: PrecalibrationContext | Mapping[str, object],
     text: str,
 ) -> dict[str, Any] | None:
-    """Persist one complete, context-matched EasyCon success marker."""
+    """Persist a context-matched success marker with its evidence category."""
     if MARKER_PREFIX not in text:
         return None
     marker = parse_marker(text)
@@ -404,7 +437,9 @@ def update_from_log(
     updates = marker_updates(marker, context)
     if updates is None:
         raise ValueError("预校准成功标记与本次生成上下文不一致，未更新记录")
-    return update_record(path, context, updates)
+    evidence = ({"kind": "target_shiny", "target_species_id": marker["TARGET_DEX"]}
+                if marker.get("EVIDENCE") == "TARGET_SHINY" else {"kind": "full_target_hit"})
+    return update_record(path, context, updates, evidence=evidence)
 
 
 def update_from_manifest(
@@ -427,6 +462,10 @@ def update_from_manifest(
         return None
     if "context" not in config:
         raise ValueError("预校准生成清单缺少上下文，未更新记录")
+    marker = parse_marker(text)
+    if marker is not None and marker.get("EVIDENCE") == "TARGET_SHINY":
+        if marker["TARGET_DEX"] != config.get("target_species_id"):
+            raise ValueError("出闪预校准标记不是本次方案目标，未更新记录")
     return update_from_log(path, config["context"], text)
 
 

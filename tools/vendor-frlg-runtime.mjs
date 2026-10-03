@@ -10,7 +10,8 @@ const manifestPath = resolve('runtime/python/frlg-runtime-manifest.json');
 // docs/FRLG_EXECUTION_PARITY.md before dropping/rebasing the Blackout R patch.
 const patches = ['tools/frlg-runtime-patches/menu-navigation.patch',
   'tools/frlg-runtime-patches/blackout-r-nx2-early-press.patch',
-  'tools/frlg-runtime-patches/ocr-name-candidates.patch'];
+  'tools/frlg-runtime-patches/ocr-name-candidates.patch',
+  'tools/frlg-runtime-patches/target-shiny-precalibration.patch'];
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 if (process.argv.includes('--check')) {
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));

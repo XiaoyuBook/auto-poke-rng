@@ -4,7 +4,7 @@ const { EventEmitter } = require('node:events');
 const { registerFrlgAutomation } = require('../electron/frlg-automation.cjs');
 const plan = require('./fixtures/frlg-golbat-plan.json');
 
-function harness({ beforePrepare, outcome = 'completed', immediateDone = false, connected = true, store } = {}) {
+function harness({ beforePrepare, outcome = 'completed', immediateDone = false, connected = true, store, calibrationResult = { calibrationUpdated: true } } = {}) {
   const handlers = new Map(), events = new EventEmitter(), sent = [], logs = [], logRows = [], calls = [];
   const sender = { mainFrame: {}, send: (channel, state) => sent.push([channel, state]) };
   const event = { sender, senderFrame: sender.mainFrame };
@@ -22,7 +22,7 @@ function harness({ beforePrepare, outcome = 'completed', immediateDone = false, 
   };
   const service = registerFrlgAutomation({
     ipcMain: { handle: (name, action) => handlers.set(name, action) }, getMainWindow: () => ({ webContents: sender }),
-    devices, client: { call: async (method) => { calls.push(method); if (method === 'prepare') { await beforePrepare?.(); return { main: 'D:/test-library/generated/main.ecs', manifest: 'manifest.json' }; } return { calibrationUpdated: true }; }, close: () => {} },
+    devices, client: { call: async (method, args) => { calls.push(method); if (method === 'prepare') { await beforePrepare?.(); return { main: 'D:/test-library/generated/main.ecs', manifest: 'manifest.json' }; } calls.push({ finalize: args }); return calibrationResult; }, close: () => {} },
     userData: 'D:/test-data', store, log: (...args) => { logs.push(args[0]); logRows.push(args); }, notifications: { notifyTask: async (...args) => calls.push(args) },
     readFile: async file => file === 'manifest.json' ? JSON.stringify({ plan }) : 'PRINT test', makeDirectory: async () => {},
   });
@@ -129,6 +129,18 @@ test('FRLG runs through shared runner, logs, calibration, notification and relea
   assert.ok((await h.invoke('state')).logEntries.some(row => row.message === '反查完成' && row.source === 'ECS'));
   assert.deepEqual((await h.invoke('state')).bingo, { version: 1, grid: [] });
   assert.ok(h.calls.includes('finalize'));
+  assert.equal((await h.invoke('state')).status, 'completed');
+});
+
+test('target shiny marker reaches finalize and reports its evidence without a reverse result', async () => {
+  const h = harness({ calibrationResult: { calibrationUpdated: true,
+    record: { seed_ns2: 3, frame_ns2: -6, evidence: { kind: 'target_shiny' } } } });
+  await h.invoke('start', { request: plan.request, profileId: 'save-a', options: { update_precalibration: true } });
+  const marker = 'PRECALIBRATION_UPDATE|V=1|GAME=FR|NX=2|MODE=8|STARTUP=0|ENTRY=FORMAL|KIND=WILD|SEED_INDEX=3|FRAME_PRE=-6|FRAME_ENABLED=1|EVIDENCE=TARGET_SHINY|TARGET_DEX=25|OBSERVED_DEX=25';
+  h.events.emit('script', { event: 'script.log', runId: 'script1', message: marker });
+  h.done(); await h.service.settled();
+  assert.equal(h.calls.find(call => call?.finalize)?.finalize.log, marker);
+  assert.ok(h.logs.includes('当前存档的预校准已更新（来自目标出闪时的执行修正）。'));
   assert.equal((await h.invoke('state')).status, 'completed');
 });
 

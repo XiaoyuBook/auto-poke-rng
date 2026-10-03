@@ -48,7 +48,7 @@ export function FrlgRunSettings({ options, onChange, locked, wild }: {
           <label className="frlg-run-select-row"><span>Seed 启动方案</span><select aria-label="Seed 启动方案" value={options.seed_startup_scheme ?? 0} onChange={event => update('seed_startup_scheme', Number(event.target.value))}><option value={0}>HOME_BUFFER</option><option value={1}>固定用户选择</option></select></label>
           <label className="frlg-run-select-row"><span>Seed 校准方案</span><select aria-label="Seed 校准方案" value={options.seed_calibration_scheme ?? 0} onChange={event => update('seed_calibration_scheme', Number(event.target.value))}><option value={0}>方案 1</option><option value={1}>方案 2</option></select></label>
           <RunToggle label="HOME 自适应阈值" accessibleLabel="HOME 画面自适应阈值" description="适应 HOME 画面的亮度变化" checked={options.home_buffer_adaptive_threshold ?? false} onChange={value => update('home_buffer_adaptive_threshold', value)} />
-          <RunToggle label="复用成功预校准" accessibleLabel="保存并复用当前存档的成功预校准" description="完整命中、上下文一致且正常结束后更新" checked={options.update_precalibration ?? false} onChange={value => update('update_precalibration', value)} />
+          <RunToggle label="复用成功预校准" accessibleLabel="保存并复用当前存档的成功预校准" description="目标出闪或完整命中，上下文一致且正常结束后保存" checked={options.update_precalibration ?? false} onChange={value => update('update_precalibration', value)} />
           <p className="frlg-run-lock-note">{locked ? '当前流程进行中，设置暂不可修改。' : '运行期间设置锁定'}</p>
         </section>
       </div>

@@ -3198,6 +3198,7 @@ def _load_plan_precalibration(
     manifest = {
         "enabled": bool(options.update_precalibration),
         "context": context.to_dict(),
+        "target_species_id": plan.species_id,
         "source_path": str(store_path),
         "frame_enabled": frame_enabled,
         "loaded": loaded,
@@ -3367,7 +3368,24 @@ def _apply_regular_precalibration_runtime_text(
     if block.count(terminal_anchor) != 1:
         raise ValueError("2.0 自动校准函数缺少唯一的完整目标命中分支")
     block = block.replace(terminal_anchor, marker_line + "\n" + terminal_anchor, 1)
-    return _replace_function_block(text, signature, block)
+    text = _replace_function_block(text, signature, block)
+    # A target shiny is sufficient evidence for reusing the working execution
+    # corrections. Do not require catching/reversing a manually preserved shiny.
+    # Reset the library flag every attempt to reject stale/non-target sightings.
+    attempt = "        $本轮流程结果 = 执行RNG启动与目标获取()"
+    if text.count(attempt) != 1:
+        raise ValueError("2.0 模板缺少唯一目标获取入口，拒绝猜测出闪预校准位置")
+    text = text.replace(attempt, "        CALL 清空最近出闪检测\n" + attempt
+                        + "\n        CALL 保存目标出闪预校准", 1)
+    species_id = int(config["target_species_id"])
+    shiny_marker = marker_line + f' & "|EVIDENCE=TARGET_SHINY|TARGET_DEX={species_id}|OBSERVED_DEX={species_id}"'
+    return text + (
+        "\n\nFUNC 保存目标出闪预校准\n"
+        f"    IF $更新预校准 == 1 and $循环计数 > 0 and 读取最近出闪检测结果() == 1 and 读取最近出闪检测图鉴编号() == {species_id}\n"
+        + shiny_marker + "\n"
+        + "        PRINT 已确认目标闪光，保存本轮执行修正作为预校准\n"
+        + "    ENDIF\nENDFUNC\n"
+    )
 
 
 def _apply_egg_precalibration_runtime_text(

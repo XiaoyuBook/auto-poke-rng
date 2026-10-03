@@ -149,8 +149,13 @@ function registerFrlgAutomation({ ipcMain, getMainWindow, devices, client, userD
       if (result.status !== 'completed') throw Error('火叶脚本意外停止');
       let calibrationUpdated = false;
       if (run.options.update_precalibration) {
-        ({ calibrationUpdated } = await client.call('finalize', { calibrationStore, manifest: generated.manifest, log: logLines.join('\n') }));
-        record(run, calibrationUpdated ? '当前存档的预校准已更新。' : '没有完整命中记录，预校准未更新。', calibrationUpdated ? 'success' : 'warning', { phase: '预校准' });
+        const calibration = await client.call('finalize', { calibrationStore, manifest: generated.manifest, log: logLines.join('\n') });
+        calibrationUpdated = calibration.calibrationUpdated;
+        const message = calibrationUpdated
+          ? calibration.record?.evidence?.kind === 'target_shiny'
+            ? '当前存档的预校准已更新（来自目标出闪时的执行修正）。' : '当前存档的预校准已更新。'
+          : '没有目标出闪或完整命中记录，预校准未更新。';
+        record(run, message, calibrationUpdated ? 'success' : 'warning', { phase: '预校准' });
       }
       const message = '流程已结束；请核对日志中的实际捕获结果。';
       finishStoredRun(run, 'completed', message);
