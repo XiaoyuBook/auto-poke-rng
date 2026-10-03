@@ -43,3 +43,17 @@ it('supersedes older checks and keeps path and size restrictions', async () => {
   await expect(runner.validate({ text: 'A', path: '../test.rng' })).rejects.toThrow('路径');
   await expect(runner.validate({ text: 'A'.repeat(1024 * 1024 + 1), path: 'test.rng' })).rejects.toThrow('内容');
 });
+
+it('accepts UTF-8 BOM comments from the editor and imported libraries, preserving error lines', async () => {
+  const text = '\uFEFF# ==================================================\r\n# Seed 表入口\r\nFUNC seed(): INT\r\nRETURN 1 # 正常注释\r\nENDFUNC';
+  const relative = 'lib/00_Seed表_入口.ecs';
+  await fs.mkdir(path.join(root, 'lib'));
+  await fs.writeFile(path.join(root, relative), text);
+  expect(await runner.validate({ text, path: relative })).toMatchObject({ valid: true });
+  expect(await runner.validate({ text: 'PRINT seed()', path: 'test.rng' })).toMatchObject({ valid: true });
+  expect(await runner.validate({ text: '\uFEFF# 正常注释\r\n???', path: relative })).toMatchObject({
+    valid: false, diagnostic: { source: relative, line: 2, message: '无法识别的语句' },
+  });
+  expect(await runner.validate({ text: '\uFEFFPRINT "# 注释符号 \uFEFF 字符" # 行尾注释', path: 'test.rng' })).toMatchObject({ valid: true });
+  expect(controller.call).not.toHaveBeenCalled();
+});

@@ -416,7 +416,9 @@ class _ProgramParser:
         self.source = source
         self.library = library
         self.lines: list[_Line] = []
-        for number, physical_line in enumerate(text.splitlines(), 1):
+        # Editor text retains the UTF-8 BOM, unlike files read with utf-8-sig.
+        # Ignore only the file prefix; keep source text and line numbers intact.
+        for number, physical_line in enumerate(text.removeprefix("\ufeff").splitlines(), 1):
             code = _strip_comment(physical_line).strip()
             if code:
                 self.lines.append(_Line(code, number))
