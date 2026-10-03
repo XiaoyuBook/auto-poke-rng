@@ -283,11 +283,74 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .frlg-target-open { width: 100%; padding: 0 !important; text-align: left; border: 0 !important; background: transparent !important; }
 .frlg-target-open:hover:not(:disabled) { background: #ffffff04 !important; }
 .frlg-target-search-status { margin: 8px 0 0; font-size: 11px; color: var(--muted); }
-.frlg-bingo-card { min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 9px; background: #191e1d; }
-.frlg-bingo-state.is-compact { gap: 9px; }
-.frlg-bingo-state.is-compact .frlg-bingo-plot svg { max-height: 280px; }
-.frlg-bingo-state.is-compact .frlg-bingo-metrics > div { padding: 8px; }
-.frlg-bingo-state.is-compact .frlg-bingo-metrics dd { font-size: 16px; }
+.frlg-bingo-card { container-type: inline-size; min-width: 0; padding: 18px 20px; border: 1px solid #718d7f36; border-radius: 12px; background: #1e2523; }
+.frlg-bingo-state.is-compact { gap: 10px; }
+.frlg-bingo-state.is-compact .frlg-bingo-heading { align-items: center; }
+.frlg-bingo-state.is-compact .frlg-bingo-heading strong { font-size: 14px; font-weight: 600; }
+.frlg-bingo-state.is-compact .frlg-bingo-badge { display: inline-flex; align-items: center; gap: 6px; padding: 0; border-radius: 0; background: none; font-size: 11px; }
+.frlg-bingo-state.is-compact .frlg-bingo-badge::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: .8; }
+.frlg-bingo-layout { display: contents; }
+.frlg-bingo-state.is-compact .frlg-bingo-layout { display: grid; grid-template-columns: minmax(0, 1fr) 112px; column-gap: 16px; align-items: center; }
+.frlg-bingo-state.is-compact .frlg-bingo-layout:not(:has(.frlg-bingo-metrics)) { grid-template-columns: minmax(0, 1fr); }
+.frlg-bingo-state.is-compact .frlg-bingo-metrics { grid-column: 2; grid-row: 1; display: flex; flex-direction: column; gap: 18px; margin: 0; padding-left: 16px; border: 0; border-left: 1px solid #a0b8aa18; border-radius: 0; background: none; overflow: visible; }
+.frlg-bingo-state.is-compact .frlg-bingo-metrics > div { padding: 0; background: none; }
+.frlg-bingo-state.is-compact .frlg-bingo-metrics dt { font-size: 11px; color: #9daea5; }
+.frlg-bingo-state.is-compact .frlg-bingo-metrics dd { margin-top: 5px; font-size: 26px; font-weight: 500; color: #e4eee8; letter-spacing: -.7px; }
+.frlg-bingo-state.is-compact .frlg-bingo-metrics dd small { margin-left: 5px; letter-spacing: 0; }
+.frlg-bingo-state.is-compact .frlg-bingo-metrics > div:last-child dd { font-size: 20px; color: #afc1b5; }
+.frlg-bingo-state.is-compact .frlg-bingo-plot { grid-column: 1; grid-row: 1; min-width: 0; border: 0; border-radius: 0; background: none; }
+.frlg-bingo-state.is-compact .frlg-bingo-plot svg { max-height: 232px; }
+.frlg-bingo-state.is-compact .bingo-grid-line line { stroke: #738b7e; stroke-dasharray: 1 7; opacity: .15; }
+.frlg-bingo-state.is-compact .bingo-grid-line line.is-zero { stroke: #91b29e; stroke-dasharray: none; opacity: .5; }
+.frlg-bingo-state.is-compact .bingo-grid-line text { font-size: 12px; fill: #8c9c93; }
+.frlg-bingo-state.is-compact .bingo-axis-title { font-size: 12px; fill: #a0b1a7; }
+.frlg-bingo-state.is-compact .bingo-dot { fill: #65786c; opacity: .28; }
+.frlg-bingo-state.is-compact .bingo-hit { fill: #9aabd3; }
+.frlg-bingo-state.is-compact .bingo-count { font-size: 10px; fill: #18231d; }
+.frlg-bingo-state.is-compact .bingo-point:has(.bingo-current:not(.is-excluded)) .bingo-hit { fill: #b6ddc3; }
+.frlg-bingo-state.is-compact .bingo-point-area { fill: transparent; stroke: transparent; }
+.frlg-bingo-state.is-compact .bingo-point:hover .bingo-point-area, .frlg-bingo-state.is-compact .bingo-point[aria-pressed="true"] .bingo-point-area { fill: transparent; stroke: transparent; }
+.frlg-bingo-state.is-compact .bingo-point:hover .bingo-hit, .frlg-bingo-state.is-compact .bingo-point:focus-visible .bingo-hit { filter: brightness(1.2); }
+.frlg-bingo-state.is-compact .bingo-point:focus-visible .bingo-point-area { stroke: #9aabd366; }
+.bingo-selection { fill: none; stroke: #c8d3ec; stroke-width: 1; stroke-dasharray: 2 3; }
+.frlg-bingo-state.is-compact .bingo-current { stroke: #b6ddc3; stroke-width: 1.4; }
+.frlg-bingo-state.is-compact .bingo-current.is-excluded { stroke: var(--red); }
+.frlg-bingo-state.is-compact .bingo-prediction { fill: #a7cbb710; stroke: #a7cbb775; stroke-width: .8; stroke-dasharray: 3 4; }
+.frlg-bingo-state.is-compact .bingo-target { stroke: #b5c8bc; stroke-width: 1; }
+.frlg-bingo-state.is-compact .is-empty svg { opacity: .22; }
+.frlg-bingo-state.is-compact .is-empty .bingo-grid-line text, .frlg-bingo-state.is-compact .is-empty .bingo-axis-title { visibility: hidden; }
+.frlg-bingo-state.is-compact .is-empty .bingo-point { pointer-events: none; }
+.frlg-bingo-state.is-compact .frlg-bingo-placeholder { top: 34%; background: none; padding: 12px 0; gap: 9px; }
+.frlg-bingo-state.is-compact .frlg-bingo-placeholder strong { font-size: 14px; color: #b5c7bc; }
+.frlg-bingo-state.is-compact .frlg-bingo-placeholder span { font-size: 11px; color: #83988b; }
+.frlg-bingo-state.is-compact .frlg-bingo-legend { gap: 8px 18px; font-size: 11px; color: #99aba0; }
+.frlg-bingo-state.is-compact .frlg-bingo-legend .legend-hit { background: #9aabd3; }
+.frlg-bingo-state.is-compact .frlg-bingo-legend i { width: 7px; height: 7px; }
+.frlg-bingo-state.is-compact .frlg-bingo-inspection { margin: 0; padding: 0; border-radius: 0; background: none; color: #afc1b5; font-size: 11px; line-height: 1.6; }
+.frlg-bingo-state.is-compact .frlg-bingo-outside { margin: 0; padding: 7px 10px; background: #c7ad7210; }
+.frlg-bingo-state.is-compact .frlg-bingo-stability { font-size: 11px; }
+.frlg-bingo-state.is-compact .frlg-bingo-tv { margin-top: 2px; padding-top: 13px; border-color: #a0b8aa18; }
+.frlg-bingo-state.is-compact .frlg-bingo-tv header { font-size: 12px; }
+.frlg-bingo-state.is-compact .frlg-bingo-tv header > div { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 12px; }
+.frlg-tv-sample-count { font-size: 10px; color: #849b8c; font-weight: 400; }
+.frlg-bingo-state.is-compact .frlg-bingo-tv header small { color: #b6ddc3; font-size: 11px; }
+.frlg-bingo-state.is-compact .frlg-bingo-sample-caption { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px 12px; margin-top: 5px; font-size: 10px; color: #849b8c; }
+.frlg-bingo-state.is-compact .frlg-tv-track { gap: 0; margin-top: 10px; }
+.frlg-bingo-state.is-compact .frlg-tv-track > div { gap: 4px; padding: 4px 2px 5px; border: 0; border-radius: 0; background: none; outline: none; }
+.frlg-bingo-state.is-compact .frlg-tv-track > div.is-predicted { background: #a7cbb708; }
+.frlg-bingo-state.is-compact .frlg-tv-track strong { font-size: 11px; font-weight: 500; color: #c2cec7; }
+.frlg-bingo-state.is-compact .frlg-tv-track small { font-size: 10px; color: #849b8c; }
+.frlg-tv-bar-space { display: flex; justify-content: center; align-items: flex-end; width: 100%; height: 36px; border-bottom: 1px solid #a0b8aa18; }
+.frlg-tv-bar-space i { display: block; width: 12px; max-width: 50%; border-radius: 3px 3px 0 0; background: #667d70; }
+.frlg-bingo-state.is-compact .is-current .frlg-tv-bar-space i { background: #b6ddc3; }
+.frlg-bingo-state.is-compact .is-current > small, .frlg-bingo-state.is-compact .is-current > strong { color: #b6ddc3; }
+.frlg-bingo-state.is-compact .is-excluded .frlg-tv-bar-space i { background: none; border: 1px dashed var(--red); }
+@media (prefers-reduced-motion: no-preference) { .frlg-tv-bar-space i { transition: height 180ms ease-out, background-color 180ms ease-out; } }
+@container (max-width: 440px) {
+  .frlg-bingo-state.is-compact .frlg-bingo-layout { display: flex; flex-direction: column; align-items: stretch; gap: 12px; }
+  .frlg-bingo-state.is-compact .frlg-bingo-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 6px 0 0; padding: 0; border: 0; }
+  .frlg-bingo-state.is-compact .frlg-bingo-metrics dd { font-size: 23px; }
+}
 .frlg-target-card { min-height: 263px; }
 .frlg-target-emblem { display: grid; place-items: center; flex: 0 0 96px; width: 96px; height: 96px; border: 1px solid #bbcff833; border-radius: 12px; background: radial-gradient(circle, #bbcff81b, #bbcff803 68%); color: #c8d8ff; font-size: 42px; }
 .frlg-target-card .automation-target-main .automation-target-identity > strong { font-size: 21px; }
