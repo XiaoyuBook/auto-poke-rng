@@ -255,7 +255,6 @@ export function FrlgAutomationWorkspace({ profile = defaultFrlgSaveProfile, onOp
   return <section className="automation-workspace frlg-automation-workspace" aria-label="火叶自动流程工作区">
     <header className="automation-heading frlg-automation-heading">
       <div><h2>火叶自动流程</h2><p>搜索目标，执行捕获、反查校准与自动重试。</p></div>
-      <span className="frlg-source-badge">FRLG · 野生／静态</span>
     </header>
     <div className="automation-toolbar automation-run-toolbar frlg-run-toolbar">
       <button type="button" className="button primary" disabled={locked || !result?.route_support.can_start} onClick={() => void startRun()}><Play size={14} />开始运行</button>
@@ -265,10 +264,10 @@ export function FrlgAutomationWorkspace({ profile = defaultFrlgSaveProfile, onOp
     </div>
     {!targetSettingsOpen && (error || notice) && <p role={error ? 'alert' : 'status'} className={error ? 'panel-error' : 'automation-notice'}>{error || notice}</p>}
     <div className="automation-overview frlg-overview">
-      <div className="frlg-target-slot">{result ? <FrlgPlanSummary plan={result} locked={locked} onSettings={() => setTargetSettingsOpen(true)} onDetails={() => setResultDetailOpen(true)} /> : <><FrlgTargetCard request={request} target={target} locked={locked} onSettings={() => setTargetSettingsOpen(true)} /><p className="frlg-target-search-status" role="status">{busy ? '正在搜索并生成方案…' : '点击目标卡片，设置条件并生成方案'}</p></>}</div>
+      <div className="frlg-target-slot">{result ? <FrlgPlanSummary plan={result} compact locked={locked} onSettings={() => setTargetSettingsOpen(true)} onDetails={() => setResultDetailOpen(true)} /> : <><FrlgTargetCard request={request} target={target} locked={locked} onSettings={() => setTargetSettingsOpen(true)} /><p className="frlg-target-search-status" role="status">{busy ? '正在搜索并生成方案…' : '点击目标卡片，设置条件并生成方案'}</p></>}</div>
       <div className="frlg-bingo-card"><FrlgBingoBoard key={`${profileId}:${bingoRun?.runId || 'idle'}`} state={bingoRun?.bingo} compact /></div>
     </div>
-    <FrlgRunSettings key={profileId} options={options} onChange={saveOptions} locked={locked} wild={wildMethod(request.method)} />
+    <details className="frlg-run-settings-fold" key={profileId}><summary><strong>运行与反查校准</strong><span>{options.entry === 'timeline' ? '时间轴入口' : '正式入口'} · 设置随存档保存</span></summary><FrlgRunSettings options={options} onChange={saveOptions} locked={locked} wild={wildMethod(request.method)} /></details>
     {targetSettingsOpen && !running && <Dialog title="火叶目标与筛选条件" close={() => setTargetSettingsOpen(false)} className="automation-target-dialog frlg-target-dialog">
       <div className="automation-target-dialog-body">
         <section className="frlg-dialog-section"><h3>目标</h3><div className="automation-fields frlg-fields">

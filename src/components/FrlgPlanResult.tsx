@@ -17,10 +17,29 @@ function Metric({ title, children }: { title: string; children: ReactNode }) {
   return <div><dt>{title}</dt><dd>{children}</dd></div>;
 }
 
-export function FrlgPlanSummary({ plan, onDetails, onSettings, locked = false }: { plan: FrlgPlannerResult; onDetails: () => void; onSettings?: () => void; locked?: boolean }) {
+export function FrlgPlanSummary({ plan, onDetails, onSettings, locked = false, compact = false }: { plan: FrlgPlannerResult; onDetails: () => void; onSettings?: () => void; locked?: boolean; compact?: boolean }) {
   const { request, target, initial_seed, route_support } = plan;
   const direct = request.direct_mode;
   const shiny = !direct && ['Star', 'Square'].includes(target.shiny);
+  if (compact) return <section className="frlg-recommendation-card is-dock" aria-label="火叶推荐方案">
+    <div className="frlg-plan-dock-identity">
+      <span className="frlg-recommendation-emblem"><FrlgSprite species={target.pokemon} shiny={shiny} /></span>
+      <div className="frlg-recommendation-identity">
+        <strong>{shiny ? '闪光' : ''}{getFrlgSpeciesLabel(target.pokemon)}</strong>
+        <small>{request.location ? getFrlgLocationLabel(request.location) : '定点目标'}{!direct && target.level > 0 ? ` · LV ${target.level}` : ''}</small>
+      </div>
+    </div>
+    <dl className="frlg-plan-dock-numbers"><Metric title="Seed">{initial_seed.seed}</Metric><Metric title="Advance">{initial_seed.advances.toLocaleString('en-US')}</Metric></dl>
+    <div className="frlg-plan-dock-actions">
+      {onSettings && <button type="button" disabled={locked} onClick={onSettings}><SlidersHorizontal size={13} aria-hidden="true"/>目标设置</button>}
+      <button type="button" onClick={onDetails}>查看方案详情</button>
+    </div>
+    {!route_support.can_start && <p className="frlg-plan-dock-warning">{route_support.summary}</p>}
+    <details className="frlg-plan-dock-extra"><summary>个体与属性</summary>{direct ? <p className="frlg-recommendation-ivs">指定模式不计算个体与闪光结果；Seed 模式 {plan.execution.seed_mode}，启动等待 {initial_seed.seed_time.toLocaleString('en-US')} ms。</p> : <>
+      <p className="frlg-recommendation-ivs">IV {ivText(plan)}<span>个体合计 <strong>{plan.selection.iv_total}</strong></span></p>
+      <p className="frlg-recommendation-attributes">{label(FRLG_NATURE_LABELS, target.nature)} · {label(FRLG_ABILITY_LABELS, target.ability)} · {genderLabel(target.gender)}</p>
+    </>}</details>
+  </section>;
   return <section className="frlg-recommendation-card" aria-label="火叶推荐方案">
     <header className="frlg-recommendation-heading">
       <div><h3>{onSettings ? '当前目标与方案' : '推荐方案'}</h3><p>{direct ? '使用指定 Seed 与消耗帧' : '按个体合计最高、可达 Advance 最小选择'}</p></div>
