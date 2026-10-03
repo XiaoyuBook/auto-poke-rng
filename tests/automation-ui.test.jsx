@@ -250,6 +250,66 @@ test('L01/L03: record navigation filters detailed logs to the selected run and r
   expect(screen.getByText('other round')).toBeTruthy();
 });
 
+test('L04: FRLG runs expose lifecycle and ECS sources with phase and error filters',async()=>{
+  const {snapshot}=fixture();
+  snapshot.runs=[{id:'frlg-1',kind:'frlg',startedAt:'2026-09-25T10:00:00Z',status:'failed',message:'火叶流程失败',rounds:[]}];
+  snapshot.logs=[
+    {id:'l1',time:'10:00:01',source:'火叶',level:'info',message:'正在准备',phase:'准备',runId:'frlg-1'},
+    {id:'l2',time:'10:00:02',source:'ECS',level:'error',message:'标签读取失败',phase:'ECS 执行',runId:'frlg-1'},
+    {id:'l3',time:'10:00:03',source:'火叶',level:'info',message:'阶段完成：wild.data.candidate_range',phase:'ECS 执行',runId:'frlg-1',detailOnly:true},
+  ];
+  render(<AutomationLogs />);
+  fireEvent.click(await screen.findByRole('button',{name:'查看火叶运行日志'}));
+  expect(screen.getByText('标签读取失败')).toBeTruthy();
+  expect(screen.queryByText('阶段完成：wild.data.candidate_range')).toBeNull();
+  expect(screen.getByText('ECS 执行')).toBeTruthy();
+  fireEvent.change(screen.getByRole('combobox',{name:'筛选日志来源'}),{target:{value:'ECS'}});
+  expect(screen.getByText('标签读取失败')).toBeTruthy();
+  expect(screen.queryByText('正在准备')).toBeNull();
+  fireEvent.change(screen.getByRole('combobox',{name:'筛选日志级别'}),{target:{value:'error'}});
+  expect(screen.getByText('标签读取失败')).toBeTruthy();
+});
+
+test('FRLG rounds default to latest, update live, and scope logs to round zero', async()=>{
+  const {snapshot,api}=fixture();
+  snapshot.runs=[{id:'frlg-1',kind:'frlg',startedAt:'2026-10-03T02:00:00Z',status:'running',context:{game:'frlg',target:'Pikachu',profileId:'save-a'},rounds:[
+    {number:0,outcome:'已结束',candidates:[],events:[],frlg:{}},
+    {number:1,outcome:'已反查',candidates:[],events:[],frlg:{request:{seedMs:1200,f1:10,tv:314,f2:20},hitSeed:'7422',seedOffset:-1,hitFrame:25295,frameError:-1,nextRequest:{seedMs:1205,f1:10,tv:314,f2:21}}}
+  ]}];
+  snapshot.logs=[{id:'a',time:'10:00',source:'ECS',level:'info',message:'第零轮环境检查',runId:'frlg-1',round:0},{id:'b',time:'10:01',source:'ECS',level:'info',message:'第一轮结果',runId:'frlg-1',round:1}];
+  render(<AutomationLogs/>);
+  const detail=await screen.findByRole('region',{name:'火叶轮次详情'});
+  expect(within(detail).getByText('7422')).toBeTruthy();
+  expect(within(detail).getByText('1200 ms')).toBeTruthy();
+  expect(within(detail).getByText('1205 ms')).toBeTruthy();
+  await act(async()=>api.onState.mock.calls[0][0]({...snapshot,runs:[{...snapshot.runs[0],rounds:[...snapshot.runs[0].rounds,{number:2,outcome:'运行中',candidates:[],events:[],frlg:{request:{seedMs:1300}}}]}]}));
+  expect(within(detail).getByText('1300 ms')).toBeTruthy();
+  expect(within(detail).queryByText('7422')).toBeNull();
+  fireEvent.click(screen.getByRole('button',{name:/第 0 轮 · 已结束/}));
+  fireEvent.click(screen.getByRole('button',{name:'查看火叶运行日志'}));
+  expect(screen.getByText('第零轮环境检查')).toBeTruthy();
+  expect(screen.queryByText('第一轮结果')).toBeNull();
+  expect(screen.getByRole('cell',{name:'0'})).toBeTruthy();
+});
+
+test('BINGO renders an interactive distribution and explicitly shows out-of-chart hits',async()=>{
+  fixture();
+  const axis=[-4,-3,-2,-1,0,1,2,3,4];
+  const state={status:'running',runId:'frlg-1',profileId:'save-a',message:'执行中',logs:[],bingo:{version:1,observed:true,axis,seedText:[],grid:axis.map(seed=>axis.map(frame=>({seed,frame,count:seed===1&&frame===-1?12:0,marker:'．'}))),prediction:{seed:1,seedRadius:1,frame:-1,frameRadius:1},current:{seed:1,frame:-1,hitSeed:1,hitFrame:-1,inRange:true,inDeadZone:false},context:{enterTv:false},stable:{result:false},count:12,tv:{enabled:false}}};
+  const onState=vi.fn(()=>()=>{});
+  window.desktop.frlgAutomation={getState:vi.fn(async()=>state),onState};
+  render(<AutomationLogs/>);
+  fireEvent.click(await screen.findByRole('button',{name:'BINGO 状态'}));
+  await screen.findByText('本轮已计入');
+  expect(screen.queryByRole('table')).toBeNull();
+  const point=screen.getByRole('button',{name:'Seed 偏差 +1，帧偏差 -1，累计命中 12 次，本轮落点'});
+  fireEvent.keyDown(point,{key:'Enter'});
+  expect(screen.getByText('选中落点 · Seed +1 / 帧 -1 · 累计 12 次')).toBeTruthy();
+  await act(async()=>onState.mock.calls[0][0]({...state,bingo:{...state.bingo,current:{...state.bingo.current,seed:7,hitSeed:7,inRange:false}}}));
+  expect(screen.getByText(/本轮落点在图外/)).toBeTruthy();
+  expect(screen.queryByRole('button',{name:/本轮落点$/})).toBeNull();
+});
+
 test('O01/O10: warmup calls the real service and exposes failures without claiming readiness',async()=>{
   const {api}=fixture();api.ocr=vi.fn(async()=>{throw Error('模型加载失败');});
   render(<OcrWorkspace />);

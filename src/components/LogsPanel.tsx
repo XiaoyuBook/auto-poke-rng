@@ -13,7 +13,7 @@ export function LogsPanel({ logs, clear, source, setSource }: {
       <div className="logs-toolbar">
         <label className="log-filter"><ListFilter size={14} />
           <select aria-label="筛选日志来源" value={source} onChange={event => setSource(event.target.value as LogSource)}>
-            {['全部来源', '系统', '脚本', '手柄'].map(item => <option key={item}>{item}</option>)}
+            {['全部来源', '系统', '火叶', 'ECS', '脚本', '手柄'].map(item => <option key={item}>{item}</option>)}
           </select>
         </label>
         <span className="muted">{filtered.length} 条记录</span>

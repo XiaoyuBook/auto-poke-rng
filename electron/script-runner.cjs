@@ -179,6 +179,8 @@ class ScriptRunner {
           phase: message.phase, source: message.source, line: message.line, column: message.column,
         });
         else if (message.event === 'script.log') this.emit({ ...message, runId: run.id });
+        else if (message.event === 'script.bingo') this.emit({ ...message, runId: run.id });
+        else if (message.event === 'script.round') this.emit({ ...message, runId: run.id });
         else if (message.event === 'script.progress') this.emit({ ...message, runId: run.id });
         else if (message.event === 'script.image-result') this.emit({ ...message, runId: run.id });
       }

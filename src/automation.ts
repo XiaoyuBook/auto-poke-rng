@@ -5,6 +5,7 @@ import type { StaticGenerationRequest, NativeStaticResult } from './desktop';
 import type { LogEntry } from './workspace';
 
 export type AutomationKind = 'static' | 'tid';
+export type AutomationRunKind = AutomationKind | 'frlg';
 export type OcrRegionRow = { id: string; label: string; rect: { x: number; y: number; width: number; height: number } };
 export type TargetFilter = StaticGenerationRequest['filter'];
 export type AutomationParameters = {
@@ -39,9 +40,12 @@ export type AutomationFlow = {
   trace: { seq: number; node: FlowNode; phase: string; roundIndex: number; attemptIndex: number; activityId: number }[];
 };
 export type Candidate = Omit<NativeStaticResult, 'pid' | 'ec'> & { pid: string | number; ec: string | number };
-export type AutomationRound = { number: number; seed?: string; outcome: string; candidates: Candidate[]; selected?: number; sources?: string[];
+export type FrlgRoundRequest = { seedMs: number; f1?: number; tv?: number; f2?: number; menu?: number; held?: number; pickup?: number };
+export type FrlgRoundRecord = { request?: FrlgRoundRequest; nextRequest?: FrlgRoundRequest; hitSeed?: string; seedOffset?: number; hitFrame?: number; frameError?: number;
+  seedMsError?: number; candidateCount?: number; nextSeedMs?: number; f1?: number; tv?: number; f2?: number; result?: string; notes?: string[] };
+export type AutomationRound = { number: number; seed?: string; outcome: string; startedAt?: string; endedAt?: string; frlg?: FrlgRoundRecord; candidates: Candidate[]; selected?: number; sources?: string[];
   interval?: number; trigger?: number; usedDelay?: number; actualDelays?: number[]; reverse?: Candidate[]; events: { event: string; args: unknown[] }[] };
-export type AutomationRun = { id: string; kind: AutomationKind; context?: AutomationFlow['context'] | null; startedAt: string; endedAt?: string; status: string; message?: string; rounds: AutomationRound[] };
+export type AutomationRun = { id: string; kind: AutomationRunKind; context?: AutomationFlow['context'] | { profileId: string; target: string; game: 'frlg' } | null; startedAt: string; endedAt?: string; status: string; message?: string; rounds: AutomationRound[] };
 export type AutomationSnapshot = {
   config: { static: StaticAutomationConfig; tid: AutomationConfig; ocr: OcrRegionRow[] }; profiles: Record<string, DelayProfile>;
   staticGroups: { activeId: string; items: AutomationConfigGroup[] };

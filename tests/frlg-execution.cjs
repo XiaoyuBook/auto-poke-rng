@@ -4,8 +4,8 @@ const { EventEmitter } = require('node:events');
 const { registerFrlgAutomation } = require('../electron/frlg-automation.cjs');
 const plan = require('./fixtures/frlg-golbat-plan.json');
 
-function harness({ beforePrepare, outcome = 'completed', immediateDone = false, connected = true } = {}) {
-  const handlers = new Map(), events = new EventEmitter(), sent = [], logs = [], calls = [];
+function harness({ beforePrepare, outcome = 'completed', immediateDone = false, connected = true, store } = {}) {
+  const handlers = new Map(), events = new EventEmitter(), sent = [], logs = [], logRows = [], calls = [];
   const sender = { mainFrame: {}, send: (channel, state) => sent.push([channel, state]) };
   const event = { sender, senderFrame: sender.mainFrame };
   let locked = false, running = false;
@@ -23,12 +23,12 @@ function harness({ beforePrepare, outcome = 'completed', immediateDone = false, 
   const service = registerFrlgAutomation({
     ipcMain: { handle: (name, action) => handlers.set(name, action) }, getMainWindow: () => ({ webContents: sender }),
     devices, client: { call: async (method) => { calls.push(method); if (method === 'prepare') { await beforePrepare?.(); return { main: 'D:/test-library/generated/main.ecs', manifest: 'manifest.json' }; } return { calibrationUpdated: true }; }, close: () => {} },
-    userData: 'D:/test-data', log: message => logs.push(message), notifications: { notifyTask: async (...args) => calls.push(args) },
+    userData: 'D:/test-data', store, log: (...args) => { logs.push(args[0]); logRows.push(args); }, notifications: { notifyTask: async (...args) => calls.push(args) },
     readFile: async () => 'PRINT test', makeDirectory: async () => {},
   });
   const invoke = (name, args) => handlers.get('frlg-automation:' + name)(event, args);
   const done = () => events.emit('script', { event: 'script.done', runId: 'script1', status: outcome });
-  return { service, invoke, done, events, calls, logs, handlers, locked: () => locked };
+  return { service, invoke, done, events, calls, logs, logRows, handlers, locked: () => locked };
 }
 
 test('rejects duplicate starts and foreign IPC senders', async () => {
@@ -38,6 +38,34 @@ test('rejects duplicate starts and foreign IPC senders', async () => {
   assert.throws(() => h.handlers.get('frlg-automation:stop')({ sender: {}, senderFrame: {} }), /sender/);
   await h.invoke('stop');
   assert.equal(h.locked(), false);
+});
+
+test('FRLG structured records retain independent rounds and round-scoped logs', async () => {
+  const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
+  const { AutomationStore } = require('../electron/automation-store.cjs');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'frlg-rounds-'));
+  try {
+    const store = new AutomationStore(directory);
+    const h = harness({ store });
+    await h.invoke('start', { request: plan.request, profileId: 'save-a' });
+    h.events.emit('script', { event: 'script.started', runId: 'script1' });
+    h.events.emit('script', { event: 'script.round', runId: 'other-script', number: 99 });
+    h.events.emit('script', { event: 'script.round', runId: 'script1', number: 1, start: true });
+    h.events.emit('script', { event: 'script.round', runId: 'script1', number: 1, data: { request: { seedMs: 1200, f1: 5 }, hitSeed: 'ABCD', frameError: -2, result: '已反查' } });
+    h.events.emit('script', { event: 'script.log', runId: 'script1', message: '反查完成' });
+    h.events.emit('script', { event: 'script.round', runId: 'script1', number: 2, start: true });
+    h.events.emit('script', { event: 'script.round', runId: 'script1', number: 2, data: { request: { seedMs: 1210 } } });
+    h.done(); await h.service.settled();
+    const rounds = store.snapshot().runs[0].rounds;
+    assert.deepEqual(rounds.map(round => round.number), [0, 1, 2]);
+    assert.equal(rounds[1].frlg.hitSeed, 'ABCD');
+    assert.equal(rounds[1].frlg.frameError, -2);
+    assert.equal(rounds[2].frlg.hitSeed, undefined);
+    assert.equal(rounds[2].outcome, '已完成');
+    assert.ok(rounds.every(round => round.startedAt && round.endedAt));
+    assert.equal(h.logRows.find(row => row[0] === '反查完成')[3].round, 1);
+    assert.ok(h.logRows.some(row => row[3]?.event === 'frlg.round' && row[3].detailOnly === true && row[3].data?.frameError === -2));
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });
 
 test('done before start response still settles and releases device ownership', async () => {
@@ -61,11 +89,18 @@ test('FRLG runs through shared runner, logs, calibration, notification and relea
   const h = harness();
   await h.invoke('start', { request: plan.request, profileId: 'save-a', options: { update_precalibration: true } });
   assert.equal(h.locked(), true);
+  h.events.emit('script', { event: 'script.log', runId: 'script1', message: '阶段开始：wild.data.candidate_range' });
   h.events.emit('script', { event: 'script.log', runId: 'script1', message: '反查完成' });
+  h.events.emit('script', { event: 'script.bingo', runId: 'script1', state: { version: 1, grid: [] } });
   h.done();
   await h.service.settled();
   assert.equal(h.locked(), false);
   assert.ok(h.logs.includes('反查完成'));
+  assert.ok(h.logRows.some(row => row[0] === '反查完成' && row[1] === 'ECS' && row[3].runId));
+  assert.ok(h.logRows.some(row => row[0] === '阶段开始：wild.data.candidate_range' && row[3].detailOnly === true));
+  assert.ok((await h.invoke('state')).logEntries.some(row => row.message === '阶段开始：wild.data.candidate_range' && row.detailOnly === true));
+  assert.ok((await h.invoke('state')).logEntries.some(row => row.message === '反查完成' && row.source === 'ECS'));
+  assert.deepEqual((await h.invoke('state')).bingo, { version: 1, grid: [] });
   assert.ok(h.calls.includes('finalize'));
   assert.equal((await h.invoke('state')).status, 'completed');
 });
@@ -91,4 +126,18 @@ test('failed capture/reverse run cannot be reported or persisted as successful',
   await h.service.settled();
   assert.equal((await h.invoke('state')).status, 'failed');
   assert.ok(!h.calls.includes('finalize'));
+});
+
+test('FRLG run is available in the shared run history with its own source labels', async () => {
+  const stored = { runs: [], beginRun(id, kind, context) { this.runs.push({ id, kind, context }); }, finishRun(id, status, message) { Object.assign(this.runs.find(run => run.id === id), { status, message }); } };
+  const h = harness({ store: stored });
+  await h.invoke('start', { request: plan.request, profileId: 'save-c', options: {} });
+  h.events.emit('script', { event: 'script.log', runId: 'script1', message: 'ECS 反查诊断' });
+  h.done();
+  await h.service.settled();
+  assert.equal(stored.runs.length, 1);
+  assert.equal(stored.runs[0].kind, 'frlg');
+  assert.equal(stored.runs[0].context.profileId, 'save-c');
+  assert.equal(stored.runs[0].status, 'completed');
+  assert.ok(h.logRows.some(row => row[0] === 'ECS 反查诊断' && row[1] === 'ECS'));
 });

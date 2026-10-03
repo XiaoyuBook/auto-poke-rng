@@ -3,8 +3,9 @@
 The generated ECS library keeps only same-signature ``EXTERN`` declarations.
 All counters, prediction windows and dead-zone decisions live in this object,
 so BINGO state is reset with the script run and cannot leak through ECS global
-variables.  ``emit`` is deliberately a small log callback: it replaces the
-original ECS ``PRINT`` calls without moving device/OCR work into Python.
+variables.  Generated runs use ``update`` for a structured GUI snapshot;
+``emit`` remains available for standalone callers that need the original ECS
+``PRINT`` stream without moving device/OCR work into Python.
 """
 
 from __future__ import annotations
@@ -23,11 +24,13 @@ class BingoSession:
     """One script-run copy of the former BINGO ECS state."""
 
     emit: Callable[[str], None] | None = None
+    update: Callable[[dict[str, object]], None] | None = None
     counts: list[list[int]] = field(default_factory=lambda: [[0] * 9 for _ in range(9)])
     tv_counts: list[int] = field(default_factory=lambda: [0] * 9)
     seed_difference: int = 0
     frame_difference: int = 0
     count: int = 0
+    observed: bool = False
     row_offset: int = 0
     seed_text: list[str] = field(default_factory=lambda: [""] * 9)
     cell: str = ""
@@ -67,8 +70,78 @@ class BingoSession:
     stable_count: int = 0
     stable_result: int = 0
 
+    def _grid_marker(self, seed: int, frame: int) -> str:
+        """Return the marker used by the former text renderer for one cell."""
+        count = self.counts[seed + 4][frame + 4]
+        if seed == 0 and frame == 0:
+            return "＠" if self.hit_seed_offset == 0 and self.hit_frame_error == 0 else "＋"
+        if seed == self.hit_seed_offset and frame == self.normalize_frame(self.hit_frame_error):
+            return _CIRCLED[min(max(count, 1), 9) - 1] if self.current_in_range else "ｘ"
+        if count > 0:
+            return _DIGITS[min(max(count, 0), 9)]
+        inside = (self.cluster_seed_center - self.cluster_seed_radius <= seed <= self.cluster_seed_center + self.cluster_seed_radius and
+                  self.cluster_frame_center - self.cluster_frame_radius <= frame <= self.cluster_frame_center + self.cluster_frame_radius)
+        return "ｏ" if inside else "．"
+
+    def _tv_marker(self, frame: int) -> str:
+        count = self.tv_counts[frame + 4]
+        marker = "＋" if frame == 0 else "．"
+        if self.tv_prediction - self.tv_prediction_radius <= frame <= self.tv_prediction + self.tv_prediction_radius:
+            marker = "ｏ"
+        if count > 0:
+            marker = _DIGITS[min(max(count, 0), 9)]
+        if frame == self.tv_current:
+            marker = _CIRCLED[min(max(count, 1), 9) - 1] if self.tv_current_in_range else "ｘ"
+        return marker
+
+    def _snapshot(self) -> dict[str, object]:
+        return {
+            "version": 1,
+            "observed": self.observed,
+            "prediction": {
+                "seed": self.cluster_seed_center, "seedRadius": self.cluster_seed_radius,
+                "frame": self.cluster_frame_center, "frameRadius": self.cluster_frame_radius,
+            },
+            "axis": list(_AXIS),
+            "seedText": list(self.seed_text),
+            "grid": [[{
+                "seed": seed, "frame": frame, "count": self.counts[seed + 4][frame + 4],
+                "marker": self._grid_marker(seed, frame),
+            } for frame in _AXIS] for seed in _AXIS],
+            "tv": {
+                "enabled": bool(self.tv_enabled), "current": self.tv_current,
+                "inRange": bool(self.tv_current_in_range),
+                "prediction": self.tv_prediction, "radius": self.tv_prediction_radius,
+                "counts": list(self.tv_counts),
+                "cells": [{"frame": frame, "count": self.tv_counts[frame + 4], "marker": self._tv_marker(frame)} for frame in _AXIS],
+            },
+            "current": {
+                "seed": self.hit_seed_offset, "frame": self.normalize_frame(self.hit_frame_error),
+                "hitSeed": self.hit_seed_offset, "hitFrame": self.hit_frame_error,
+                "inRange": bool(self.current_in_range), "inDeadZone": bool(self.stable_result),
+            },
+            "context": {
+                "seedTolerance": self.seed_tolerance, "targetIndex": self.target_index,
+                "seedMaxIndex": self.seed_max_index, "game": self.game, "seedMode": self.seed_mode,
+                "enterTv": bool(self.enter_tv), "tvFrameCost": self.tv_frame_cost,
+            },
+            "stable": {
+                "type": self.stable_type, "count": self.stable_count,
+                "threshold": self.stable_threshold, "seed": self.stable_seed_difference,
+                "frame": self.stable_frame_difference, "result": bool(self.stable_result),
+            },
+            "count": self._cell_count(self.hit_seed_offset, self.normalize_frame(self.hit_frame_error)),
+        }
+
+    def _publish(self) -> None:
+        if self.update is not None:
+            self.update(self._snapshot())
+
     def _print(self, value: object = "") -> None:
-        if self.emit is not None:
+        # Generated FRLG runs provide ``update`` and render the board in the
+        # GUI.  Keep the legacy PRINT stream only for standalone/full-fidelity
+        # callers that do not have the structured channel.
+        if self.emit is not None and self.update is None:
             # EasyCon's PRINT callback receives a line terminator.  Preserve
             # that contract so the host log and the original ECS log have the
             # same line boundaries.
@@ -79,6 +152,7 @@ class BingoSession:
                     target_index: int, seed_max_index: int, game: int, seed_mode: int,
                     enter_tv: int, tv_cost: int, tv_positive: int, tv_negative: int) -> int:
         self.hit_seed_offset = int(hit_seed)
+        self.observed = True
         self.hit_frame_error = int(hit_frame)
         self.frame_dead_zone = int(frame_zone)
         self.frame_dead_zone_negative = int(frame_negative)
@@ -94,6 +168,7 @@ class BingoSession:
         self.tv_negative_rounds = int(tv_negative)
         self.current_in_range = 0
         self.tv_current_in_range = 0
+        self._publish()
         return 1
 
     @property
@@ -110,6 +185,7 @@ class BingoSession:
         self.cluster_seed_radius = int(seed_radius)
         self.cluster_frame_center = int(frame_center)
         self.cluster_frame_radius = int(frame_radius)
+        self._publish()
         return 1
 
     def set_tv_axis(self, enabled: int, current: int, prediction: int, radius: int) -> int:
@@ -118,11 +194,13 @@ class BingoSession:
         self.tv_prediction = int(prediction)
         self.tv_prediction_radius = int(radius)
         self.tv_current_in_range = 0
+        self._publish()
         return 1
 
     def set_seed_text(self, *values: str) -> int:
         self.seed_text = [str(value) for value in values[:9]]
         self.seed_text += [""] * (9 - len(self.seed_text))
+        self._publish()
         return 1
 
     def normalize_frame(self, raw: int) -> int:
@@ -170,6 +248,7 @@ class BingoSession:
             self._print(f"归一化帧偏移: {self.frame_difference} 帧")
         self.add_count()
         self.current_in_range = 1
+        self._publish()
         return 1
 
     def record_tv_hit(self) -> int:
@@ -178,6 +257,7 @@ class BingoSession:
             return 0
         self.tv_counts[self.tv_current + 4] += 1
         self.tv_current_in_range = 1
+        self._publish()
         return 1
 
     def get_seed_dead_zone(self, value: int) -> int:
@@ -335,6 +415,7 @@ class BingoSession:
             self.output_row()
         self._print("")
         self.output_tv_axis()
+        self._publish()
         return 1
 
     def add_dead_zone_count(self) -> int:
@@ -386,13 +467,19 @@ class BingoSession:
             self._print(f"条件: 同消耗帧列在死区内累计达到 {self.stable_threshold} 次")
             self._print(f"消耗帧偏移: {self.stable_frame_difference} 帧")
         self._print(f"累计命中: {self.stable_count}")
+        self._publish()
         return 1
 
     def clear(self) -> int:
+        self.observed = False
         self.counts = [[0] * 9 for _ in range(9)]
         self.tv_counts = [0] * 9
         self.current_in_range = 0
         self.tv_current_in_range = 0
+        self.stable_type = 0
+        self.stable_count = 0
+        self.stable_result = 0
+        self._publish()
         return 1
 
     def extern_functions(self) -> dict[str, Callable[..., object]]:
@@ -436,8 +523,9 @@ class BingoSession:
         return 1
 
 
-def extern_functions(*, emit: Callable[[str], None] | None = None) -> dict[str, Callable[..., object]]:
-    return BingoSession(emit=emit).extern_functions()
+def extern_functions(*, emit: Callable[[str], None] | None = None,
+                     update: Callable[[dict[str, object]], None] | None = None) -> dict[str, Callable[..., object]]:
+    return BingoSession(emit=emit, update=update).extern_functions()
 
 
 __all__ = ["BingoSession", "extern_functions"]

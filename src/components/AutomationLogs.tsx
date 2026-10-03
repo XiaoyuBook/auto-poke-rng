@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { downloadText, nativeCandidate, useAutomation, type Candidate } from '../automation';
 import { staticResultCells } from '../staticResults';
 import { STATIC_COLUMNS } from '../staticTable';
+import { isFrlgDiagnosticLog, type FrlgRunState } from '../frlgExecution';
+import { FrlgBingoBoard } from './FrlgBingoBoard';
+import { FrlgRoundDetails } from './FrlgRoundDetails';
 
 export function CandidateTable({ rows, selected = -1, sources = [] }: { rows: Candidate[]; selected?: number; sources?: string[] }) {
   const [page,setPage]=useState(0),[selection,setSelection]=useState<number|null>(null),[notice,setNotice]=useState('');
@@ -21,56 +24,68 @@ export function CandidateTable({ rows, selected = -1, sources = [] }: { rows: Ca
 
 export function AutomationLogs() {
   const {api,snapshot,error,setError}=useAutomation();
-  const [tab,setTab]=useState<'rounds'|'logs'>('rounds'),[runId,setRunId]=useState(''),[roundIndex,setRoundIndex]=useState(0);
+  const [tab,setTab]=useState<'rounds'|'logs'|'bingo'>('rounds'),[runId,setRunId]=useState(''),[roundIndex,setRoundIndex]=useState<number|null>(null);
+  const [frlgState,setFrlgState]=useState<FrlgRunState|null>(null);
   const [context,setContext]=useState<{runId:string;round?:number}|null>(null);
   const [source,setSource]=useState('全部来源'),[level,setLevel]=useState('全部级别'),[query,setQuery]=useState(''),[follow,setFollow]=useState(true);
   const scroll=useRef<HTMLDivElement>(null);
   const lastRun=useRef<string|null>(null);
   useEffect(()=>{
-    const id=snapshot?.state.runId;
+    const frlg=window.desktop?.frlgAutomation;
+    if(!frlg)return;
+    let alive=true;
+    void frlg.getState().then(value=>{if(alive)setFrlgState(current=>current||value);}).catch(()=>{});
+    const unsubscribe=frlg.onState(value=>{if(alive)setFrlgState(value);});
+    return()=>{alive=false;unsubscribe();};
+  },[]);
+  useEffect(()=>{
+    const id=snapshot?.runs.at(0)?.id || snapshot?.state.runId;
     if(id&&lastRun.current&&id!==lastRun.current){setContext(null);localStorage.removeItem('auto-poke-rng:log-context');}
     if(id)lastRun.current=id;
-  },[snapshot?.state.runId]);
+  },[snapshot?.state.runId,snapshot?.runs.at(0)?.id]);
   useEffect(()=>{
     const receive=()=>{try{const value=JSON.parse(localStorage.getItem('auto-poke-rng:log-context')||'null');if(value){setContext(value);setTab('logs');setSource('全部来源');setLevel('全部级别');setQuery('');}}catch{/* invalid navigation */}};
     receive();window.addEventListener('auto-poke:related-logs',receive);window.addEventListener('storage',receive);
     return()=>{window.removeEventListener('auto-poke:related-logs',receive);window.removeEventListener('storage',receive);};
   },[]);
-  useEffect(()=>{if(follow&&tab==='logs'&&scroll.current)scroll.current.scrollTop=scroll.current.scrollHeight;},[snapshot?.logs.length,follow,tab]);
+  const latestLogId=snapshot?.logs.filter(row=>!isFrlgDiagnosticLog(row.message,row.detailOnly)).at(-1)?.id;
+  useEffect(()=>{if(follow&&tab==='logs'&&scroll.current)scroll.current.scrollTop=scroll.current.scrollHeight;},[latestLogId,follow,tab]);
   if(!snapshot)return <p role="status">{error||'正在加载日志中心…'}</p>;
+  const sourceOptions=['全部来源',...new Set(['系统','火叶','ECS','自动定点','自动TID','眨眼','OCR','脚本','手柄','QQ通知',...snapshot.logs.map(row=>row.source)])];
   const run=snapshot.runs.find(item=>item.id===runId)||snapshot.runs[0];
-  const round=run?.rounds[Math.min(roundIndex,Math.max(0,run.rounds.length-1))];
-  const logs=snapshot.logs.filter(row=>(source==='全部来源'||row.source===source)&&(level==='全部级别'||row.level===level)
+  const round=run?.rounds[roundIndex === null ? run.rounds.length-1 : Math.min(roundIndex,Math.max(0,run.rounds.length-1))];
+  const logs=snapshot.logs.filter(row=>!isFrlgDiagnosticLog(row.message,row.detailOnly)&&(source==='全部来源'||row.source===source)&&(level==='全部级别'||row.level===level)
     &&(!context||(row.runId===context.runId&&(context.round===undefined||row.round===context.round)))
-    &&(!query||`${row.message} ${row.source}`.toLocaleLowerCase().includes(query.toLocaleLowerCase())));
+    &&(!query||`${row.message} ${row.source} ${row.phase||''} ${row.event||''}`.toLocaleLowerCase().includes(query.toLocaleLowerCase())));
   const perform=(promise:Promise<unknown>|undefined)=>void promise?.catch(error=>setError(error.message));
-  const text=logs.map(row=>`${row.time}\t${row.source}\t${row.level}\t${row.message}`).join('\n');
+  const text=logs.map(row=>`${row.time}\t${row.source}\t${row.level}\t${row.phase||''}\t${row.message}`).join('\n');
+  const openRunLogs=(number?:number)=>{if(!run)return;setContext({runId:run.id,...(number === undefined ? {} : {round:number})});setSource('全部来源');setLevel('全部级别');setQuery('');setTab('logs');};
   const clearContext=()=>{setContext(null);localStorage.removeItem('auto-poke-rng:log-context');};
   return <section className="automation-log-center" aria-label="日志中心内容">
-    <nav className="automation-toolbar" aria-label="日志视图"><button aria-pressed={tab==='rounds'} onClick={()=>setTab('rounds')}>轮次记录</button><button aria-pressed={tab==='logs'} onClick={()=>setTab('logs')}>详细日志</button>
+    <nav className="automation-toolbar" aria-label="日志视图"><button aria-pressed={tab==='rounds'} onClick={()=>setTab('rounds')}>轮次记录</button><button aria-pressed={tab==='logs'} onClick={()=>setTab('logs')}>运行日志</button><button aria-pressed={tab==='bingo'} onClick={()=>setTab('bingo')}>BINGO 状态</button>
       <label><input type="checkbox" checked={snapshot.logging} onChange={event=>perform(api?.setLogging(event.target.checked))}/>自动保存磁盘日志</label></nav>
     {(error||snapshot.error)&&<p role="alert" className="panel-error">{error||snapshot.error}</p>}
-    {tab==='rounds'?<div className="automation-records">
-      <aside><label>运行记录<select aria-label="运行记录" value={run?.id||''} onChange={event=>{setRunId(event.target.value);setRoundIndex(0);}}>{snapshot.runs.map(item=><option key={item.id} value={item.id}>{new Date(item.startedAt).toLocaleString()} · {item.kind==='static'?'定点':'TID'}</option>)}</select></label>
-        {run?.rounds.map((item,index)=><button className={round===item?'active':''} key={item.number} onClick={()=>setRoundIndex(index)}>第 {item.number} 轮 · {item.outcome}</button>)}
+    {tab==='bingo'?<FrlgBingoBoard key={frlgState?.runId || 'idle'} state={frlgState?.bingo}/>:tab==='rounds'?<div className="automation-records">
+      <aside><label>运行记录<select aria-label="运行记录" value={run?.id||''} onChange={event=>{setRunId(event.target.value);setRoundIndex(null);}}>{snapshot.runs.map(item=><option key={item.id} value={item.id}>{new Date(item.startedAt).toLocaleString()} · {item.kind==='static'?'定点':item.kind==='tid'?'TID':'火叶'}</option>)}</select></label>
+        <div className="automation-round-list">{run?.rounds.map((item,index)=><button className={round===item?'active':''} key={item.number} onClick={()=>setRoundIndex(index)}><span>第 {item.number} 轮 · {item.outcome}</span>{item.frlg && <small>{item.frlg.hitSeed ? `Seed ${item.frlg.hitSeed} · 帧偏差 ${item.frlg.frameError ?? '—'}` : item.number === 0 ? '游戏环境与计时校准' : '等待反查结果'}</small>}</button>)}</div>
         {!run&&<p className="muted">运行自动流程后，轮次记录会显示在这里。</p>}</aside>
-      <div className="automation-record-detail">{round&&<><div className="automation-toolbar"><strong>第 {round.number} 轮 · {round.outcome}</strong>
+      <div className="automation-record-detail">{run?.kind==='frlg' ? <FrlgRoundDetails run={run} round={round} logs={snapshot.logs} openLogs={openRunLogs}/> : round&&<><div className="automation-toolbar"><strong>第 {round.number} 轮 · {round.outcome}</strong>
         <button onClick={()=>{setContext({runId:run.id,round:round.number});setSource('全部来源');setLevel('全部级别');setQuery('');setTab('logs');}}>查看相关日志</button>
         <button onClick={()=>downloadText(JSON.stringify({runId:run.id,...round},null,2),'轮次记录.json','application/json')}>导出记录</button></div>
         <dl className="automation-metrics"><div><dt>Seed</dt><dd>{round.seed||'—'}</dd></div><div><dt>启动帧</dt><dd>{round.trigger??'—'}</dd></div><div><dt>本轮 delay</dt><dd>{round.usedDelay??'—'}</dd></div><div><dt>实际 delay</dt><dd>{round.actualDelays?.join(' / ')||'—'}</dd></div></dl>
         <CandidateTable rows={round.candidates} selected={round.selected} sources={round.sources}/>
         {!!round.reverse?.length&&<details><summary>反查结果</summary><CandidateTable rows={round.reverse}/></details>}
         <details><summary>轮次事件与诊断</summary><pre>{JSON.stringify(round.events,null,2)}</pre></details></>}
-        {run?.message&&<p>{run.message}</p>}</div>
+        {run?.kind!=='frlg'&&run?.message&&<p>{run.message}</p>}</div>
     </div>:<>
-      <div className="automation-toolbar"><select aria-label="筛选日志来源" value={source} onChange={event=>setSource(event.target.value)}>{['全部来源','系统','自动定点','自动TID','眨眼','OCR','脚本','手柄'].map(value=><option key={value}>{value}</option>)}</select>
-        <select aria-label="筛选日志级别" value={level} onChange={event=>setLevel(event.target.value)}><option>全部级别</option><option value="info">信息</option><option value="success">成功</option><option value="warning">警告/错误</option></select>
+      <div className="automation-toolbar"><select aria-label="筛选日志来源" value={source} onChange={event=>setSource(event.target.value)}>{sourceOptions.map(value=><option key={value}>{value}</option>)}</select>
+        <select aria-label="筛选日志级别" value={level} onChange={event=>setLevel(event.target.value)}><option>全部级别</option><option value="info">信息</option><option value="success">成功</option><option value="warning">警告</option><option value="error">错误</option></select>
         <input aria-label="搜索日志" placeholder="搜索日志…" value={query} onChange={event=>setQuery(event.target.value)}/>
         <label><input type="checkbox" checked={follow} onChange={event=>setFollow(event.target.checked)}/>自动跟随</label>
         <button onClick={()=>perform(navigator.clipboard.writeText(text))}>复制</button><button onClick={()=>downloadText(text,'运行日志.txt')}>导出</button>
-        <button onClick={()=>perform(api?.clearLogs())}>清空显示</button><span>{logs.length} 条</span>
+        <button onClick={()=>perform(api?.clearLogs())}>清空显示</button><span>{logs.length} 条摘要</span><span className="automation-log-hint">阶段诊断按设置写入日志文件</span>
         {context&&<button onClick={clearContext}>清除轮次筛选</button>}</div>
-      <div ref={scroll} className="automation-table-scroll automation-log-lines"><table><thead><tr><th>时间</th><th>来源</th><th>轮次</th><th>内容</th></tr></thead><tbody>{logs.map(row=><tr key={row.id}><td>{row.time}</td><td>{row.source}</td><td>{row.round||'—'}</td><td className={'log-'+row.level}>{row.message}</td></tr>)}</tbody></table>
+      <div ref={scroll} className="automation-table-scroll automation-log-lines"><table><thead><tr><th>时间</th><th>来源</th><th>阶段</th><th>轮次</th><th>内容</th></tr></thead><tbody>{logs.map(row=><tr key={row.id}><td>{row.time}</td><td>{row.source}</td><td>{row.phase||'—'}</td><td>{row.round??'—'}</td><td className={'log-'+row.level}>{row.message}</td></tr>)}</tbody></table>
         {!logs.length&&<p className="muted">当前筛选没有日志。</p>}</div>
     </>}
   </section>;

@@ -29,6 +29,18 @@ function chooseGolbat() {
 afterEach(() => { cleanup(); delete window.desktop; localStorage.clear(); });
 
 describe('real FRLG planner result contract', () => {
+  it('keeps run status in the toolbar and opens the centralized logs without a duplicate log card', async () => {
+    mockApi();
+    const onOpenLogs = vi.fn();
+    window.desktop!.frlgAutomation = { getState: vi.fn(async () => ({ status: 'running' as const, runId: 'frlg-1', profileId: profile.id, message: '正在执行火叶自动流程', logs: ['已开始'], progress: { source: 'main.ecs', line: 10, action: 'settings.check', text: '' } })), onState: vi.fn(() => () => {}), start: vi.fn(), stop: vi.fn() };
+    render(<FrlgAutomationWorkspace profile={profile} onOpenLogs={onOpenLogs}/>);
+    await screen.findByText('正在检查游戏设置');
+    expect(screen.queryByRole('region', { name: '火叶运行状态' })).toBeNull();
+    expect(screen.queryByLabelText('火叶运行日志')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '打开日志中心' }));
+    expect(onOpenLogs).toHaveBeenCalledOnce();
+    expect(JSON.parse(localStorage.getItem('auto-poke-rng:log-context')!)).toEqual({ runId: 'frlg-1' });
+  });
   it('handles damaged saved options and restores expansion settings when switching saves', () => {
     mockApi();
     localStorage.setItem('auto-poke-frlg-run:' + profile.id, 'null');

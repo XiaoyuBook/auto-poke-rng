@@ -188,6 +188,24 @@ class AutomationStore extends EventEmitter {
   beginRun(id, kind, context = null) { this.runs.unshift({ id, kind, context: context ? clone(context) : null, startedAt: this.now().toISOString(), status: 'running', rounds: [] }); this.emit('change'); }
   history(id, event, args) {
     const run = this.runs.find(item => item.id === id); if (!run) return;
+    if (event === 'frlg_round') {
+      const record = args[0];
+      let round = run.rounds.find(item => item.number === record.number);
+      if (!round) {
+        const previous = run.rounds.at(-1);
+        if (previous?.outcome === '运行中') previous.outcome = previous.frlg?.result || '已结束';
+        if (previous && !previous.endedAt) previous.endedAt = this.now().toISOString();
+        round = { number: record.number, startedAt: this.now().toISOString(), outcome: '运行中', candidates: [], events: [], frlg: {} };
+        run.rounds.push(round);
+      }
+      const { note, ...data } = record.data || {};
+      Object.assign(round.frlg, clone(data));
+      if (note) round.frlg.notes = [...new Set([...(round.frlg.notes || []), note])].slice(-12);
+      if (data.result) round.outcome = data.result;
+      round.updatedAt = this.now().toISOString();
+      this.emit('change');
+      return;
+    }
     if (event === 'cycle_start') run.rounds.push({ number: args[0], outcome: '运行中', candidates: [], events: [] });
     const round = run.rounds.at(-1); if (!round) return;
     round.events.push({ event, args: clone(args) });
@@ -203,6 +221,7 @@ class AutomationStore extends EventEmitter {
     const run = this.runs.find(item => item.id === id); if (!run) return;
     Object.assign(run, { status, message, endedAt: this.now().toISOString() });
     const round = run.rounds.at(-1); if (round?.outcome === '运行中') round.outcome = status === 'stopped' ? '已停止' : status === 'failed' ? '失败' : '已完成';
+    if (round && !round.endedAt) round.endedAt = this.now().toISOString();
     this.emit('change');
   }
   snapshot() { return clone({ ...this.data, logs: this.logs, runs: this.runs, error: this.error }); }

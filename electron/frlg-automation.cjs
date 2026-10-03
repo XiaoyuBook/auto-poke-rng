@@ -2,19 +2,57 @@ const path = require('node:path');
 const fs = require('node:fs/promises');
 const { randomUUID } = require('node:crypto');
 
+const isDiagnosticStageLog = message => {
+  const text = String(message).trim();
+  return text.startsWith('FRLG_STAGE|BEGIN|')
+    || text.startsWith('FRLG_STAGE|END|')
+    || text.startsWith('FRLG_STAGE|PROGRESS|')
+    || text.startsWith('FRLG_STAGE|THRESHOLD|')
+    || /^阶段(?:开始|完成)：/.test(text);
+};
+
 // FRLG owns its lifecycle and calibration. Hardware, interpreter, OCR and notifications are shared.
 function registerFrlgAutomation({ ipcMain, getMainWindow, devices, client, userData,
-  log = () => {}, notifications, readFile = fs.readFile, makeDirectory = fs.mkdir }) {
+  log = () => {}, notifications, store, readFile = fs.readFile, makeDirectory = fs.mkdir }) {
   let active = null, lastDone = Promise.resolve(), closed = false;
-  let state = { status: 'idle', runId: null, profileId: null, message: '等待开始', progress: null, logs: [] };
+  let state = { status: 'idle', runId: null, profileId: null, message: '等待开始', progress: null, logs: [], logEntries: [], bingo: null };
+  let uiLogs = [], uiEntries = [], ecsUiTimer = null;
   const update = patch => {
     state = { ...state, ...patch };
     const contents = getMainWindow()?.webContents;
     if (contents && !contents.isDestroyed?.()) contents.send('frlg-automation:state', state);
   };
-  const record = (run, message, level = 'info') => {
-    log(message, '火叶', level, { runId: run.id });
-    update({ logs: [...state.logs.slice(-199), String(message)] });
+  const flushUiLogs = () => {
+    if (ecsUiTimer) { clearTimeout(ecsUiTimer); ecsUiTimer = null; }
+    update({ logs: uiLogs, logEntries: uiEntries });
+  };
+  const record = (run, message, level = 'info', metadata = {}) => {
+    const source = metadata.source || '火叶';
+    const text = String(message);
+    const detailOnly = metadata.detailOnly === true || isDiagnosticStageLog(text);
+    const { source: ignored, detailOnly: ignoredDetailOnly, ...context } = metadata;
+    if (detailOnly) context.detailOnly = true;
+    log(text, source, level, { runId: run.id, ...(Number.isInteger(run.round) ? { round: run.round } : {}), ...context });
+    const entry = {
+      id: randomUUID(), time: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
+      source, level, message: text, ...(context.phase ? { phase: context.phase } : {}),
+      ...(Number.isInteger(context.line) ? { line: context.line } : {}),
+      ...(detailOnly ? { detailOnly: true } : {}),
+    };
+    uiLogs = [...uiLogs.slice(-199), text];
+    uiEntries = [...uiEntries.slice(-199), entry];
+    if (source === 'ECS') {
+      if (!ecsUiTimer) ecsUiTimer = setTimeout(flushUiLogs, 80);
+    } else flushUiLogs();
+  };
+  const beginStoredRun = run => {
+    if (!store?.beginRun) return;
+    store.beginRun(run.id, 'frlg', { game: 'frlg', profileId: run.profileId, target: run.request.pokemon });
+  };
+  const finishStoredRun = (run, status, message) => {
+    if (run.storeFinished || !store?.finishRun) return;
+    run.storeFinished = true;
+    store.finishRun(run.id, status, message);
   };
   const checkStopped = run => { if (closed || run.stopped || active !== run) throw Error('火叶流程已停止'); };
   const execute = async run => {
@@ -37,20 +75,44 @@ function registerFrlgAutomation({ ipcMain, getMainWindow, devices, client, userD
       const device = devices.getState();
       if (device.controller?.status !== 'connected') throw Error('请先连接伊机控');
       if (device.video?.status !== 'connected') throw Error('请先连接视频源');
-      record(run, '脚本已生成并通过语法检查；启动公共执行器进行标签、OCR 与视频帧预检。');
+      record(run, '脚本已生成并通过语法检查；启动 ECS 执行器进行标签、OCR 与视频帧预检。', 'info', { phase: '脚本预检' });
       let scriptId, resolveScript;
       const early = [], logLines = [];
       const completion = new Promise(resolve => { resolveScript = resolve; });
       const dispatch = message => {
         if (message.runId !== scriptId) return;
+        if (message.event === 'script.round' && Number.isInteger(message.number) && message.number >= 0) {
+          run.round = message.number;
+          store?.history?.(run.id, 'frlg_round', [{ number: message.number, data: message.data }]);
+          log(`第 ${message.number} 轮结构化记录`, '火叶', 'info', {
+            runId: run.id, round: message.number, event: 'frlg.round', detailOnly: true,
+            ...(message.data ? { data: message.data } : {}),
+          });
+        }
         if (message.event === 'script.log') {
-          record(run, message.message);
-          // Only success markers are needed for persistence; full logs use the shared log store.
+          record(run, message.message, 'info', {
+            source: 'ECS', phase: run.phase || 'ECS 输出', line: state.progress?.line,
+            event: 'script.log', scriptId, detailOnly: isDiagnosticStageLog(message.message),
+          });
           if (String(message.message).includes('PRECALIBRATION_UPDATE|')) logLines.push(String(message.message));
         }
-        if (message.event === 'script.progress') update({ progress: message });
-        if (message.event === 'script.started') update({ status: 'running', message: '正在执行火叶自动流程' });
-        if (message.event === 'script.done') resolveScript(message);
+        if (message.event === 'script.bingo') update({ bingo: message.state || null });
+        if (message.event === 'script.progress') {
+          run.phase = message.action || message.source || 'ECS 执行';
+          update({ progress: message });
+        }
+        if (message.event === 'script.started') {
+          run.round = 0;
+          store?.history?.(run.id, 'frlg_round', [{ number: 0 }]);
+          run.phase = 'ECS 执行';
+          update({ status: 'running', message: '正在执行火叶自动流程' });
+          record(run, '火叶自动流程已开始执行。', 'info', { phase: '执行', event: 'script.started' });
+        }
+        if (message.event === 'script.done') {
+          if (message.status === 'failed') record(run, `火叶自动流程执行失败：${message.message || '请查看详细日志。'}`, 'error', { phase: '执行', event: 'script.done' });
+          else if (message.status === 'completed') record(run, '火叶自动流程执行完成。', 'success', { phase: '执行', event: 'script.done' });
+          resolveScript(message);
+        }
       };
       listener = message => { if (!scriptId) early.push(message); else dispatch(message); };
       devices.events.on('script', listener);
@@ -66,13 +128,18 @@ function registerFrlgAutomation({ ipcMain, getMainWindow, devices, client, userD
       let calibrationUpdated = false;
       if (run.options.update_precalibration) {
         ({ calibrationUpdated } = await client.call('finalize', { calibrationStore, manifest: generated.manifest, log: logLines.join('\n') }));
-        record(run, calibrationUpdated ? '当前存档的预校准已更新。' : '没有完整命中记录，预校准未更新。');
+        record(run, calibrationUpdated ? '当前存档的预校准已更新。' : '没有完整命中记录，预校准未更新。', calibrationUpdated ? 'success' : 'warning', { phase: '预校准' });
       }
-      update({ status: 'completed', message: '流程已结束；请核对日志中的实际捕获结果。', calibrationUpdated });
+      const message = '流程已结束；请核对日志中的实际捕获结果。';
+      finishStoredRun(run, 'completed', message);
+      record(run, message, 'success', { phase: '完成' });
+      update({ status: 'completed', message, calibrationUpdated });
     } catch (error) {
       const stopped = run.stopped || closed;
-      update({ status: stopped ? 'stopped' : 'failed', message: stopped ? '火叶流程已停止' : String(error.message || error) });
-      record(run, state.message, stopped ? 'info' : 'error');
+      const message = stopped ? '火叶流程已停止' : String(error.message || error);
+      update({ status: stopped ? 'stopped' : 'failed', message });
+      finishStoredRun(run, stopped ? 'stopped' : 'failed', message);
+      record(run, message, stopped ? 'info' : 'error', { phase: stopped ? '停止' : '失败' });
       run.reject(error);
     } finally {
       if (listener) devices.events.off('script', listener);
@@ -93,7 +160,10 @@ function registerFrlgAutomation({ ipcMain, getMainWindow, devices, client, userD
     const run = { id: randomUUID(), request: args.request, profileId: args.profileId, options: args.options || {}, stopped: false };
     active = run;
     const accepted = new Promise((resolve, reject) => { run.accept = resolve; run.reject = reject; });
-    update({ status: 'preparing', runId: run.id, profileId: run.profileId, message: '正在生成并预检火叶脚本', logs: [], progress: null, calibrationUpdated: false });
+    beginStoredRun(run);
+    uiLogs = []; uiEntries = [];
+    update({ status: 'preparing', runId: run.id, profileId: run.profileId, message: '正在生成并预检火叶脚本', logs: [], logEntries: [], progress: null, bingo: null, calibrationUpdated: false });
+    record(run, '正在生成并预检火叶脚本。', 'info', { phase: '准备' });
     lastDone = run.done = execute(run);
     return accepted.then(() => state);
   };

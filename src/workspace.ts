@@ -4,15 +4,19 @@ export type Modal = 'controller' | 'easycon' | 'video' | 'notification' | 'mappi
 export type LogEntry = {
   id: string;
   time: string;
-  source: '系统' | '脚本' | '手柄' | '自动定点' | '自动TID' | '眨眼' | 'OCR';
+  source: '系统' | '脚本' | 'ECS' | '火叶' | '手柄' | '自动定点' | '自动TID' | '眨眼' | 'OCR';
   runId?: string;
   round?: number;
+  phase?: string;
+  event?: string;
+  line?: number;
   timestamp?: string;
+  detailOnly?: boolean;
   message: string;
-  level: 'info' | 'success' | 'warning';
+  level: 'info' | 'success' | 'warning' | 'error';
 };
 
-export const isEasyConLog = (log: LogEntry) => log.source === '脚本' || log.source === '手柄';
+export const isEasyConLog = (log: LogEntry) => log.source === '脚本' || log.source === 'ECS' || log.source === '手柄';
 
 export const games = [
   { id: 'frlg', label: '火叶', generation: '第三世代', detail: 'FRLG · Switch', color: '#d8817c' },

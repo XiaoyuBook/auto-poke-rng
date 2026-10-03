@@ -605,7 +605,7 @@ export default function App({ connections = initialConnections }: { connections?
                   {visitedAutomationTabs.has('static') && <div className="automation-page automation-hub-panel" id="automation-panel-static" hidden={automationTab !== 'static'}><AutomationWorkspace kind="static" profile={bdspProfile} blinkConfig={blink.config} blinkConfigs={blink.configs} openLogs={() => showPanel('logs')} onSwitchKind={() => selectAutomationTab('tid')} /></div>}
                   {visitedAutomationTabs.has('tid') && <div className="automation-page automation-hub-panel" id="automation-panel-tid" hidden={automationTab !== 'tid'}><AutomationWorkspace kind="tid" profile={bdspProfile} blinkConfig={blink.config} blinkConfigs={blink.configs} openLogs={() => showPanel('logs')} onSwitchKind={() => selectAutomationTab('static')} /></div>}
                 </>}
-                {game === 'frlg' && <FrlgAutomationWorkspace profile={frlgSaves.active} />}
+                {game === 'frlg' && <FrlgAutomationWorkspace profile={frlgSaves.active} onOpenLogs={() => showPanel('logs')} />}
               </div>}
               {visitedPages.has('闪光反查区域') && <div hidden={page !== '闪光反查区域'}><OcrWorkspace overlayTarget={page === '闪光反查区域' ? ocrOverlayHost : null} previewTarget={page === '闪光反查区域' ? ocrPreviewHost : null} /></div>}
               {page === '定点数据' && <StaticDataWorkspace profile={bdspProfile} onLog={message => addLog(message, '系统', 'success')} />}

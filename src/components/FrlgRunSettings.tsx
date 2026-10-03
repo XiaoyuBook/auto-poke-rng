@@ -34,9 +34,9 @@ export function FrlgRunSettings({ options, onChange, locked, wild }: {
         <label>Seed 校准方案<select value={options.seed_calibration_scheme ?? 0} onChange={event => update('seed_calibration_scheme', Number(event.target.value))}><option value={0}>方案 1</option><option value={1}>方案 2</option></select></label>
       </div>
       <details className="automation-subsection"><summary>高级反查与校准参数</summary>
-        <p className="muted">留空使用原版脚本默认值。扩窗覆盖需同时填写层数和两组三层数值。只有完整命中、上下文一致且正常结束时，才更新该存档的预校准。</p>
+        <p className="muted">默认使用精简 ECS 输出，只保留阶段、结果和异常。需要排查脚本时再切换完整调试；扩窗覆盖需同时填写层数和两组三层数值。只有完整命中、上下文一致且正常结束时，才更新该存档的预校准。</p>
         <div className="automation-fields frlg-base-fields">
-          <label>调试日志<select value={options.debug_log_output ?? 1} onChange={event => update('debug_log_output', Number(event.target.value))}><option value={1}>输出</option><option value={0}>关闭</option></select></label>
+          <label>ECS 输出<select value={options.debug_log_output ?? 0} onChange={event => update('debug_log_output', Number(event.target.value))}><option value={0}>精简</option><option value={1}>完整调试</option></select></label>
           <label>帧奇偶修正方案<select value={options.frame_parity_scheme ?? 1} onChange={event => update('frame_parity_scheme', Number(event.target.value))}><option value={0}>方案 0</option><option value={1}>方案 1</option></select></label>
           <label>反查扩窗层数<input type="number" min={0} max={3} value={options.reverse_expansion_layers ?? ''} placeholder="原版默认" onChange={event => update('reverse_expansion_layers', event.target.value === '' ? undefined : Number(event.target.value))} /></label>
           {(['reverse_expansion_seed_tolerances', 'reverse_expansion_frame_half_widths'] as const).map(key => <label key={key}>{key.includes('seed') ? '三层 Seed 容差' : '三层帧半宽'}<ExpansionInput value={options[key]} onChange={value => update(key, value)} /></label>)}

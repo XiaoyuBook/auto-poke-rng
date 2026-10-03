@@ -18,13 +18,146 @@ from easycon.native.errors import ScriptCancelled
 from easycon.native.ast import Call, CallStatement
 from easycon.native.trace import ExecutionTrace
 
-sys.stdout.reconfigure(encoding="utf-8")
-sys.stdin.reconfigure(encoding="utf-8")
-sys.stderr.reconfigure(encoding="utf-8")
+for _stream in (sys.stdout, sys.stdin, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8")
 output_lock = threading.Lock()
 cancelled = threading.Event()
 pending = {}
 request_number = 0
+
+
+# Generated FRLG ECS projects carry this marker in their source.  Keeping the
+# policy in the script means a copied project behaves the same way in the
+# shared host, while ordinary user scripts keep their original PRINT output.
+ECS_LOG_POLICY_RE = re.compile(r"(?m)^# GUI_ECS_LOG_POLICY_V1 mode=(compact|full)\s*$")
+_COMPACT_ECS_QUIET_PREFIXES = (
+    "HOME_BUFFER_", "TID_HOME_BUFFER_", "孵蛋重启识图", "设置识别 ",
+    "孵蛋池塘冲浪检测|尝试=", "孵蛋池塘战斗检测|尝试=", "孵蛋Seed校准控制器",
+    "观测差:", "索引修正:", "毫秒细调:", "目标Seed保持:",
+    "方案2接续方向票:", "下轮Seed", "快捷登记识别:", "孵蛋快捷登记识别:",
+    "TV局部时间轴:", "日版性格最高匹配度:", "日版HP最高匹配度:",
+    "日版ATK最高匹配度:", "日版DEF最高匹配度:", "日版SPA最高匹配度:",
+    "日版SPD最高匹配度:", "日版SPE最高匹配度:",
+)
+_COMPACT_ECS_QUIET_CONTAINS = (
+    "OCR原文:",
+)
+_COMPACT_ECS_ERROR_WORDS = (
+    "失败", "错误", "无效", "异常", "未找到", "没有找到", "无法", "不能",
+    "停止", "超时", "缺少", "不支持", "请检查", "不完整", "暂无",
+)
+_COMPACT_ECS_KEEP_CONTAINS = (
+    "已命中", "流程完成", "流程已结束", "目标Seed已确认", "出闪", "闪光",
+    "开始", "完成", "正确", "准备", "重启", "重试", "继续", "校准成功",
+    "可用", "候选命中", "观测采集完成", "最终候选", "唯一", "目标Seed:",
+    "孵蛋方法", "BINGO稳定校准",
+)
+_BINGO_GRAPH_SYMBOLS = "＠①②③④⑤⑥⑦⑧⑨ｘｏ．"
+
+
+def _is_bingo_graph_line(line):
+    """Return whether a line belongs to the ECS text-rendered BINGO graph."""
+    if line.startswith((
+        "【BINGO】", "【BINGO TV归一化】", "横轴:", "纵轴:", "图例:", "消耗帧　", "TV模式:",
+        "TV帧　", "Seed",
+    )):
+        return True
+    return line.startswith(("－", "＋", "　", " ?")) and any(
+        symbol in line for symbol in _BINGO_GRAPH_SYMBOLS
+    )
+
+
+def _ecs_log_mode(config):
+    match = ECS_LOG_POLICY_RE.search(str(config.get("text", "")))
+    return match.group(1) if match else None
+
+
+def _compact_ecs_line(line):
+    line = str(line).strip()
+    if not line:
+        return None
+
+    # Stage markers carry a very large label/OCR payload.  Keep the phase and
+    # outcome while dropping the machine-generated matcher list.
+    if line.startswith("FRLG_STAGE|"):
+        fields = line.split("|")
+        if len(fields) >= 3:
+            kind, phase = fields[1], fields[2]
+            if kind == "BEGIN":
+                return f"阶段开始：{phase}"
+            if kind == "END":
+                return f"阶段完成：{phase}"
+            if kind == "FAIL":
+                detail = fields[3] if len(fields) > 3 and fields[3] else "阶段执行失败"
+                return f"阶段失败：{phase}：{detail}"
+        return None
+
+    # These records are consumed by calibration finalization and must remain
+    # machine-readable even in compact mode.
+    if line.startswith("PRECALIBRATION_UPDATE|"):
+        return line
+    if line.startswith(("SIDREV|META|", "SIDREV|ERROR|", "SIDREV|DONE|")):
+        return line
+    if line.startswith("SIDREV|"):
+        return None
+    if _is_bingo_graph_line(line):
+        return None
+
+    if any(line.startswith(prefix) for prefix in _COMPACT_ECS_QUIET_PREFIXES):
+        return None
+    if any(token in line for token in _COMPACT_ECS_QUIET_CONTAINS):
+        return None
+
+    # Suppress the 9x9 BINGO grid and its explanatory rows.  A stable-cluster
+    # reason remains useful, so only the table rendering is hidden.
+    if line.startswith(("BINGO稳定校准", "条件:", "Seed距离:", "消耗帧偏移:", "累计命中:")):
+        return line
+    # Repeated attempts and score dumps are useful in full diagnostics but
+    # obscure the current route in the normal workspace log.
+    if line.startswith("SIDREV|ATTEMPT_"):
+        return None
+    if line.startswith(("HOME_BUFFER", "TID_HOME_BUFFER")):
+        return line if any(word in line for word in _COMPACT_ECS_ERROR_WORDS) else None
+    if "匹配度=" in line or line.startswith(("快捷登记识别:", "孵蛋快捷登记识别:")):
+        return None
+
+    # Keep an unstructured line only when it reports a state transition or an
+    # actionable result.  The common input/setup instructions are one-off and
+    # therefore remain visible through their explicit status words.
+    if any(word in line for word in _COMPACT_ECS_ERROR_WORDS):
+        return line
+    if any(word in line for word in _COMPACT_ECS_KEEP_CONTAINS):
+        return line
+    return None
+
+
+def make_script_log_emitter(config):
+    mode = _ecs_log_mode(config)
+    if mode is None:
+        return lambda message: emit({"event": "script.log", "message": str(message)})
+
+    from frlg_round_records import RoundRecorder
+    recorder = RoundRecorder(lambda record: emit({"event": "script.round", **record}))
+
+    def emit_compact(message):
+        recorder.consume(message)
+        if mode == "full":
+            emit({"event": "script.log", "message": str(message)})
+            return
+        # BINGO's grid is delivered through ``script.bingo`` as structured
+        # state.  Its old PRINT lines are deliberately omitted from the ECS
+        # stream so the log center stays readable.
+        for line in str(message).splitlines():
+            compact = _compact_ecs_line(line.rstrip("\r"))
+            if compact is not None:
+                emit({"event": "script.log", "message": compact})
+
+    return emit_compact
+
+
+def make_script_bingo_emitter():
+    return lambda state: emit({"event": "script.bingo", "state": state})
 
 
 def emit(payload):
@@ -121,6 +254,8 @@ def normalize_preview_aliases(text):
 
 def run(config, program):
     frames = None
+    script_log = make_script_log_emitter(config)
+    script_bingo = make_script_bingo_emitter()
     trace = ExecutionTrace()
     finished = threading.Event()
     sources = {unit.source: unit.text.splitlines() for unit in (*program.ast.libraries, program.ast.main)}
@@ -258,14 +393,14 @@ def run(config, program):
                 EggReverseSession(data_runtime=data_runtime).extern_functions()
             )
         # 24 is pure BINGO state/rendering.  The generated EXTERN callbacks
-        # use the same script-run lifetime as 25/28; PRINT output is routed
-        # through the normal script logger so the UI keeps the old diagnostics.
+        # use the same script-run lifetime as 25/28; the structured snapshot
+        # is routed to the GUI while the old grid PRINT stream stays quiet.
         python_bingo_snapshot = root / "python_bingo.json"
         if python_bingo_snapshot.is_file():
             from frlg_planner.automation.frlg_bingo_runtime import BingoSession
 
             extern_functions.update(
-                BingoSession(emit=lambda message: emit({"event": "script.log", "message": str(message)})).extern_functions()
+                BingoSession(emit=script_log, update=script_bingo).extern_functions()
             )
         # Mixed libraries keep their device/image functions in ECS, but these
         # deterministic support and Seed-wait helpers are Python callbacks.
@@ -278,7 +413,7 @@ def run(config, program):
                 EggFlowRuntime(
                     seed_runtime=seed_runtime,
                     catalog_runtime=catalog_runtime,
-                    emit=lambda message: emit({"event": "script.log", "message": str(message)}),
+                    emit=script_log,
                 ).extern_functions()
             )
         # main.ecs 的通用反查也必须整段进入 Python，不能只迁移 lib/11 的
@@ -295,7 +430,7 @@ def run(config, program):
 
             extern_functions.update(MainReverseSession(
                 seed_runtime=seed_runtime, vote_session=vote_session,
-                emit=lambda message: emit({"event": "script.log", "message": str(message)}),
+                emit=script_log,
                 checkpoint=reverse_checkpoint,
             ).extern_functions())
         ocr_reader = None
@@ -382,7 +517,7 @@ def run(config, program):
         reporter.start()
         program.run(gamepad=RemoteGamepad(), waiter=RemoteWaiter(), external_getters=getters,
                     extern_functions=extern_functions,
-                    cancel_event=cancelled, output=lambda message: emit({"event": "script.log", "message": str(message)}),
+                    cancel_event=cancelled, output=script_log,
                     trace=trace.record)
     except ScriptCancelled:
         result["status"] = "cancelled"

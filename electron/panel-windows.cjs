@@ -17,7 +17,7 @@ function registerPanelWindows({ getMainWindow, loadWindow }) {
     return { x, y, width, height, frame };
   };
   const validTools = new Set(['video', 'logs']);
-  const sources = new Set(['全部来源', '系统', '脚本', '手柄']);
+  const sources = new Set(['全部来源', '系统', '火叶', 'ECS', '脚本', '手柄']);
   const canSend = window => window && !window.isDestroyed() && !window.webContents.isDestroyed();
   const notifyMain = action => {
     const main = getMainWindow();
@@ -111,7 +111,7 @@ function registerPanelWindows({ getMainWindow, loadWindow }) {
     requireMain(event);
     if (!Array.isArray(entries) || entries.length > 500 || !entries.every(entry =>
       entry && typeof entry.id === 'string' && typeof entry.time === 'string' && typeof entry.message === 'string'
-      && ['系统', '脚本', '手柄'].includes(entry.source) && ['info', 'success', 'warning'].includes(entry.level))) {
+      && ['系统', '火叶', 'ECS', '脚本', '手柄'].includes(entry.source) && ['info', 'success', 'warning', 'error'].includes(entry.level))) {
       throw new Error('Invalid log snapshot');
     }
     logs = entries;

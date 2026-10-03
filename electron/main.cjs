@@ -91,6 +91,7 @@ app.whenReady().then(async () => {
   notifications.on('log', (message, level = 'info') => automation?.store.log(message, 'QQ通知', level));
   frlgAutomation = registerFrlgAutomation({ ipcMain, getMainWindow: () => mainWindow, devices,
     client: frlgRng.client, userData: app.getPath('userData'), notifications,
+    store: automation.store,
     log: (...args) => automation.store.log(...args) });
   registerScriptRepository({ ipcMain, getMainWindow: () => mainWindow, dialog, storage, rootDirectory, userData: app.getPath('userData'), appVersion: app.getVersion(), gate: scriptGate,
     migrateScriptPaths: aliases => automation.store.migrateScriptPaths(aliases),

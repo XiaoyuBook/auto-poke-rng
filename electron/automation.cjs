@@ -79,7 +79,7 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
     const dispatch=message=>{
       if(message.runId!==id)return;
       if(message.event==='script.log'){
-        store.log(message.message,'脚本','info',{runId:run.id,round:run.round});
+        store.log(message.message,'ECS','info',{runId:run.id,round:run.round,event:'script.log',phase:name||'ECS 输出'});
       }
       if(message.event==='script.image-result'&&script.scriptId&&[481,488].includes(run.target?.speciesId)
         &&message.labelName==='宝可表'&&Number.isInteger(message.scriptValue)&&message.scriptValue<95){

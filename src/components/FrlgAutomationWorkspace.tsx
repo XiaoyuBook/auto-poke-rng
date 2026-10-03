@@ -98,7 +98,7 @@ function FrlgTargetCard({ request, target, locked, onSettings }: {
   </section>;
 }
 
-export function FrlgAutomationWorkspace({ profile }: { profile?: FrlgSaveProfile }) {
+export function FrlgAutomationWorkspace({ profile, onOpenLogs }: { profile?: FrlgSaveProfile; onOpenLogs?: () => void }) {
   const [request, setRequest] = useState<FrlgStaticRequest>(() => {
     const base = defaultFrlgStaticRequest();
     return profile ? { ...base, game: profile.game, tid: profile.tid, sid: profile.sid } : base;
@@ -244,6 +244,22 @@ export function FrlgAutomationWorkspace({ profile }: { profile?: FrlgSaveProfile
     update(kind, values);
   };
   const abilityOptions = useMemo(() => getFrlgAbilities(request.pokemon), [request.pokemon]);
+  const openRunLogs = () => {
+    if (run?.runId) {
+      localStorage.setItem('auto-poke-rng:log-context', JSON.stringify({ runId: run.runId }));
+      window.dispatchEvent(new Event('auto-poke:related-logs'));
+    }
+    onOpenLogs?.();
+  };
+  const progressLabel = (progress: FrlgRunState['progress']) => {
+    const action = progress?.action || progress?.source || '';
+    if (/^(shutdown\.|egg\.restart\.)/.test(action)) return '正在准备游戏环境';
+    if (/^(main\.home_buffer|sid\.home_buffer)/.test(action)) return '正在校准主页缓冲';
+    if (/^settings\./.test(action)) return '正在检查游戏设置';
+    if (/^capture\.(wait_ready|ball_result)/.test(action)) return '正在读取捕获结果';
+    if (/^wild\.data\./.test(action)) return '正在识别野生个体信息';
+    return action || '正在执行火叶流程';
+  };
   useEffect(() => {
     if (request.ability !== 'Any' && !abilityOptions.some(option => option.english === request.ability)) {
       setRequest(current => ({ ...current, ability: 'Any' }));
@@ -259,7 +275,8 @@ export function FrlgAutomationWorkspace({ profile }: { profile?: FrlgSaveProfile
       <button type="button" disabled={!locked} onClick={() => void (running ? stopRun() : cancelSearch())}><Square size={14} />停止</button>
       <button type="button" disabled={locked} onClick={() => void validate()}><ListChecks size={14} />参数检查</button>
       <button type="button" disabled={locked || !result?.route_support.can_start} onClick={() => void startRun()}><Play size={14} />开始运行</button>
-      <span className="frlg-save-status" role="status">{running ? run?.message : busy ? '正在搜索方案' : result ? '搜索完成' : '待命'}</span>
+      <span className="frlg-save-status" role="status">{run && run.status !== 'idle' ? (running && run.progress ? progressLabel(run.progress) : run.message) : busy ? '正在搜索方案' : result ? '搜索完成' : '待命'}</span>
+      {run && run.status !== 'idle' && <button type="button" className="text-button" onClick={openRunLogs}>打开日志中心</button>}
     </div>
     {(error || notice) && <p role={error ? 'alert' : 'status'} className={error ? 'panel-error' : 'automation-notice'}>{error || notice}</p>}
     <div className="automation-overview frlg-overview">
@@ -293,12 +310,6 @@ export function FrlgAutomationWorkspace({ profile }: { profile?: FrlgSaveProfile
       </fieldset>
     </section>
     <FrlgRunSettings key={profileId} options={options} onChange={saveOptions} locked={locked} wild={wildMethod(request.method)} />
-    {run && run.status !== 'idle' && <section className="automation-card" aria-label="火叶运行状态">
-      <strong>{run.message}</strong>
-      {run.profileId !== profileId && <p>正在显示存档 {run.profileId} 的运行记录。</p>}
-      {run.progress && <p className="muted">{run.progress.action} · {run.progress.source}:{run.progress.line}</p>}
-      <pre className="frlg-run-log" aria-label="火叶运行日志">{run.logs.join('\n')}</pre>
-    </section>}
     {targetSettingsOpen && !running && <Dialog title="火叶目标与筛选条件" close={() => setTargetSettingsOpen(false)} className="automation-target-dialog frlg-target-dialog">
       <div className="automation-target-dialog-body">
         <section className="frlg-dialog-section"><h3>目标</h3><div className="automation-fields frlg-fields">
