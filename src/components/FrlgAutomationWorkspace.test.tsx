@@ -147,6 +147,29 @@ describe('real FRLG planner result contract', () => {
     expect(within(ability).getByRole('option', { name: '茂盛 · Overgrow' })).toBeTruthy();
   });
 
+  it('applies IV presets atomically, validates ranges and sends the selected preset to search', async () => {
+    const api = mockApi(); render(<FrlgAutomationWorkspace profile={profile}/>);
+    chooseGolbat();
+    change('性格筛选', 'Timid');
+    fireEvent.click(screen.getByRole('button', {name:'全部 31'}));
+    for (const label of ['HP','攻击','防御','特攻','特防','速度']) {
+      expect((screen.getByLabelText(`${label}最小IV`) as HTMLInputElement).value).toBe('31');
+      expect((screen.getByLabelText(`${label}最大IV`) as HTMLInputElement).value).toBe('31');
+    }
+    change('HP最大IV', '30');
+    expect(screen.getByRole('alert').textContent).toContain('每项个体值');
+    expect((searchButton() as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', {name:'不限'}));
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect((screen.getByLabelText('HP最小IV') as HTMLInputElement).value).toBe('0');
+    expect((screen.getByLabelText('HP最大IV') as HTMLInputElement).value).toBe('31');
+    expect((screen.getByLabelText('性格筛选') as HTMLSelectElement).value).toBe('Timid');
+    fireEvent.click(screen.getByRole('button', {name:'全部 31'}));
+    fireEvent.click(searchButton());
+    await screen.findByRole('region', {name:'火叶推荐方案'});
+    expect(api.search).toHaveBeenCalledWith(expect.objectContaining({iv_min:[31,31,31,31,31,31],iv_max:[31,31,31,31,31,31],nature:'Timid'}));
+  });
+
   it('invalidates completed and in-flight results when the active save changes', async () => {
     const api = mockApi();
     const view = render(<FrlgAutomationWorkspace profile={profile} />);

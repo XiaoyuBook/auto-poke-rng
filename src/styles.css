@@ -578,6 +578,78 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .automation-target-dialog-body .automation-ivs input { width: 100%; }
 .automation-target-dialog-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex: 0 0 auto; padding: 12px 22px; border-top: 1px solid var(--line); }
 .automation-target-dialog-actions .muted { margin-right: auto; }
+.dialog.automation-target-dialog.frlg-target-dialog { width: min(1000px, calc(100vw - 40px)); max-height: calc(100dvh - 48px); container-type: inline-size; background: #202525; }
+.frlg-target-dialog > .dialog-header { padding: 12px 18px 12px 22px; }
+.frlg-target-dialog > .dialog-header h2 { font-size: 17px; }
+.frlg-target-dialog .automation-target-dialog-body { flex: 1; max-height: none; padding: 16px 22px 20px; }
+.frlg-search-identity { display: flex; align-items: center; gap: 14px; min-width: 0; padding: 8px 14px; margin-bottom: 16px; border: 1px solid #788b8b33; border-radius: 6px; background: #242c2d; }
+.frlg-search-sprite { width: 54px; height: 54px; flex: none; }
+.frlg-search-sprite .frlg-sprite { width: 100%; height: 100%; }
+.frlg-search-identity > div { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.frlg-search-identity strong { font-size: 20px; font-weight: 600; line-height: 1.25; }
+.frlg-search-identity span:not(.frlg-search-sprite) { color: var(--secondary); font-size: 12px; }
+.frlg-search-identity > small { margin-left: auto; color: var(--muted); font-size: 11px; text-align: right; }
+.frlg-search-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(230px, 29%); gap: 24px; }
+.frlg-target-dialog fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+.frlg-target-dialog h3 { font-size: 14px; font-weight: 600; margin: 0 0 10px; }
+.frlg-search-section + .frlg-search-section { margin-top: 16px; padding-top: 16px; border-top: 1px solid #788b8b26; }
+.frlg-target-dialog .automation-fields { gap: 10px 14px; margin: 0; }
+.frlg-target-dialog .automation-fields > label { gap: 5px; font-size: 12px; }
+.frlg-target-dialog .automation-target-dialog-body input:not([type="checkbox"]), .frlg-target-dialog .automation-target-dialog-body select { min-height: 34px; padding: 7px 9px; border-color: #56656588; border-radius: 5px; font-size: 12px; line-height: 18px; }
+.frlg-target-dialog input:focus-visible, .frlg-target-dialog select:focus-visible, .frlg-target-dialog button:focus-visible, .frlg-search-advanced > summary:focus-visible { outline: 2px solid #aaa2cc; outline-offset: 2px; }
+.frlg-target-dialog .frlg-encounter-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.frlg-encounter-fields.is-static > label:first-child { grid-column: 1 / -1; }
+.frlg-target-dialog .frlg-attribute-fields { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.frlg-attribute-fields > label { grid-column: span 2; }
+.frlg-attribute-fields > label:nth-child(n+4) { grid-column: span 3; }
+.frlg-iv-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 7px; }
+.frlg-iv-heading h3 { margin: 0; }
+.frlg-iv-heading > div { display: flex; gap: 5px; }
+.frlg-target-dialog .frlg-iv-heading button { border: 0; background: transparent; padding: 3px 7px; color: #c6bee4; font-size: 11px; }
+.frlg-target-dialog .frlg-iv-heading button:hover:not(:disabled) { background: #aaa2cc16; }
+.frlg-iv-matrix { width: 100%; table-layout: fixed; border-spacing: 5px; margin: 0 -5px; }
+.frlg-iv-matrix th { font-size: 11px; font-weight: 500; color: var(--secondary); }
+.frlg-iv-matrix thead th { padding-bottom: 3px; text-align: center; }
+.frlg-iv-matrix th[scope="row"], .frlg-iv-matrix thead td { width: 33px; text-align: left; }
+.frlg-target-dialog .frlg-iv-matrix input { text-align: center; padding: 6px 2px !important; font-family: var(--mono); }
+.frlg-iv-matrix input::-webkit-inner-spin-button, .frlg-iv-matrix input::-webkit-outer-spin-button { appearance: none; margin: 0; }
+.frlg-target-dialog .frlg-search-rail { display: flex; flex-direction: column; padding-left: 22px; border-left: 1px solid #788b8b33; }
+.frlg-target-dialog .frlg-search-rail-fields { grid-template-columns: minmax(0, 1fr); gap: 15px; }
+.frlg-search-advanced { margin-top: 22px; padding-top: 18px; border-top: 1px solid #788b8b33; }
+.frlg-target-dialog .frlg-search-advanced summary { position: relative; list-style: none; padding-left: 19px; margin: 0; font-size: 13px; }
+.frlg-search-advanced summary::-webkit-details-marker { display: none; }
+.frlg-search-advanced summary::before { content: '›'; position: absolute; left: 1px; top: -2px; font-size: 21px; color: var(--secondary); }
+.frlg-search-advanced[open] summary::before { transform: rotate(90deg); }
+.frlg-search-advanced summary span { display: block; margin-top: 8px; color: var(--muted); font-size: 11px; font-weight: 400; }
+.frlg-target-dialog .frlg-search-advanced .automation-fields { margin-top: 18px; }
+.frlg-search-rule { margin: auto 0 0; padding-top: 24px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.frlg-target-dialog .automation-target-dialog-actions { gap: 10px; padding: 12px 22px; }
+.frlg-target-dialog .automation-target-dialog-actions > span { font-size: 11px; }
+.frlg-target-dialog .automation-target-dialog-actions button { min-height: 34px; padding: 7px 14px; }
+.frlg-target-dialog .automation-target-dialog-actions .primary { color: #16231d; background: #a9d3ba; border: 1px solid #a9d3ba; }
+.frlg-target-dialog .automation-target-dialog-actions .primary:hover:not(:disabled) { background: #bee2cb; }
+@container (max-width: 840px) {
+  .frlg-search-layout { grid-template-columns: minmax(0, 1fr); gap: 22px; }
+  .frlg-target-dialog .frlg-search-rail { padding: 18px 0 0; border-left: 0; border-top: 1px solid #788b8b33; }
+  .frlg-target-dialog .frlg-search-rail > .frlg-search-rail-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .frlg-search-identity > small { max-width: 170px; line-height: 1.6; }
+  .frlg-search-rule { padding-top: 16px; }
+}
+@container (max-width: 480px) {
+  .frlg-search-identity { flex-wrap: wrap; gap: 8px; padding: 10px; }
+  .frlg-search-identity > small { margin: 0 0 0 62px; max-width: none; text-align: left; }
+  .frlg-search-identity strong { font-size: 17px; }
+  .frlg-target-dialog .frlg-attribute-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .frlg-attribute-fields > label:nth-child(n) { grid-column: span 1; }
+  .frlg-attribute-fields > label:last-child { grid-column: 1 / -1; }
+  .frlg-target-dialog .frlg-search-rail > .frlg-search-rail-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .frlg-search-rail > .frlg-search-rail-fields > label:last-child { grid-column: 1 / -1; }
+  .frlg-iv-matrix { border-spacing: 3px; margin: 0 -3px; }
+  .frlg-iv-matrix th { font-size: 10px; }
+  .frlg-iv-matrix th[scope="row"], .frlg-iv-matrix thead td { width: 25px; }
+  .frlg-target-dialog .automation-target-dialog-actions { flex-wrap: wrap; padding: 10px 16px; }
+  .frlg-target-dialog .automation-target-dialog-actions > span { flex-basis: 100%; }
+}
 .dialog.automation-target-dialog.automation-tid-target-dialog { width: min(520px, calc(100vw - 32px)); }
 .dialog.automation-target-dialog.automation-tid-all-dialog { width: min(520px, calc(100vw - 32px)); }
 .automation-tid-target-all-list { max-height: min(50dvh, 320px); margin-top: 12px; overflow-y: auto; }

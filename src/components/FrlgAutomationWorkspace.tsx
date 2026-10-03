@@ -2,11 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Play, SlidersHorizontal, Sparkles, Square } from 'lucide-react';
 import type { FrlgTargetIntent } from '../frlgDex';
 import {
-  FRLG_HIDDEN_TYPES,
   FRLG_WILD_CATEGORIES,
-  FRLG_METHODS,
-  FRLG_NATURES,
-  FRLG_SHININESS,
   FRLG_STATIC_CATEGORIES,
   defaultFrlgStaticRequest,
   getFrlgLocationLabel,
@@ -21,35 +17,14 @@ import {
   type FrlgWildTarget,
   type FrlgPlannerResult,
 } from '../frlgAutomation';
-import { Dialog } from './Dialog';
+import { FrlgTargetSettingsDialog } from './FrlgTargetSettingsDialog';
 import { FrlgPlanSummary, FrlgPlanDetails } from './FrlgPlanResult';
 import { FrlgSprite } from './FrlgSprite';
-import { FRLG_ABILITY_LABELS, FRLG_NATURE_LABELS, FRLG_TYPE_LABELS } from '../frlgMetadata';
+import { abilityLabels, categoryLabels, gameLabels, methodLabels, natureLabels, shinyLabels, statLabels, typeLabels } from '../frlgLabels';
 import { defaultFrlgSaveProfile, type FrlgSaveProfile } from '../frlgProfile';
 import { frlgRunBusy, loadFrlgRunOptions, type FrlgRunOptions, type FrlgRunState } from '../frlgExecution';
 import { FrlgRunSettings } from './FrlgRunSettings';
 import { FrlgBingoBoard } from './FrlgBingoBoard';
-
-const gameLabels: Record<string, string> = {
-  fr_nx: '火红 · 美版 · Switch 1', fr_nx2: '火红 · 美版 · Switch 2',
-  lg_nx: '叶绿 · 美版 · Switch 1', lg_nx2: '叶绿 · 美版 · Switch 2',
-  fr_jpn_nx: '火红 · 日版 · Switch 1', fr_jpn_nx2: '火红 · 日版 · Switch 2',
-  lg_jpn_nx: '叶绿 · 日版 · Switch 1', lg_jpn_nx2: '叶绿 · 日版 · Switch 2',
-};
-const categoryLabels: Record<string, string> = {
-  Starter: '御三家', Fossil: '化石', Gift: '赠送', GameCorner: '游戏中心',
-  Stationary: '定点', Legend: '传说', Event: '事件', Roaming: '游走',
-  Grass: '草丛', Surfing: '冲浪', OldRod: '破旧钓竿', GoodRod: '好钓竿', SuperRod: '厉害钓竿', RockSmash: '碎岩',
-};
-const methodLabels: Record<string, string> = {
-  Static: 'Static', 'Static 1': 'Static 1', 'Static 2': 'Static 2', 'Static 4': 'Static 4',
-  Wild: 'Wild', 'Wild 1': 'Wild 1', 'Wild 2': 'Wild 2', 'Wild 4': 'Wild 4', 'All Wild Methods': '全部野生方法',
-};
-const statLabels = ['HP', '攻击', '防御', '特攻', '特防', '速度'];
-const natureLabels: Record<string, string> = FRLG_NATURE_LABELS;
-const abilityLabels: Record<string, string> = FRLG_ABILITY_LABELS;
-const typeLabels: Record<string, string> = FRLG_TYPE_LABELS;
-const shinyLabels: Record<string, string> = { None: '非闪光', Star: '星形闪光', Square: '方形闪光', 'Star/Square': '星形／方形闪光' };
 
 type PlanResult = FrlgPlannerResult;
 type FrlgTarget = FrlgStaticTarget | FrlgWildTarget;
@@ -286,46 +261,10 @@ export function FrlgAutomationWorkspace({ profile = defaultFrlgSaveProfile, onOp
       <div className="frlg-bingo-card"><FrlgBingoBoard key={`${profileId}:${bingoRun?.runId || 'idle'}`} state={bingoRun?.bingo} compact /></div>
     </div>
     <details className="frlg-run-settings-fold" key={profileId}><summary><strong>运行与反查校准</strong><span>{options.entry === 'timeline' ? '时间轴入口' : '正式入口'} · 设置随存档保存</span></summary><FrlgRunSettings options={options} onChange={saveOptions} locked={locked} wild={wildMethod(request.method)} /></details>
-    {targetSettingsOpen && !running && <Dialog title="火叶目标与筛选条件" close={() => setTargetSettingsOpen(false)} className="automation-target-dialog frlg-target-dialog">
-      <div className="automation-target-dialog-body">
-        <section className="frlg-dialog-section"><h3>目标</h3><div className="automation-fields frlg-fields">
-          <label>搜索方法<select aria-label="搜索方法" value={request.method} disabled={busy} onChange={event => changeMethod(event.target.value)}>{FRLG_METHODS.map(method => <option key={method} value={method}>{methodLabels[method]}</option>)}</select></label>
-          <label>{wildMethod(request.method) ? '遭遇类别' : '分类'}<select aria-label={wildMethod(request.method) ? '野生遭遇类别' : '静态分类'} value={request.category} disabled={busy} onChange={event => changeCategory(event.target.value)}>{(wildMethod(request.method) ? FRLG_WILD_CATEGORIES : FRLG_STATIC_CATEGORIES).map(category => <option key={category} value={category}>{categoryLabels[category]}</option>)}</select></label>
-          {wildMethod(request.method) && <label>遭遇地点<select aria-label="野生遭遇地点" value={request.location} disabled={busy} onChange={event => changeLocation(event.target.value)}>{locations.map(location => <option key={location} value={location}>{getFrlgLocationLabel(location)}</option>)}</select></label>}
-          <label>目标宝可梦<select aria-label="火叶自动目标宝可梦" value={request.pokemon} disabled={busy} onChange={event => update('pokemon', event.target.value)}>{targets.map(item => <option key={item.species} value={item.species}>{item.displayName} · {item.species}</option>)}</select></label>
-        </div></section>
-        <details open><summary>目标条件</summary><div className="automation-fields frlg-fields">
-          <label>闪光<select aria-label="闪光筛选" value={request.shiny} disabled={busy} onChange={event => update('shiny', event.target.value as FrlgStaticRequest['shiny'])}><option value="Any">任意</option>{FRLG_SHININESS.map(value => <option key={value} value={value}>{shinyLabels[value]}</option>)}</select></label>
-          <label>性格<select aria-label="性格筛选" value={request.nature} disabled={busy} onChange={event => update('nature', event.target.value as FrlgStaticRequest['nature'])}><option value="Any">任意</option>{FRLG_NATURES.map(value => <option key={value} value={value}>{natureLabels[value] || value}</option>)}</select></label>
-          <label>性别<select aria-label="性别筛选" value={request.gender} disabled={busy} onChange={event => update('gender', event.target.value as FrlgStaticRequest['gender'])}><option value="Any">任意</option><option value="M">雄性</option><option value="F">雌性</option><option value="-">无性别</option></select></label>
-          <label>特性<select aria-label="特性筛选" value={request.ability} disabled={busy} onChange={event => update('ability', event.target.value)}><option value="Any">任意</option>{abilityOptions.map(option => <option key={option.english} value={option.english}>{option.displayName} · {option.english}</option>)}</select></label>
-          <label>隐藏属性<select aria-label="隐藏属性筛选" value={request.hiddenType} disabled={busy} onChange={event => update('hiddenType', event.target.value as FrlgStaticRequest['hiddenType'])}><option value="Any">任意</option>{FRLG_HIDDEN_TYPES.map(value => <option key={value} value={value}>{typeLabels[value] || value}</option>)}</select></label>
-        </div><div className="automation-ivs frlg-ivs">{statLabels.map((label, index) => <label key={label}>{label}<input aria-label={`${label}最小IV`} type="number" min={0} max={31} value={request.ivMin[index]} disabled={busy} onChange={event => setIv(index, 'ivMin', event.target.value)} /><input aria-label={`${label}最大IV`} type="number" min={0} max={31} value={request.ivMax[index]} disabled={busy} onChange={event => setIv(index, 'ivMax', event.target.value)} /></label>)}</div></details>
-        <section className="automation-card automation-feature-card frlg-base-card" aria-label="火叶自动流程参数">
-          <div className="automation-feature-heading"><strong>搜索设置</strong></div>
-          <fieldset disabled={locked} className="automation-feature-body">
-            <div className="automation-fields frlg-search-fields">
-              <label>最小 Advance<input aria-label="最小 Advance" type="number" min={0} value={request.minAdvances} onChange={event => update('minAdvances', Number(event.target.value))} /></label>
-              <label>最大 Advance<input aria-label="最大 Advance" type="number" min={0} value={request.maxAdvances} onChange={event => update('maxAdvances', Number(event.target.value))} /></label>
-              <label>Seed 模式<select aria-label="Seed 模式" value={request.seedMode === null ? 'auto' : String(request.seedMode)} onChange={event => update('seedMode', event.target.value === 'auto' ? null : Number(event.target.value))}><option value="auto">自动选择</option>{Array.from({ length: 10 }, (_, mode) => <option key={mode} value={mode}>模式 {mode}</option>)}</select></label>
-            </div>
-            <details className="automation-subsection"><summary>高级设置 · 指定 Seed、搜索工作量</summary>
-              <div className="automation-fields frlg-advanced-fields">
-                <label className="frlg-checkbox-field"><span>指定 Seed / Advance</span><input aria-label="指定 Seed / Advance" type="checkbox" checked={request.directMode} onChange={event => update('directMode', event.target.checked)} /></label>
-                {request.directMode && <label>指定 Seed<input aria-label="指定 Seed" inputMode="text" value={request.directSeed} placeholder="0000-FFFF" onChange={event => update('directSeed', event.target.value)} /></label>}
-                {request.directMode && <label>指定 Advance<input aria-label="指定 Advance" type="number" min={0} value={request.directAdvances ?? ''} onChange={event => update('directAdvances', event.target.value === '' ? null : Number(event.target.value))} /></label>}
-                <label>初始 Seed 候选数<input aria-label="初始 Seed 候选数" type="number" min={1} value={request.initialSeedResultCount} onChange={event => update('initialSeedResultCount', Number(event.target.value))} /></label>
-                <label>搜索工作量上限<input aria-label="搜索工作量上限" type="number" min={1} value={request.maxIvCombinations} onChange={event => update('maxIvCombinations', Number(event.target.value))} /></label>
-              </div>
-            </details>
-          </fieldset>
-        </section>
-        {diagnostics.length > 0 && <p className="panel-error" role="alert">{diagnostics[0]}</p>}
-        {error && !diagnostics.length && <p className="panel-error" role="alert">{error}</p>}
-        {notice && <p role="status" className="automation-notice">{notice}</p>}
-      </div>
-      <div className="automation-target-dialog-actions"><span className="muted">{busy ? '正在搜索方案…' : diagnostics.length ? '参数待检查' : '按当前条件搜索并生成方案'}</span><button type="button" onClick={() => busy ? void cancelSearch() : setTargetSettingsOpen(false)}>{busy ? '取消搜索' : '取消'}</button><button type="button" className="button primary" disabled={locked || diagnostics.length > 0} onClick={() => void search()}>{busy ? '搜索中…' : '搜索并生成方案'}</button></div>
-    </Dialog>}
+    {targetSettingsOpen && !running && <FrlgTargetSettingsDialog request={request} profile={profile} target={target} targets={targets} locations={locations} abilities={abilityOptions} busy={busy} diagnostics={diagnostics} error={error} notice={notice}
+      onChange={update} onMethod={changeMethod} onCategory={changeCategory} onLocation={changeLocation} onIv={setIv}
+      onIvPreset={perfect => { invalidate(); setRequest(current => ({ ...current, ivMin: Array(6).fill(perfect ? 31 : 0), ivMax: Array(6).fill(31) })); }}
+      onClose={() => setTargetSettingsOpen(false)} onSearch={() => void search()} onCancelSearch={() => void cancelSearch()}/>}
     {resultDetailOpen && result && <FrlgPlanDetails plan={result} close={() => setResultDetailOpen(false)} />}
   </section>;
 }
