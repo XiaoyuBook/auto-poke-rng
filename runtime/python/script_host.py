@@ -297,7 +297,8 @@ def run(config, program):
     sources = {unit.source: unit.text.splitlines() for unit in (*program.ast.libraries, program.ast.main)}
     sources[config["name"]] = config["text"].splitlines()
     runtime_root = Path(__file__).resolve().parent
-    runtime_files = [runtime_root / 'script_host.py', runtime_root / 'easycon/native/runtime.py',
+    runtime_files = [runtime_root / 'script_host.py', runtime_root / 'frlg_audio_diagnostic.py',
+                     runtime_root / 'easycon/native/runtime.py',
                      runtime_root / 'easycon/native/ocr.py', *sorted((runtime_root / 'frlg_planner/automation').glob('*runtime.py')),
                      runtime_root / 'frlg_planner/automation/frlg_ocr_names.py']
     diagnostic_sink(kind='script.preflight', name=config['name'],

@@ -24,6 +24,8 @@ class EncounterGate:
     start: int
     end: int
     wait_ms: int
+    window_ms: int
+    returns: tuple[int, ...]
 
 
 def encounter_gates(sources):
@@ -40,14 +42,27 @@ def encounter_gates(sources):
                          if lines[i].strip() == "ENDFUNC"), len(lines))
             starts = [i for i in range(first, last)
                       if lines[i].strip() == f"WAIT {waits[match[1]]}"]
-            ends = [i for i in range(first, last)
+            names = [i for i in range(first, last)
                     if "= 识别抓捕对象名称优先OCR(" in lines[i]]
             checks = [i for i in range(first, last) if "= CheckCaptureShiny(" in lines[i]]
-            # Reject ambiguous upstream layout instead of extending into our
-            # own Pokémon's entrance or silently using another wait interval.
-            if len(starts) == len(ends) == len(checks) == 1 and starts[0] < ends[0] < checks[0]:
-                gates.append(EncounterGate(source, match[1], first + 1, last + 1,
-                                           starts[0] + 1, ends[0] + 1, waits[match[1]]))
+            # Bind the actual continuation A, rather than the start of OCR.
+            # Nested OCR / score / result-writing calls must not close sampling.
+            if not (len(starts) == len(names) == len(checks) == 1
+                    and starts[0] < names[0] < checks[0]):
+                continue
+            buttons = [i for i in range(starts[0] + 1, last)
+                       if re.fullmatch(r"A(?:\s+\d+)?", lines[i].split("#", 1)[0].strip())]
+            if not buttons or buttons[0] <= checks[0]:
+                continue  # Unknown entrance sequence: never sample past a guessed A.
+            end = buttons[0]
+            returns = tuple(i + 1 for i in range(starts[0] + 1, end)
+                            if re.match(r"RETURN(?:\s|$)", lines[i].strip()))
+            # 20261003_225824.mp4: Sweet Scent at ~14.2s, full encounter at
+            # ~24s. Add 3s tolerance, capped BEFORE our entrance A; no new wait.
+            window_ms = 13000 if match[1] == "甜甜香气" else waits[match[1]]
+            gates.append(EncounterGate(source, match[1], first + 1, last + 1,
+                                       starts[0] + 1, end + 1, waits[match[1]],
+                                       window_ms, returns))
     return gates
 
 
@@ -152,8 +167,10 @@ def evaluate_window(blocks, start_ns, end_ns, reference, failure=None, compariso
 class AudioShinyDiagnostic:
     def __init__(self, sources, descriptor, reference_path, output, *, reader=None, comparison_path=None):
         self.gates = encounter_gates(sources)
+        self.starts = {(gate.source, gate.start): gate for gate in self.gates}
         self.output = output
         self.active = None
+        self.start_location = None
         self.number = 0
         self.lock = threading.Lock()
         self.jobs = deque()
@@ -183,32 +200,58 @@ class AudioShinyDiagnostic:
             output("【音频判闪·实验】未找到已核对的普通野生采样位置，跳过检测")
 
     def observe(self, point):
-        if self.active:
-            _, gate, _ = self.active
-            if point.location.source != gate.source or not gate.first <= point.location.line <= gate.last:
-                self._finish("遭遇窗口未正常结束")
-            elif point.location.line == gate.end:
-                self._finish()
-        for gate in self.gates:
-            if (point.location.source == gate.source and point.location.line == gate.start
-                    and point.duration_ms == gate.wait_ms and self.active is None):
+        source, line = point.location.source, point.location.line
+        location = (source, line)
+        if location != self.start_location:
+            self.start_location = None
+        active = self.active
+        if active:
+            _, gate, _ = active
+            if source == gate.source:
+                if line == gate.end:
+                    self._finish(cutoff="我方入场A前", expected=active)
+                elif line in gate.returns:
+                    self._finish(cutoff="遭遇函数提前返回", expected=active)
+        gate = self.starts.get(location)
+        if (gate is not None and point.duration_ms == gate.wait_ms
+                and self.start_location != location):
+            with self.lock:
+                if self.active is not None:
+                    return
                 self.number += 1
+                self.start_location = location
                 self.active = (self.number, gate, time.perf_counter_ns())
                 # No I/O or logging on this hot path; detection runs off-thread.
-                break
 
-    def _finish(self, reason=None):
-        number, gate, start = self.active
-        self.active = None
-        job = (number, gate.name, start, time.perf_counter_ns(), reason, time.monotonic() + 0.25)
+    def _finish(self, reason=None, *, cutoff="脚本结束", expected=None):
         with self.lock:
+            if self.active is None or (expected is not None and self.active is not expected):
+                return
+            number, gate, start = self.active
+            self.active = None
+            now = time.perf_counter_ns()
+            deadline = start + gate.window_ms * 1_000_000
+            end = min(now, deadline)
+            if now >= deadline:
+                cutoff = "时长上限"
+            job = (number, gate.name, start, end, reason, cutoff, gate.window_ms,
+                   time.monotonic() + 0.25)
             self.jobs.append(job)
 
+    def _expire_window(self):
+        active = self.active
+        if active and time.perf_counter_ns() >= active[2] + active[1].window_ms * 1_000_000:
+            self._finish(cutoff="时长上限", expected=active)
+
     def _report(self, job, blocks):
-        number, name, start, end, reason, _ = job
+        number, name, start, end, reason, cutoff, window_ms, _ = job
         result = evaluate_window(blocks, start, end, self.reference, reason or self.failure, self.comparison)
+        shortfall = max(0, (window_ms / 1000) - (end - start) / 1e9)
+        if shortfall > 0.15 and result["result"] == "not_detected":
+            result.update(result="unknown", reason="提前截止，未覆盖计划音频窗口")
         labels = {"unknown": "无法判定", "candidate": "检出闪光音效候选", "not_detected": "未检出闪光音效"}
-        fields = [f"窗口={number}", f"遭遇={name}", "截止=名称识别前", labels[result["result"]],
+        fields = [f"窗口={number}", f"遭遇={name}", f"截止={cutoff}", labels[result["result"]],
+                  f"planned_seconds={window_ms / 1000:g}", f"shortfall_seconds={shortfall:.3f}",
                   f"start_qpc_ns={start}", f"end_qpc_ns={end}",
                   f"window_seconds={(end - start) / 1e9:.3f}"]
         relevant = [b for b in blocks if b.timestamp_ns < end
@@ -236,8 +279,10 @@ class AudioShinyDiagnostic:
                         if block is not None:
                             self.blocks.append(block)
                             self.buffer_bytes += len(block.pcm)
-                            while self.blocks and (block.timestamp_ns - self.blocks[0].timestamp_ns > 14_000_000_000
-                                                   or len(self.blocks) > 1400
+                            # Keep the 13s window plus read / collection grace;
+                            # the byte cap still bounds high-rate audio memory.
+                            while self.blocks and (block.timestamp_ns - self.blocks[0].timestamp_ns > 16_000_000_000
+                                                   or len(self.blocks) > 3200
                                                    or self.buffer_bytes > 16 * 1024 * 1024):
                                 self.buffer_bytes -= len(self.blocks.popleft().pcm)
                     except Exception:
@@ -253,6 +298,7 @@ class AudioShinyDiagnostic:
             self._flush_ready(force=True)
 
     def _flush_ready(self, force=False):
+        self._expire_window()
         while True:
             with self.lock:
                 if not self.jobs or (not force and self.jobs[0][-1] > time.monotonic()):
@@ -264,8 +310,7 @@ class AudioShinyDiagnostic:
                 self.output(f"【音频判闪·实验】窗口={job[0]}；无法判定；检测器异常")
 
     def close(self):
-        if self.active:
-            self._finish("脚本结束前未完成遭遇窗口")
+        self._finish("脚本结束前未完成遭遇窗口")
         self.stop_event.set()
         if self.thread:
             self.thread.join(timeout=0.8)

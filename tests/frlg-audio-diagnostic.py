@@ -1,6 +1,7 @@
 import sys
 from pathlib import Path
 import unittest
+from threading import Event
 from dataclasses import replace
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -86,27 +87,130 @@ class AudioDiagnosticTests(unittest.TestCase):
             "$name = 识别抓捕对象名称优先OCR(85)",
             "$shiny = CheckCaptureShiny(25, 85)", "A", "RETURN 1", "ENDFUNC"]}
 
-    def point(self, line, duration=None):
-        return SimpleNamespace(location=SimpleNamespace(source="lib/17_获取_野生目标.ecs", line=line),
+    def point(self, line, duration=None, source="lib/17_获取_野生目标.ecs"):
+        return SimpleNamespace(location=SimpleNamespace(source=source, line=line),
                                duration_ms=duration)
 
-    def test_gate_closes_before_ocr_and_ignores_player_actions(self):
+    def test_gate_survives_nested_ocr_and_closes_before_player_a(self):
         logs = []
         observer = AudioShinyDiagnostic(self.source(), {"status":"idle"}, None, logs.append)
-        with patch("frlg_audio_diagnostic.time.perf_counter_ns", side_effect=[10, 20]):
+        with patch("frlg_audio_diagnostic.time.perf_counter_ns", side_effect=[1_000_000_000, 11_000_000_000]):
             observer.observe(self.point(3))  # generic statement trace
             self.assertIsNone(observer.active)
             observer.observe(self.point(3, 10000))
             observer.observe(self.point(3, 10000))  # same WAIT may be observed twice
             self.assertEqual(observer.number, 1)
             observer.observe(self.point(4))
-            self.assertIsNone(observer.active)
+            observer.observe(self.point(350, source="lib/20_识图_抓捕对象名称识别.ecs"))
+            observer.observe(self.point(5, source="lib/19_OCR文字读取.ecs"))
+            observer.observe(self.point(20))  # nested lib17 result-writing function
+            self.assertIsNotNone(observer.active)
             observer.observe(self.point(5))
+            self.assertIsNotNone(observer.active)
+            observer.observe(self.point(6))  # statement trace precedes the actual A request
+            self.assertIsNone(observer.active)
             observer.observe(self.point(6, 50))
         self.assertEqual(len(observer.jobs), 1)
-        self.assertEqual(observer.jobs[0][2:4], (10,20))
+        self.assertEqual(observer.jobs[0][2:4], (1_000_000_000, 11_000_000_000))
+        self.assertEqual(observer.jobs[0][5:7], ("我方入场A前", 13000))
         observer.close()
-        self.assertTrue(any("无法判定" in line and "窗口=1" in line for line in logs))
+        self.assertTrue(any("无法判定" in line and "窗口=1" in line
+                            and "planned_seconds=13" in line and "shortfall_seconds=3.000" in line
+                            and "截止=我方入场A前" in line for line in logs))
+
+    def test_deadline_expires_off_thread_during_ocr_and_keeps_exact_cutoff(self):
+        logs = []
+        observer = AudioShinyDiagnostic(self.source(), {}, None, logs.append)
+        with patch("frlg_audio_diagnostic.time.perf_counter_ns", return_value=1_000_000_000):
+            observer.observe(self.point(3, 10000))
+        with patch("frlg_audio_diagnostic.time.perf_counter_ns", return_value=14_800_000_000):
+            observer._expire_window()
+            self.assertIsNone(observer.active)
+            self.assertEqual(observer.jobs[0][2:4], (1_000_000_000, 14_000_000_000))
+            observer.observe(self.point(3, 10000))  # paused WAIT resumes after deadline
+            self.assertEqual(observer.number, 1)
+        observer.observe(self.point(4))
+        observer.observe(self.point(6))
+        observer.close()
+        self.assertTrue(any("截止=时长上限" in line and "window_seconds=13.000" in line for line in logs))
+
+    def test_reader_thread_closes_at_deadline_without_more_script_progress(self):
+        clock, wake, reported, logs = [1_000_000_000], Event(), Event(), []
+        def read(**kwargs):
+            wake.wait(0.01)
+            wake.clear()
+            return None
+        def output(line):
+            logs.append(line)
+            if "窗口=1" in line:
+                reported.set()
+        with patch("frlg_audio_diagnostic.time.perf_counter_ns", side_effect=lambda: clock[0]):
+            observer = AudioShinyDiagnostic(self.source(), {}, None, output,
+                                            reader=SimpleNamespace(read=read))
+            try:
+                observer.observe(self.point(3, 10000))
+                # An OCR call can run for seconds without another source trace.
+                clock[0] = 14_800_000_000
+                wake.set()
+                self.assertTrue(reported.wait(1), "audio worker did not enforce its own deadline")
+                self.assertIsNone(observer.active)
+                self.assertTrue(any("截止=时长上限" in line and "window_seconds=13.000" in line
+                                    for line in logs))
+            finally:
+                observer.close()
+
+    def test_late_opponent_sound_is_included_but_post_deadline_sound_is_excluded(self):
+        samples, rate = self.reference
+        noise = np.random.default_rng(9).normal(0, .003, (rate*15, 2))
+        # Opponent shiny at 10.5s was outside the old 10s window.
+        start = round(rate*10.5)
+        noise[start:start+len(samples)] += samples
+        blocks = self.blocks(noise)
+        old = evaluate_window(blocks, 1_000_000_000, 11_000_000_000, self.reference)
+        self.assertEqual(old["result"], "not_detected")
+        logs = []
+        observer = AudioShinyDiagnostic(self.source(), {}, None, logs.append)
+        observer.failure, observer.reference = None, self.reference
+        observer._report((1, "甜甜香气", 1_000_000_000, 14_000_000_000,
+                          None, "时长上限", 13000, 0), blocks)
+        self.assertTrue(any("检出闪光音效候选" in line and "offset_seconds=10.5" in line for line in logs))
+        # A shiny sound starting after the 13s boundary is never classified as opponent shiny.
+        noise[:] = np.random.default_rng(10).normal(0, .003, noise.shape)
+        start = round(rate*13.005)
+        noise[start:start+len(samples)] += samples
+        result = evaluate_window(self.blocks(noise), 1_000_000_000, 14_000_000_000, self.reference)
+        self.assertEqual(result["result"], "not_detected")
+        observer.close()
+
+    def test_early_a_negative_is_unknown_but_positive_is_preserved(self):
+        rate = self.reference[1]
+        noise = np.random.default_rng(15).normal(0, .003, (rate*12, 2))
+        job = (1, "甜甜香气", 1_000_000_000, 11_000_000_000,
+               None, "我方入场A前", 13000, 0)
+        logs = []
+        observer = AudioShinyDiagnostic(self.source(), {}, None, logs.append)
+        observer.failure, observer.reference = None, self.reference
+        observer._report(job, self.blocks(noise))
+        self.assertIn("无法判定", logs[-1])
+        self.assertIn("提前截止，未覆盖计划音频窗口", logs[-1])
+        samples = self.reference[0]
+        noise[rate*8:rate*8+len(samples)] += samples
+        observer._report(job, self.blocks(noise))
+        self.assertIn("检出闪光音效候选", logs[-1])
+        observer.close()
+
+    def test_shiny_stop_return_closes_without_waiting_for_deadline(self):
+        source = self.source()
+        source["lib/17_获取_野生目标.ecs"][5:5] = ["IF $shiny == 1", "    RETURN -1", "ENDIF"]
+        observer = AudioShinyDiagnostic(source, {}, None, lambda _: None)
+        with patch("frlg_audio_diagnostic.time.perf_counter_ns", side_effect=[1_000_000_000, 11_000_000_000]):
+            observer.observe(self.point(3, 10000))
+            observer.observe(self.point(4))
+            observer.observe(self.point(5))
+            observer.observe(self.point(7))
+        self.assertIsNone(observer.active)
+        self.assertEqual(observer.jobs[0][5], "遭遇函数提前返回")
+        observer.close()
 
     def test_unknown_upstream_layout_is_not_guessed(self):
         source = self.source()
@@ -114,6 +218,12 @@ class AudioDiagnosticTests(unittest.TestCase):
         self.assertEqual(encounter_gates(source), [])
         source = self.source()
         source["lib/17_获取_野生目标.ecs"].insert(4, "$other = 识别抓捕对象名称优先OCR(85)")
+        self.assertEqual(encounter_gates(source), [])
+        source = self.source()
+        source["lib/17_获取_野生目标.ecs"][5] = "CALL 继续战斗()"
+        self.assertEqual(encounter_gates(source), [])
+        source = self.source()
+        source["lib/17_获取_野生目标.ecs"].insert(4, "A")
         self.assertEqual(encounter_gates(source), [])
 
     def test_observation_preserves_interpreter_buttons_and_waits(self):
