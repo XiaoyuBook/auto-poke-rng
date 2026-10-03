@@ -402,9 +402,10 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .frlg-plan-dock-actions { display: flex; flex-direction: column; gap: 5px; }
 .automation-workspace .frlg-plan-dock-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 5px 9px; font-size: 11px; background: transparent; border-color: #95aabd29; }
 .automation-workspace .frlg-plan-dock-actions button:last-child { color: #bdcce6; }
-.frlg-plan-dock-extra { grid-column: 1 / -1; border-top: 1px solid #95aabd15; padding-top: 7px; color: var(--muted); font-size: 10px; }
-.frlg-plan-dock-extra summary { cursor: pointer; width: fit-content; }
-.frlg-plan-dock-extra .frlg-recommendation-ivs span { display: inline-flex; gap: 7px; margin-left: 18px; }
+.frlg-plan-dock-extra { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 24px; border-top: 1px solid #95aabd15; padding-top: 10px; }
+.frlg-plan-dock-extra .frlg-recommendation-ivs, .frlg-plan-dock-extra .frlg-recommendation-attributes { margin: 0; }
+.frlg-plan-dock-extra .frlg-recommendation-ivs { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.frlg-plan-dock-extra .frlg-recommendation-ivs span { display: inline-flex; gap: 7px; }
 .frlg-plan-dock-warning { grid-column: 1 / -1; margin: 0; color: var(--yellow); font-size: 11px; }
 .frlg-run-settings-fold { border: 1px solid var(--line-soft); border-radius: 8px; background: #1b201e; }
 .frlg-run-settings-fold > summary { display: flex; align-items: center; gap: 10px; padding: 14px 17px; cursor: pointer; list-style: none; }

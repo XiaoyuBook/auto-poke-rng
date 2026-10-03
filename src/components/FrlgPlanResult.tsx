@@ -35,10 +35,10 @@ export function FrlgPlanSummary({ plan, onDetails, onSettings, locked = false, c
       <button type="button" onClick={onDetails}>查看方案详情</button>
     </div>
     {!route_support.can_start && <p className="frlg-plan-dock-warning">{route_support.summary}</p>}
-    <details className="frlg-plan-dock-extra"><summary>个体与属性</summary>{direct ? <p className="frlg-recommendation-ivs">指定模式不计算个体与闪光结果；Seed 模式 {plan.execution.seed_mode}，启动等待 {initial_seed.seed_time.toLocaleString('en-US')} ms。</p> : <>
+    <div className="frlg-plan-dock-extra" role="group" aria-label="个体与属性">{direct ? <p className="frlg-recommendation-ivs">指定模式不计算个体与闪光结果；Seed 模式 {plan.execution.seed_mode}，启动等待 {initial_seed.seed_time.toLocaleString('en-US')} ms。</p> : <>
       <p className="frlg-recommendation-ivs">IV {ivText(plan)}<span>个体合计 <strong>{plan.selection.iv_total}</strong></span></p>
       <p className="frlg-recommendation-attributes">{label(FRLG_NATURE_LABELS, target.nature)} · {label(FRLG_ABILITY_LABELS, target.ability)} · {genderLabel(target.gender)}</p>
-    </>}</details>
+    </>}</div>
   </section>;
   return <section className="frlg-recommendation-card" aria-label="火叶推荐方案">
     <header className="frlg-recommendation-heading">
