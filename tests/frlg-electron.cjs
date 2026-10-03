@@ -64,13 +64,14 @@ app.whenReady().then(async () => {
   })()`);
   await loadWindow(main);
   await until(`Boolean(document.querySelector('[title="自动流程"]'))`, 'app ready');
+  await js(`document.querySelector('[title="首页"]').click()`);
+  await change('火叶存档 SID', '38448');
+  await click('保存当前存档');
   await js(`document.querySelector('[title="自动流程"]').click()`);
-  await change('SID', '38448');
   await click('目标设置');
   await change('搜索方法', 'All Wild Methods', true);
   await change('野生遭遇地点', 'Cerulean Cave 1F', true);
   await change('火叶自动目标宝可梦', 'Golbat', true);
-  await click('完成设置');
   assert.equal(await js(`document.querySelector('[aria-label="最小 Advance"]').value`), '3000');
   assert.equal(await js(`document.querySelector('[aria-label="最大 Advance"]').value`), '100000');
   const start = Date.now();
@@ -83,14 +84,14 @@ app.whenReady().then(async () => {
   await until(`Array.from(document.querySelectorAll('.frlg-sprite')).every(img => img.complete && img.naturalWidth > 0)`, 'bundled sprites loaded');
   const overviewFits = sideBySide => js(`(() => {
     const overview = document.querySelector('.frlg-overview');
-    const target = overview.querySelector('.frlg-target-card');
-    const plan = overview.querySelector('.frlg-recommendation-card');
-    if (!target || !plan || document.querySelectorAll('.frlg-recommendation-card').length !== 1) return false;
-    const a = target.getBoundingClientRect(), b = plan.getBoundingClientRect();
+    const target = overview.querySelector('.frlg-recommendation-card');
+    const bingo = overview.querySelector('.frlg-bingo-card');
+    if (!target || !bingo || document.querySelectorAll('.frlg-recommendation-card').length !== 1) return false;
+    const a = target.getBoundingClientRect(), b = bingo.getBoundingClientRect();
     const arranged = ${sideBySide} ? b.left >= a.right && Math.abs(a.top - b.top) < 1 : b.top >= a.bottom && Math.abs(a.left - b.left) < 1;
-    return arranged && b.left >= 0 && b.right <= innerWidth && plan.scrollWidth <= plan.clientWidth;
+    return arranged && b.left >= 0 && b.right <= innerWidth && bingo.scrollWidth <= bingo.clientWidth;
   })()`);
-  assert.equal(await overviewFits(true), true, 'recommended plan sits beside the target without overflow');
+  assert.equal(await overviewFits(true), true, 'target plan sits beside BINGO without overflow');
   await js(`document.querySelector('.frlg-overview').scrollIntoView({ block: 'center' })`);
   await screenshot('recommendation.png');
   await click('查看方案详情');

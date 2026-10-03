@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { SlidersHorizontal } from 'lucide-react';
 import { getFrlgLocationLabel, getFrlgSpeciesLabel, type FrlgPlannerResult } from '../frlgAutomation';
 import { FRLG_ABILITY_LABELS, FRLG_NATURE_LABELS, FRLG_TYPE_LABELS, FRLG_SOUND_LABELS, FRLG_BTN_MODE_LABELS, FRLG_SEED_BTN_LABELS, FRLG_EXTRA_BTN_LABELS } from '../frlgMetadata';
 import { Dialog } from './Dialog';
@@ -16,14 +17,14 @@ function Metric({ title, children }: { title: string; children: ReactNode }) {
   return <div><dt>{title}</dt><dd>{children}</dd></div>;
 }
 
-export function FrlgPlanSummary({ plan, onDetails }: { plan: FrlgPlannerResult; onDetails: () => void }) {
+export function FrlgPlanSummary({ plan, onDetails, onSettings, locked = false }: { plan: FrlgPlannerResult; onDetails: () => void; onSettings?: () => void; locked?: boolean }) {
   const { request, target, initial_seed, route_support } = plan;
   const direct = request.direct_mode;
   const shiny = !direct && ['Star', 'Square'].includes(target.shiny);
   return <section className="frlg-recommendation-card" aria-label="火叶推荐方案">
     <header className="frlg-recommendation-heading">
-      <div><h3>推荐方案</h3><p>{direct ? '使用指定 Seed 与消耗帧' : '按个体合计最高、可达 Advance 最小选择'}</p></div>
-      <span className="frlg-plan-badge">{route_support.can_start ? '规划完成' : '路线未覆盖'}</span>
+      <div><h3>{onSettings ? '当前目标与方案' : '推荐方案'}</h3><p>{direct ? '使用指定 Seed 与消耗帧' : '按个体合计最高、可达 Advance 最小选择'}</p></div>
+      <div className="frlg-recommendation-actions"><span className="frlg-plan-badge">{route_support.can_start ? '规划完成' : '路线未覆盖'}</span>{onSettings && <button type="button" className="automation-target-settings" disabled={locked} onClick={onSettings}><SlidersHorizontal size={14} aria-hidden="true"/>目标设置</button>}</div>
     </header>
     <div className="frlg-recommendation-main">
       <span className="frlg-recommendation-emblem"><FrlgSprite species={target.pokemon} shiny={shiny} /></span>

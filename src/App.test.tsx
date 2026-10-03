@@ -189,19 +189,23 @@ describe('workspace interactions', () => {
     window.desktop!.frlgRng = { validate: vi.fn(async () => ({ valid: true, source: 'test' })), search, cancel: vi.fn(async () => {}) };
     await openApp();
     const nav = screen.getByRole('navigation', { name: '工作区' });
+    fireEvent.click(within(nav).getByRole('button', { name: '首页' }));
+    fireEvent.change(screen.getByLabelText('火叶存档 SID'), { target: { value: '38448' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存当前存档' }));
     fireEvent.click(within(nav).getByRole('button', { name: '自动流程' }));
     expect(screen.getByRole('heading', { name: '火叶自动流程', level: 2 })).toBeTruthy();
-    expect(screen.getByRole('region', { name: '火叶自动流程参数' })).toBeTruthy();
     expect(screen.getByRole('region', { name: '当前火叶目标与筛选条件' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'BINGO 状态' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '目标设置' }));
     expect(screen.getByRole('dialog', { name: '火叶目标与筛选条件' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: '火叶自动流程参数' })).toBeTruthy();
     fireEvent.change(within(screen.getByRole('dialog', { name: '火叶目标与筛选条件' })).getByLabelText('搜索方法'), { target: { value: 'All Wild Methods' } });
     fireEvent.change(screen.getByLabelText('野生遭遇地点'), { target: { value: 'Cerulean Cave 1F' } });
     fireEvent.change(screen.getByLabelText('火叶自动目标宝可梦'), { target: { value: 'Golbat' } });
-    fireEvent.click(screen.getByRole('button', { name: '完成设置' }));
     expect(screen.queryByRole('button', { name: '定点数据' })).toBeNull();
-    fireEvent.change(screen.getByLabelText('TID'), { target: { value: '0' } });
-    fireEvent.change(screen.getByLabelText('SID'), { target: { value: '38448' } });
+    expect(screen.queryByLabelText('游戏版本')).toBeNull();
+    expect(screen.queryByLabelText('TID')).toBeNull();
+    expect(screen.queryByLabelText('SID')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '搜索并生成方案' }));
     await screen.findByRole('region', { name: '火叶推荐方案' });
     expect(screen.getByRole('region', { name: '火叶推荐方案' })).toBeTruthy();
@@ -226,7 +230,7 @@ describe('workspace interactions', () => {
     fireEvent.change(location, { target: { value: 'Route 1' } });
     const pokemon = within(dialog).getByLabelText('火叶自动目标宝可梦') as HTMLSelectElement;
     expect([...pokemon.options].some(option => option.value === 'Pidgey')).toBe(true);
-    fireEvent.click(within(dialog).getByRole('button', { name: '完成设置' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '取消' }));
   });
 
   it('switches automation beside the current heading and keeps the selection', async () => {

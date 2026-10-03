@@ -53,6 +53,8 @@ export function AutomationLogs() {
   if(!snapshot)return <p role="status">{error||'正在加载日志中心…'}</p>;
   const sourceOptions=['全部来源',...new Set(['系统','火叶','ECS','自动定点','自动TID','眨眼','OCR','脚本','手柄','QQ通知',...snapshot.logs.map(row=>row.source)])];
   const run=snapshot.runs.find(item=>item.id===runId)||snapshot.runs[0];
+  const bingoRun=snapshot.runs.find(item=>item.id===frlgState?.runId);
+  const bingoStartedRounds=bingoRun?.rounds.some(item=>item.number>0) ? Math.max(...bingoRun.rounds.map(item=>item.number)) : undefined;
   const round=run?.rounds[roundIndex === null ? run.rounds.length-1 : Math.min(roundIndex,Math.max(0,run.rounds.length-1))];
   const logs=snapshot.logs.filter(row=>!isFrlgDiagnosticLog(row.message,row.detailOnly)&&(source==='全部来源'||row.source===source)&&(level==='全部级别'||row.level===level)
     &&(!context||(row.runId===context.runId&&(context.round===undefined||row.round===context.round)))
@@ -65,7 +67,7 @@ export function AutomationLogs() {
     <nav className="automation-toolbar" aria-label="日志视图"><button aria-pressed={tab==='rounds'} onClick={()=>setTab('rounds')}>轮次记录</button><button aria-pressed={tab==='logs'} onClick={()=>setTab('logs')}>运行日志</button><button aria-pressed={tab==='bingo'} onClick={()=>setTab('bingo')}>BINGO 状态</button>
       <label><input type="checkbox" checked={snapshot.logging} onChange={event=>perform(api?.setLogging(event.target.checked))}/>自动保存磁盘日志</label></nav>
     {(error||snapshot.error)&&<p role="alert" className="panel-error">{error||snapshot.error}</p>}
-    {tab==='bingo'?<FrlgBingoBoard key={frlgState?.runId || 'idle'} state={frlgState?.bingo}/>:tab==='rounds'?<div className="automation-records">
+    {tab==='bingo'?<FrlgBingoBoard key={frlgState?.runId || 'idle'} state={frlgState?.bingo} startedRounds={bingoStartedRounds}/>:tab==='rounds'?<div className="automation-records">
       <aside><label>运行记录<select aria-label="运行记录" value={run?.id||''} onChange={event=>{setRunId(event.target.value);setRoundIndex(null);}}>{snapshot.runs.map(item=><option key={item.id} value={item.id}>{new Date(item.startedAt).toLocaleString()} · {item.kind==='static'?'定点':item.kind==='tid'?'TID':'火叶'}</option>)}</select></label>
         <div className="automation-round-list">{run?.rounds.map((item,index)=><button className={round===item?'active':''} key={item.number} onClick={()=>setRoundIndex(index)}><span>第 {item.number} 轮 · {item.outcome}</span>{item.frlg && <small>{item.frlg.hitSeed ? `Seed ${item.frlg.hitSeed} · 帧偏差 ${item.frlg.frameError ?? '—'}` : item.number === 0 ? '游戏环境与计时校准' : '等待反查结果'}</small>}</button>)}</div>
         {!run&&<p className="muted">运行自动流程后，轮次记录会显示在这里。</p>}</aside>

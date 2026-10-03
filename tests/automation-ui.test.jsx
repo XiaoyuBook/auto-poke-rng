@@ -293,7 +293,8 @@ test('FRLG rounds default to latest, update live, and scope logs to round zero',
 });
 
 test('BINGO renders an interactive distribution and explicitly shows out-of-chart hits',async()=>{
-  fixture();
+  const {snapshot}=fixture();
+  snapshot.runs=[{id:'frlg-1',kind:'frlg',startedAt:'2026-10-03T02:00:00Z',status:'running',rounds:[{number:0,candidates:[],events:[]},{number:19,candidates:[],events:[]}]}];
   const axis=[-4,-3,-2,-1,0,1,2,3,4];
   const state={status:'running',runId:'frlg-1',profileId:'save-a',message:'执行中',logs:[],bingo:{version:1,observed:true,axis,seedText:[],grid:axis.map(seed=>axis.map(frame=>({seed,frame,count:seed===1&&frame===-1?12:0,marker:'．'}))),prediction:{seed:1,seedRadius:1,frame:-1,frameRadius:1},current:{seed:1,frame:-1,hitSeed:1,hitFrame:-1,inRange:true,inDeadZone:false},context:{enterTv:false},stable:{result:false},count:12,tv:{enabled:false}}};
   const onState=vi.fn(()=>()=>{});
@@ -308,6 +309,15 @@ test('BINGO renders an interactive distribution and explicitly shows out-of-char
   await act(async()=>onState.mock.calls[0][0]({...state,bingo:{...state.bingo,current:{...state.bingo.current,seed:7,hitSeed:7,inRange:false}}}));
   expect(screen.getByText(/本轮落点在图外/)).toBeTruthy();
   expect(screen.queryByRole('button',{name:/本轮落点$/})).toBeNull();
+  const tvBingo={...state.bingo,grid:axis.map(seed=>axis.map(frame=>({seed,frame,count:seed===1&&frame===0?6:0,marker:'．'}))),context:{enterTv:true,tvFrameCost:314},current:{...state.bingo.current,frame:0,hitFrame:314},tv:{enabled:true,current:1,prediction:1,radius:2,cells:axis.map(frame=>({frame,count:frame===0?9:frame===1?8:0,marker:'．'}))}};
+  await act(async()=>onState.mock.calls[0][0]({...state,bingo:tvBingo}));
+  expect(screen.getByText('本次运行已开始 19 轮（含当前轮）')).toBeTruthy();
+  expect(screen.getByText('有效样本 17 次')).toBeTruthy();
+  expect(screen.getByText(/样本数有重叠，不能相加作为总轮数/)).toBeTruthy();
+  expect(screen.getByText(/本轮帧偏差拆分：\+314 帧 = \+1 周期 × 314 帧 \+ \(0 帧\)/)).toBeTruthy();
+  expect(screen.getByRole('button',{name:'Seed 偏差 +1，剩余帧偏差 0，累计命中 6 次，本轮落点'})).toBeTruthy();
+  await act(async()=>onState.mock.calls[0][0]({...state,runId:'different-run',bingo:tvBingo}));
+  expect(screen.queryByText('本次运行已开始 19 轮（含当前轮）')).toBeNull();
 });
 
 test('O01/O10: warmup calls the real service and exposes failures without claiming readiness',async()=>{
