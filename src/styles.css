@@ -904,7 +904,6 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .frlg-dex-regions { display: flex; gap: 3px; }
 .frlg-home-workspace .frlg-dex-regions button { padding: 5px 10px; background: transparent; border-color: transparent; color: var(--secondary); }
 .frlg-home-workspace .frlg-dex-regions button[aria-pressed="true"] { color: #e0ddf1; background: #53516c65; border-color: #8884ab55; }
-.frlg-dex-searchable { display: flex; align-items: center; gap: 5px; color: var(--secondary); font-size: 11px; white-space: nowrap; }
 .frlg-home-workspace input[type="checkbox"] { accent-color: #a9d3ba; width: 14px; height: 14px; cursor: pointer; }
 .frlg-dex-search { display: flex; align-items: center; gap: 7px; flex: 1; min-width: 150px; padding: 0 8px; background: #171d1a; border: 1px solid #3b4540; border-radius: 5px; color: var(--muted); }
 .frlg-home-workspace .frlg-dex-search input { width: 100%; border: 0; padding-left: 0; background: transparent; }
@@ -931,9 +930,8 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .frlg-dex-target-name small { color: var(--muted); font-size: 10px; }
 .frlg-dex-target select { flex: 1; width: 140px; margin-left: auto; }
 .frlg-dex-target button { white-space: nowrap; }
-.frlg-dex-unavailable { flex: 1; min-width: 120px; color: var(--muted); font-size: 11px; }
-@container (max-width: 520px) { .frlg-dex-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (max-width: 580px) { .frlg-dex-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } .frlg-home-heading { align-items: flex-start; } .frlg-dex-target select { flex-basis: 100%; } }
+@container (max-width: 520px) { .frlg-pokedex { flex-basis: 530px; min-height: 530px; } .frlg-dex-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } .frlg-dex-target select { flex-basis: 100%; } }
+@media (max-width: 580px) { .frlg-pokedex { flex-basis: 530px; min-height: 530px; } .frlg-dex-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } .frlg-home-heading { align-items: flex-start; } .frlg-dex-target select { flex-basis: 100%; } }
 @media (max-width: 340px) { .frlg-dex-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .frlg-home-note { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; flex: 1; min-height: 130px; padding: 24px 15px; border: 1px dashed var(--line); border-radius: 8px; color: var(--muted); }
 .frlg-home-note h3 { color: var(--secondary); font-size: 13px; font-weight: 500; }

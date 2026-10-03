@@ -1,7 +1,7 @@
 import { FRLG_STATIC_CATEGORIES, FRLG_WILD_CATEGORIES, getFrlgStaticTargets, getFrlgWildLocations, getFrlgWildTargets, type FrlgRngMethod } from './frlgAutomation';
 import { FRLG_SPECIES_METADATA } from './frlgMetadata';
 
-export const FRLG_DEX = Object.entries(FRLG_SPECIES_METADATA).map(([species, metadata]) => ({ species, id: metadata.id, name: metadata.label })).sort((a, b) => a.id - b.id);
+const speciesMetadata = Object.entries(FRLG_SPECIES_METADATA).map(([species, metadata]) => ({ species, id: metadata.id, name: metadata.label })).sort((a, b) => a.id - b.id);
 export type FrlgDexRoute = { pokemon: string; method: FrlgRngMethod; category: string; location: string };
 export type FrlgTargetIntent = { profileId: string; route: FrlgDexRoute };
 
@@ -18,4 +18,9 @@ export function getFrlgDexRoutes(game: string): Map<number, FrlgDexRoute[]> {
     for (const target of getFrlgWildTargets(game, category, location)) add(target.speciesId, { pokemon: target.species, method: 'All Wild Methods', category, location });
   }
   return result;
+}
+
+export function getFrlgDex(game: string) {
+  const routes = getFrlgDexRoutes(game);
+  return { entries: speciesMetadata.filter(entry => routes.has(entry.id)), routes };
 }
