@@ -190,6 +190,7 @@ describe('workspace interactions', () => {
     await openApp();
     const nav = screen.getByRole('navigation', { name: '工作区' });
     fireEvent.click(within(nav).getByRole('button', { name: '首页' }));
+    fireEvent.click(screen.getByText('存档资料', {exact:true}));
     fireEvent.change(screen.getByLabelText('火叶存档 SID'), { target: { value: '38448' } });
     fireEvent.click(screen.getByRole('button', { name: '保存当前存档' }));
     fireEvent.click(within(nav).getByRole('button', { name: '自动流程' }));
@@ -198,7 +199,7 @@ describe('workspace interactions', () => {
     expect(screen.getByRole('region', { name: 'BINGO 状态' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '目标设置' }));
     expect(screen.getByRole('dialog', { name: '火叶目标与筛选条件' })).toBeTruthy();
-    expect(screen.getByRole('region', { name: '火叶自动流程参数' })).toBeTruthy();
+    expect(screen.getByLabelText('脚本入口')).toBeTruthy();
     fireEvent.change(within(screen.getByRole('dialog', { name: '火叶目标与筛选条件' })).getByLabelText('搜索方法'), { target: { value: 'All Wild Methods' } });
     fireEvent.change(screen.getByLabelText('野生遭遇地点'), { target: { value: 'Cerulean Cave 1F' } });
     fireEvent.change(screen.getByLabelText('火叶自动目标宝可梦'), { target: { value: 'Golbat' } });

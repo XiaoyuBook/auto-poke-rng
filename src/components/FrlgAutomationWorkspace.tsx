@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Play, SlidersHorizontal, Sparkles, Square } from 'lucide-react';
+import type { FrlgTargetIntent } from '../frlgDex';
 import {
   FRLG_HIDDEN_TYPES,
   FRLG_WILD_CATEGORIES,
@@ -98,7 +99,7 @@ function FrlgTargetCard({ request, target, locked, onSettings }: {
   </section>;
 }
 
-export function FrlgAutomationWorkspace({ profile = defaultFrlgSaveProfile, onOpenLogs }: { profile?: FrlgSaveProfile; onOpenLogs?: () => void }) {
+export function FrlgAutomationWorkspace({ profile = defaultFrlgSaveProfile, onOpenLogs, targetIntent, onTargetConsumed }: { profile?: FrlgSaveProfile; onOpenLogs?: () => void; targetIntent?: FrlgTargetIntent | null; onTargetConsumed?: () => void }) {
   const [request, setRequest] = useState<FrlgStaticRequest>(() => {
     const base = defaultFrlgStaticRequest();
     return { ...base, game: profile.game, tid: profile.tid, sid: profile.sid };
@@ -170,6 +171,23 @@ export function FrlgAutomationWorkspace({ profile = defaultFrlgSaveProfile, onOp
       return { ...current, game: profile.game, tid: profile.tid, sid: profile.sid, location, pokemon };
     });
   }, [profile.id, profile.game, profile.tid, profile.sid]);
+  useEffect(() => {
+    if (!targetIntent) return;
+    if (targetIntent.profileId !== profile.id) { onTargetConsumed?.(); return; }
+    let alive = true;
+    void (window.desktop?.frlgAutomation?.getState() || Promise.resolve(run)).then(latest => {
+      if (!alive) return;
+      if (locked || frlgRunBusy(latest) || pendingSearch.current) {
+        setNotice('当前流程正在执行，请结束运行或搜索后再更换图鉴目标。');
+      } else {
+        invalidate();
+        setRequest({ ...defaultFrlgStaticRequest(), ...targetIntent.route, game: profile.game, tid: profile.tid, sid: profile.sid });
+        setTargetSettingsOpen(true);
+      }
+      onTargetConsumed?.();
+    }).catch(reason => { if (alive) { setError(reason instanceof Error ? reason.message : String(reason)); onTargetConsumed?.(); } });
+    return () => { alive = false; };
+  }, [targetIntent, profile.id, profile.game, profile.tid, profile.sid, locked]);
   const locations = useMemo(() => requestLocations(request.game, request.category, request.method), [request.game, request.category, request.method]);
   const targets = useMemo(() => requestTargets(request.game, request.category, request.method, request.location), [request.game, request.category, request.method, request.location]);
   const target = targets.find(item => item.species === request.pokemon) || targets[0];

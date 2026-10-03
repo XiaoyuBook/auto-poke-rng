@@ -65,6 +65,7 @@ app.whenReady().then(async () => {
   await loadWindow(main);
   await until(`Boolean(document.querySelector('[title="自动流程"]'))`, 'app ready');
   await js(`document.querySelector('[title="首页"]').click()`);
+  await js(`document.querySelector('.frlg-save-editor > summary').click()`);
   await change('火叶存档 SID', '38448');
   await click('保存当前存档');
   await js(`document.querySelector('[title="自动流程"]').click()`);

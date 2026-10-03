@@ -14,10 +14,11 @@ function Home() {
 
 it('keeps fireleaf save slots independent when saving and switching profiles', () => {
   render(<Home />);
+  fireEvent.click(screen.getByText('存档资料', { exact: true }));
   fireEvent.change(screen.getByLabelText('火叶存档名称'), { target: { value: '火红主线' } });
   fireEvent.change(screen.getByLabelText('火叶存档 TID'), { target: { value: '12345' } });
   fireEvent.change(screen.getByLabelText('火叶存档 SID'), { target: { value: '54321' } });
-  fireEvent.click(screen.getByLabelText('已完成全国图鉴'));
+  fireEvent.click(screen.getByLabelText('标记妙蛙种子已完成'));
   fireEvent.click(screen.getByRole('button', { name: '保存当前存档' }));
   expect(document.querySelector('.frlg-save-feedback')?.textContent).toContain('当前存档已保存');
 
@@ -32,5 +33,49 @@ it('keeps fireleaf save slots independent when saving and switching profiles', (
   fireEvent.change(selector, { target: { value: 'frlg-save-1' } });
   expect((screen.getByLabelText('火叶存档名称') as HTMLInputElement).value).toBe('火红主线');
   expect((screen.getByLabelText('火叶存档 TID') as HTMLInputElement).value).toBe('12345');
-  expect((screen.getByLabelText('已完成全国图鉴') as HTMLInputElement).checked).toBe(true);
+  expect((screen.getByLabelText('标记妙蛙种子已完成') as HTMLInputElement).checked).toBe(true);
+});
+
+it('persists individual progress across reloads and never guesses species from the old global flag', () => {
+  localStorage.setItem('auto-poke-rng:frlg-saves-v1', JSON.stringify({activeId:'legacy',profiles:[{id:'legacy',name:'旧存档',game:'fr_nx',tid:0,sid:0,dexCompleted:true,completedSpecies:[1,1,25,0,387,'4']}]}));
+  const view = render(<Home/>);
+  expect((screen.getByRole('progressbar', {name:'全国乱数图鉴进度'}) as HTMLProgressElement).value).toBe(2);
+  fireEvent.click(screen.getByLabelText('标记小火龙已完成'));
+  view.unmount();
+  render(<Home/>);
+  expect((screen.getByLabelText('标记小火龙已完成') as HTMLInputElement).checked).toBe(true);
+  expect((screen.getByRole('progressbar', {name:'全国乱数图鉴进度'}) as HTMLProgressElement).value).toBe(3);
+});
+
+it('copies the checklist independently and does not erase progress when trainer edits are saved', () => {
+  render(<Home/>);
+  fireEvent.click(screen.getByText('存档资料', {exact:true}));
+  fireEvent.change(screen.getByLabelText('训练家名称'), {target:{value:'小智'}});
+  fireEvent.click(screen.getByLabelText('标记妙蛙种子已完成'));
+  fireEvent.click(screen.getByLabelText('标记小火龙已完成'));
+  fireEvent.click(screen.getByRole('button', {name:'保存当前存档'}));
+  fireEvent.click(screen.getByRole('button', {name:'复制当前存档'}));
+  expect((screen.getByLabelText('标记妙蛙种子已完成') as HTMLInputElement).checked).toBe(true);
+  fireEvent.click(screen.getByLabelText('标记妙蛙种子已完成'));
+  fireEvent.change(screen.getByLabelText('当前火叶存档'), {target:{value:'frlg-save-1'}});
+  expect((screen.getByLabelText('标记妙蛙种子已完成') as HTMLInputElement).checked).toBe(true);
+  expect((screen.getByLabelText('标记小火龙已完成') as HTMLInputElement).checked).toBe(true);
+  expect((screen.getByLabelText('训练家名称') as HTMLInputElement).value).toBe('小智');
+});
+
+it('filters completion, searches national entries and disables unavailable targets for the active version', () => {
+  render(<Home/>);
+  fireEvent.click(screen.getByLabelText('标记妙蛙种子已完成'));
+  fireEvent.change(screen.getByLabelText('图鉴完成状态'), {target:{value:'complete'}});
+  expect(screen.getByRole('button', {name:'选择 妙蛙种子 #001'})).toBeTruthy();
+  expect(screen.queryByRole('button', {name:'选择 小火龙 #004'})).toBeNull();
+  fireEvent.change(screen.getByLabelText('图鉴完成状态'), {target:{value:'all'}});
+  fireEvent.click(screen.getByRole('button', {name:'城都'}));
+  fireEvent.change(screen.getByLabelText('搜索图鉴'), {target:{value:'#152'}});
+  fireEvent.click(screen.getByRole('button', {name:'选择 菊草叶 #152'}));
+  expect((screen.getByRole('button', {name:'设为乱数目标'}) as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.click(screen.getByLabelText('标记菊草叶已完成'));
+  expect((screen.getByRole('progressbar', {name:'全国乱数图鉴进度'}) as HTMLProgressElement).value).toBe(2);
+  fireEvent.click(screen.getByLabelText('可搜索目标'));
+  expect(screen.getByText(/没有符合条件/)).toBeTruthy();
 });

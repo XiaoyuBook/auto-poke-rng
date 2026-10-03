@@ -9,12 +9,13 @@ export interface FrlgSaveProfile {
   tid: number;
   sid: number;
   dexCompleted: boolean;
+  completedSpecies?: number[];
 }
 
 type FrlgSaveState = { activeId: string; profiles: FrlgSaveProfile[] };
 
 export const defaultFrlgSaveProfile: FrlgSaveProfile = {
-  id: 'frlg-save-1', name: '火叶存档 1', trainerName: '-', game: 'fr_nx', tid: 0, sid: 0, dexCompleted: false,
+  id: 'frlg-save-1', name: '火叶存档 1', trainerName: '-', game: 'fr_nx', tid: 0, sid: 0, dexCompleted: false, completedSpecies: [],
 };
 
 const storageKey = 'auto-poke-rng:frlg-saves-v1';
@@ -27,6 +28,9 @@ function validId(value: unknown) {
   return Number.isInteger(value) && Number(value) >= 0 && Number(value) <= 65535;
 }
 
+const completedIds = (value: unknown): number[] => Array.isArray(value)
+  ? [...new Set(value.filter((id): id is number => Number.isInteger(id) && id >= 1 && id <= 386))].sort((a, b) => a - b) : [];
+
 function normalizeProfile(value: unknown, index: number): FrlgSaveProfile | null {
   if (!value || typeof value !== 'object') return null;
   const item = value as Partial<FrlgSaveProfile>;
@@ -38,6 +42,7 @@ function normalizeProfile(value: unknown, index: number): FrlgSaveProfile | null
     trainerName: typeof item.trainerName === 'string' ? item.trainerName : '-',
     game: item.game as FrlgGame,
     tid: Number(item.tid), sid: Number(item.sid), dexCompleted: item.dexCompleted === true,
+    completedSpecies: completedIds(item.completedSpecies),
   };
 }
 
@@ -62,13 +67,19 @@ export function useFrlgSaves() {
   const select = (id: string) => setState(current => current.profiles.some(item => item.id === id) ? ({ ...current, activeId: id }) : current);
   const save = (profile: FrlgSaveProfile) => setState(current => {
     if (!current.profiles.some(item => item.id === profile.id)) return current;
-    return { ...current, profiles: current.profiles.map(item => item.id === profile.id ? { ...profile, name: profile.name.trim() || '未命名存档', trainerName: profile.trainerName.trim() || '-' } : item) };
+    return { ...current, profiles: current.profiles.map(item => item.id === profile.id ? { ...profile, completedSpecies: completedIds(profile.completedSpecies), name: profile.name.trim() || '未命名存档', trainerName: profile.trainerName.trim() || '-' } : item) };
+  });
+  const setSpeciesCompleted = (speciesId: number, completed: boolean) => setState(current => {
+    if (!Number.isInteger(speciesId) || speciesId < 1 || speciesId > 386) return current;
+    return { ...current, profiles: current.profiles.map(item => item.id !== current.activeId ? item : {
+      ...item, completedSpecies: completedIds(completed ? [...(item.completedSpecies || []), speciesId] : (item.completedSpecies || []).filter(id => id !== speciesId)),
+    }) };
   });
   const create = (copy?: FrlgSaveProfile) => {
-    const next: FrlgSaveProfile = { ...(copy || defaultFrlgSaveProfile), id: newId(), name: copy ? `${copy.name} 副本` : `火叶存档 ${state.profiles.length + 1}` };
+    const next: FrlgSaveProfile = { ...(copy || defaultFrlgSaveProfile), completedSpecies: [...(copy?.completedSpecies || [])], id: newId(), name: copy ? `${copy.name} 副本` : `火叶存档 ${state.profiles.length + 1}` };
     setState(current => ({ activeId: next.id, profiles: [...current.profiles, next] }));
     return next;
   };
-  return { profiles: state.profiles, activeId: state.activeId, active, select, save, create };
+  return { profiles: state.profiles, activeId: state.activeId, active, select, save, create, setSpeciesCompleted };
 }
 

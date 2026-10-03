@@ -32,6 +32,7 @@ import { BdspHomeWorkspace } from './components/BdspProfileCard';
 import { FrlgHomeWorkspace } from './components/FrlgHomeWorkspace';
 import { useBdspProfile } from './bdspProfile';
 import { useFrlgSaves } from './frlgProfile';
+import type { FrlgTargetIntent } from './frlgDex';
 import { loadControllerMapping, type MappingAction } from './controllerMapping';
 import { useDevices } from './useDevices';
 import type { ScriptProgress } from './devices';
@@ -68,6 +69,7 @@ export default function App({ connections = initialConnections }: { connections?
   const [game, setGame] = useState<GameId>('frlg');
   const [bdspProfile, setBdspProfile] = useBdspProfile();
   const frlgSaves = useFrlgSaves();
+  const [frlgTargetIntent, setFrlgTargetIntent] = useState<FrlgTargetIntent | null>(null);
   const [gameMenuOpen, setGameMenuOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [run, setRun] = useState<ScriptRun | null>(null);
@@ -605,12 +607,12 @@ export default function App({ connections = initialConnections }: { connections?
                   {visitedAutomationTabs.has('static') && <div className="automation-page automation-hub-panel" id="automation-panel-static" hidden={automationTab !== 'static'}><AutomationWorkspace kind="static" profile={bdspProfile} blinkConfig={blink.config} blinkConfigs={blink.configs} openLogs={() => showPanel('logs')} onSwitchKind={() => selectAutomationTab('tid')} /></div>}
                   {visitedAutomationTabs.has('tid') && <div className="automation-page automation-hub-panel" id="automation-panel-tid" hidden={automationTab !== 'tid'}><AutomationWorkspace kind="tid" profile={bdspProfile} blinkConfig={blink.config} blinkConfigs={blink.configs} openLogs={() => showPanel('logs')} onSwitchKind={() => selectAutomationTab('static')} /></div>}
                 </>}
-                {game === 'frlg' && <FrlgAutomationWorkspace profile={frlgSaves.active} onOpenLogs={() => showPanel('logs')} />}
+                {game === 'frlg' && <FrlgAutomationWorkspace profile={frlgSaves.active} targetIntent={frlgTargetIntent} onTargetConsumed={() => setFrlgTargetIntent(null)} onOpenLogs={() => showPanel('logs')} />}
               </div>}
               {visitedPages.has('闪光反查区域') && <div hidden={page !== '闪光反查区域'}><OcrWorkspace overlayTarget={page === '闪光反查区域' ? ocrOverlayHost : null} previewTarget={page === '闪光反查区域' ? ocrPreviewHost : null} /></div>}
               {page === '定点数据' && <StaticDataWorkspace profile={bdspProfile} onLog={message => addLog(message, '系统', 'success')} />}
               {page === '眨眼捕获' && <BlinkWorkspace blink={blink} video={devices.video} />}
-              {page === '首页' && (game === 'bdsp' ? <BdspHomeWorkspace profile={bdspProfile} onChange={setBdspProfile} onOpenScript={() => navigateToPage('脚本编辑')} /> : <FrlgHomeWorkspace saves={frlgSaves} onOpenAutomation={() => navigateToPage('自动流程')} />)}
+              {page === '首页' && (game === 'bdsp' ? <BdspHomeWorkspace profile={bdspProfile} onChange={setBdspProfile} onOpenScript={() => navigateToPage('脚本编辑')} /> : <FrlgHomeWorkspace saves={frlgSaves} onOpenAutomation={route => { setFrlgTargetIntent(route ? { profileId: frlgSaves.activeId, route } : null); navigateToPage('自动流程'); }} />)}
             </div>
             <section className="workspace-labels" aria-label="标签工作区" hidden={!inlineLabelsOpen}>
               <VideoPreview labelsOnly labelsOpen={inlineLabelsOpen} labelFolder={labelFolder} referenceTarget={labelReferenceHost} onCloseLabels={() => setVideoLabelsOpen(false)} />

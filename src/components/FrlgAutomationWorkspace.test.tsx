@@ -32,6 +32,24 @@ function chooseGolbat() {
 afterEach(() => { cleanup(); delete window.desktop; localStorage.clear(); });
 
 describe('real FRLG planner result contract', () => {
+  it('prefills a dex target without starting a search or execution', async () => {
+    const api = mockApi();
+    const consumed = vi.fn();
+    render(<FrlgAutomationWorkspace profile={profile} targetIntent={{profileId:profile.id,route:{pokemon:'Pikachu',method:'All Wild Methods',category:'Grass',location:'Power Plant'}}} onTargetConsumed={consumed}/>);
+    const dialog = await screen.findByRole('dialog', {name:'火叶目标与筛选条件'});
+    expect((within(dialog).getByLabelText('火叶自动目标宝可梦') as HTMLSelectElement).value).toBe('Pikachu');
+    expect((within(dialog).getByLabelText('野生遭遇地点') as HTMLSelectElement).value).toBe('Power Plant');
+    expect(api.search).not.toHaveBeenCalled();
+    expect(consumed).toHaveBeenCalledOnce();
+  });
+  it('does not replace a running target while the initial execution snapshot is still loading', async () => {
+    mockApi();
+    window.desktop!.frlgAutomation = {getState:vi.fn(async()=>({status:'running' as const,runId:'live',profileId:profile.id,message:'正在运行',logs:[]})),onState:vi.fn(()=>()=>{}),start:vi.fn(),stop:vi.fn()};
+    render(<FrlgAutomationWorkspace profile={profile} targetIntent={{profileId:profile.id,route:{pokemon:'Pikachu',method:'All Wild Methods',category:'Grass',location:'Power Plant'}}} onTargetConsumed={vi.fn()}/>);
+    await screen.findByText('当前流程正在执行，请结束运行或搜索后再更换图鉴目标。');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(window.desktop!.frlgAutomation.start).not.toHaveBeenCalled();
+  });
   it('keeps run status in the toolbar and opens the centralized logs without a duplicate log card', async () => {
     mockApi();
     const onOpenLogs = vi.fn();
