@@ -127,8 +127,12 @@ def evaluate_window(blocks, start_ns, end_ns, reference, failure=None, compariso
         return {"result": "unknown", "reason": "窗口内没有音频数据"}
     parts, prior_end, covered_start = [], None, None
     for block in relevant:
-        if block.skipped or block.discontinuity or block.timestamp_error:
-            return {"result": "unknown", "reason": "音频缺块或时间戳不可靠"}
+        if block.skipped:
+            return {"result": "unknown", "reason": "读取落后，音频块已被缓存淘汰"}
+        if block.discontinuity:
+            return {"result": "unknown", "reason": "音频采集端报告数据不连续"}
+        if block.timestamp_error:
+            return {"result": "unknown", "reason": "音频采集端报告时间戳不可靠"}
         if block.sample_rate != relevant[0].sample_rate or block.channels != relevant[0].channels:
             return {"result": "unknown", "reason": "音频格式变化"}
         stop = block.timestamp_ns + block.frames * 1_000_000_000 // block.sample_rate
@@ -177,11 +181,14 @@ class AudioShinyDiagnostic:
         self.blocks = deque()
         self.buffer_bytes = 0
         self.stop_event = threading.Event()
+        self.closing = threading.Event()
+        self.report_wake = threading.Event()
         self.failure = None
         self.reference = None
         self.comparison = None
         self.reader = reader
         self.thread = None
+        self.report_thread = None
         try:
             self.reference = load_reference(reference_path)
             self.comparison = load_reference(comparison_path)
@@ -191,7 +198,9 @@ class AudioShinyDiagnostic:
         except Exception:
             self.failure = "音频源未连接或参考音效无效"
         if self.reader is not None and self.gates:
+            self.report_thread = threading.Thread(target=self._report_worker, daemon=True)
             self.thread = threading.Thread(target=self._worker, daemon=True)
+            self.report_thread.start()
             self.thread.start()
         status = self.failure or ("参考音效已加载；匹配阈值尚待实机验证" if self.reference is not None
                                   else "缺少已确认的闪光参考音效，暂输出采样状态和无法判定")
@@ -237,6 +246,7 @@ class AudioShinyDiagnostic:
             job = (number, gate.name, start, end, reason, cutoff, gate.window_ms,
                    time.monotonic() + 0.25)
             self.jobs.append(job)
+            self.report_wake.set()
 
     def _expire_window(self):
         active = self.active
@@ -264,6 +274,8 @@ class AudioShinyDiagnostic:
                 f"skipped_packets={sum(b.skipped for b in relevant)}",
                 f"discontinuities={sum(bool(b.discontinuity) for b in relevant)}",
                 f"timestamp_errors={sum(bool(b.timestamp_error) for b in relevant)}"))
+            fields.append(f"tail_gap_seconds={max(0, (end - (relevant[-1].timestamp_ns + relevant[-1].frames * 1_000_000_000 // relevant[-1].sample_rate)) / 1e9):.3f}")
+        fields.append(f"reader_mode={'batch' if getattr(self.reader, 'source', {}).get('batchVersion') == 1 else 'single'}")
         fields.extend(f"{key}={value}" for key, value in result.items() if key != "result")
         self.output("【音频判闪·实验】" + "；".join(fields))
 
@@ -275,25 +287,42 @@ class AudioShinyDiagnostic:
             while not self.stop_event.is_set():
                 if not self.failure:
                     try:
-                        block = self.reader.read(timeout=0.4)
-                        if block is not None:
-                            self.blocks.append(block)
-                            self.buffer_bytes += len(block.pcm)
-                            # Keep the 13s window plus read / collection grace;
-                            # the byte cap still bounds high-rate audio memory.
-                            while self.blocks and (block.timestamp_ns - self.blocks[0].timestamp_ns > 16_000_000_000
-                                                   or len(self.blocks) > 3200
-                                                   or self.buffer_bytes > 16 * 1024 * 1024):
-                                self.buffer_bytes -= len(self.blocks.popleft().pcm)
+                        read_many = getattr(self.reader, 'read_many', None)
+                        blocks = read_many(timeout=0.4) if read_many else [self.reader.read(timeout=0.4)]
+                        with self.lock:
+                            for block in blocks:
+                                if block is None:
+                                    continue
+                                self.blocks.append(block)
+                                self.buffer_bytes += len(block.pcm)
+                                # Keep bounded history; analysis snapshots reference
+                                # immutable blocks while this thread keeps draining.
+                                while self.blocks and (block.timestamp_ns - self.blocks[0].timestamp_ns > 16_000_000_000
+                                                       or len(self.blocks) > 3200
+                                                       or self.buffer_bytes > 16 * 1024 * 1024):
+                                    self.buffer_bytes -= len(self.blocks.popleft().pcm)
+                        self.report_wake.set()
                     except Exception:
                         self.failure = "音频读取失败或会话已变化"
                 else:
                     self.stop_event.wait(0.02)
-                self._flush_ready()
+                self._expire_window()
         except Exception:
             self.failure = "音频读取失败或会话已变化"
             while not self.stop_event.wait(0.02):
+                self.report_wake.set()
+        finally:
+            self.report_wake.set()
+
+    def _report_worker(self):
+        try:
+            while not self.stop_event.is_set():
+                self.report_wake.clear()
                 self._flush_ready()
+                with self.lock:
+                    if self.closing.is_set() and not self.jobs:
+                        return
+                self.report_wake.wait(0.02)
         finally:
             self._flush_ready(force=True)
 
@@ -301,18 +330,33 @@ class AudioShinyDiagnostic:
         self._expire_window()
         while True:
             with self.lock:
-                if not self.jobs or (not force and self.jobs[0][-1] > time.monotonic()):
+                if not self.jobs:
+                    return
+                end = self.jobs[0][3]
+                latest = self.blocks[-1] if self.blocks else None
+                covered = latest is not None and latest.timestamp_ns + latest.frames * 1_000_000_000 // latest.sample_rate >= end
+                if not force and not self.failure and not covered and self.jobs[0][-1] > time.monotonic():
                     return
                 job = self.jobs.popleft()
+                blocks = list(self.blocks)
             try:
-                self._report(job, list(self.blocks))
+                self._report(job, blocks)
             except Exception:
                 self.output(f"【音频判闪·实验】窗口={job[0]}；无法判定；检测器异常")
 
     def close(self):
         self._finish("脚本结束前未完成遭遇窗口")
+        # Keep collecting during the bounded report grace. The cutoff itself
+        # never moves, so this cannot admit the player's post-A shiny audio.
+        self.closing.set()
+        self.report_wake.set()
+        if self.report_thread:
+            self.report_thread.join(timeout=1.0)
         self.stop_event.set()
+        self.report_wake.set()
         if self.thread:
-            self.thread.join(timeout=0.8)
-        else:
+            self.thread.join(timeout=0.5)
+        if self.report_thread and self.report_thread.is_alive():
+            self.report_thread.join(timeout=0.3)
+        if not self.report_thread:
             self._flush_ready(force=True)

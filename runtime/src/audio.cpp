@@ -80,6 +80,23 @@ AudioRead AudioHub::read(uint64_t after, bool next, std::chrono::milliseconds wa
     if (next) for (const auto& candidate:blocks_) if (candidate->sequence>after) { block=candidate; break; }
     return {block,after ? block->sequence-after-1 : 0};
 }
+std::vector<AudioRead> AudioHub::read_batch(uint64_t after, size_t limit, std::chrono::milliseconds wait, const std::string& session) {
+    if (!limit || limit>64) throw Error("INVALID_ARGUMENT","Invalid audio batch size");
+    std::unique_lock lock(mutex_);
+    changed_.wait_for(lock,wait,[&] { return !active_ || (!session.empty() && session!=session_) || (!blocks_.empty() && blocks_.back()->sequence>after); });
+    if (!session.empty() && session!=session_) throw Error("SESSION_CHANGED","音频源会话已变化");
+    std::vector<AudioRead> result;
+    size_t bytes=0;
+    if (!active_) return result;
+    for (const auto& block:blocks_) {
+        if (block->sequence<=after) continue;
+        const auto size=block->samples.size()*sizeof(float);
+        if (result.size()==limit || bytes+size>16*1024*1024) break;
+        result.push_back({block,after ? block->sequence-after-1 : 0});
+        bytes+=size; after=block->sequence;
+    }
+    return result;
+}
 std::vector<float> audio_pcm(const unsigned char* data,size_t samples,int bits,bool floating,bool silent) {
     if ((floating && bits!=32) || (!floating && bits!=8 && bits!=16 && bits!=24 && bits!=32))
         throw Error("AUDIO_FORMAT","不支持此音频采样格式");
@@ -139,7 +156,7 @@ void AudioService::capture_loop(Json config) {
         auto item=hub_.publish(std::move(block)); if (!item || stop_) return;
         if (!announced) {
             state({{"status","connected"},{"deviceId",config["deviceId"]},{"name",name},{"backend","wasapi"},
-                {"session",item->session},{"sampleRate",item->sample_rate},{"channels",item->channels},{"format","f32le"},
+                {"session",item->session},{"sampleRate",item->sample_rate},{"channels",item->channels},{"format","f32le"},{"batchVersion",1},
                 {"baseUrl","http://127.0.0.1:"+std::to_string(port_)},{"token",token_}});
             announced=true;
         }
@@ -154,16 +171,28 @@ void AudioService::capture_loop(Json config) {
     };
     try {
         if (config["deviceId"]=="synthetic") {
+            const auto rate=config.value("sampleRate",48000),channels=config.value("channels",2),packet_ms=config.value("packetMs",20);
+            if (rate<8000 || rate>384000 || channels<1 || channels>32 || packet_ms<5 || packet_ms>100)
+                throw Error("INVALID_ARGUMENT","Invalid synthetic audio format");
+            const auto frames=static_cast<size_t>(rate)*packet_ms/1000;
             uint64_t position=0;
+            const auto started=Clock::now();
+            const auto started_ns=now_ns();
             while (!stop_) {
-                auto tick=Clock::now(); AudioBlock block; block.sample_rate=48000; block.channels=2; block.timestamp_ns=now_ns();
+                const auto elapsed_ns=(position/rate)*1'000'000'000ULL + (position%rate)*1'000'000'000ULL/rate;
+                AudioBlock block; block.sample_rate=rate; block.channels=channels; block.timestamp_ns=started_ns+elapsed_ns;
                 // Silence is a valid connected input, distinct from a stalled source.
-                block.silent=config.value("silent",false); block.samples.resize(960*2);
-                for (size_t i=0;i<960;++i) {
-                    auto value=block.silent ? 0.f : float(.25*std::sin(2*3.141592653589793*1000*double(position+i)/48000));
-                    block.samples[i*2]=value; block.samples[i*2+1]=value;
+                block.silent=config.value("silent",false); block.samples.resize(frames*channels);
+                for (size_t i=0;i<frames;++i) {
+                    auto value=block.silent ? 0.f : float(.25*std::sin(2*3.141592653589793*1000*double(position+i)/rate));
+                    for (int channel=0;channel<channels;++channel) block.samples[i*channels+channel]=value;
                 }
-                position+=960; publish(std::move(block),"测试音频（模拟）"); std::this_thread::sleep_until(tick+20ms);
+                position+=frames; publish(std::move(block),"测试音频（模拟）");
+                // Absolute pacing catches up after a coarse Windows timer wake.
+                // Packet timestamps follow the sample clock, like WASAPI, rather
+                // than simulating missing samples on every delayed sleep.
+                const auto next_ns=(position/rate)*1'000'000'000ULL + (position%rate)*1'000'000'000ULL/rate;
+                std::this_thread::sleep_until(started+std::chrono::nanoseconds(next_ns));
             }
         } else {
             ComScope scope; auto source=enumerator(); ComPtr<IMMDevice> device;
@@ -222,12 +251,46 @@ void AudioService::routes() {
     server_.Get("/audio",[this](const auto& request,auto& response) {
         try {
             const auto session=request.get_param_value("session"),mode=request.get_param_value("mode");
-            if (session.empty() || (!mode.empty() && mode!="next" && mode!="latest")) throw Error("INVALID_ARGUMENT","Invalid audio session or mode");
+            if (session.empty() || (!mode.empty() && mode!="next" && mode!="latest" && mode!="batch")) throw Error("INVALID_ARGUMENT","Invalid audio session or mode");
             uint64_t after=0;
             if (request.has_param("after")) {
                 auto value=request.get_param_value("after");
                 if (value.empty() || value.size()>19 || value.find_first_not_of("0123456789")!=std::string::npos) throw Error("INVALID_ARGUMENT","Invalid audio cursor");
                 after=std::stoull(value);
+            }
+            if (mode=="batch") {
+                size_t limit=64;
+                if (request.has_param("max_blocks")) {
+                    const auto value=request.get_param_value("max_blocks");
+                    if (value.empty() || value.size()>2 || value.find_first_not_of("0123456789")!=std::string::npos)
+                        throw Error("INVALID_ARGUMENT","Invalid audio batch size");
+                    limit=std::stoul(value);
+                }
+                auto blocks=hub_.read_batch(after,limit,200ms,session);
+                if (blocks.empty()) { response.status=stop_ ? 503 : 204; return; }
+                if (now_ns()-blocks.back().block->received_ns>3'000'000'000ULL) { response.status=503; return; }
+                // Keep each packet's timestamp and loss flags. Do not concatenate
+                // through an overrun or turn discontinuous PCM into valid audio.
+                Json metadata={{"version",1},{"blocks",Json::array()}};
+                for (const auto& read:blocks) {
+                    const auto& b=*read.block;
+                    metadata["blocks"].push_back({{"session",b.session},{"sequence",b.sequence},{"skipped",read.skipped},
+                        {"timestamp_ns",b.timestamp_ns},{"received_ns",b.received_ns},
+                        {"sample_rate",b.sample_rate},{"channels",b.channels},{"frames",b.samples.size()/b.channels},
+                        {"discontinuity",b.discontinuity},{"timestamp_error",b.timestamp_error},{"silent",b.silent}});
+                }
+                const auto header=metadata.dump();
+                std::string body;
+                const auto length=static_cast<uint32_t>(header.size());
+                for (unsigned i=0;i<4;++i) body.push_back(static_cast<char>((length>>(i*8))&255));
+                body+=header;
+                for (const auto& read:blocks) {
+                    const auto& samples=read.block->samples;
+                    body.append(reinterpret_cast<const char*>(samples.data()),samples.size()*sizeof(float));
+                }
+                response.set_header("X-Audio-Format","f32le-batch-v1");
+                response.set_content(std::move(body),"application/octet-stream");
+                return;
             }
             auto read=hub_.read(after,mode=="next",200ms,session);
             if (!read.block) { response.status=stop_ ? 503 : 204; return; }

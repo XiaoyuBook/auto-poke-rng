@@ -31,6 +31,7 @@ public:
     void stop();
     std::shared_ptr<const AudioBlock> publish(AudioBlock block);
     AudioRead read(uint64_t after=0, bool next=false, std::chrono::milliseconds wait=0ms, const std::string& session={});
+    std::vector<AudioRead> read_batch(uint64_t after, size_t limit=64, std::chrono::milliseconds wait=0ms, const std::string& session={});
 };
 // Convert WASAPI's native mix format to a common consumer format without resampling.
 std::vector<float> audio_pcm(const unsigned char* data, size_t samples, int bits, bool floating, bool silent);

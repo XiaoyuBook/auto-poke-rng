@@ -25,15 +25,25 @@ int main() {
         CHECK(hub.read().block==hub.read().block);
         for(int i=0;i<6;++i) hub.publish(b);
         auto slow=hub.read(1,true); CHECK(slow.block->sequence==5 && slow.skipped==3);
+        auto batch=hub.read_batch(1,2,0ms,session);
+        CHECK(batch.size()==2 && batch[0].block->sequence==5 && batch[0].skipped==3);
+        CHECK(batch[1].block->sequence==6 && batch[1].skipped==0);
+        CHECK(hub.read_batch(6,64,0ms,session).back().block->sequence==7);
+        CHECK(hub.read_batch(7,64,0ms,session).empty());
+        invalid=false; try { hub.read_batch(1,65); } catch(const Error&) { invalid=true; } CHECK(invalid);
         auto waiter=std::async(std::launch::async,[&] { return hub.read(7,true,2s,session); });
         b.silent=true; b.discontinuity=true; b.timestamp_error=true;
         hub.publish(b); auto next=waiter.get();
         CHECK(next.block->sequence==8 && next.block->discontinuity && next.block->timestamp_error && next.block->silent);
+        batch=hub.read_batch(7,64,0ms,session);
+        CHECK(batch.size()==1 && batch[0].block->discontinuity && batch[0].block->timestamp_error && batch[0].block->silent);
         auto stopped=std::async(std::launch::async,[&] { return hub.read(8,true,2s,session); });
-        hub.stop(); CHECK(!stopped.get().block && !hub.read().block);
+        hub.stop(); CHECK(!stopped.get().block && !hub.read().block && hub.read_batch(0).empty());
         hub.reset(); bool changed=false;
         try { hub.read(0,false,0ms,session); } catch(const Error& e) { changed=e.code=="SESSION_CHANGED"; }
         CHECK(changed); CHECK(first->samples[0]==.25f);
+        changed=false; try { hub.read_batch(0,64,0ms,session); } catch(const Error& e) { changed=e.code=="SESSION_CHANGED"; }
+        CHECK(changed);
         std::cout<<"PCM conversion, silence, ownership, independent cursors, overrun, wakeup and session changes: passed\n";
     } catch(const std::exception& error) { std::cerr<<error.what()<<"\n"; return 1; }
 }

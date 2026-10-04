@@ -26,9 +26,13 @@ test('native audio exposes authorized continuous stereo PCM and independent read
   assert.ok((await client.call('audio.list')).some(x => x.id === 'synthetic'));
   const source = await connect(client);
   assert.equal(source.sampleRate, 48000); assert.equal(source.channels, 2);
+  assert.equal(source.batchVersion, 1);
   assert.equal((await fetch(source.baseUrl + '/audio')).status, 401);
   assert.equal((await request(source, '&after=-1')).status, 400);
   assert.equal((await request(source, '&mode=wrong')).status, 400);
+  for (const limit of ['0', '65', '-1', 'abc']) {
+    assert.equal((await request(source, '&mode=batch&max_blocks=' + limit)).status, 400);
+  }
   const first = await request(source), sequence = Number(first.headers.get('x-audio-sequence'));
   const bytes = Buffer.from(await first.arrayBuffer());
   assert.equal(bytes.length, 960 * 2 * 4);
@@ -60,6 +64,40 @@ test('native audio exposes authorized continuous stereo PCM and independent read
   assert.equal(quiet.headers.get('x-audio-silent'), '1');
   assert.ok(Buffer.from(await quiet.arrayBuffer()).every(x => x === 0));
   assert.equal((await client.call('audio.status')).status, 'connected');
+});
+
+test('96kHz mono batch reader catches up and stays current through a full 13 second encounter', { ...options, timeout: 25000 }, async t => {
+  const client = new RuntimeClient({ role: 'audio', testMode: true });
+  t.after(() => client.close());
+  const source = await connect(client, { sampleRate: 96000, channels: 1, packetMs: 10 });
+  assert.equal(source.sampleRate, 96000); assert.equal(source.channels, 1);
+  const python = spawnSync(path.join(__dirname, '../.deps/script-python/Scripts/python.exe'), ['-X', 'utf8', '-c',
+    `import sys,json,time,threading
+sys.path.insert(0,'runtime/clients')
+from audio import Audio
+a=Audio(json.loads(sys.argv[1])); a.read(next_block=False)
+# Accumulate backlog like a briefly stalled OCR/analysis process, within cache retention.
+time.sleep(.5)
+begin=time.perf_counter(); batch=a.read_many(); elapsed=time.perf_counter()-begin
+assert len(batch)>=20 and sum(b.skipped for b in batch)==0, (len(batch), elapsed)
+assert elapsed<.25, elapsed
+# Competing Python CPU work mirrors ECS/OCR activity, with collection still independent.
+stop=threading.Event()
+def load():
+ while not stop.is_set(): sum(i*i for i in range(8000))
+worker=threading.Thread(target=load); worker.start()
+begin=time.perf_counter(); count=len(batch); skipped=0; lag=0
+try:
+ while time.perf_counter()-begin<13:
+  blocks=a.read_many(timeout=.4)
+  count+=len(blocks); skipped+=sum(b.skipped for b in blocks)
+  if blocks: lag=max(lag,(time.perf_counter_ns()-blocks[-1].timestamp_ns)/1e9)
+finally: stop.set(); worker.join()
+assert skipped==0 and count>1000 and lag<.5, (skipped,count,lag)
+print(json.dumps(dict(packets=count,skipped=skipped,max_lag_seconds=round(lag,3),backlog_read_seconds=round(elapsed,3))))`, JSON.stringify(source)],
+    { encoding: 'utf8', timeout: 18000, windowsHide: true });
+  assert.equal(python.status, 0, python.stdout + python.stderr + (python.error?.message || ''));
+  t.diagnostic(python.stdout.trim());
 });
 
 test('production rejects synthetic input and missing input cannot silently become the default microphone', options, async t => {

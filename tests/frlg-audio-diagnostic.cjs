@@ -15,6 +15,13 @@ test('FRLG log-only audio observes opponent windows and excludes player shiny so
   assert.equal(result.status, 0, result.stdout + result.stderr + (result.error?.message || ''));
 });
 
+test('audio batch protocol validates loss, metadata, PCM and cursor atomicity', () => {
+  const result = spawnSync(pythonPath(), ['-X', 'utf8', path.join(__dirname, '../runtime/tests/test_audio_client.py')], {
+    encoding: 'utf8', windowsHide: true, timeout: 10000,
+  });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+});
+
 test('shared host optional audio diagnostics log without a connected audio device', async t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'frlg-audio-host-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));

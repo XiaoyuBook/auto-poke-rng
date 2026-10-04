@@ -1,7 +1,8 @@
 import sys
 from pathlib import Path
 import unittest
-from threading import Event
+from threading import Event, Thread
+import time
 from dataclasses import replace
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -211,6 +212,64 @@ class AudioDiagnosticTests(unittest.TestCase):
         self.assertIsNone(observer.active)
         self.assertEqual(observer.jobs[0][5], "遭遇函数提前返回")
         observer.close()
+
+    def test_slow_matcher_does_not_block_audio_collection(self):
+        analysis_started, release_analysis, collected = Event(), Event(), Event()
+        feed = Event()
+        block = self.blocks(np.zeros((480, 2)))[0]
+        def read_many(**kwargs):
+            if feed.wait(.01):
+                feed.clear(); collected.set()
+                return [block]
+            return []
+        def report(*args):
+            analysis_started.set(); release_analysis.wait(1)
+        reader = SimpleNamespace(read=lambda **_: None, read_many=read_many)
+        with patch.object(AudioShinyDiagnostic, '_report', side_effect=report):
+            observer = AudioShinyDiagnostic(self.source(), {}, None, lambda _: None, reader=reader)
+            try:
+                with observer.lock:
+                    observer.jobs.append((1, '甜甜香气', 1, 2, None, '时长上限', 13000, 0))
+                observer.report_wake.set()
+                self.assertTrue(analysis_started.wait(1))
+                feed.set()
+                self.assertTrue(collected.wait(.5), 'template comparison blocked collection')
+                with observer.lock:
+                    self.assertEqual(observer.blocks[-1], block)
+            finally:
+                release_analysis.set(); observer.close()
+            self.assertFalse(observer.thread.is_alive())
+            self.assertFalse(observer.report_thread.is_alive())
+
+    def test_shiny_stop_drains_tail_during_grace_without_moving_cutoff(self):
+        samples, rate = self.reference
+        audio = np.zeros((rate*2, 2), dtype=np.float32)
+        audio[rate:rate+len(samples)] = samples
+        blocks = self.blocks(audio)
+        ready, tail = Event(), Event()
+        calls = [0]
+        def read_many(**kwargs):
+            calls[0] += 1
+            if calls[0] == 1:
+                ready.set(); return blocks[:-10]
+            if tail.wait(.01):
+                tail.clear(); return blocks[-10:]
+            return []
+        logs = []
+        observer = AudioShinyDiagnostic(self.source(), {}, None, logs.append,
+            reader=SimpleNamespace(read=lambda **_: None, read_many=read_many))
+        observer.reference = self.reference
+        self.assertTrue(ready.wait(1))
+        with observer.lock:
+            observer.jobs.append((1, '甜甜香气', 1_000_000_000, 3_000_000_000,
+                                  None, '遭遇函数提前返回', 2000, time.monotonic()+.25))
+        closing = Thread(target=observer.close)
+        closing.start()
+        self.assertTrue(observer.closing.wait(1))
+        tail.set(); closing.join(2)
+        self.assertFalse(closing.is_alive())
+        self.assertTrue(any('检出闪光音效候选' in line and 'end_qpc_ns=3000000000' in line
+                            and 'tail_gap_seconds=0.000' in line for line in logs), logs)
 
     def test_unknown_upstream_layout_is_not_guessed(self):
         source = self.source()

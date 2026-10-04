@@ -49,6 +49,8 @@ if (-not (Test-Path -LiteralPath $pythonPath -PathType Leaf)) {
 if (-not (Test-Path -LiteralPath $pythonPath -PathType Leaf)) { throw 'Python 3.12+ was not found.' }
 & $pythonPath -X utf8 -m unittest runtime/tests/test_ocr.py
 if ($LASTEXITCODE -ne 0) { throw 'OCR adapter tests failed.' }
+& $pythonPath -X utf8 -m unittest runtime/tests/test_audio_client.py
+if ($LASTEXITCODE -ne 0) { throw 'Audio batch client tests failed.' }
 & $ctestExecutable --test-dir (Join-Path $projectRoot 'runtime/build') -C Release --output-on-failure
 if ($LASTEXITCODE -ne 0) { throw 'C++ runtime tests failed.' }
 
