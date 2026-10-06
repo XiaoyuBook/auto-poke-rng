@@ -18,7 +18,9 @@ from automation.precalibration import update_from_manifest
 def execution_options(payload, plan):
     if not isinstance(payload, dict):
         raise ValueError('运行参数必须是对象')
-    payload = {key: value for key, value in payload.items() if key != 'entry'}
+    if 'auto_complete_pokedex' in payload and not isinstance(payload['auto_complete_pokedex'], bool):
+        raise ValueError('auto_complete_pokedex 必须是布尔值')
+    payload = {key: value for key, value in payload.items() if key not in {'entry', 'auto_complete_pokedex'}}
     allowed = {field.name for field in fields(EasyCon118Options)}
     unknown = set(payload) - allowed
     if unknown:
@@ -45,6 +47,34 @@ def execution_options(payload, plan):
     return EasyCon118Options(**values)
 
 
+def add_pokedex_confirmation(text, species_id, *, japanese_starter=False):
+    """Observe the current attempt independently of optional calibration storage."""
+    attempt = '        $本轮流程结果 = 执行RNG启动与目标获取()'
+    if text.count(attempt) != 1:
+        raise ValueError('火叶模板缺少唯一目标获取入口，无法记录图鉴完成证据')
+    reset = '        CALL 清空最近出闪检测\n'
+    if reset + attempt not in text:
+        text = text.replace(attempt, reset + attempt, 1)
+    text = text.replace(attempt, attempt + '\n        CALL 记录图鉴目标出闪', 1)
+    if japanese_starter:
+        # This fixed starter route detects shininess on its own summary page.
+        # Feed that positive branch into the same per-attempt detector record.
+        start = text.index('FUNC 读取并输出日版御三家识图结果(): INT\n')
+        end = text.index('\nENDFUNC', start)
+        block = text[start:end]
+        shiny = '        PRINT 已识别到出闪，脚本停止'
+        if block.count(shiny) != 1:
+            raise ValueError('日版御三家缺少唯一出闪分支，无法记录图鉴完成证据')
+        block = block.replace(shiny, f'        $图鉴出闪记录 = 记录最近出闪检测({species_id})\n' + shiny, 1)
+        text = text[:start] + block + text[end:]
+    return text + (
+        '\n\nFUNC 记录图鉴目标出闪\n'
+        f'    IF $循环计数 > 0 and 读取最近出闪检测结果() == 1 and 读取最近出闪检测图鉴编号() == {species_id}\n'
+        f'        PRINT "FRLG_TARGET_CONFIRMED|V=1|DEX={species_id}|KIND=TARGET_SHINY"\n'
+        '    ENDIF\nENDFUNC\n'
+    )
+
+
 def prepare(plan, payload):
     options = execution_options(payload.get('options', {}), plan)
     entry = payload.get('options', {}).get('entry', 'formal')
@@ -68,10 +98,14 @@ def prepare(plan, payload):
                                     template_name=template,
                                     precalibration_store_path=store)
     validate_generated_project_consistency(main, plan, options, template_name=template)
+    if payload.get('options', {}).get('auto_complete_pokedex') is True:
+        text = add_pokedex_confirmation(main.read_text(encoding='utf-8'), plan.species_id,
+                                        japanese_starter=options.japanese_starter)
+        main.write_text(text, encoding='utf-8')
     # Keep optional resources beside generated imports (never a source checkout).
     if (source / 'Tessdata').is_dir():
         shutil.copytree(source / 'Tessdata', output / 'Tessdata')
-    return {'main': str(main), 'manifest': str(output / 'plan.json'),
+    return {'main': str(main), 'manifest': str(output / 'plan.json'), 'targetSpeciesId': plan.species_id,
             'options': json.loads((output / 'plan.json').read_text(encoding='utf-8'))['easycon118_options']}
 
 

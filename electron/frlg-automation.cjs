@@ -88,6 +88,7 @@ function registerFrlgAutomation({ ipcMain, getMainWindow, devices, client, userD
         request: run.request, options: run.options, source: path.join(root, '火红叶绿', '自动流程'), output, calibrationStore,
       });
       checkStopped(run);
+      run.targetSpeciesId = generated.targetSpeciesId;
       try {
         const manifest = JSON.parse(await readFile(generated.manifest, 'utf8'));
         store?.diagnostic?.(run.id, { event: 'frlg.plan', main: generated.main, manifestPath: generated.manifest, manifest });
@@ -120,6 +121,10 @@ function registerFrlgAutomation({ ipcMain, getMainWindow, devices, client, userD
         }
         if (message.event === 'script.round' && Number.isInteger(message.number) && message.number >= 0) {
           run.round = message.number;
+          const data = message.data;
+          if (data?.targetHit === true) run.targetEvidence = 'full_target_hit';
+          else if (data?.shiny === true && data.result === '目标出闪' && data.observedDex === run.targetSpeciesId
+              && !run.targetEvidence) run.targetEvidence = 'target_shiny';
           rememberShiny(run, message.number, message.data);
           store?.history?.(run.id, 'frlg_round', [{ number: message.number, data: message.data }]);
           log(`第 ${message.number} 轮结构化记录`, '火叶', 'info', {
@@ -179,9 +184,14 @@ function registerFrlgAutomation({ ipcMain, getMainWindow, devices, client, userD
       }
       const message = shinyDetail(run) || '流程已结束；请核对日志中的实际捕获结果。';
       run.finalStatus = 'completed'; run.finalMessage = message;
+      checkStopped(run);
+      const dexCompletion = run.options.auto_complete_pokedex === true && run.targetEvidence
+        && Number.isInteger(run.targetSpeciesId) && run.targetSpeciesId >= 1 && run.targetSpeciesId <= 386
+        ? { speciesId: run.targetSpeciesId, evidence: run.targetEvidence } : null;
       finishStoredRun(run, 'completed', message);
       record(run, message, 'success', { phase: '完成' });
-      update({ status: 'completed', message, calibrationUpdated });
+      if (dexCompletion) record(run, `已确认目标，自动标记本次存档的图鉴 #${dexCompletion.speciesId} 为已完成。`, 'success', { phase: '图鉴' });
+      update({ status: 'completed', message, calibrationUpdated, dexCompletion });
     } catch (error) {
       const stopped = run.stopped || closed;
       const message = stopped ? '火叶流程已停止' : String(error.message || error);
@@ -216,7 +226,7 @@ function registerFrlgAutomation({ ipcMain, getMainWindow, devices, client, userD
     const accepted = new Promise((resolve, reject) => { run.accept = resolve; run.reject = reject; });
     beginStoredRun(run);
     uiLogs = []; uiEntries = [];
-    update({ status: 'preparing', runId: run.id, profileId: run.profileId, message: '正在生成并预检火叶脚本', logs: [], logEntries: [], progress: null, bingo: null, calibrationUpdated: false });
+    update({ status: 'preparing', runId: run.id, profileId: run.profileId, message: '正在生成并预检火叶脚本', logs: [], logEntries: [], progress: null, bingo: null, calibrationUpdated: false, dexCompletion: null });
     record(run, '正在生成并预检火叶脚本。', 'info', { phase: '准备' });
     lastDone = run.done = execute(run);
     return accepted.then(() => state);

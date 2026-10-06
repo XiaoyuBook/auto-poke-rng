@@ -21,6 +21,21 @@ _BINGO_SPEC.loader.exec_module(_BINGO_MODULE)
 
 
 class FrlgLogPolicy(unittest.TestCase):
+    def test_pokedex_confirmation_requires_exact_positive_markers(self):
+        from frlg_round_records import RoundRecorder
+        records = []
+        recorder = RoundRecorder(records.append)
+        for line in ('FRLG_TARGET_CONFIRMED|V=2|DEX=25|KIND=TARGET_SHINY',
+                     'FRLG_TARGET_CONFIRMED|V=1|DEX=0|KIND=TARGET_SHINY',
+                     'FRLG_TARGET_CONFIRMED|V=1|DEX=387|KIND=TARGET_SHINY',
+                     '已命中目标', '未命中目标，脚本停止'):
+            recorder.consume(line)
+        self.assertEqual(records, [])
+        recorder.consume('FRLG_TARGET_CONFIRMED|V=1|DEX=25|KIND=TARGET_SHINY')
+        self.assertEqual(records[-1]['data'], {'result': '目标出闪', 'shiny': True, 'observedDex': 25})
+        recorder.consume('已命中目标，脚本停止')
+        self.assertEqual(records[-1]['data'], {'result': '完整命中', 'targetHit': True})
+
     def test_positive_shiny_observation_survives_without_precalibration(self):
         from frlg_round_records import RoundRecorder
         records = []
@@ -173,9 +188,10 @@ class FrlgLogPolicy(unittest.TestCase):
                 {"text": "# GUI_ECS_LOG_POLICY_V1 mode=compact"}
             )
             compact("HOME_BUFFER_RECOVERY|NX=1\n已命中目标，脚本停止\n")
-            self.assertEqual([item["message"] for item in events], ["已命中目标，脚本停止"])
+            self.assertEqual([item["message"] for item in events if item['event'] == 'script.log'], ["已命中目标，脚本停止"])
+            self.assertEqual(events[0], {'event': 'script.round', 'number': 0, 'data': {'result': '完整命中', 'targetHit': True}})
             compact("【BINGO】\n消耗帧　－４－３－２－１　０＋１＋２＋３＋４\n－４　．　．　．\n")
-            self.assertEqual(events, [{"event": "script.log", "message": "已命中目标，脚本停止"}])
+            self.assertEqual([item for item in events if item['event'] == 'script.log'], [{"event": "script.log", "message": "已命中目标，脚本停止"}])
             bingo = script_host.make_script_bingo_emitter()
             bingo({"version": 1, "grid": []})
             self.assertEqual(events[-1], {"event": "script.bingo", "state": {"version": 1, "grid": []}})

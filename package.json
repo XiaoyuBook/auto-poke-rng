@@ -20,6 +20,7 @@
     "test:rng": "node --test --test-concurrency=1 tests/pokefinder-native.cjs tests/pokefinder-iv.cjs tests/rng-client-regressions.cjs tests/frlg-rng-host.cjs tests/frlg-compute.cjs",
     "test:rng:electron": "npm run build && node tests/run-electron.cjs pokefinder-electron.cjs",
     "test:frlg:electron": "npm run build && node tests/run-electron.cjs frlg-electron.cjs",
+    "test:frlg:pokedex:electron": "npm run build && node tests/run-electron.cjs frlg-pokedex-electron.cjs",
     "build:runtime": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/build-runtime.ps1",
     "setup:runtime": "npm run build:runtime && powershell -NoProfile -ExecutionPolicy Bypass -File tools/setup-script-host.ps1",
     "test:runtime": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/test-runtime.ps1",

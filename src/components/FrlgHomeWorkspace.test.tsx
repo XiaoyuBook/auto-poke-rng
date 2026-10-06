@@ -1,17 +1,51 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { FrlgHomeWorkspace } from './FrlgHomeWorkspace';
 import { useFrlgSaves } from '../frlgProfile';
 import { getFrlgDex } from '../frlgDex';
+import type { FrlgRunState } from '../frlgExecution';
+import type { DesktopApi } from '../desktop';
 
 beforeEach(() => localStorage.clear());
-afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); delete window.desktop; });
 
 function Home() {
   const saves = useFrlgSaves();
   return <FrlgHomeWorkspace saves={saves} onOpenAutomation={vi.fn()} />;
 }
+
+it('applies automatic completion to the originating save and preserves manual undo across replays and reloads', async () => {
+  const idle: FrlgRunState = { status: 'idle', runId: null, profileId: null, message: '', logs: [] };
+  let latest = idle;
+  const onState = vi.fn((_listener: (state: FrlgRunState) => void) => vi.fn());
+  window.desktop = { frlgAutomation: { getState: vi.fn(async () => latest), onState } } as unknown as DesktopApi;
+  const view = render(<Home />);
+  fireEvent.click(screen.getByRole('button', { name: '新建存档' }));
+  const selector = screen.getByLabelText('当前火叶存档');
+  latest = { ...idle, status: 'completed', runId: 'run-a', profileId: 'frlg-save-1', dexCompletion: { speciesId: 1, evidence: 'target_shiny' } };
+  await act(async () => onState.mock.calls[0][0](latest));
+  expect((screen.getByLabelText('标记妙蛙种子已完成') as HTMLInputElement).checked).toBe(false);
+  fireEvent.change(selector, { target: { value: 'frlg-save-1' } });
+  expect((screen.getByLabelText('标记妙蛙种子已完成') as HTMLInputElement).checked).toBe(true);
+  fireEvent.click(screen.getByLabelText('标记妙蛙种子已完成'));
+  await act(async () => onState.mock.calls[0][0](latest));
+  expect((screen.getByLabelText('标记妙蛙种子已完成') as HTMLInputElement).checked).toBe(false);
+  view.unmount();
+  render(<Home />);
+  await act(async () => {});
+  expect((screen.getByLabelText('标记妙蛙种子已完成') as HTMLInputElement).checked).toBe(false);
+  const notify = onState.mock.calls[1][0];
+  await act(async () => notify({ ...latest, runId: 'run-b', dexCompletion: { speciesId: 4, evidence: 'full_target_hit' } }));
+  expect((screen.getByLabelText('标记小火龙已完成') as HTMLInputElement).checked).toBe(true);
+  for (const state of [
+    { ...latest, status: 'failed' as const, runId: 'failed', dexCompletion: { speciesId: 7, evidence: 'target_shiny' as const } },
+    { ...latest, runId: 'invalid', dexCompletion: { speciesId: 387, evidence: 'target_shiny' as const } },
+    { ...latest, runId: 'missing', profileId: 'missing', dexCompletion: { speciesId: 7, evidence: 'target_shiny' as const } },
+  ]) await act(async () => notify(state));
+  expect((screen.getByLabelText('标记杰尼龟已完成') as HTMLInputElement).checked).toBe(false);
+  expect(JSON.parse(localStorage.getItem('auto-poke-rng:frlg-saves-v1')!).profiles[0].completedSpecies).toEqual([4]);
+});
 
 it('keeps fireleaf save slots independent when saving and switching profiles', () => {
   render(<Home />);

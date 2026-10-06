@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { FRLG_GAMES, type FrlgGame } from './frlgAutomation';
+import type { FrlgRunState } from './frlgExecution';
 
 export interface FrlgSaveProfile {
   id: string;
@@ -12,7 +13,7 @@ export interface FrlgSaveProfile {
   completedSpecies?: number[];
 }
 
-type FrlgSaveState = { activeId: string; profiles: FrlgSaveProfile[] };
+type FrlgSaveState = { activeId: string; profiles: FrlgSaveProfile[]; completedRunIds?: string[] };
 
 export const defaultFrlgSaveProfile: FrlgSaveProfile = {
   id: 'frlg-save-1', name: '火叶存档 1', trainerName: '-', game: 'fr_nx', tid: 0, sid: 0, dexCompleted: false, completedSpecies: [],
@@ -52,7 +53,9 @@ function loadSaves(): FrlgSaveState {
     const profiles = Array.isArray(value?.profiles) ? value.profiles.map(normalizeProfile).filter((item): item is FrlgSaveProfile => !!item) : [];
     if (profiles.length) {
       const activeId = profiles.some(item => item.id === value?.activeId) ? String(value?.activeId) : profiles[0].id;
-      return { activeId, profiles };
+      const completedRunIds = Array.isArray(value?.completedRunIds)
+        ? value.completedRunIds.filter((id): id is string => typeof id === 'string').slice(-100) : [];
+      return { activeId, profiles, completedRunIds };
     }
   } catch { /* Invalid or unavailable storage falls back to one empty FireRed save. */ }
   return { activeId: defaultFrlgSaveProfile.id, profiles: [{ ...defaultFrlgSaveProfile }] };
@@ -60,6 +63,27 @@ function loadSaves(): FrlgSaveState {
 
 export function useFrlgSaves() {
   const [state, setState] = useState<FrlgSaveState>(loadSaves);
+  useEffect(() => {
+    const api = window.desktop?.frlgAutomation;
+    if (!api) return;
+    let alive = true;
+    const complete = (run: FrlgRunState) => {
+      const { runId, profileId } = run;
+      const speciesId = run.dexCompletion?.speciesId;
+      if (!alive || run.status !== 'completed' || !runId || !profileId || typeof speciesId !== 'number'
+          || !Number.isInteger(speciesId) || speciesId < 1 || speciesId > 386) return;
+      setState(current => {
+        if (current.completedRunIds?.includes(runId) || !current.profiles.some(item => item.id === profileId)) return current;
+        return { ...current, completedRunIds: [...(current.completedRunIds || []), runId].slice(-100),
+          profiles: current.profiles.map(item => item.id === profileId ? {
+            ...item, completedSpecies: completedIds([...(item.completedSpecies || []), speciesId]),
+          } : item) };
+      });
+    };
+    const unsubscribe = api.onState(complete);
+    void api.getState().then(complete).catch(() => {});
+    return () => { alive = false; unsubscribe(); };
+  }, []);
   useEffect(() => {
     try { localStorage.setItem(storageKey, JSON.stringify(state)); } catch { /* The active save remains available for this session. */ }
   }, [state]);

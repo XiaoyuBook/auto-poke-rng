@@ -28,7 +28,7 @@ function harness({ beforePrepare, outcome = 'completed', immediateDone = false, 
   };
   const service = registerFrlgAutomation({
     ipcMain: { handle: (name, action) => handlers.set(name, action) }, getMainWindow: () => ({ webContents: sender }),
-    devices, client: { call: async (method, args) => { calls.push(method); if (method === 'prepare') { await beforePrepare?.(); return { main: 'D:/test-library/generated/main.ecs', manifest: 'manifest.json' }; } calls.push({ finalize: args }); return calibrationResult; }, close: () => {} },
+    devices, client: { call: async (method, args) => { calls.push(method); if (method === 'prepare') { await beforePrepare?.(); return { main: 'D:/test-library/generated/main.ecs', manifest: 'manifest.json', targetSpeciesId: 42 }; } calls.push({ finalize: args }); return calibrationResult; }, close: () => {} },
     userData: 'D:/test-data', store, log: (...args) => { logs.push(args[0]); logRows.push(args); }, notifications: { wantsTaskImage, notifyTask: async (...args) => calls.push(args) },
     captureImage, encodeNotificationImage,
     readFile: async file => file === 'manifest.json' ? JSON.stringify({ plan }) : 'PRINT test', makeDirectory: async () => {},
@@ -45,6 +45,54 @@ test('rejects duplicate starts and foreign IPC senders', async () => {
   assert.throws(() => h.handlers.get('frlg-automation:stop')({ sender: {}, senderFrame: {} }), /sender/);
   await h.invoke('stop');
   assert.equal(h.locked(), false);
+});
+
+test('pokedex completion requires the enabled option and confirmed target evidence', async () => {
+  for (const [enabled, data, evidence] of [
+    [true, { result: '目标出闪', shiny: true, observedDex: 42 }, 'target_shiny'],
+    [true, { result: '完整命中', targetHit: true }, 'full_target_hit'],
+    [false, { result: '目标出闪', shiny: true, observedDex: 42 }, null],
+    [true, { result: '目标出闪', shiny: true, observedDex: 25 }, null],
+    [true, { result: '非目标出闪', shiny: true, observedDex: 19 }, null],
+    [true, { result: '发现闪光', shiny: true }, null],
+    [true, { result: '已反查', frameError: 0 }, null],
+    [true, {}, null],
+  ]) {
+    const h = harness();
+    await h.invoke('start', { request: plan.request, profileId: 'save-a', options: { auto_complete_pokedex: enabled } });
+    h.events.emit('script', { event: 'script.round', runId: 'script1', number: 1, data });
+    assert.equal((await h.invoke('state')).dexCompletion, null, 'running is not completed');
+    h.done(); await h.service.settled();
+    const state = await h.invoke('state');
+    assert.equal(state.profileId, 'save-a');
+    assert.deepEqual(state.dexCompletion, evidence ? { speciesId: 42, evidence } : null);
+    assert.equal(h.calls.includes('finalize'), false, 'pokedex is independent of calibration updates');
+  }
+});
+
+test('failed, stopped and foreign-script target observations never complete the pokedex', async () => {
+  for (const mode of ['failed', 'stopped', 'foreign']) {
+    const h = harness({ outcome: mode === 'failed' ? 'failed' : 'completed' });
+    await h.invoke('start', { request: plan.request, profileId: 'save-a', options: { auto_complete_pokedex: true } });
+    h.events.emit('script', { event: 'script.round', runId: mode === 'foreign' ? 'other' : 'script1', number: 1,
+      data: { result: '目标出闪', shiny: true, observedDex: 42 } });
+    if (mode === 'stopped') await h.invoke('stop'); else h.done();
+    await h.service.settled();
+    assert.equal((await h.invoke('state')).dexCompletion, null);
+  }
+});
+
+test('new runs clear prior pokedex success and duplicate patches produce a single completion log', async () => {
+  const h = harness();
+  await h.invoke('start', { request: plan.request, profileId: 'save-a', options: { auto_complete_pokedex: true } });
+  for (let n = 0; n < 2; n++) h.events.emit('script', { event: 'script.round', runId: 'script1', number: 1,
+    data: { result: '目标出闪', shiny: true, observedDex: 42 } });
+  h.done(); await h.service.settled();
+  assert.equal(h.logs.filter(line => line.includes('自动标记本次存档')).length, 1);
+  await h.invoke('start', { request: plan.request, profileId: 'save-b', options: { auto_complete_pokedex: true } });
+  assert.equal((await h.invoke('state')).dexCompletion, null);
+  h.done(); await h.service.settled();
+  assert.equal((await h.invoke('state')).dexCompletion, null);
 });
 
 test('FRLG structured records retain independent rounds and round-scoped logs', async () => {

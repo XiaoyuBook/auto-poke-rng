@@ -19,6 +19,61 @@ CORPUS = Path(os.environ.get('FRLG_SCRIPT_CORPUS',
 
 
 class PrecalibrationTests(unittest.TestCase):
+    @unittest.skipUnless(CORPUS.is_dir(), 'Set FRLG_SCRIPT_CORPUS to installed scripts')
+    def test_pokedex_confirmation_runs_without_calibration_and_resets_each_attempt(self):
+        from automation.planner import AutoSearchRequest, search_best_plan
+        from frlg_execution import prepare, execution_options
+        request = json.loads((ROOT / 'tests/fixtures/frlg-golbat-plan.json').read_text())['request']
+        request.update(direct_mode=True, direct_seed='7422', direct_advances=25296)
+        plan = search_best_plan(AutoSearchRequest(**request)).plan
+        with self.assertRaisesRegex(ValueError, '必须是布尔值'):
+            execution_options({'auto_complete_pokedex': 1}, plan)
+        for entry in ('formal', 'timeline'):
+            for calibration in (False, True):
+                result = prepare(plan, {'source': str(CORPUS), 'output': str(self.root / f'dex-{entry}-{calibration}'),
+                    'calibrationStore': str(self.store), 'options': {'entry': entry,
+                        'auto_complete_pokedex': True, 'update_precalibration': calibration}})
+                main = Path(result['main'])
+                text = main.read_text(encoding='utf-8')
+                self.assertEqual(result['targetSpeciesId'], 42)
+                self.assertEqual(text.count('CALL 清空最近出闪检测\n        $本轮流程结果 ='), 1)
+                EasyConScriptEngine().load_file(main)
+                helper = re.search(r'(?ms)^FUNC 记录图鉴目标出闪\n.*?^ENDFUNC', text)[0]
+                base = '\n'.join([
+                    'EXTERN FUNC 读取最近出闪检测结果(): INT FROM "python:test"',
+                    'EXTERN FUNC 读取最近出闪检测图鉴编号(): INT FROM "python:test"', helper])
+                for shiny, dex, round_number, expected in [(1, 42, 1, True), (1, 25, 1, False),
+                                                          (0, 42, 1, False), (1, 42, 0, False)]:
+                    logs = []
+                    EasyConScriptEngine().compile(base + f'\n$循环计数 = {round_number}\nCALL 记录图鉴目标出闪').run(
+                        extern_functions={'读取最近出闪检测结果': lambda: shiny,
+                                          '读取最近出闪检测图鉴编号': lambda: dex}, output=logs.append)
+                    self.assertEqual(bool(logs), expected)
+                    if expected:
+                        records = []
+                        RoundRecorder(records.append).consume(''.join(logs))
+                        self.assertEqual(records[-1]['data'], {'result': '目标出闪', 'shiny': True, 'observedDex': 42})
+                self.assertFalse(self.store.exists(), 'observing a target must not save calibration')
+
+        request.update(game='fr_jpn_nx', method='Static 1', category='Starter', location='', pokemon='Bulbasaur')
+        japanese_plan = search_best_plan(AutoSearchRequest(**request)).plan
+        result = prepare(japanese_plan, {'source': str(CORPUS), 'output': str(self.root / 'dex-japanese'),
+            'calibrationStore': str(self.store), 'options': {'auto_complete_pokedex': True}})
+        text = Path(result['main']).read_text(encoding='utf-8')
+        EasyConScriptEngine().load_file(result['main'])
+        helper = re.search(r'(?ms)^FUNC 读取并输出日版御三家识图结果\(\): INT\n.*?^ENDFUNC', text)[0]
+        # Execute the actual positive summary-page branch; it returns before OCR.
+        prefix = helper[:helper.index('        RETURN 0')] + '        RETURN 0\n    ENDIF\n    RETURN 1\nENDFUNC'
+        base = '\n'.join([
+            '$道具乱数模式 = 0', '$识图阈值 = 95',
+            'EXTERN FUNC 重置候选数字标签次数(): INT FROM "python:test"',
+            'EXTERN FUNC 记录最近出闪检测($dex: INT): INT FROM "python:test"', prefix,
+            '$result = 读取并输出日版御三家识图结果()'])
+        observed = []
+        EasyConScriptEngine().compile(base).run(external_getters={'出闪': lambda: 100}, extern_functions={
+            '重置候选数字标签次数': lambda: 0, '记录最近出闪检测': lambda dex: observed.append(dex) or 1})
+        self.assertEqual(observed, [1])
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)

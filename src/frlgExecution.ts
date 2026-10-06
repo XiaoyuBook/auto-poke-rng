@@ -9,6 +9,7 @@ export type FrlgRunOptions = {
   reverse_expansion_layers?: number; reverse_expansion_seed_tolerances?: number[];
   reverse_expansion_frame_half_widths?: number[]; togepi_seed_reverse_frame_half_width?: number;
   record_shiny_video?: boolean; stop_on_non_target_shiny?: boolean;
+  auto_complete_pokedex?: boolean;
   precalibration_seed_ns1?: number; precalibration_seed_ns2?: number;
   precalibration_frame_ns1?: number; precalibration_frame_ns2?: number;
 };
@@ -38,6 +39,7 @@ export type FrlgRunState = {
   runId: string | null; profileId: string | null; message: string; logs: string[]; logEntries?: FrlgRunLog[];
   progress?: { source: string; line: number; action: string; text: string } | null;
   calibrationUpdated?: boolean; bingo?: FrlgBingoState | null;
+  dexCompletion?: { speciesId: number; evidence: 'target_shiny' | 'full_target_hit' } | null;
 };
 export type FrlgRunInput = { request: FrlgPlannerRequest; profileId: string; options: FrlgRunOptions };
 export const frlgRunBusy = (state: FrlgRunState | null) => !!state && ['preparing', 'running', 'stopping'].includes(state.status);

@@ -20,6 +20,11 @@ class RoundRecorder:
                 self.publish({"number": self.number, "start": True})
                 continue
             patch = {}
+            confirmed = re.fullmatch(r"FRLG_TARGET_CONFIRMED\|V=1\|DEX=(\d+)\|KIND=TARGET_SHINY", line)
+            if confirmed and 1 <= int(confirmed[1]) <= 386:
+                patch.update(result="目标出闪", shiny=True, observedDex=int(confirmed[1]))
+            if line in ("已命中目标，脚本停止", "孵蛋目标Seed、Held帧和Pickup帧全部命中，流程完成"):
+                patch.update(result="完整命中", targetHit=True)
             # These are positive detector outcomes, independent of the optional
             # pre-calibration marker. Setup/threshold logs never count as a shiny.
             if line in ("已识别到闪光个体", "已识别到出闪，脚本停止", "时差检测到出闪",

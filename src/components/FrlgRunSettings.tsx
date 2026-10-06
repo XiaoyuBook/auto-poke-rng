@@ -32,6 +32,7 @@ export function FrlgRunSettings({ options, onChange, locked, wild }: {
       <div className="frlg-run-groups">
         <section className="frlg-run-group" aria-labelledby={`${groupId}-capture`}>
           <h3 id={`${groupId}-capture`}>捕获与出闪</h3>
+          <RunToggle label="成功后自动完成图鉴" description="确认目标出闪或完整命中且流程正常结束后，标记本次存档的图鉴" checked={options.auto_complete_pokedex ?? false} onChange={value => update('auto_complete_pokedex', value)} />
           <label className="frlg-run-select-row"><span>脚本入口</span><select aria-label="脚本入口" value={options.entry ?? 'formal'} onChange={event => update('entry', event.target.value)}><option value="formal">正式入口（默认）</option><option value="timeline">时间轴入口</option></select></label>
           <RunToggle label="使用麻痹" checked={options.paralysis ?? false} onChange={value => update('paralysis', value)} />
           <RunToggle label="使用点到为止" checked={options.false_swipe ?? false} onChange={value => update('false_swipe', value)} />

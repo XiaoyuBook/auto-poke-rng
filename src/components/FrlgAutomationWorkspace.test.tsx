@@ -32,6 +32,29 @@ function chooseGolbat() {
 afterEach(() => { cleanup(); delete window.desktop; localStorage.clear(); });
 
 describe('real FRLG planner result contract', () => {
+  it('persists the pokedex switch per save and sends it with the searched run', async () => {
+    mockApi();
+    const start = vi.fn(async () => ({ status: 'running' as const, runId: 'frlg-1', profileId: profile.id, message: '执行中', logs: [] }));
+    window.desktop!.frlgAutomation = { getState: vi.fn(async () => ({ status: 'idle' as const, runId: null, profileId: null, message: '待命', logs: [] })), onState: vi.fn(() => () => {}), start, stop: vi.fn() };
+    const view = render(<FrlgAutomationWorkspace profile={profile} />);
+    fireEvent.click(document.querySelector('.frlg-run-settings-fold > summary')!);
+    const toggle = () => screen.getByRole('switch', { name: '成功后自动完成图鉴' }) as HTMLInputElement;
+    expect(toggle().checked).toBe(false);
+    fireEvent.click(toggle());
+    expect(JSON.parse(localStorage.getItem('auto-poke-frlg-run:' + profile.id)!)).toMatchObject({ auto_complete_pokedex: true });
+    view.rerender(<FrlgAutomationWorkspace profile={{ ...profile, id: 'save-b' }} />);
+    fireEvent.click(document.querySelector('.frlg-run-settings-fold > summary')!);
+    expect(toggle().checked).toBe(false);
+    view.rerender(<FrlgAutomationWorkspace profile={profile} />);
+    fireEvent.click(document.querySelector('.frlg-run-settings-fold > summary')!);
+    expect(toggle().checked).toBe(true);
+    chooseGolbat();
+    fireEvent.click(searchButton());
+    await screen.findByRole('region', { name: '火叶推荐方案' });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: '开始运行' })));
+    expect(start).toHaveBeenCalledWith(expect.objectContaining({ options: expect.objectContaining({ auto_complete_pokedex: true }) }));
+    expect(toggle().matches(':disabled')).toBe(true);
+  });
   it('prefills a dex target without starting a search or execution', async () => {
     const api = mockApi();
     const consumed = vi.fn();
