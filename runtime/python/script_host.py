@@ -112,6 +112,8 @@ def _compact_ecs_line(line):
     if line.startswith('FRLG_REFINEMENT|V=1|'):
         fields = dict(part.split('=', 1) for part in line.split('|')[2:] if '=' in part)
         return f"候选细分：{fields.get('CANDIDATES', '?')} 个候选，已喂 {fields.get('CANDIES', '?')} 颗糖；{fields.get('REASON', '')}"
+    if line.startswith('OCR地点筛选:'):
+        return line
     if line.startswith(("SIDREV|META|", "SIDREV|ERROR|", "SIDREV|DONE|")):
         return line
     if line.startswith("SIDREV|"):
@@ -356,6 +358,7 @@ def run(config, program):
         seed_runtime = None
         data_runtime = None
         catalog_runtime = None
+        wild_runtime = None
         vote_session = None
         # 00_Seed表_入口.ecs and 01_Seed表_HEX转换.ecs are generated as
         # EXTERN declarations by the FRLG project builder.  Bind them once to
@@ -418,9 +421,6 @@ def run(config, program):
             from frlg_planner.automation.frlg_text_runtime import TextRuntime
 
             extern_functions.update(TextRuntime.from_project(root).extern_functions())
-        if (root / 'python_ocr_names.json').is_file():
-            from frlg_planner.automation.frlg_ocr_names import OcrNameRuntime
-            extern_functions.update(OcrNameRuntime.from_project(root, diagnostic_sink).extern_functions())
         python_wild_snapshot = root / "python_wild_data.json"
         if python_wild_snapshot.is_file():
             planner_root = Path(__file__).resolve().parent / "frlg_planner"
@@ -428,7 +428,14 @@ def run(config, program):
                 sys.path.insert(0, str(planner_root))
             from frlg_planner.automation.frlg_wild_data_runtime import WildDataRuntime
 
-            extern_functions.update(WildDataRuntime.from_project(root).extern_functions())
+            wild_runtime = WildDataRuntime.from_project(root)
+            extern_functions.update(wild_runtime.extern_functions())
+        if (root / 'python_ocr_names.json').is_file():
+            from frlg_planner.automation.frlg_ocr_names import OcrNameRuntime
+            # Share the run's extracted tables. The context callback updates
+            # with actual flow state rather than the initial GUI target.
+            extern_functions.update(OcrNameRuntime.from_project(root, diagnostic_sink,
+                data_runtime=data_runtime, wild_runtime=wild_runtime).extern_functions())
         # 25/28 are stateful calculations.  Each script run gets a distinct
         # Python session; this is the explicit replacement for their former
         # ECS file-scope arrays ($V_* / $C_* and $孵蛋反查_*).  The generated

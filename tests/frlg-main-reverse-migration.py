@@ -23,6 +23,9 @@ from automation.frlg_main_reverse_runtime import MainReverseSession, FUNCTIONS
 from automation.seed_table_runtime import SeedTableRuntime
 from automation.frlg_vote_runtime import CalibrationVoteSession
 from automation.frlg_bingo_runtime import BingoSession
+from automation.frlg_ocr_names import OcrNameRuntime
+from automation.frlg_data_runtime import DataRuntime
+from automation.frlg_wild_data_runtime import WildDataRuntime
 from automation.frlg_compute_runtime import extern_functions as compute_functions
 from automation.easycon118 import _apply_blackout_r_nx2_early_press_text
 
@@ -170,6 +173,9 @@ ENDFUNC
                                      emit=lambda line: output.append(line + '\n'), checkpoint=checkpoint)
         callbacks = {**seed.extern_functions(), **compute_functions(), **vote.extern_functions(),
                      **BingoSession().extern_functions(), **session.extern_functions()}
+        callbacks.update(OcrNameRuntime.from_project(self.generated_root,
+            data_runtime=DataRuntime.from_project(self.generated_root),
+            wild_runtime=WildDataRuntime.from_project(self.generated_root)).extern_functions())
         return callbacks, session, vote
 
     def dump(self, label='state'):
@@ -379,6 +385,9 @@ PRINT "MATCH=" & $匹配
                     self.assertNotIn('FOR ', scan, 'Seed/ADV scan still runs inside the ECS interpreter')
                     self.assertIn('Python反查执行入口', scan)
                     self.assertTrue((main.parent / 'python_main_reverse.json').is_file())
+                    ocr_policy = json.loads((main.parent / 'python_ocr_names.json').read_text(encoding='utf-8'))
+                    self.assertEqual(ocr_policy['application_policy'], 'GUI_OCR_ENCOUNTER_SCOPE_V1')
+                    self.assertIn('OCR名称设置遇敌环境($游戏版本, $遭遇类型, $遭遇方法, $遭遇地点)', text)
                     for name in FUNCTIONS:
                         block = re.search(rf'(?ms)^FUNC {name}.*?^ENDFUNC', text)[0]
                         self.assertNotRegex(block, r'(?m)^\s*(FOR|WHILE|IF) ')
@@ -398,6 +407,9 @@ PRINT "MATCH=" & $匹配
             self.assertNotIn('FOR ', scan)
             self.assertIn('Python反查执行入口', scan)
             self.assertTrue((main.parent / 'python_main_reverse.json').is_file())
+            ocr_policy = json.loads((main.parent / 'python_ocr_names.json').read_text(encoding='utf-8'))
+            self.assertEqual(ocr_policy['application_policy'], 'GUI_OCR_ENCOUNTER_SCOPE_V1')
+            self.assertIn('OCR名称设置遇敌环境($游戏版本, $遭遇类型, $遭遇方法, $遭遇地点)', text)
             EasyConScriptEngine().load_file(main)
 
 

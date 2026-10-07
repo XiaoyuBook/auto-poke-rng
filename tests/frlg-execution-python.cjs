@@ -31,7 +31,7 @@ test('FRLG target shiny persists execution corrections without requiring capture
   assert.equal(result.status, 0, result.stdout + result.stderr + (result.error?.message || ''));
 });
 
-test('FRLG indexed OCR preserves reference scores and verifies sprite alternatives', {
+test('FRLG OCR preserves reference scores and verifies encounter-scoped sprite alternatives', {
   skip: existsSync(corpus) ? false : 'Set FRLG_SCRIPT_CORPUS to the audited script bundle',
 }, () => {
   const result = spawnSync(pythonPath(), ['-X', 'utf8', path.join(__dirname, 'frlg-ocr-names.py')], {

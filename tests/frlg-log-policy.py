@@ -21,6 +21,19 @@ _BINGO_SPEC.loader.exec_module(_BINGO_MODULE)
 
 
 class FrlgLogPolicy(unittest.TestCase):
+    def test_encounter_scope_summary_survives_compact_without_inventing_a_hit(self):
+        events = []
+        original_emit = script_host.emit
+        try:
+            script_host.emit = events.append
+            logger = script_host.make_script_log_emitter({'text': '# GUI_ECS_LOG_POLICY_V1 mode=compact', 'diagnostics': True})
+            summary = 'OCR地点筛选: 游戏1，地点17，遭遇方式101；候选物种5'
+            logger(summary)
+            self.assertEqual([x['message'] for x in events if x['event'] == 'script.log'], [summary])
+            self.assertFalse(any(x['event'] == 'script.round' for x in events))
+        finally:
+            script_host.emit = original_emit
+
     def test_pokedex_confirmation_requires_exact_positive_markers(self):
         from frlg_round_records import RoundRecorder
         records = []
