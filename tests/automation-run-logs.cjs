@@ -68,7 +68,9 @@ test('real Python host sends full hidden OCR and controller timing to the run fi
   controller.call = async method => method === 'controller.status' ? { status: 'connected' }
     : method === 'controller.acquire' ? { owner: 'test' } : {};
   controller.sequence = async () => ({});
-  const text = '# GUI_ECS_LOG_POLICY_V1 mode=compact\nPRINT "OCR原文:HAGNEHITE"\nPRINT "后处理:MAGNEMITE"\nA\nWAIT 1\nPRINT 已命中目标';
+  const audioReport = '【音频判闪·实验】窗口=5；无法判定；threshold=0.85；start_qpc_ns=1234；score=0.6338；enhanced_score=0.1108；reason=提前截止，未覆盖计划音频窗口';
+  const text = ['# GUI_ECS_LOG_POLICY_V1 mode=compact', 'PRINT "OCR原文:HAGNEHITE"',
+    'PRINT "后处理:MAGNEMITE"', `PRINT "${audioReport}"`, 'A', 'WAIT 1', 'PRINT 已命中目标'].join('\n');
   fs.writeFileSync(path.join(f.directory, 'test.ecs'), text);
   f.store.beginRun('real', 'frlg');
   let resolveDone;
@@ -87,6 +89,9 @@ test('real Python host sends full hidden OCR and controller timing to the run fi
     const rows = f.read(f.files()[0]);
     assert.ok(rows.some(x => x.kind === 'ecs.output' && x.message.includes('OCR原文:HAGNEHITE')));
     assert.ok(rows.some(x => x.kind === 'ecs.output' && x.message.includes('后处理:MAGNEMITE')));
+    assert.ok(rows.some(x => x.kind === 'ecs.output' && x.message.trim() === audioReport));
+    assert.ok(f.store.logs.some(x => x.message === '【音频判闪·实验】无法判定；分数 0.6338 / 阈值 0.85；采样提前结束'));
+    assert.equal(f.store.logs.some(x => /start_qpc_ns|enhanced_score/.test(x.message)), false);
     assert.ok(rows.some(x => x.kind === 'controller.request' && x.params?.actions?.[0]?.key === 'A'));
     assert.ok(rows.some(x => x.kind === 'controller.reply' && x.elapsedMs >= 0));
     assert.equal(f.store.logs.some(x => x.message.includes('OCR原文')), false);

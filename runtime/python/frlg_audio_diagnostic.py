@@ -15,6 +15,10 @@ import time
 import wave
 
 
+# Keep the displayed threshold tied to the actual experimental classifier.
+SHINY_SCORE_THRESHOLD = 0.85
+
+
 @dataclass(frozen=True)
 class EncounterGate:
     source: str
@@ -165,7 +169,7 @@ def evaluate_window(blocks, start_ns, end_ns, reference, failure=None, compariso
         alternate, alternate_offset = template_score(samples, relevant[0].sample_rate, *comparison)
         details["enhanced_score"] = round(alternate, 4)
         details["enhanced_offset_seconds"] = round(alternate_offset, 3)
-    return {**details, "result": "candidate" if score >= 0.85 else "not_detected"}
+    return {**details, "result": "candidate" if score >= SHINY_SCORE_THRESHOLD else "not_detected"}
 
 
 class AudioShinyDiagnostic:
@@ -261,6 +265,7 @@ class AudioShinyDiagnostic:
             result.update(result="unknown", reason="提前截止，未覆盖计划音频窗口")
         labels = {"unknown": "无法判定", "candidate": "检出闪光音效候选", "not_detected": "未检出闪光音效"}
         fields = [f"窗口={number}", f"遭遇={name}", f"截止={cutoff}", labels[result["result"]],
+                  f"threshold={SHINY_SCORE_THRESHOLD:g}",
                   f"planned_seconds={window_ms / 1000:g}", f"shortfall_seconds={shortfall:.3f}",
                   f"start_qpc_ns={start}", f"end_qpc_ns={end}",
                   f"window_seconds={(end - start) / 1e9:.3f}"]

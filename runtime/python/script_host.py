@@ -85,10 +85,44 @@ def _ecs_log_mode(config):
     return match.group(1) if match else None
 
 
+def _compact_audio_line(line):
+    """GUI summary only; the emitter archives the full audio report first.
+
+    Keep the detector's verdict, rather than reclassifying its rounded score:
+    an incomplete window can have a score and still be unknown. The enhanced
+    comparison score is diagnostic and never controls this verdict.
+    """
+    from frlg_audio_diagnostic import SHINY_SCORE_THRESHOLD
+    prefix = "【音频判闪·实验】"
+    parts = line.removeprefix(prefix).split("；")
+    fields = dict(part.split("=", 1) for part in parts if "=" in part)
+    labels = {"检出闪光音效候选": "疑似出闪", "未检出闪光音效": "未检出", "无法判定": "无法判定"}
+    verdict = next((part for part in parts if part in labels), None)
+    if verdict:
+        summary = [labels[verdict],
+                   f"分数 {fields.get('score', '—')} / 阈值 {fields.get('threshold', f'{SHINY_SCORE_THRESHOLD:g}')}"]
+        reason = fields.get("reason")
+        if reason is None and verdict == "无法判定":
+            # A detector exception is emitted without key/value fields.
+            reason = next((part for part in parts if part and "=" not in part and part not in labels), None)
+        if reason:
+            summary.append({"提前截止，未覆盖计划音频窗口": "采样提前结束"}.get(reason, reason))
+        return prefix + "；".join(summary)
+    if parts[0].startswith("参考音效已加载"):
+        return prefix + f"已启用；阈值 {SHINY_SCORE_THRESHOLD:g}"
+    # One-off setup/failure messages only need their first clause.
+    return prefix + parts[0]
+
+
 def _compact_ecs_line(line):
     line = str(line).strip()
     if not line:
         return None
+
+    # Audio reports otherwise match the generic "闪光"/"无法" keep rules and
+    # expose packet timestamps and comparison scores in the normal GUI log.
+    if line.startswith("【音频判闪·实验】"):
+        return _compact_audio_line(line)
 
     # Stage markers carry a very large label/OCR payload.  Keep the phase and
     # outcome while dropping the machine-generated matcher list.
@@ -111,7 +145,12 @@ def _compact_ecs_line(line):
         return line
     if line.startswith('FRLG_REFINEMENT|V=1|'):
         fields = dict(part.split('=', 1) for part in line.split('|')[2:] if '=' in part)
-        return f"候选细分：{fields.get('CANDIDATES', '?')} 个候选，已喂 {fields.get('CANDIES', '?')} 颗糖；{fields.get('REASON', '')}"
+        reason = fields.get('REASON', '')
+        if fields.get('STATUS') == 'refining':
+            reason = f"继续升至 LV{fields.get('NEXT_LEVEL', '?')}"
+        elif reason == '升级能力值无法区分剩余落点，等待跨轮证据':
+            reason = '升级无法消歧，转下一轮'
+        return f"候选细分：{fields.get('CANDIDATES', '?')} 个，已用 {fields.get('CANDIES', '?')} 颗糖；{reason}"
     if line.startswith('OCR地点筛选:'):
         return line
     if line.startswith(("SIDREV|META|", "SIDREV|ERROR|", "SIDREV|DONE|")):

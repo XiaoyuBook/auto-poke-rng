@@ -117,7 +117,7 @@ class AudioDiagnosticTests(unittest.TestCase):
         observer.close()
         self.assertTrue(any("无法判定" in line and "窗口=1" in line
                             and "planned_seconds=13" in line and "shortfall_seconds=3.000" in line
-                            and "截止=我方入场A前" in line for line in logs))
+                            and "截止=我方入场A前" in line and "threshold=0.85" in line for line in logs))
 
     def test_deadline_expires_off_thread_during_ocr_and_keeps_exact_cutoff(self):
         logs = []

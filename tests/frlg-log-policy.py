@@ -21,6 +21,73 @@ _BINGO_SPEC.loader.exec_module(_BINGO_MODULE)
 
 
 class FrlgLogPolicy(unittest.TestCase):
+    def test_audio_summary_keeps_actual_verdict_and_primary_score(self):
+        # Rounding or the enhanced reference must never turn a negative or an
+        # incomplete window into a positive. Missing scores are not zeroes.
+        prefix = '【音频判闪·实验】'
+        for payload, expected in (
+            ('窗口=5；无法判定；score=0.6338；enhanced_score=0.99；threshold=0.85；reason=提前截止，未覆盖计划音频窗口',
+             '无法判定；分数 0.6338 / 阈值 0.85；采样提前结束'),
+            ('窗口=6；未检出闪光音效；score=0.85；enhanced_score=0.99；threshold=0.85',
+             '未检出；分数 0.85 / 阈值 0.85'),
+            ('窗口=7；检出闪光音效候选；score=0.92；threshold=0.9',
+             '疑似出闪；分数 0.92 / 阈值 0.9'),
+            ('窗口=8；无法判定；reason=音频静音或音量过低',
+             '无法判定；分数 — / 阈值 0.85；音频静音或音量过低'),
+            ('窗口=9；无法判定；检测器异常',
+             '无法判定；分数 — / 阈值 0.85；检测器异常'),
+            ('参考音效已加载；匹配阈值尚待实机验证；仅观察普通野生遭遇，不参与抓捕或停止决策',
+             '已启用；阈值 0.85'),
+            ('无法启动检测；继续原有图像判闪流程', '无法启动检测'),
+        ):
+            with self.subTest(payload=payload):
+                self.assertEqual(script_host._compact_ecs_line(prefix + payload), prefix + expected)
+
+    def test_full_audio_report_is_archived_before_ui_summary(self):
+        events = []
+        original_emit = script_host.emit
+        raw = ('【音频判闪·实验】窗口=5；遭遇=甜甜香气；截止=我方入场A前；无法判定；'
+               'threshold=0.85；planned_seconds=13；shortfall_seconds=2.944；'
+               'start_qpc_ns=25754107661700；end_qpc_ns=25764163227400；'
+               'packet_count=1007；score=0.6338；enhanced_score=0.1108；'
+               'reason=提前截止，未覆盖计划音频窗口')
+        try:
+            script_host.emit = events.append
+            for mode in ('compact', 'full'):
+                events.clear()
+                logger = script_host.make_script_log_emitter({
+                    'text': '# GUI_ECS_LOG_POLICY_V1 mode=' + mode, 'diagnostics': True})
+                logger(raw)
+                self.assertEqual([x['message'] for x in events if x['event'] == 'script.diagnostic'], [raw])
+                displayed = [x['message'] for x in events if x['event'] == 'script.log']
+                self.assertEqual(displayed, [raw] if mode == 'full' else [
+                    '【音频判闪·实验】无法判定；分数 0.6338 / 阈值 0.85；采样提前结束'])
+                self.assertFalse(any(x['event'] == 'script.round' for x in events))
+        finally:
+            script_host.emit = original_emit
+
+    def test_short_refinement_logs_preserve_round_progress_and_stop_reason(self):
+        events = []
+        original_emit = script_host.emit
+        prefix = 'FRLG_REFINEMENT|V=1|CANDIDATES=2|POINTS=2|LEVEL=7|CANDIES=2|'
+        reason = '升级能力值无法区分剩余落点，等待跨轮证据'
+        try:
+            script_host.emit = events.append
+            logger = script_host.make_script_log_emitter({'text': '# GUI_ECS_LOG_POLICY_V1 mode=compact'})
+            logger('第2轮开始')
+            logger(prefix + 'NEXT_LEVEL=9|STATUS=refining|REASON=继续升级至有效观测LV9')
+            self.assertEqual(events[-1]['message'], '候选细分：2 个，已用 2 颗糖；继续升至 LV9')
+            progress = [x['data'] for x in events if x['event'] == 'script.round' and 'data' in x]
+            self.assertEqual(progress[-1]['nextObservationLevel'], 9)
+            self.assertEqual(progress[-1]['observedLevel'], 7)
+            logger(prefix + 'NEXT_LEVEL=0|STATUS=unresolved|REASON=' + reason)
+            self.assertEqual(events[-1]['message'], '候选细分：2 个，已用 2 颗糖；升级无法消歧，转下一轮')
+            self.assertEqual(events[-2]['data']['note'], reason)
+            self.assertEqual(events[-2]['data']['result'], '待消歧')
+            self.assertNotIn('hitSeed', events[-2]['data'])
+        finally:
+            script_host.emit = original_emit
+
     def test_encounter_scope_summary_survives_compact_without_inventing_a_hit(self):
         events = []
         original_emit = script_host.emit
