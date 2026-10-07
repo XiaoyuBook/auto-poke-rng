@@ -15,6 +15,7 @@ import { usePanelWindows } from './usePanelWindows';
 import { useScriptLibrary } from './useScriptLibrary';
 import { parentFolder, scriptError } from './scriptLibrary';
 import { GlobalTools, initialConnections, type DeviceConnections } from './components/GlobalTools';
+import { GameEmblem } from './components/GameEmblem';
 import { VirtualControllerWindow } from './components/VirtualControllerWindow';
 import { ControllerOverlayApp } from './components/ControllerOverlayApp';
 import { KeyMappingDialog } from './components/KeyMappingDialog';
@@ -540,7 +541,7 @@ export default function App({ connections = initialConnections }: { connections?
         <div className="sidebar-top">
           <div className="workspace-switcher" ref={switcher}>
             <button ref={gameButton} className="workspace-button" title={activeGame.label + ' · ' + activeGame.detail} aria-label={'切换游戏：' + activeGame.label} aria-expanded={gameMenuOpen} aria-controls="game-menu" aria-haspopup="menu" onClick={() => setGameMenuOpen(value => !value)}>
-              <span className="game-mark" style={{ background: activeGame.color }} />
+              <GameEmblem game={activeGame.id} compact={!collapsed} />
               <strong>{activeGame.label}</strong><ChevronDown size={13} />
             </button>
             {gameMenuOpen && (
@@ -562,7 +563,7 @@ export default function App({ connections = initialConnections }: { connections?
                       if (item.id === 'frlg' && ['定点数据', '闪光反查区域', '眨眼捕获'].includes(page)) setPage('首页');
                       if (item.id !== game) addLog('已切换查看：' + item.label + '。');
                     }}>
-                    <span className="game-mark" style={{ background: item.color }} />
+                    <GameEmblem game={item.id} />
                     <span><strong>{item.label}</strong><small>{item.generation} · {item.detail}</small></span>
                     {item.id === game && <Check size={14} />}
                   </button>

@@ -51,11 +51,13 @@ h1, h2, h3, p { margin: 0; }
 .sidebar { display: flex; flex-direction: column; min-height: 0; min-width: 0; padding: 0 12px; }
 .sidebar-top { display: flex; align-items: center; gap: 5px; min-height: 44px; -webkit-app-region: drag; }
 .workspace-switcher { position: relative; flex: 1; min-width: 0; }
-.workspace-button { display: flex; align-items: center; width: 100%; gap: 7px; padding: 6px 5px; background: none; border: 0; border-radius: 5px; }
+.workspace-button { display: flex; align-items: center; width: 100%; gap: 4px; padding: 6px 3px; background: none; border: 0; border-radius: 5px; }
 .workspace-button:hover, .workspace-button[aria-expanded="true"] { background: var(--raised); }
 .workspace-button strong { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; text-align: left; white-space: nowrap; }
 .workspace-button > svg { color: var(--muted); }
-.game-mark { display: inline-block; width: 10px; height: 10px; flex: 0 0 auto; border-radius: 3px; }
+.game-emblem { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; flex: 0 0 24px; pointer-events: none; }
+.game-emblem.compact { width: 16px; height: 16px; flex-basis: 16px; }
+.game-emblem img { display: block; width: 100%; height: 100%; object-fit: contain; }
 .sidebar-actions { display: flex; gap: 1px; flex-shrink: 0; }
 .controller-tools { position: relative; display: flex; }
 .controller-tools-menu { position: absolute; z-index: 30; top: calc(100% + 8px); left: 0; width: 180px; padding: 5px; border: 1px solid #3b3d3d; border-radius: 8px; background: #202121; box-shadow: 0 10px 30px #0006; -webkit-app-region: no-drag; }
@@ -92,7 +94,7 @@ h1, h2, h3, p { margin: 0; }
 .menu-label { padding: 7px 9px; color: var(--muted); font-size: 12px; }
 .game-option { width: 100%; display: flex; align-items: center; gap: 10px; border: 0; background: transparent; border-radius: 5px; padding: 8px 9px; text-align: left; }
 .game-option:hover, .game-option.selected { background: #2b2d2d; }
-.game-option > span:nth-child(2) { flex: 1; }
+.game-option > span:nth-child(2) { flex: 1; min-width: 0; }
 .game-option strong { display: block; font-size: 13px; font-weight: 500; }
 .game-option small { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; }
 .game-option > svg { color: var(--secondary); }
@@ -2040,7 +2042,7 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 @media (max-width: 880px) {
   .app-shell { grid-template-columns: 220px minmax(0, 1fr); }
   .sidebar { padding: 0 8px; }
-  .workspace-button { gap: 5px; }
+  .workspace-button { gap: 4px; }
   .sidebar-actions { gap: 0; }
   .sidebar-actions .icon-button { width: 26px; }
   .topbar-actions { gap: 10px; }
