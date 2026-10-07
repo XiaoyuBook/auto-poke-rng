@@ -5,6 +5,7 @@ from pathlib import Path
 import re
 
 from .frlg_main_reverse_runtime import FUNCTIONS
+from .frlg_candidate_refinement import install_refinement
 
 MARKER = '# PYTHON_MAIN_REVERSE_MIGRATION_V1'
 SNAPSHOT = 'python_main_reverse.json'
@@ -67,6 +68,9 @@ def materialize_python_main_reverse(project_dir):
     backup = root / 'python_backup' / 'main.ecs'
     backup.parent.mkdir(parents=True, exist_ok=True)
     backup.write_bytes(main.read_bytes())
+    # Original application policy: install only after capturing the generator
+    # output, keeping migration/parity and intentional behaviour changes auditable.
+    source = install_refinement(source, sorted(writes), types)
     main.write_text('\n'.join(prefix) + '\n' + source, encoding='utf-8')
     payload = {
         'migration_version': 1,
@@ -75,6 +79,7 @@ def materialize_python_main_reverse(project_dir):
         'sha256': hashlib.sha256(backup.read_bytes()).hexdigest(),
         'inputs': types,
         'outputs': sorted(writes),
+        'application_policy': 'GUI_ADAPTIVE_REFINEMENT_V1',
         'functions': {name: {'python': FUNCTIONS.get(name, 'IV是否在范围'),
                              'sha256': hashlib.sha256(block.encode('utf-8')).hexdigest()}
                       for name, block in blocks.items()},

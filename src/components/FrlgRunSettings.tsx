@@ -71,6 +71,14 @@ export function FrlgRunSettings({ options, onChange, locked, wild }: {
             {(['reverse_expansion_seed_tolerances', 'reverse_expansion_frame_half_widths'] as const).map(key => <label key={key}>{key.includes('seed') ? '三层 Seed 容差' : '三层帧半宽'}<ExpansionInput value={options[key]} onChange={value => update(key, value)} /></label>)}
           </div>
         </section>
+        <section className="frlg-run-advanced-group" aria-label="候选细分预算设置">
+          <h4>候选细分预算</h4>
+          <p>普通野生／定点按后续等级的能力值差异继续喂糖。0 颗表示由信息量决定，最高到 LV100；每只默认最多 10 分钟。预算耗尽且仍有歧义时保留候选，等待跨轮筛选。</p>
+          <div className="automation-fields frlg-run-advanced-fields">
+            <label>每只糖果预算<input type="number" min={0} max={99} step={1} value={options.refinement_candy_budget ?? 0} onChange={event => update('refinement_candy_budget', event.target.value === '' ? undefined : Number(event.target.value))} /></label>
+            <label>每只细分时间（秒）<input type="number" min={1} max={21600} step={1} value={(options.refinement_time_budget_ms ?? 600000) / 1000} onChange={event => update('refinement_time_budget_ms', event.target.value === '' ? undefined : Number(event.target.value) * 1000)} /></label>
+          </div>
+        </section>
         <section className="frlg-run-advanced-group" aria-label="预校准覆盖设置">
           <h4>预校准覆盖</h4>
           <div className="automation-fields frlg-run-advanced-fields">

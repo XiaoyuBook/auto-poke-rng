@@ -31,6 +31,8 @@ class BingoSession:
     frame_difference: int = 0
     count: int = 0
     observed: bool = False
+    reverse_count: int = 0
+    outside_count: int = 0
     row_offset: int = 0
     seed_text: list[str] = field(default_factory=lambda: [""] * 9)
     cell: str = ""
@@ -98,6 +100,10 @@ class BingoSession:
         return {
             "version": 1,
             "observed": self.observed,
+            # Display-only counters; never widen the original +/-4 grid or
+            # contribute out-of-range observations to stability/calibration.
+            "reverseCount": self.reverse_count,
+            "outsideCount": self.outside_count,
             "prediction": {
                 "seed": self.cluster_seed_center, "seedRadius": self.cluster_seed_radius,
                 "frame": self.cluster_frame_center, "frameRadius": self.cluster_frame_radius,
@@ -235,6 +241,10 @@ class BingoSession:
         return self.count
 
     def record_hit(self) -> int:
+        self.reverse_count += 1
+        if not self._in_axis(self.hit_seed_offset) or not self._in_axis(self.normalize_frame(self.hit_frame_error)):
+            self.outside_count += 1
+            self._publish()
         if not self._in_axis(self.hit_seed_offset):
             return 0
         self.seed_difference = self.hit_seed_offset
@@ -472,6 +482,8 @@ class BingoSession:
 
     def clear(self) -> int:
         self.observed = False
+        self.reverse_count = 0
+        self.outside_count = 0
         self.counts = [[0] * 9 for _ in range(9)]
         self.tv_counts = [0] * 9
         self.current_in_range = 0

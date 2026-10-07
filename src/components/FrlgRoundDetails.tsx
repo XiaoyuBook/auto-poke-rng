@@ -24,10 +24,11 @@ export function FrlgRoundDetails({ run, round, logs, openLogs }: { run: Automati
     <dl className="frlg-round-results"><div><dt>实际 Seed</dt><dd>{data?.hitSeed || '—'}</dd></div><div><dt>Seed 偏差</dt><dd>{signed(data?.seedOffset)}<small> 个</small></dd></div><div><dt>实际消耗帧</dt><dd>{data?.hitFrame ?? '—'}</dd></div><div><dt>帧偏差</dt><dd>{signed(data?.frameError)}<small> 帧</small></dd></div></dl>
     {data?.seedMsError !== undefined && <p className="muted">Seed 计时误差 {signed(data.seedMsError)} ms</p>}
     {data?.candidateCount !== undefined && <p className="muted">反查匹配 {data.candidateCount} 个候选</p>}
+    {data?.candyCount !== undefined && <p className="muted">已使用 {data.candyCount} 颗糖 · 当前 LV{data.observedLevel}{data.refinementStatus === 'refining' && !!data.nextObservationLevel ? ` · 下一有效观测 LV${data.nextObservationLevel}` : ''}</p>}
     {request && Object.values(request).some(value => value !== undefined) && <section className="frlg-round-section"><h3>本轮执行参数</h3><RequestMetrics request={request}/></section>}
     {(data?.nextRequest || data?.nextSeedMs !== undefined) && <section className="frlg-round-section"><h3>下轮请求</h3><RequestMetrics request={data.nextRequest || { seedMs: data.nextSeedMs }}/></section>}
     {!!data?.notes?.length && <section className="frlg-round-section"><h3>校准判断</h3><ul>{data.notes.map(note => <li key={note}>{note}</li>)}</ul></section>}
-    {!data?.hitSeed && <p className="frlg-round-pending">{!round ? '此运行尚无结构化轮次数据，下方显示已收到的运行事件。' : data?.result === '校准跳过' ? '本轮反查后跳过校准，未输出完整落点；具体原因见校准判断。' : round.endedAt || run.endedAt ? '本轮已结束，没有收到完整反查落点。' : round.number === 0 ? '正在检查游戏环境与固定延迟，完成后进入目标轮次。' : '等待本轮捕获与反查结果，参数和偏差将随运行更新。'}</p>}
+    {!data?.hitSeed && <p className="frlg-round-pending">{!round ? '此运行尚无结构化轮次数据，下方显示已收到的运行事件。' : data?.result === '待消歧' ? '本轮已找到候选，尚未确定唯一落点；保留候选供跨轮筛选，具体原因见校准判断。' : data?.result === '校准跳过' ? '本轮反查后跳过校准，未输出完整落点；具体原因见校准判断。' : round.endedAt || run.endedAt ? '本轮已结束，没有收到完整反查落点。' : round.number === 0 ? '正在检查游戏环境与固定延迟，完成后进入目标轮次。' : '等待本轮捕获与反查结果，参数和偏差将随运行更新。'}</p>}
     {!!rows.length && <ol className="frlg-round-timeline" aria-label="轮次关键事件">{rows.map(row => <li key={row.id}><time>{row.time}</time><span className={`log-${row.level}`}>{row.message}</span></li>)}</ol>}
     {run.message && <p className="muted">{run.message}</p>}
   </section>;

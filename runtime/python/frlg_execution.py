@@ -13,6 +13,7 @@ from automation.easycon118 import (
     validate_generated_project_consistency, STANDARD_TEMPLATE_NAME, EGG_TEMPLATE_NAME,
 )
 from automation.precalibration import update_from_manifest
+from automation.frlg_candidate_refinement import DEFAULTS as REFINEMENT_OPTIONS, refinement_options, configure_refinement
 
 
 def execution_options(payload, plan):
@@ -20,7 +21,8 @@ def execution_options(payload, plan):
         raise ValueError('运行参数必须是对象')
     if 'auto_complete_pokedex' in payload and not isinstance(payload['auto_complete_pokedex'], bool):
         raise ValueError('auto_complete_pokedex 必须是布尔值')
-    payload = {key: value for key, value in payload.items() if key not in {'entry', 'auto_complete_pokedex'}}
+    refinement_options(payload)
+    payload = {key: value for key, value in payload.items() if key not in {'entry', 'auto_complete_pokedex', *REFINEMENT_OPTIONS}}
     allowed = {field.name for field in fields(EasyCon118Options)}
     unknown = set(payload) - allowed
     if unknown:
@@ -98,6 +100,7 @@ def prepare(plan, payload):
                                     template_name=template,
                                     precalibration_store_path=store)
     validate_generated_project_consistency(main, plan, options, template_name=template)
+    configure_refinement(main, payload.get('options', {}))
     if payload.get('options', {}).get('auto_complete_pokedex') is True:
         text = add_pokedex_confirmation(main.read_text(encoding='utf-8'), plan.species_id,
                                         japanese_starter=options.japanese_starter)

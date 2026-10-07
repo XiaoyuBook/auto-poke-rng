@@ -6,6 +6,7 @@ export type FrlgRunOptions = {
   home_buffer_adaptive_threshold?: boolean; seed_startup_scheme?: number; seed_calibration_scheme?: number;
   item_rng_mode?: boolean; party_empty_slots?: number; update_precalibration?: boolean;
   debug_log_output?: number; frame_parity_scheme?: number;
+  refinement_candy_budget?: number; refinement_time_budget_ms?: number;
   reverse_expansion_layers?: number; reverse_expansion_seed_tolerances?: number[];
   reverse_expansion_frame_half_widths?: number[]; togepi_seed_reverse_frame_half_width?: number;
   record_shiny_video?: boolean; stop_on_non_target_shiny?: boolean;
@@ -27,6 +28,7 @@ export type FrlgBingoCell = { seed: number; frame: number; count: number; marker
 export type FrlgBingoState = {
   version: number; axis: number[]; seedText: string[]; grid: FrlgBingoCell[][];
   observed?: boolean;
+  reverseCount?: number; outsideCount?: number;
   prediction?: { seed: number; seedRadius: number; frame: number; frameRadius: number };
   tv: { enabled: boolean; current: number; inRange?: boolean; prediction: number; radius: number; counts: number[]; cells: FrlgBingoCell[] };
   current: { seed: number; frame: number; hitSeed: number; hitFrame: number; inRange: boolean; inDeadZone: boolean };

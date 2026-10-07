@@ -109,6 +109,9 @@ def _compact_ecs_line(line):
     # machine-readable even in compact mode.
     if line.startswith("PRECALIBRATION_UPDATE|"):
         return line
+    if line.startswith('FRLG_REFINEMENT|V=1|'):
+        fields = dict(part.split('=', 1) for part in line.split('|')[2:] if '=' in part)
+        return f"候选细分：{fields.get('CANDIDATES', '?')} 个候选，已喂 {fields.get('CANDIES', '?')} 颗糖；{fields.get('REASON', '')}"
     if line.startswith(("SIDREV|META|", "SIDREV|ERROR|", "SIDREV|DONE|")):
         return line
     if line.startswith("SIDREV|"):
@@ -300,7 +303,8 @@ def run(config, program):
     runtime_files = [runtime_root / 'script_host.py', runtime_root / 'frlg_audio_diagnostic.py',
                      runtime_root / 'easycon/native/runtime.py',
                      runtime_root / 'easycon/native/ocr.py', *sorted((runtime_root / 'frlg_planner/automation').glob('*runtime.py')),
-                     runtime_root / 'frlg_planner/automation/frlg_ocr_names.py']
+                     runtime_root / 'frlg_planner/automation/frlg_ocr_names.py',
+                     runtime_root / 'frlg_planner/automation/frlg_candidate_refinement.py']
     diagnostic_sink(kind='script.preflight', name=config['name'],
         sources=[{'source': source_name(source, config), 'sha256': hashlib.sha256('\n'.join(lines).encode()).hexdigest()}
                  for source, lines in sources.items()],

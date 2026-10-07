@@ -24,7 +24,7 @@ export function FrlgBingoBoard({ state, startedRounds, compact = false }: { stat
   const predictionVisible = prediction && prediction.frame + prediction.frameRadius >= -4 && prediction.frame - prediction.frameRadius <= 4 && prediction.seed + prediction.seedRadius >= -4 && prediction.seed - prediction.seedRadius <= 4;
   const currentVisible = observed && axis.includes(state.current.seed) && axis.includes(state.current.frame);
   const stable = observed && [1, 2].includes(state.stable.type) && state.stable.count >= state.stable.threshold;
-  const status = !observed ? '等待校准' : stable ? '检测到稳定簇' : state.current.inRange ? `本轮已计入${tvMode ? '二维图' : ''}` : `本轮未计入${tvMode ? '二维图' : ''}`;
+  const status = !observed ? '等待校准' : stable ? '检测到稳定簇' : !currentVisible ? '已反查 · 落点在图外' : state.current.inRange ? `本轮已计入${tvMode ? '二维图' : ''}` : `本轮未计入${tvMode ? '二维图' : ''}`;
   const metrics = <dl className="frlg-bingo-metrics">
     <div><dt>本轮 Seed 偏差</dt><dd>{observed ? signed(state.current.hitSeed) : '—'}<small> 个</small></dd></div>
     <div><dt>本轮总帧偏差</dt><dd>{observed ? signed(state.current.hitFrame) : '—'}<small> 帧</small></dd></div>
@@ -45,6 +45,7 @@ export function FrlgBingoBoard({ state, startedRounds, compact = false }: { stat
       {startedRounds !== undefined && <strong>本次运行已开始 {startedRounds} 轮（含当前轮）</strong>}
       <span>{tvMode ? '上下两图展示同批校准的不同偏差，样本数有重叠，不能相加作为总轮数。' : '图内有效样本仅统计可信且落在坐标范围内的校准，不代表总轮数。'}</span>
     </div>}
+    {observed && state.reverseCount !== undefined && <p className="frlg-bingo-sample-caption" title="当前分布清空后记录的反查落点；图外落点不参与图内稳定簇计数">反查记录 {state.reverseCount} 次 · 图外 {state.outsideCount ?? 0} 次</p>}
     <div className="frlg-bingo-layout">
     {!compact && metrics}
     {compact && observed && <aside className="frlg-bingo-rail" aria-label="本轮校准结果">{metrics}{tvPanel}</aside>}

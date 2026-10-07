@@ -20,6 +20,20 @@ class RoundRecorder:
                 self.publish({"number": self.number, "start": True})
                 continue
             patch = {}
+            if line.startswith('FRLG_REFINEMENT|V=1|'):
+                fields = dict(part.split('=', 1) for part in line.split('|')[2:] if '=' in part)
+                try:
+                    values = {key: int(fields[key]) for key in ('CANDIDATES', 'POINTS', 'LEVEL', 'CANDIES', 'NEXT_LEVEL')}
+                    status = fields['STATUS']
+                    if min(values.values()) >= 0 and status in ('refining', 'resolved', 'unresolved'):
+                        patch.update(candidateCount=values['CANDIDATES'], candidatePointCount=values['POINTS'],
+                                     observedLevel=values['LEVEL'], candyCount=values['CANDIES'],
+                                     nextObservationLevel=values['NEXT_LEVEL'], refinementStatus=status,
+                                     note=fields.get('REASON', ''))
+                        if status == 'unresolved':
+                            patch['result'] = '待消歧'
+                except (KeyError, ValueError):
+                    pass
             confirmed = re.fullmatch(r"FRLG_TARGET_CONFIRMED\|V=1\|DEX=(\d+)\|KIND=TARGET_SHINY", line)
             if confirmed and 1 <= int(confirmed[1]) <= 386:
                 patch.update(result="目标出闪", shiny=True, observedDex=int(confirmed[1]))
@@ -82,6 +96,12 @@ class RoundRecorder:
                 # These calibration branches return before the usual round
                 # summary. Record their real outcome without inventing a hit.
                 patch.update(result="校准跳过", note=line)
+            if line.startswith('多候选跨组筛选: 本轮候选'):
+                count = re.search(r'本轮候选(\d+)', line)
+                if count:
+                    patch['candidateCount'] = int(count[1])
+            if line.startswith(('跨组候选尚未由共同区消歧', '跨组共同候选重新计算未通过识图校验')):
+                patch.update(result='待消歧', note=line)
             if line.startswith(("目标获取未完成", "孵蛋Seed预校准反查失败", "本轮时间轴截止已错过")):
                 patch.update(result="继续重试", note=line)
             if patch:

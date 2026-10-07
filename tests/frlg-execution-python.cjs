@@ -15,6 +15,15 @@ test('shared native interpreter supports the FRLG OCR and calibration contracts'
 
 const corpus = process.env.FRLG_SCRIPT_CORPUS || path.resolve(__dirname, '../../auto-poke-rng-scripts/bundles/frlg-automation/files');
 
+test('application-authored refinement handles low levels, budgets and single encounter evidence', {
+  skip: existsSync(corpus) ? false : 'Set FRLG_SCRIPT_CORPUS to generate the audited ECS probes',
+}, () => {
+  const result = spawnSync(pythonPath(), ['-X', 'utf8', path.join(__dirname, 'frlg-adaptive-refinement.py')], {
+    env: { ...process.env, FRLG_SCRIPT_CORPUS: corpus }, encoding: 'utf8', windowsHide: true, timeout: 180000,
+  });
+  assert.equal(result.status, 0, result.stdout + result.stderr + (result.error?.message || ''));
+});
+
 test('FRLG target shiny persists execution corrections without requiring capture or reverse', () => {
   const result = spawnSync(pythonPath(), ['-X', 'utf8', path.join(__dirname, 'frlg-precalibration.py')], {
     env: { ...process.env, FRLG_SCRIPT_CORPUS: corpus }, encoding: 'utf8', windowsHide: true, timeout: 30000,

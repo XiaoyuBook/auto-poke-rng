@@ -16,6 +16,7 @@ from .frlg_compute_runtime import (
     static_gender,
 )
 from .seed_table_runtime import hex_to_decimal
+from .frlg_candidate_refinement import first_informative_level
 
 
 FUNCTIONS = {
@@ -46,10 +47,15 @@ class MainReverseSession:
     def __init__(self, *, seed_runtime, vote_session, emit=lambda message: None,
                  checkpoint=lambda: None):
         self.seed_runtime = seed_runtime
+        self.vote_session = vote_session
         self.vote = vote_session.extern_functions()
         self.emit = emit
         self.checkpoint = checkpoint
         self.state = {}
+        self.refinement_active = False
+        self.refinement_candidates = []
+        self.refinement_overflow = False
+        self.refinement_metrics = {}
 
     def put(self, name, value):
         self.state[name] = value
@@ -74,11 +80,21 @@ class MainReverseSession:
             'Python反查读文本': self.get,
             'Python反查执行入口': self.execute,
             'IV是否在范围': lambda value, low, high: int(low <= value <= high),
+            'Python细分开始': self.refinement_begin,
+            'Python细分决策': self.refinement_decide,
+            'Python细分中止': self.refinement_stop,
+            'Python细分取整数': lambda key: self.refinement_metrics[key],
         }
 
     def scan(self):
         """原 执行反查扫描：保持 Seed/ADV/101→102→104 的顺序与并列首选。"""
         s = self.state
+        if self.refinement_active:
+            # Original behaviour accumulates candidates from every candy scan.
+            # Our policy replaces that encounter's provisional vote tables so
+            # a longer low-level refinement cannot manufacture extra evidence.
+            for key, value in self.refinement_vote_baseline.items():
+                setattr(self.vote_session, key, list(value))
         self.reset()
         s['找到候选Seed'] = 0
         s['扫描起始索引'] = max(0, _i32(s['目标索引'] - s['有效Seed容差']))
@@ -236,6 +252,8 @@ class MainReverseSession:
     def reset(self):
         """原 重置本轮候选状态；投票历史不随每次扫描重置。"""
         s = self.state
+        self.refinement_candidates = []
+        self.refinement_overflow = False
         if s['跨组筛选收集启用'] == 1:
             self.vote['共同区开始扫描']()
         for name in (
@@ -299,6 +317,16 @@ class MainReverseSession:
         if s['当前候选Seed离群'] == 1 or s['当前候选TV帧离群'] == 1:
             outlier = 1
         s['当前候选离群'] = outlier
+        if self.refinement_active:
+            if len(self.refinement_candidates) >= 4096:
+                self.refinement_overflow = True
+            else:
+                # Retain the actual generating method, including 101/102/104
+                # under option 199, and all fields needed to restore a hit.
+                keys = [key for key in s if key.startswith(('当前候选', '个体', '野生'))]
+                keys += ['当前Seed', '当前MS', '当前消耗帧', '种子索引', '差索引', '当前反查算法',
+                         'PIDHI', 'PIDLO', 'IV1', 'IV2', '临HI', '临LO', '临RAND', '新HI', '新LO', '候HI', '候LO']
+                self.refinement_candidates.append({key: s[key] for key in keys})
         if (s['最佳候选有效'] == 0 or (s['最佳候选离群'] == 1 and outlier == 0)
                 or (s['最佳候选离群'] == outlier and mse < s['最佳候选MSE'])):
             self.record_best()
@@ -320,3 +348,83 @@ class MainReverseSession:
             s['命中' + target] = s[source]
         for stat in STATS:
             s['命中' + stat + 'IV'] = s['个体' + stat + 'IV']
+
+    # Application-authored policy. Ordinary scans outside this entry retain
+    # their parity behaviour; see docs/FRLG_ADAPTIVE_REFINEMENT.md.
+    def refinement_begin(self, round_number):
+        self.refinement_active = True
+        self.refinement_candidates = []
+        self.refinement_overflow = False
+        self.refinement_metrics = {'round': int(round_number), 'independent': 0, 'commonTrusted': 0}
+        self.refinement_vote_baseline = {
+            key: list(getattr(self.vote_session, key)) for key in
+            ('phase_table', 'ring_table', 'seed_table', 'joint_keys', 'joint_votes')}
+        return 1
+
+    def _refinement_event(self, status, reason, next_level=0):
+        m = self.refinement_metrics
+        self.emit('FRLG_REFINEMENT|V=1|'
+                  f'CANDIDATES={self.state["本轮候选命中计数"]}|POINTS={m.get("points", 0)}|'
+                  f'LEVEL={m.get("level", 0)}|CANDIES={m.get("candies", 0)}|'
+                  f'NEXT_LEVEL={next_level}|STATUS={status}|REASON={reason}')
+
+    def refinement_stop(self, reason):
+        # Submit exactly the final observation of this encounter, never a
+        # broad pre-candy group and its refinements as separate rounds.
+        self.vote_session.common_submit()
+        self.refinement_active = False
+        self._refinement_event('unresolved', reason)
+        return -1
+
+    def refinement_decide(self, level, candies, candy_budget, elapsed, time_budget,
+                          nature, *base_and_effort):
+        self.checkpoint()
+        s, m = self.state, self.refinement_metrics
+        previous_level, previous_candies = m.get('level'), m.get('candies', 0)
+        m.update(level=int(level), candies=int(candies), independent=0, commonTrusted=0)
+        candidates = self.refinement_candidates
+        points = {(c['种子索引'], c['当前消耗帧']) for c in candidates}
+        m['points'] = len(points)
+        if self.refinement_overflow or not candidates:
+            return self.refinement_stop('候选保存不完整，不能据截断结果校准')
+        if previous_level is not None and candies > previous_candies and level <= previous_level:
+            return self.refinement_stop('使用糖果后等级未增加，需检查菜单或识图')
+        chosen = candidates[0] if len(points) == 1 else None
+        if chosen is not None:
+            m['independent'] = 1
+        else:
+            # Use only previous encounters to disambiguate this one. Do not
+            # submit a broad current group before evaluating its own truth.
+            slot = self.vote_session.common_select()
+            if slot >= 0:
+                _, adv, index = self.vote_session.common_current[slot]
+                matches = [c for c in candidates
+                           if c['种子索引'] + s['Seed累计修正索引'] == index
+                           and c['当前消耗帧'] + s['消耗帧实际执行修正量'] == adv]
+                if matches:
+                    chosen = matches[0]
+                    m['commonTrusted'] = 1
+        if chosen is not None:
+            s.update(chosen)
+            self.record_best()
+            s['最佳候选离群'] = chosen['当前候选离群']
+            if m['commonTrusted']:
+                for key in ('最佳候选离群', '最佳候选剩余帧离群', '最佳候选Seed离群', '最佳候选TV帧离群'):
+                    s[key] = 0
+            self.vote_session.common_submit()
+            self.refinement_active = False
+            self._refinement_event('resolved', '独立唯一落点' if m['independent'] else '跨轮共同区唯一落点')
+            return 1
+        if not 1 <= level <= 100 or len(base_and_effort) != 12:
+            return self.refinement_stop('等级或能力值模型参数无效')
+        vectors = {tuple(c['个体' + stat + 'IV'] for stat in STATS) for c in candidates}
+        next_level = first_informative_level(vectors, level, base_and_effort[:6],
+                                             base_and_effort[6:], nature, self.checkpoint)
+        if next_level == 0:
+            return self.refinement_stop('升级能力值无法区分剩余落点，等待跨轮证据')
+        if candy_budget > 0 and candies + next_level - level > candy_budget:
+            return self.refinement_stop(f'下一有效观测需LV{next_level}，超出糖果预算')
+        if elapsed >= time_budget:
+            return self.refinement_stop('达到本只耗时预算，等待跨轮证据')
+        self._refinement_event('refining', f'继续升级至有效观测LV{next_level}', next_level)
+        return 0

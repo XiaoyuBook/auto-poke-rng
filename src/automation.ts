@@ -42,7 +42,9 @@ export type AutomationFlow = {
 export type Candidate = Omit<NativeStaticResult, 'pid' | 'ec'> & { pid: string | number; ec: string | number };
 export type FrlgRoundRequest = { seedMs: number; f1?: number; tv?: number; f2?: number; menu?: number; held?: number; pickup?: number };
 export type FrlgRoundRecord = { request?: FrlgRoundRequest; nextRequest?: FrlgRoundRequest; hitSeed?: string; seedOffset?: number; hitFrame?: number; frameError?: number;
-  seedMsError?: number; candidateCount?: number; nextSeedMs?: number; f1?: number; tv?: number; f2?: number; result?: string; notes?: string[] };
+  seedMsError?: number; candidateCount?: number; candidatePointCount?: number; observedLevel?: number; candyCount?: number;
+  nextObservationLevel?: number; refinementStatus?: 'refining' | 'resolved' | 'unresolved';
+  nextSeedMs?: number; f1?: number; tv?: number; f2?: number; result?: string; notes?: string[] };
 export type AutomationRound = { number: number; seed?: string; outcome: string; startedAt?: string; endedAt?: string; frlg?: FrlgRoundRecord; candidates: Candidate[]; selected?: number; sources?: string[];
   interval?: number; trigger?: number; usedDelay?: number; actualDelays?: number[]; reverse?: Candidate[]; events: { event: string; args: unknown[] }[] };
 export type AutomationRun = { id: string; kind: AutomationRunKind; context?: AutomationFlow['context'] | { profileId: string; target: string; game: 'frlg' } | null; startedAt: string; endedAt?: string; status: string; message?: string; rounds: AutomationRound[] };
