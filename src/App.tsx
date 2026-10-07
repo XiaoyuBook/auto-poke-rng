@@ -8,7 +8,6 @@ import { LogsPanel } from './components/LogsPanel';
 import { FloatingSidePanel, type PanelState, type PanelTool } from './components/FloatingSidePanel';
 import { ScriptWorkspace } from './components/ScriptWorkspace';
 import { ScriptLibrary } from './components/ScriptLibrary';
-import { QuickTools } from './components/QuickTools';
 import { ToolsDialog } from './components/Tools';
 import { VideoPreview, VideoLabelsButton } from './components/VideoPreview';
 import { createLog, games, isEasyConLog, type GameId, type LogEntry, type Modal, type Page } from './workspace';
@@ -140,7 +139,7 @@ export default function App({ connections = initialConnections }: { connections?
   const videoRegion = useRef<HTMLElement>(null);
   const logRegion = useRef<HTMLElement>(null);
   const videoResize = useRef<{ startX: number; width: number } | null>(null);
-  const dockButtons = useRef<Partial<Record<PanelTool, HTMLButtonElement | null>>>({});
+  const logExpandButton = useRef<HTMLButtonElement>(null);
   const activeGame = games.find(item => item.id === game)!;
   const script = library.active?.body || '';
   const validation = useScriptValidation(library.active?.path || '', script);
@@ -297,18 +296,13 @@ export default function App({ connections = initialConnections }: { connections?
     setToolPanel(current => ({ tool, minimized: false, expanded: current?.expanded ?? false }));
   };
 
-  const togglePanel = (tool: PanelTool) => {
-    if (panelWindows.detached.includes(tool)) { showPanel(tool); return; }
-    setToolPanel(current => ({ tool, minimized: current?.tool === tool && !current.minimized, expanded: current?.expanded ?? false }));
-  };
-
   const closePanel = () => {
-    if (toolPanel) dockButtons.current[toolPanel.tool]?.focus();
+    logExpandButton.current?.focus();
     setToolPanel(null);
   };
 
   const minimizePanel = () => {
-    if (toolPanel) dockButtons.current[toolPanel.tool]?.focus();
+    logExpandButton.current?.focus();
     setToolPanel(current => current && { ...current, minimized: true });
   };
 
@@ -664,13 +658,13 @@ export default function App({ connections = initialConnections }: { connections?
               <header className="persistent-logs-header">
                 <FileClock size={15} />
                 <h2 id="persistent-logs-title">日志中心</h2>
-                <button className="text-button" onClick={() => showPanel('logs')}>展开</button>
+                <button ref={logExpandButton} className="text-button" onClick={() => showPanel('logs')}>展开</button>
               </header>
               <LogsPanel logs={logs} source={panelWindows.logSource} setSource={setLogSource} clear={() => setLogs([])} />
             </section>
           </aside>
         </div>
-        <footer className="workspace-footer" aria-label="工作区状态与工具">
+        <footer className="workspace-footer" aria-label="工作区状态">
           <div className="workspace-status">
             {page === '脚本编辑' ? <>
               <span>文本脚本</span>
@@ -679,7 +673,6 @@ export default function App({ connections = initialConnections }: { connections?
               <span>{script.split('\n').length} 行</span>
             </> : page === '闪光反查区域' ? <span>闪光反查区域</span> : page === '定点数据' ? <span>定点数据</span> : <span>{activeGame.label}</span>}
           </div>
-          <QuickTools panel={toolPanel} detached={panelWindows.detached} toggle={togglePanel} buttons={dockButtons.current} />
         </footer>
       </main>
 

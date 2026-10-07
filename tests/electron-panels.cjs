@@ -29,6 +29,7 @@ const timeout = setTimeout(() => { console.error('Electron panel checks timed ou
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const evaluate = (window, code) => window.webContents.executeJavaScript(code).catch(error => { throw new Error(code + '\n' + error.message); });
 const click = (window, label) => evaluate(window, `document.querySelector('[aria-label="${label}"]').click()`);
+const openLogs = window => evaluate(window, `document.querySelector('.persistent-logs-header .text-button').click()`);
 const panelBounds = window => evaluate(window, `(() => {
   const r = document.querySelector('.floating-side-panel').getBoundingClientRect();
   return { x: r.x, y: r.y, width: r.width, height: r.height, right: r.right, bottom: r.bottom };
@@ -189,7 +190,6 @@ app.whenReady().then(async () => {
   assert.ok(workspaceVideoLayout.logs.top >= workspaceVideoLayout.video.bottom, 'logs stay below the persistent video');
   assert.ok(Math.abs(workspaceVideoLayout.logs.left - workspaceVideoLayout.video.left) < 1 && Math.abs(workspaceVideoLayout.logs.right - workspaceVideoLayout.video.right) < 1, 'logs align to the video width in the fixed right rail');
   assert.ok(Math.abs(workspaceVideoLayout.rail.left - workspaceVideoLayout.video.left) < 1 && Math.abs(workspaceVideoLayout.rail.right - workspaceVideoLayout.video.right) < 1, 'the right rail stays fixed to the video column');
-  assert.equal(await evaluate(main, `Boolean(document.querySelector('.quick-dock [aria-label="视频预览"]'))`), false, 'video no longer uses the footer dock');
   await evaluate(main, `document.querySelector('.nav-item[title="首页"]').click()`);
   assert.deepEqual(await videoBounds(main), pinnedBounds, 'video stays in place on home page');
   await evaluate(main, `document.querySelector('.nav-item[title="脚本编辑"]').click()`);
@@ -207,7 +207,7 @@ app.whenReady().then(async () => {
   await click(main, '选择脚本：菜单');
   console.log('Project folder discovery, selection, and disk save passed');
   await editor.edit('# unsaved detached test');
-  await evaluate(main, `document.querySelector('.quick-dock [aria-label="日志中心"]').click()`);
+  await openLogs(main);
   const original = await panelBounds(main);
   const handle = await evaluate(main, `(() => {
     const r = document.querySelector('.resize-corner').getBoundingClientRect();
@@ -231,7 +231,7 @@ app.whenReady().then(async () => {
   assert.deepEqual(await panelBounds(main), resized);
   console.log('Pointer resize and expand/restore passed');
   await click(main, '关闭日志中心');
-  await click(main, '日志中心');
+  await openLogs(main);
   assert.deepEqual(await panelBounds(main), resized);
   await evaluate(main, `(() => {
     const select = document.querySelector('[aria-label="筛选日志来源"]');
@@ -250,7 +250,7 @@ app.whenReady().then(async () => {
   assert.equal(logs.getParentWindow(), main);
   assert.equal(logs.isModal(), false, 'detached tools do not block the main window');
   console.log('Detached window ready');
-  await click(main, '日志中心');
+  await openLogs(main);
   assert.equal(BrowserWindow.getAllWindows().length, 2, 'existing window is reused');
   await evaluate(main, `window.desktop.devices.controller.connect('mock')`);
   await evaluate(main, `Array.from(document.querySelectorAll('button')).find(b => b.textContent === '开始运行').click()`);
@@ -406,8 +406,8 @@ app.whenReady().then(async () => {
   assert.equal(reopenedBounds.y, movedNative.y, 'native vertical position remembered');
   await until(() => evaluate(main, '!document.querySelector(".floating-side-panel")'), 'reopened inline panel removed');
   logs.close();
-  await until(() => evaluate(main, `document.querySelector('[aria-label="日志中心"]').dataset.state === 'closed'`), 'closing window clears dock state');
-  await click(main, '日志中心');
+  await until(() => evaluate(main, `window.desktop.panels.getState().then(state => !state.detached.includes('logs'))`), 'closing window clears detached state');
+  await openLogs(main);
   await until(() => evaluate(main, 'Boolean(document.querySelector(".floating-side-panel"))'), 'closed tool opens inline again');
   assert.equal(await editor.read(), '# unsaved detached test');
   main.setContentSize(1100, 680);

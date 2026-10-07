@@ -416,7 +416,7 @@ describe('workspace interactions', () => {
     expect(editorLogs().queryByText('运行演示已停止。')).toBeNull();
     expect(editorLogs().queryByText('录制完成，输入已写入当前脚本。')).toBeNull();
     expect((editorLogs().getByRole('button', { name: '清屏' }) as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.click(screen.getByRole('button', { name: '日志中心' }));
+    fireEvent.click(screen.getByRole('button', { name: '展开' }));
     const logCenter = within(screen.getByRole('dialog', { name: '日志中心' }));
     expect(logCenter.getByText('工作区已就绪，等待运行脚本。')).toBeTruthy();
     expect(logCenter.getByText('已切换查看：珍钻复刻。')).toBeTruthy();
@@ -429,7 +429,6 @@ describe('workspace interactions', () => {
     await openApp();
     const video = screen.getByRole('region', { name: '视频预览' });
     const frame = within(video).getByLabelText('视频画面');
-    expect(within(screen.getByRole('toolbar', { name: '快捷工具' })).queryByRole('button', { name: '视频预览' })).toBeNull();
     expect(screen.getByRole('textbox', { name: '脚本内容' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '首页' }));
     expect(within(screen.getByRole('region', { name: '视频预览' })).getByLabelText('视频画面')).toBe(frame);
@@ -466,7 +465,7 @@ describe('workspace interactions', () => {
   it('keeps edits and log filters while the floating panel expands, minimizes, and restores', async () => {
     await openApp();
     edit('# 工作中的草稿');
-    fireEvent.click(screen.getByRole('button', { name: '日志中心' }));
+    fireEvent.click(screen.getByRole('button', { name: '展开' }));
     const panel = screen.getByRole('dialog', { name: '日志中心' });
     expect(panel.getAttribute('aria-modal')).toBe('false');
     expect(screen.getByRole('heading', { name: '脚本编辑', level: 1 })).toBeTruthy();
@@ -477,7 +476,7 @@ describe('workspace interactions', () => {
     expect(panel.getAttribute('data-expanded')).toBe('false');
     fireEvent.click(within(panel).getByRole('button', { name: '收起日志中心' }));
     expect(within(panel).queryByRole('combobox')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: '日志中心' }));
+    fireEvent.click(within(panel).getByRole('button', { name: '恢复日志中心' }));
     expect((within(panel).getByRole('combobox') as HTMLSelectElement).value).toBe('脚本');
     expect(screen.getByRole('textbox', { name: '脚本内容' }).textContent).toBe('# 工作中的草稿');
     const video = screen.getByRole('region', { name: '视频预览' });
@@ -485,7 +484,7 @@ describe('workspace interactions', () => {
     expect(video.querySelector('.preview-frame')).toBeTruthy();
     fireEvent.keyDown(panel, { key: 'Escape' });
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: '日志中心' }));
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: '展开' }));
     expect(screen.getByRole('region', { name: '视频预览' })).toBe(video);
   });
 

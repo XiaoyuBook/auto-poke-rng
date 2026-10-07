@@ -1260,13 +1260,6 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .logs-table td .status-dot { margin-right: 9px; }
 .logs-table td.mono { color: var(--muted); font-size: 12px; }
 
-.quick-dock { display: flex; align-items: center; gap: 2px; flex: 0 0 auto; }
-.quick-tool-button { display: inline-flex; align-items: center; gap: 6px; height: 27px; padding: 0 8px; border: 0; border-radius: 5px; background: transparent; color: var(--muted); font-size: 12px; white-space: nowrap; }
-.quick-tool-button:hover { background: var(--raised); color: var(--text); }
-.quick-tool-button[data-state="open"] { background: #292c2c; color: var(--text); }
-.quick-tool-button[data-state="detached"] { color: var(--secondary); }
-.quick-tool-indicator { display: inline-flex; width: 11px; height: 11px; align-items: center; justify-content: center; color: var(--muted); }
-.quick-tool-button[data-state="detached"] .quick-tool-indicator { color: #a5aecb; }
 .floating-side-panel { position: fixed; z-index: 12; right: 22px; bottom: 58px; display: flex; flex-direction: column; width: min(var(--panel-width, 400px), calc(100vw - 44px)); height: min(var(--panel-height, 600px), calc(100dvh - 122px)); overflow: hidden; border: 1px solid #3e4242; border-radius: 12px; outline: none; background: #1d2020; box-shadow: 0 16px 48px #0005; -webkit-app-region: no-drag; }
 .floating-side-panel[data-expanded="true"] { width: min(760px, calc(100vw - 44px)); height: calc(100dvh - 122px); }
 .floating-side-panel[data-wide="true"] { width: min(1180px, calc(100vw - 44px)); height: calc(100dvh - 122px); }
