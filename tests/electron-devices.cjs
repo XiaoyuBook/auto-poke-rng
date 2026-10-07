@@ -73,6 +73,7 @@ app.whenReady().then(async()=>{
   await js(main,"document.querySelector('[title=\"脚本编辑\"]').click()");
   await until(()=>js(main,"document.querySelector('.workspace-labels').hidden"),'script workspace visible');
   await js(main,"document.querySelector('[aria-label=\"伊机控：未尝试连接\"]').click()");
+  await js(main,"Array.from(document.querySelectorAll('[role=menuitem]')).find(x=>x.textContent==='连接设置').click()");
   await until(()=>js(main,"Array.from(document.querySelectorAll('option')).some(x=>x.value==='mock')"),'serial ports enumerated');
   await js(main,`(()=>{const select=document.querySelector('[aria-label="伊机控串口"]');select.value='mock';select.dispatchEvent(new Event('change',{bubbles:true}));})()`);
   await js(main,"Array.from(document.querySelectorAll('button')).find(x=>x.textContent==='连接伊机控').click()");

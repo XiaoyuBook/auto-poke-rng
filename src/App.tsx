@@ -572,6 +572,7 @@ export default function App({ connections = initialConnections }: { connections?
           </div>
           <GlobalTools connections={actualConnections} notificationStatus={notificationError ? 'failed' : notificationState?.status || 'unconfigured'} open={openModal}
             reconnect={reconnectDevices} reconnectBusy={reconnectBusy} reconnectAvailable={Boolean(deviceConnections.api)}
+            virtualControllerOpen={virtualControllerOpen} toggleVirtualController={() => void toggleVirtualController()}
             messages={{ video: devices.audio?.status === 'failed' ? (devices.video.status === 'connected' ? '视频已连接，游戏音频失败：' : '游戏音频失败：') + devices.audio.message : devices.video.status === 'failed' ? devices.video.message : undefined, controller: devices.controller.status === 'failed' ? devices.controller.message : undefined }} />
         </div>
 

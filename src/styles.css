@@ -57,6 +57,10 @@ h1, h2, h3, p { margin: 0; }
 .workspace-button > svg { color: var(--muted); }
 .game-mark { display: inline-block; width: 10px; height: 10px; flex: 0 0 auto; border-radius: 3px; }
 .sidebar-actions { display: flex; gap: 1px; flex-shrink: 0; }
+.controller-tools { position: relative; display: flex; }
+.controller-tools-menu { position: absolute; z-index: 30; top: calc(100% + 8px); left: 0; width: 180px; padding: 5px; border: 1px solid #3b3d3d; border-radius: 8px; background: #202121; box-shadow: 0 10px 30px #0006; -webkit-app-region: no-drag; }
+.controller-tools-menu > button { display: flex; align-items: center; gap: 9px; width: 100%; padding: 9px; border: 0; border-radius: 5px; background: transparent; color: var(--secondary); text-align: left; }
+.controller-tools-menu > button:hover, .controller-tools-menu > button:focus-visible { background: var(--raised); color: var(--text); }
 .icon-button { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 29px; height: 29px; padding: 0; border: 0; border-radius: 5px; background: transparent; color: var(--muted); flex: 0 0 auto; }
 .icon-button:hover:not(:disabled), .icon-button.active { background: var(--hover); color: var(--text); }
 .tool-status-dot { position: absolute; top: 3px; right: 2px; width: 6px; height: 6px; border-radius: 50%; outline: 2px solid var(--canvas); pointer-events: none; }
@@ -116,6 +120,7 @@ h1, h2, h3, p { margin: 0; }
 .app-shell[data-collapsed="true"] .nav-item span,
 .app-shell[data-collapsed="true"] .sidebar-brand { display: none; }
 .app-shell[data-collapsed="true"] .sidebar-actions { flex-direction: column; gap: 3px; margin-top: 7px; }
+.app-shell[data-collapsed="true"] .controller-tools-menu { top: 0; left: calc(100% + 8px); }
 .app-shell[data-collapsed="true"] .sidebar-nav { padding-top: 20px; }
 .app-shell[data-collapsed="true"] .nav-item { justify-content: center; padding: 0; height: 34px; }
 .app-shell[data-collapsed="true"] .sidebar-footer { flex-direction: column; justify-content: center; gap: 12px; padding: 12px 0; }
