@@ -187,21 +187,33 @@ it('restores capture buttons after recovery and stops old tracking before calibr
   expect(api.stop).toHaveBeenCalledOnce();
   expect(api.stop.mock.invocationCallOrder[0]).toBeLessThan(api.start.mock.invocationCallOrder[1]);
 });
-it('reports real progress, locks settings, and stops on game exit', async () => {
+it.each(['recover', 'reidentify', 'munchlax'] as const)('keeps %s capture progressing across game switches until explicitly stopped', async mode => {
   const api = setup(); const app = render(<api.Harness overlay />);
   await act(async () => {});
   fireEvent.click(screen.getByRole('button', { name: '准备配置' }));
-  api.update({ revision: 3, runId: 'one', mode: 'recover', status: 'capturing', captured: 2, target: 40, blinks: [0,1], intervals: [3,5], message: '捕获中' });
-  expect(screen.getByRole('status', { name: '眨眼捕捉进度' }).textContent).toContain('2 / 40');
+  const target = mode === 'munchlax' ? 64 : mode === 'reidentify' ? 7 : 40;
+  const state: BlinkState = { revision: 3, runId: 'one', mode, status: 'capturing', captured: 2, target, blinks: [0,1], intervals: [3,5], message: '捕获中' };
+  api.update(state);
+  expect(screen.getByRole('status', { name: '眨眼捕捉进度' }).textContent).toContain(`2 / ${target}`);
   expect((screen.getByRole('button', { name: '保存配置' }) as HTMLButtonElement).disabled).toBe(true);
   app.rerender(<api.Harness enabled={false} overlay />);
-  await waitFor(() => expect(api.stop).toHaveBeenCalled());
-  expect(screen.queryByRole('button', { name: '填入定点数据' })).toBeNull();
+  expect(api.stop).not.toHaveBeenCalled();
+  api.update({ ...state, revision: 4, captured: 3 });
+  expect(api.getBlink().state).toMatchObject({ runId: 'one', status: 'capturing', captured: 3 });
+  app.rerender(<api.Harness overlay />);
+  expect(screen.getByRole('status', { name: '眨眼捕捉进度' }).textContent).toContain(`3 / ${target}`);
+  expect(api.start).not.toHaveBeenCalled();
+  expect(api.stop).not.toHaveBeenCalled();
+  const label = { recover: '捕捉 Seed', reidentify: '校正', munchlax: 'TID/SID 测种' }[mode];
+  fireEvent.click(screen.getByRole('button', { name: `停止${label}` }));
+  expect(api.stop).toHaveBeenCalledOnce();
 });
 
-it('stops a late arriving running state after leaving BDSP', async () => {
+it.each(['starting', 'capturing', 'solving', 'tracking', 'countdown', 'timeline'] as const)('keeps late %s updates alive after leaving BDSP', async status => {
   const api = setup(); render(<api.Harness enabled={false} />);
   await act(async () => {});
-  api.update({ revision: 3, runId: 'one', status: 'capturing', captured: 0, target: 40, message: '捕获中' });
-  await waitFor(() => expect(api.stop).toHaveBeenCalled());
+  api.update({ revision: 3, runId: 'one', status, captured: 0, target: 40, message: '运行中' });
+  expect(api.getBlink().state).toMatchObject({ runId: 'one', status });
+  expect(api.getBlink().busy).toBe(true);
+  expect(api.stop).not.toHaveBeenCalled();
 });

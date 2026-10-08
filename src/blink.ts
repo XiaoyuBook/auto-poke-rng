@@ -139,11 +139,9 @@ export function useBlink(video: VideoState, enabled: boolean, viewActive = false
   }, [api, viewActive, enabled, matchingInJob, selection, selecting, video.status, video.session, video.width, video.height,
     config.eye, config.eyeRect, config.roi, config.sourceWidth, config.sourceHeight, config.threshold]);
   useEffect(() => {
+    // Game visibility controls previews and selections, not the running task.
     ++selectionVersion.current; setSelection(null); setSelecting(false);
   }, [enabled, video.session, video.status]);
-  useEffect(() => {
-    if (!enabled && busy) void api?.stop().catch(() => {});
-  }, [enabled, busy, api]);
   const cancelSelection = () => { ++selectionVersion.current; setSelection(null); setSelecting(false); };
   const beginSelection = async (kind: BlinkSelection['kind']) => {
     if (busy || !enabled) return;
