@@ -28,8 +28,9 @@ class Clock:
         self.now += seconds
 
 
-def run_flow(species=387, delay=40, *, missing_second=False, stop_at=None):
-    clock, scripts, observations = Clock(), [], []
+def run_flow(species=387, delay=40, *, missing_second=False, stop_at=None, late_zero=None, script_log=None):
+    clock, observations = Clock(), []
+    scripts = [] if script_log is None else script_log
     seed = AutoRngSeedResult(SeedState32(0x12345678, 0x9ABCDEF0, 0x11111111, 0x22222222),
                              current_advances=1, npc=1, measured_at=0.0)
     target = AutoRngTarget(raw_target_advances=401)
@@ -37,7 +38,15 @@ def run_flow(species=387, delay=40, *, missing_second=False, stop_at=None):
                 "………………", "没事没事！", "是个手提箱……", "一定是刚才那人掉的，怎么办？",
                 "就是想还也不知道对方是谁啊，虽然有听到叫博士……"]
     index = 0
+    paused_at_zero = False
     def text():
+        nonlocal paused_at_zero
+        timeline = flow.tracker.timeline
+        at_first_zero = flow.tracker.countdown == 0 and timeline is None
+        at_second_zero = timeline is not None and timeline.delay2_zero_at is not None
+        if not paused_at_zero and ((late_zero == "first" and at_first_zero) or (late_zero == "second" and at_second_zero)):
+            paused_at_zero = True
+            clock.sleep(.2)  # Simulate a stalled worker after the clock update.
         if index < len(dialogue):
             return normalize_dialog(dialogue[index])
         if index == len(dialogue):
@@ -70,16 +79,23 @@ def test_starter_runs_two_clock_gates_then_selects_at_software_delay(species, ri
     second = next(row for row in scripts if row[0] == "御三家·第二段归零")
     anchor = next(row for row in observations if row[0] == "first_countdown")
     assert anchor[1] == 401-TIMELINE_BUFFER
-    # An independent clock replay checks RNG state and the event-eleven boundary.
+    # Replay both visible Timer zeroes; advance compensation occurs later.
     oracle = BlinkTracking(Xorshift(*seed.seed.words), {**STARTER_TIMING,"mode":"recover","menuClose":True},0,0,0)
     oracle.update(anchor[2])
     assert oracle.request_timeline()
     oracle.update(first[1])
-    assert oracle.timeline is not None
-    assert first[1] == pytest.approx(oracle.timeline.starts_at, abs=.021)
+    assert oracle.countdown == 0
+    assert oracle.timeline is None
+    assert first[1] == pytest.approx(anchor[2] + 11 * 1.018, abs=.021)
+    assert first[2] == 401-200+22
     oracle.update(second[1])
-    assert second[1] == pytest.approx(oracle.timeline.delay2_at, abs=.021)
-    assert second[2] == 401-200+22+41+11+48
+    assert oracle.timeline is not None
+    assert oracle.timeline.delay2_count == 0
+    assert second[1] == pytest.approx(oracle.timeline.delay2_zero_at, abs=.021)
+    assert oracle.timeline.delay2_at is None
+    assert second[2] == 401-200+22+41+10
+    assert sum(name == "御三家·第一段归零" for name, *_ in scripts) == 1
+    assert sum(name == "御三家·第二段归零" for name, *_ in scripts) == 1
     oracle.update(observations[-1][2])
     assert flow.tracker.update(observations[-1][2])["advances"] == 401-40
     assert flow.tracker.rng.get_state() == oracle.rng.get_state()
@@ -103,6 +119,15 @@ def test_missed_second_dialog_never_returns_selection():
 def test_stop_during_countdown_does_not_dispatch_later_presses():
     with pytest.raises(RuntimeError,match="已停止"):
         run_flow(stop_at=105)
+
+
+@pytest.mark.parametrize("stage", ["first", "second"])
+def test_late_timer_zero_never_dispatches_a_later_countdown_press(stage):
+    scripts = []
+    with pytest.raises(StarterTargetMissed, match="倒计时按键超时"):
+        run_flow(late_zero=stage, script_log=scripts)
+    missed_press = "御三家·第一段归零" if stage == "first" else "御三家·第二段归零"
+    assert all(name != missed_press for name, *_ in scripts)
 
 
 @pytest.mark.parametrize("delay", [-1,78,100,200])

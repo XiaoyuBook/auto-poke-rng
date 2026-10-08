@@ -68,6 +68,46 @@ class TimingTests(unittest.TestCase):
             self.assertEqual(tracker.update(100. + index * 1.018)['phase'], 'countdown')
         self.assertEqual(tracker.update(100. + 12 * 1.018)['phase'], 'timeline')
 
+    def test_player_timer_zero_precedes_timeline_transition(self):
+        tracker = BlinkTracking(Xorshift(*SEED), {'mode': 'recover', 'npc': 1}, None, 100., 100.)
+        tracker.update(100.)
+        tracker.request_timeline()
+        zero_at = 100. + 11 * 1.018
+        tracker.update(zero_at - .000001)
+        self.assertEqual(tracker.countdown, 1)
+        self.assertIsNone(tracker.countdown_zero_at)
+        tracker.update(zero_at)
+        self.assertEqual(tracker.countdown, 0)
+        self.assertAlmostEqual(tracker.countdown_zero_at, zero_at)
+        self.assertIsNone(tracker.timeline)
+        tracker.update(zero_at + 1.018)
+        self.assertIsNotNone(tracker.timeline)
+        self.assertAlmostEqual(tracker.countdown_zero_at, zero_at)
+
+    def test_starter_timer_zero_matches_upstream_event_ten_before_second_delay(self):
+        config = {'timeDelay': 0., 'advanceDelay': 41, 'advanceDelay2': 48,
+                  'timelineNpc': -1, 'pokemonNpc': 2, 'menuClose': True}
+        records = original_timeline(config, count=12)
+        zero_at, zero_advances, zero_words = records[9]
+        compensation_at, compensation_advances, compensation_words = records[10]
+        tracker = TimelineClock(Xorshift(*SEED), config, 7, 100.)
+        tracker.update(zero_at - .000001)
+        self.assertEqual(tracker.delay2_count, 1)
+        self.assertIsNone(tracker.delay2_zero_at)
+        current = tracker.update(zero_at)
+        self.assertEqual(tracker.delay2_count, 0)
+        self.assertAlmostEqual(tracker.delay2_zero_at, zero_at, delta=1e-9)
+        self.assertIsNone(tracker.delay2_at)
+        self.assertEqual(current['advances'], zero_advances)
+        self.assertEqual(tracker.rng.get_state(), zero_words)
+        current = tracker.update(compensation_at)
+        self.assertEqual(tracker.delay2_count, -1)
+        self.assertAlmostEqual(tracker.delay2_at, compensation_at, delta=1e-9)
+        self.assertAlmostEqual(tracker.delay2_zero_at, zero_at, delta=1e-9)
+        self.assertEqual(compensation_advances - zero_advances, 1 + 48)
+        self.assertEqual(current['advances'], compensation_advances)
+        self.assertEqual(tracker.rng.get_state(), compensation_words)
+
     def test_tidsid_uses_original_random_intervals_without_timeline(self):
         tracker = BlinkTracking(Xorshift(*SEED), {'mode': 'munchlax'}, None, 99., 100.)
         expected = Xorshift(*SEED); interval = expected.rangefloat(3, 12) + .285

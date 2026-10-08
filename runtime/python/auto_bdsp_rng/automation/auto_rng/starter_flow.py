@@ -193,8 +193,9 @@ class StarterFlow:
                         raise RuntimeError("御三家 Timeline 无法启动")
                     stage = "first_countdown"
             elif stage == "first_countdown":
-                if timeline is not None:
-                    if now - (timeline.starts_at - timeline.config.get("timeDelay", 0)) > 0.15:
+                zero_at = self.tracker.countdown_zero_at
+                if zero_at is not None:
+                    if self.monotonic() - zero_at > 0.15:
                         raise StarterTargetMissed("御三家第一段倒计时按键超时，本轮不选精灵")
                     self.run_script("A 100\n", "御三家·第一段归零")
                     last_pressed, last_press_at = text, self.monotonic()
@@ -202,16 +203,17 @@ class StarterFlow:
             elif stage == "second":
                 if is_ball_dialog(text) or "是精灵球" in text or "是精靈球" in text:
                     raise StarterTargetMissed("未确认第二段对话就进入精灵球界面，本轮不选精灵")
-                if timeline.delay2_count < 0:
-                    raise StarterTargetMissed("第二段倒计时结束前未进入搞什么啊对话，本轮不选精灵")
+                if timeline is not None and timeline.delay2_zero_at is not None:
+                    raise StarterTargetMissed("第二段 Timer 归零前未进入搞什么啊对话，本轮不选精灵")
                 if is_second_dialog(text):
                     stage = "second_countdown"
                 elif text and "搞" not in text and text != last_pressed and now-last_press_at >= 0.6:
                     self.run_script("A 100\n", "御三家·推进遭遇对话")
                     last_pressed, last_press_at = text, self.monotonic()
             elif stage == "second_countdown":
-                if timeline.delay2_count < 0:
-                    if now - timeline.delay2_at > 0.15:
+                zero_at = timeline.delay2_zero_at if timeline is not None else None
+                if zero_at is not None:
+                    if self.monotonic() - zero_at > 0.15:
                         raise StarterTargetMissed("御三家第二段倒计时按键超时，本轮不选精灵")
                     self.run_script("A 100\n", "御三家·第二段归零")
                     last_pressed, last_press_at = text, self.monotonic()

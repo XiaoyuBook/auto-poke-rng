@@ -14,6 +14,7 @@ class TimelineClock:
         self.started = False
         self.queue = []
         self.delay2_count = 10
+        self.delay2_zero_at = None
         self.delay2_at = None
         self.rng.next()
         if config.get('menuClose', True):
@@ -36,6 +37,8 @@ class TimelineClock:
             if delay:
                 if self.delay2_count > 0:
                     self.delay2_count -= 1
+                    if self.delay2_count == 0:
+                        self.delay2_zero_at = timestamp
                 elif self.delay2_count == 0:
                     self.delay2_count = -1
                     self.delay2_at = timestamp
@@ -64,6 +67,7 @@ class BlinkTracking:
         self.next_at = now
         self.pending = False
         self.countdown = None
+        self.countdown_zero_at = None
         self.timeline = None
         if config['mode'] == 'reidentify' and config.get('noisy'):
             self.timeline = TimelineClock(rng, {**config, 'pokemonNpc': 1}, self.advances, now)
@@ -85,6 +89,8 @@ class BlinkTracking:
                     self.countdown = 10
                 elif self.countdown > 0:
                     self.countdown -= 1
+                    if self.countdown == 0:
+                        self.countdown_zero_at = self.next_at
                 else:
                     self.timeline = TimelineClock(self.rng, self.config, self.advances, self.next_at)
                     break
