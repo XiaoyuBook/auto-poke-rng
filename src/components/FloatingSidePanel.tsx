@@ -38,10 +38,11 @@ interface Props {
   wide?: boolean;
   contained?: boolean;
   actions?: ReactNode;
+  headerContent?: ReactNode;
   children: ReactNode;
 }
 
-export function FloatingSidePanel({ title, icon, state, minimize, restore, toggleExpanded, close, detach, detaching, wide = false, contained = false, actions, children }: Props) {
+export function FloatingSidePanel({ title, icon, state, minimize, restore, toggleExpanded, close, detach, detaching, wide = false, contained = false, actions, headerContent, children }: Props) {
   const panel = useRef<HTMLElement>(null);
   const [size, setSize] = useState(readSize);
   const drag = useRef<{ x: number; y: number; size: Size; edge: ResizeEdge } | null>(null);
@@ -76,6 +77,7 @@ export function FloatingSidePanel({ title, icon, state, minimize, restore, toggl
     <section ref={panel} id="floating-tool-panel" className="floating-side-panel"
       style={{ '--panel-width': size.width + 'px', '--panel-height': size.height + 'px' } as CSSProperties}
       data-expanded={state.expanded} data-minimized={state.minimized} data-wide={wide} data-contained={contained}
+      data-log-header={!!headerContent}
       role="dialog" aria-modal="false" aria-labelledby={titleId} tabIndex={-1}
       onKeyDown={event => {
         if (event.key === 'Escape') { event.stopPropagation(); close(); }
@@ -98,9 +100,10 @@ export function FloatingSidePanel({ title, icon, state, minimize, restore, toggl
             }));
           }} />
       ))}
-      <header className="floating-panel-header">
+      <header className={'floating-panel-header' + (headerContent ? ' log-host-header' : '')}>
         {icon}
         <h2 id={titleId}>{title}</h2>
+        {!state.minimized && headerContent}
         <div className="floating-panel-actions">
           {!state.minimized && actions}
           {detach && <button className="icon-button" title="弹出为独立窗口" aria-label="弹出为独立窗口" disabled={detaching} onClick={detach}><ExternalLink size={14} /></button>}

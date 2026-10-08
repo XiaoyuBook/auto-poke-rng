@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowUpRight, ChevronLeft, ChevronRight, Clock3, Download, History, ListFilter, MoreHorizontal, Search, SearchX, X } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { ArrowUpRight, Check, ChevronLeft, ChevronRight, Clock3, Download, History, ListFilter, MoreHorizontal, Search, SearchX, X } from 'lucide-react';
 import { downloadText, useAutomation, type AutomationApi, type AutomationSnapshot } from '../automation';
 import { logLevelLabels, logText } from '../automationLogs';
 import { isFrlgDiagnosticLog } from '../frlgExecution';
@@ -20,13 +21,14 @@ function runDate(value: string) {
   return { day, time, label: `${date.toDateString() === new Date().toDateString() ? '今天' : day} ${time}` };
 }
 
-export function AutomationLogs() {
+export function AutomationLogs({ headerTarget }: { headerTarget?: HTMLElement | null }) {
   const { api, snapshot, error, setError } = useAutomation();
-  return snapshot ? <AutomationLogCenter api={api} snapshot={snapshot} error={error} setError={setError}/> : <p role="status">{error || '正在加载日志中心…'}</p>;
+  return snapshot ? <AutomationLogCenter api={api} snapshot={snapshot} error={error} setError={setError} headerTarget={headerTarget}/> : <p role="status">{error || '正在加载日志中心…'}</p>;
 }
 
-function AutomationLogCenter({ api, snapshot, error, setError }: {
+function AutomationLogCenter({ api, snapshot, error, setError, headerTarget }: {
   api: AutomationApi | undefined; snapshot: AutomationSnapshot; error: string; setError: (value: string) => void;
+  headerTarget?: HTMLElement | null;
 }) {
   const [tab, setTab] = useState<'rounds' | 'logs'>('rounds');
   const [runId, setRunId] = useState(''), [scope, setScope] = useState<LogScope>('all');
@@ -109,20 +111,37 @@ function AutomationLogCenter({ api, snapshot, error, setError }: {
     setExporting(false);
   };
   const pendingCandidates = round?.outcome === '运行中' && !round.endedAt && !run?.endedAt && !['completed', 'stopped', 'failed'].includes(run?.status || '');
+  const canExportRun = !!run && (tab === 'rounds' || scope !== 'all');
+  const heading = <div className="automation-log-heading">
+    <nav className="automation-log-tabs" aria-label="日志视图">
+      <button type="button" aria-pressed={tab === 'rounds'} onClick={() => setTab('rounds')}>轮次记录</button>
+      <button type="button" aria-pressed={tab === 'logs'} onClick={() => setTab('logs')}>运行日志</button>
+    </nav>
+    <AutomationPopover label="更多日志操作" showChevron={false} triggerContent={<MoreHorizontal size={16} aria-hidden="true"/>}>{close => <>
+      {tab === 'logs' && <>
+        <button type="button" role="menuitem" disabled={!logs.length} onClick={() => { close(); void perform(() => navigator.clipboard.writeText(logText(logs)), '已复制当前视图的全部匹配日志'); }}>复制当前视图</button>
+        <button type="button" role="menuitem" disabled={!logs.length} onClick={() => { close(); downloadText(logText(logs), '运行日志-当前视图.txt'); }}>导出当前视图</button>
+      </>}
+      <button type="button" role="menuitem" disabled={!canExportRun || exporting} onClick={() => { close(); void exportDiagnostics(); }}>导出本次完整诊断</button>
+      <p className="automation-log-menu-hint">{!canExportRun ? '选择一次运行后可导出完整诊断。' : run?.diagnosticsIncomplete ? '此次运行曾关闭日志保存，诊断文件可能不完整。' : '导出已保存的完整文件；运行中导出截至当前的内容。'}</p>
+      <button type="button" role="menuitemcheckbox" aria-label="自动保存磁盘日志" aria-checked={snapshot.logging} onClick={() => { close(); void perform(() => api?.setLogging(!snapshot.logging)); }}><span>自动保存日志</span>{snapshot.logging && <Check size={14} aria-hidden="true"/>}</button>
+      {tab === 'logs' && <>
+        <button type="button" role="menuitem" disabled={!snapshot.logs.length} onClick={() => { close(); void perform(() => api?.clearLogs(), '已清空全部界面日志，磁盘诊断文件保留'); }}>清空显示</button>
+        <p className="automation-log-menu-hint">清空全部界面日志，不删除磁盘文件。</p>
+      </>}
+    </>}</AutomationPopover>
+  </div>;
 
   return <section className="automation-log-center" aria-label="日志中心内容">
-    <header className="automation-log-header"><nav className="automation-log-tabs" aria-label="日志视图">
-      <button type="button" aria-pressed={tab === 'rounds'} onClick={() => setTab('rounds')}>轮次记录</button><button type="button" aria-pressed={tab === 'logs'} onClick={() => setTab('logs')}>运行日志</button>
-    </nav><label className="automation-log-save"><input type="checkbox" aria-label="自动保存磁盘日志" checked={snapshot.logging} onChange={event => void perform(() => api?.setLogging(event.target.checked))}/>自动保存日志</label></header>
+    {headerTarget ? createPortal(heading, headerTarget) : <header className="automation-log-header">{heading}</header>}
     {(error || snapshot.error) && <p role="alert" className="panel-error">{error || snapshot.error}</p>}
     {notice && <p className="automation-log-notice" role="status">{notice}<button type="button" aria-label="关闭日志提示" onClick={() => setNotice('')}><X size={12}/></button></p>}
-    {(run || selectedRunId || tab === 'logs') && <div className="automation-run-bar">
+    {(run || selectedRunId || tab === 'logs') && <div className="automation-context-bar"><div className="automation-run-bar">
       <AutomationRecordPicker label="切换运行记录" value={run?.id || ''} onChange={chooseRun} options={snapshot.runs.map(item => ({ value: item.id, label: `${runKindLabels[item.kind]} · ${runDate(item.startedAt).time}`, group: runDate(item.startedAt).day, description: `${item.context && 'flowName' in item.context ? `${item.context.flowName} · ` : ''}${item.rounds.length} 轮 · ${runStatusLabels[item.status] || item.status || '状态未知'}` }))}>
         <History size={15} aria-hidden="true"/>{tab === 'logs' && scope === 'all' ? <strong>全部运行</strong> : run ? <><strong>{runKindLabels[run.kind]}</strong><span className="automation-run-date" title={new Date(run.startedAt).toLocaleString('zh-CN')}>{runDate(run.startedAt).label}</span></> : <span className="automation-run-date">{selectedRunId ? `运行 ${selectedRunId}` : '暂无运行记录'}</span>}
       </AutomationRecordPicker>
       {tab === 'logs' ? <select className="automation-log-scope" aria-label="日志范围" value={scope} onChange={event => { manualSelection(); if (event.target.value !== 'all') setRunId(selectedRunId); setScope(event.target.value as LogScope); }}><option value="all">全部日志</option><option value="run" disabled={!selectedRunId}>本次运行</option><option value="round" disabled={roundNumber === undefined}>本轮日志</option></select> : run && <span className="automation-run-status" data-status={run.status}>{runStatusLabels[run.status] || run.status || '状态未知'} · {run.rounds.length} 轮</span>}
-    </div>}
-    {hasRoundSelection && !round && (tab === 'rounds' || scope === 'round') && <p className="automation-log-context-label">第 {roundNumber} 轮 · 轮次详情不可用{tab === 'logs' ? '，显示已收到的日志' : ''}{run && !!run.rounds.length && <button type="button" className="automation-record-action" onClick={() => { manualSelection(); setSelection(null); }}>最新一轮</button>}</p>}
+    </div>
     {run && round && (tab === 'rounds' || scope === 'round') && <nav className="automation-round-navigation" aria-label="轮次导航">
       <button type="button" className="automation-record-icon" aria-label="上一轮" title="上一轮" disabled={roundIndex <= 0} onClick={() => chooseRound(roundIndex - 1)}><ChevronLeft size={16}/></button>
       <AutomationRecordPicker key={run.id} label="选择轮次" value={String(round.number)} onChange={number => chooseRound(run.rounds.findIndex(item => String(item.number) === number))} options={run.rounds.map(item => ({ value: String(item.number), label: `第 ${item.number} 轮 · ${item.outcome}`, description: item.frlg?.hitSeed ? `Seed ${item.frlg.hitSeed} · 帧偏差 ${item.frlg.frameError ?? '—'}` : item.frlg && item.number === 0 ? '准备与计时校准' : undefined }))}>
@@ -136,11 +155,13 @@ function AutomationLogCenter({ api, snapshot, error, setError }: {
         {tab === 'rounds' && <button type="button" className="automation-record-icon" aria-label="导出记录" title="导出本轮记录" onClick={() => downloadText(JSON.stringify({ runId: run.id, ...round }, null, 2), '轮次记录.json', 'application/json')}><Download size={15}/></button>}
       </div>
     </nav>}
+    </div>}
+    {hasRoundSelection && !round && (tab === 'rounds' || scope === 'round') && <p className="automation-log-context-label">第 {roundNumber} 轮 · 轮次详情不可用{tab === 'logs' ? '，显示已收到的日志' : ''}{run && !!run.rounds.length && <button type="button" className="automation-record-action" onClick={() => { manualSelection(); setSelection(null); }}>最新一轮</button>}</p>}
     {tab === 'rounds' ? <div className="automation-record-detail">
       {hasRoundSelection && !round ? <div className="automation-record-empty"><History size={24} aria-hidden="true"/><strong>本轮记录不可用</strong><p>可查看当前缓存中此轮次的日志。</p><button type="button" className="automation-record-action" onClick={() => openRunLogs(roundNumber)}>查看本轮日志<ArrowUpRight size={14} aria-hidden="true"/></button></div> : !run ? <div className="automation-record-empty"><History size={24} aria-hidden="true"/><strong>暂无运行记录</strong><p>运行自动流程后，轮次记录会显示在这里。</p></div> : run.kind === 'frlg' ? <FrlgRoundDetails run={run} round={round} logs={snapshot.logs} openLogs={openRunLogs}/> : round ? <>
         <dl className="automation-record-metrics"><div><dt>Seed</dt><dd>{round.seed || '—'}</dd></div><div><dt>启动帧</dt><dd>{round.trigger ?? '—'}</dd></div><div><dt>本轮 delay</dt><dd>{round.usedDelay ?? '—'}</dd></div><div><dt>实际 delay</dt><dd>{round.actualDelays?.join(' / ') || '—'}</dd></div></dl>
-        {round.candidates.length ? <CandidateTable key={`${run.id}:${round.number}`} rows={round.candidates} selected={round.selected} sources={round.sources}/> : <div className="automation-record-empty" role="status">
-          {pendingCandidates ? <Clock3 size={24} aria-hidden="true"/> : <SearchX size={24} aria-hidden="true"/>}<strong>{round.outcome === '无候选' ? '本轮没有符合条件的候选' : pendingCandidates ? '候选结果尚未生成' : '本轮没有候选记录'}</strong><p>{pendingCandidates ? '本轮仍在进行，结果会自动更新。' : '可查看本轮日志了解执行结果。'}</p>
+        {round.candidates.length ? <CandidateTable key={`${run.id}:${round.number}`} rows={round.candidates} selected={round.selected} sources={round.sources}/> : <div className="automation-record-result" role="status">
+          {pendingCandidates ? <Clock3 size={16} aria-hidden="true"/> : <SearchX size={16} aria-hidden="true"/>}<div><strong>{round.outcome === '无候选' ? '本轮没有符合条件的候选' : pendingCandidates ? '候选结果尚未生成' : '本轮没有候选记录'}</strong>{pendingCandidates && <p>本轮仍在进行，结果会自动更新。</p>}</div>
           <button type="button" className="automation-record-action" onClick={() => openRunLogs(round.number)}>查看本轮日志<ArrowUpRight size={14} aria-hidden="true"/></button>
         </div>}
         {!!round.reverse?.length && <details className="automation-record-diagnostics"><summary>反查结果</summary><CandidateTable key={`${run.id}:${round.number}:reverse`} rows={round.reverse}/></details>}
@@ -156,14 +177,6 @@ function AutomationLogCenter({ api, snapshot, error, setError }: {
           <label>阶段<select aria-label="筛选日志阶段" value={phase} onChange={event => setPhase(event.target.value)}><option value="">全部阶段</option>{phaseOptions.map(value => <option key={value}>{value}</option>)}</select></label>
           <div><button type="button" onClick={() => { resetFilters(); close(); }}>重置筛选</button><button type="button" onClick={close}>完成</button></div>
         </div>}</AutomationPopover>
-        <AutomationPopover label="更多日志操作" triggerContent={<MoreHorizontal size={16} aria-hidden="true"/>}>{close => <>
-          <button type="button" role="menuitem" disabled={!logs.length} onClick={() => { close(); void perform(() => navigator.clipboard.writeText(logText(logs)), '已复制当前视图的全部匹配日志'); }}>复制当前视图</button>
-          <button type="button" role="menuitem" disabled={!logs.length} onClick={() => { close(); downloadText(logText(logs), '运行日志-当前视图.txt'); }}>导出当前视图</button>
-          <button type="button" role="menuitem" disabled={!run || scope === 'all' || exporting} onClick={() => { close(); void exportDiagnostics(); }}>导出本次完整诊断</button>
-          <p className="automation-log-menu-hint">{scope === 'all' ? '选择一次运行后可导出完整诊断。' : run?.diagnosticsIncomplete ? '此次运行曾关闭日志保存，诊断文件可能不完整。' : '导出已保存的完整文件；运行中导出截至当前的内容。'}</p>
-          <button type="button" role="menuitem" disabled={!snapshot.logs.length} onClick={() => { close(); void perform(() => api?.clearLogs(), '已清空全部界面日志，磁盘诊断文件保留'); }}>清空显示</button>
-          <p className="automation-log-menu-hint">清空全部界面日志，不删除磁盘文件。</p>
-        </>}</AutomationPopover>
       </div>
       {(source || phase || level || search) && <div className="automation-log-active-filters"><span>{[source, phase, level ? logLevelLabels[level as keyof typeof logLevelLabels] : '', search ? `关键词：${search}` : ''].filter(Boolean).join(' · ')}</span><button type="button" onClick={resetFilters}>重置筛选</button></div>}
       <AutomationLogList key={viewKey} logs={logs} query={search} storageLimited={snapshot.logs.length >= 10000} onPause={() => {

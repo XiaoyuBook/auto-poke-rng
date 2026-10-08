@@ -1,29 +1,17 @@
-import { Fragment, memo, useLayoutEffect, useRef, useState } from 'react';
+import { memo, useId, useLayoutEffect, useRef, useState } from 'react';
 import { ArrowDown, CircleAlert, CircleCheck, Info, TriangleAlert } from 'lucide-react';
 import type { LogEntry } from '../workspace';
-import { LOG_ROW_HEIGHT, logLevelLabels, logPreview, logText } from '../automationLogs';
-import { Dialog } from './Dialog';
-import { RawLogData } from './AutomationRoundEvents';
+import { LOG_ROW_HEIGHT, logLevelLabels, logPreview } from '../automationLogs';
+import { AutomationLogDetail, LogHighlight } from './AutomationLogDetail';
 
-function Highlight({ text, query }: { text: string; query: string }) {
-  if (!query) return <>{text}</>;
-  const lower = text.toLocaleLowerCase(), term = query.toLocaleLowerCase();
-  const parts = [];
-  let start = 0, match = lower.indexOf(term);
-  while (match !== -1) {
-    parts.push(<Fragment key={start}>{text.slice(start, match)}<mark>{text.slice(match, match + query.length)}</mark></Fragment>);
-    start = match + query.length;
-    match = lower.indexOf(term, start);
-  }
-  return <>{parts}{text.slice(start)}</>;
-}
 const LevelIcon = { info: Info, success: CircleCheck, warning: TriangleAlert, error: CircleAlert };
-const LogRow = memo(function LogRow({ row, index, count, query, open }: { row: LogEntry; index: number; count: number; query: string; open: (row: LogEntry) => void }) {
+const LogRow = memo(function LogRow({ row, index, count, query, open, selected, detailId }: { row: LogEntry; index: number; count: number; query: string; open: (row: LogEntry) => void; selected: boolean; detailId: string }) {
   const Icon = LevelIcon[row.level];
-  return <div className="automation-log-row" role="listitem" aria-posinset={index + 1} aria-setsize={count} data-log-id={row.id} style={{ height: LOG_ROW_HEIGHT }}>
+  return <div className="automation-log-row" role="listitem" aria-posinset={index + 1} aria-setsize={count} data-log-id={row.id} data-selected={selected} style={{ height: LOG_ROW_HEIGHT }}>
     <time title={row.timestamp}>{row.time}</time>
-    <div className="automation-log-entry"><div className="automation-log-meta"><span className={`log-${row.level}`}><Icon size={12} aria-hidden="true"/>{logLevelLabels[row.level]}</span><span><Highlight text={row.source} query={query}/></span>{row.phase && <span><Highlight text={row.phase} query={query}/></span>}{row.round !== undefined && <span>第 {row.round} 轮</span>}</div>
-      <button type="button" className="automation-log-message" aria-label={`查看日志详情：${row.time}，${logLevelLabels[row.level]}，第 ${index + 1} 条`} onClick={() => open(row)}><Highlight text={logPreview(row.message, query)} query={query}/></button>
+    <div className="automation-log-entry">
+      <button type="button" className="automation-log-message" aria-label={`查看日志详情：${row.time}，${logLevelLabels[row.level]}，第 ${index + 1} 条`} aria-expanded={selected} aria-controls={selected ? detailId : undefined} onClick={() => open(row)}><LogHighlight text={logPreview(row.message, query)} query={query}/></button>
+      <div className="automation-log-meta"><span className={`log-${row.level}`}><Icon size={12} aria-hidden="true"/>{logLevelLabels[row.level]}</span><span><LogHighlight text={row.source} query={query}/></span>{row.phase && <span><LogHighlight text={row.phase} query={query}/></span>}{row.round !== undefined && <span>第 {row.round} 轮</span>}</div>
     </div>
   </div>;
 });
@@ -32,12 +20,14 @@ export function AutomationLogList({ logs, query, storageLimited = false, onPause
   const viewport = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState(304), [top, setTop] = useState(0);
   const [follow, setFollow] = useState(true), [unread, setUnread] = useState(0), [expired, setExpired] = useState(false);
-  const [detail, setDetail] = useState<LogEntry | null>(null), [notice, setNotice] = useState('');
-  const detailTrigger = useRef<HTMLElement | null>(null);
+  const [detail, setDetail] = useState<LogEntry | null>(null);
+  const detailId = useId();
+  const detailIndex = detail ? logs.findIndex(row => row.id === detail.id) : -1;
   const following = useRef(true), previousLast = useRef<string | undefined>(undefined);
   const anchor = useRef<{ id: string; offset: number } | null>(null);
   const totalHeight = logs.length * LOG_ROW_HEIGHT;
   const jumpToLatest = () => {
+    setDetail(null);
     following.current = true; setFollow(true); setUnread(0); setExpired(false);
     const next = Math.max(0, totalHeight - (viewport.current?.clientHeight || height));
     if (viewport.current) viewport.current.scrollTop = next;
@@ -77,6 +67,7 @@ export function AutomationLogList({ logs, query, storageLimited = false, onPause
     }
     if (!logs.length) {
       following.current = true; setFollow(true); setUnread(0); setExpired(false); anchor.current = null;
+      setDetail(null);
       element.scrollTop = 0; setTop(0);
     }
     previousLast.current = last;
@@ -90,25 +81,44 @@ export function AutomationLogList({ logs, query, storageLimited = false, onPause
     rememberPosition(viewport.current?.scrollTop || 0);
   };
   const openDetail = (row: LogEntry) => {
-    pause(); detailTrigger.current = document.activeElement as HTMLElement | null; setDetail(row);
+    pause(); setDetail(row);
   };
   const closeDetail = () => {
-    setDetail(null); setNotice('');
-    queueMicrotask(() => (detailTrigger.current?.isConnected ? detailTrigger.current : viewport.current)?.focus({ preventScroll: true }));
+    setDetail(null);
+    queueMicrotask(() => {
+      const row = Array.from(viewport.current?.querySelectorAll<HTMLElement>('[data-log-id]') || []).find(row => row.dataset.logId === detail?.id);
+      (row?.querySelector<HTMLButtonElement>('button') || viewport.current)?.focus({ preventScroll: true });
+    });
   };
+  const browseDetail = (index: number) => {
+    if (!logs[index] || !viewport.current) return;
+    pause(); setDetail(logs[index]);
+  };
+  useLayoutEffect(() => {
+    const element = viewport.current;
+    if (detailIndex < 0 || !element) return;
+    const viewHeight = element.clientHeight || height;
+    const rowTop = detailIndex * LOG_ROW_HEIGHT;
+    const next = rowTop < element.scrollTop ? rowTop : rowTop + LOG_ROW_HEIGHT > element.scrollTop + viewHeight ? Math.max(0, rowTop + LOG_ROW_HEIGHT - viewHeight) : element.scrollTop;
+    element.scrollTop = next; setTop(next); rememberPosition(next);
+    // Reposition for selection or size changes, preserving manual scrolling when logs arrive.
+  }, [detailIndex, height]);
   const start = Math.max(0, Math.min(logs.length - 1, Math.floor(top / LOG_ROW_HEIGHT) - 5));
   const end = Math.min(logs.length, start + Math.ceil(height / LOG_ROW_HEIGHT) + 11);
-  return <>
+  return <div className="automation-log-body" data-detail-open={!!detail} onKeyDown={event => {
+    if (detail && event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closeDetail(); }
+  }}>
+    <div className="automation-log-stream">
     <div ref={viewport} className="automation-log-lines" role="region" aria-label="日志内容" tabIndex={0} onScroll={event => {
       const element = event.currentTarget, scrollTop = element.scrollTop;
       setTop(scrollTop);
-      const atBottom = totalHeight - (element.clientHeight || height) - scrollTop <= 12;
+      const atBottom = !detail && totalHeight - (element.clientHeight || height) - scrollTop <= 12;
       if (following.current && !atBottom) onPause?.();
       following.current = atBottom; setFollow(atBottom);
       if (atBottom) { setUnread(0); setExpired(false); }
       rememberPosition(scrollTop);
     }}>
-      {logs.length ? <div role="list" aria-label="运行日志列表" className="automation-log-virtual-space" style={{ height: totalHeight }}><div className="automation-log-visible-rows" style={{ top: start * LOG_ROW_HEIGHT }}>{logs.slice(start, end).map((row, index) => <LogRow key={row.id} row={row} index={start + index} count={logs.length} query={query} open={openDetail}/>)}</div></div> : <p className="automation-log-empty">当前范围和筛选条件下没有日志。</p>}
+      {logs.length ? <div role="list" aria-label="运行日志列表" className="automation-log-virtual-space" style={{ height: totalHeight }}><div className="automation-log-visible-rows" style={{ top: start * LOG_ROW_HEIGHT }}>{logs.slice(start, end).map((row, index) => <LogRow key={row.id} row={row} index={start + index} count={logs.length} query={query} open={openDetail} selected={detail?.id === row.id} detailId={detailId}/>)}</div></div> : <p className="automation-log-empty">当前范围和筛选条件下没有日志。</p>}
     </div>
     <footer className="automation-log-footer">
       <span>{logs.length} 条摘要{storageLimited ? ' · 缓存上限 10,000 条' : ''}</span>
@@ -116,6 +126,7 @@ export function AutomationLogList({ logs, query, storageLimited = false, onPause
       {!follow && <button type="button" onClick={jumpToLatest}><ArrowDown size={13} aria-hidden="true"/>{unread ? `新增 ${unread} 条 · 回到最新` : '回到最新'}</button>}
       {expired && <span role="status">较早记录已移出缓存，已定位到最早可用记录。</span>}
     </footer>
-    {detail && <Dialog title="日志详情" className="automation-log-detail-dialog" close={closeDetail}><div className="automation-log-detail-body"><div className="automation-log-detail-meta">{detail.timestamp || detail.time} · {detail.source} · {logLevelLabels[detail.level]}{detail.phase ? ` · ${detail.phase}` : ''}{detail.round !== undefined ? ` · 第 ${detail.round} 轮` : ''}</div><pre><Highlight text={detail.message} query={query}/></pre><RawLogData value={detail}/><button type="button" className="button" onClick={() => void Promise.resolve().then(() => navigator.clipboard.writeText(logText([detail]))).then(() => setNotice('已复制此条日志'), () => setNotice('复制失败'))}>复制此条日志</button><span role="status">{notice}</span></div></Dialog>}
-  </>;
+    </div>
+    {detail && <AutomationLogDetail id={detailId} log={detail} query={query} index={detailIndex} total={logs.length} previous={() => browseDetail(detailIndex - 1)} next={() => browseDetail(detailIndex + 1)} close={closeDetail}/>}
+  </div>;
 }

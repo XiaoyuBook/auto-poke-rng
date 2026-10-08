@@ -8,6 +8,8 @@ import { VideoPreview, VideoLabelsButton } from './components/VideoPreview';
 export function DetachedPanel({ tool }: { tool: PanelTool }) {
   const { state, setLogSource, setVideoLabelsOpen, error, setError } = usePanelWindows();
   const [platform, setPlatform] = useState('win32');
+  const [logHeaderHost, setLogHeaderHost] = useState<HTMLDivElement | null>(null);
+  const inlineLogHeader = tool === 'logs' && !!window.desktop?.automation;
   const [labelFolder, setLabelFolder] = useState(() => localStorage.getItem('auto-poke-rng:label-folder') || '');
   useEffect(() => {
     const syncFolder = () => setLabelFolder(localStorage.getItem('auto-poke-rng:label-folder') || '');
@@ -30,10 +32,11 @@ export function DetachedPanel({ tool }: { tool: PanelTool }) {
     void operation?.catch(() => setError('操作失败，请重试。'));
   };
 
-  return <main className="detached-panel" data-platform={platform}>
-    <header className="detached-panel-header">
+  return <main className="detached-panel" data-platform={platform} data-log-header={inlineLogHeader}>
+    <header className={'detached-panel-header' + (inlineLogHeader ? ' log-host-header' : '')}>
       {tool === 'video' ? <MonitorPlay size={16} /> : <FileClock size={16} />}
       <h1>{title}</h1>
+      {inlineLogHeader && <div className="log-header-slot" ref={setLogHeaderHost} />}
       <div className="floating-panel-actions">
         {tool === 'video' && <VideoLabelsButton expanded={state.videoLabelsOpen} toggle={() => setVideoLabelsOpen(!state.videoLabelsOpen)} />}
         <button className="icon-button" title="收回主窗口" aria-label="收回主窗口" onClick={() => perform(api?.dock())}><PanelRightClose size={15} /></button>
@@ -44,7 +47,7 @@ export function DetachedPanel({ tool }: { tool: PanelTool }) {
     </header>
     <div className="floating-panel-body">
       {error && <p className="panel-error" role="alert">{error}</p>}
-      {tool === 'video' ? <VideoPreview labelsOpen={state.videoLabelsOpen} labelFolder={labelFolder} /> : <LogsPanel logs={state.logs} source={state.logSource} setSource={setLogSource} clear={() => perform(api?.clearLogs())} />}
+      {tool === 'video' ? <VideoPreview labelsOpen={state.videoLabelsOpen} labelFolder={labelFolder} /> : <LogsPanel logs={state.logs} source={state.logSource} setSource={setLogSource} clear={() => perform(api?.clearLogs())} headerTarget={logHeaderHost} />}
     </div>
   </main>;
 }

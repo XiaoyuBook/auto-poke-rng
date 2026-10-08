@@ -126,6 +126,8 @@ export default function App({ connections = initialConnections }: { connections?
   const [labelReferenceHost, setLabelReferenceHost] = useState<HTMLDivElement | null>(null);
   const [ocrOverlayHost, setOcrOverlayHost] = useState<HTMLDivElement | null>(null);
   const [ocrPreviewHost, setOcrPreviewHost] = useState<HTMLDivElement | null>(null);
+  const [logHeaderHost, setLogHeaderHost] = useState<HTMLDivElement | null>(null);
+  const [floatingLogHeaderHost, setFloatingLogHeaderHost] = useState<HTMLDivElement | null>(null);
   const videoDetached = panelWindows.detached.includes('video');
   const inlineLabelsOpen = panelWindows.videoLabelsOpen && !videoDetached;
   const blink = useBlink(devices.video, game === 'bdsp' && !panelQuery, page === '眨眼捕获' && !inlineLabelsOpen);
@@ -639,9 +641,10 @@ export default function App({ connections = initialConnections }: { connections?
               <VideoPreview labelsOnly labelsOpen={inlineLabelsOpen} labelFolder={labelFolder} referenceTarget={labelReferenceHost} onCloseLabels={() => setVideoLabelsOpen(false)} />
             </section>
             {toolPanel?.tool === 'logs' && <FloatingSidePanel contained state={toolPanel} title="日志中心" icon={<FileClock size={16} />}
+              headerContent={window.desktop?.automation && <div className="log-header-slot" ref={setFloatingLogHeaderHost} />}
               detach={nativePanels ? detachPanel : undefined} detaching={detaching}
               minimize={minimizePanel} restore={() => showPanel('logs')} toggleExpanded={() => setToolPanel(current => current && { ...current, expanded: !current.expanded })} close={closePanel}>
-              <LogsPanel logs={logs} source={panelWindows.logSource} setSource={setLogSource} clear={() => setLogs([])} />
+              <LogsPanel logs={logs} source={panelWindows.logSource} setSource={setLogSource} clear={() => setLogs([])} headerTarget={floatingLogHeaderHost} />
             </FloatingSidePanel>}
           </div>
           <aside className="workspace-right-rail" aria-label="固定工作区侧栏">
@@ -656,13 +659,14 @@ export default function App({ connections = initialConnections }: { connections?
             </section>
             <div ref={setLabelReferenceHost} className="persistent-label-reference" aria-label="搜图标签与标注步骤" aria-hidden={!inlineLabelsOpen || undefined} hidden={!inlineLabelsOpen} />
             <div ref={setOcrPreviewHost} className="persistent-ocr-preview" aria-hidden={page !== '闪光反查区域' || undefined} hidden={page !== '闪光反查区域'} />
-            <section ref={logRegion} className="persistent-logs" aria-labelledby="persistent-logs-title" aria-hidden={paletteOpen || inlineLabelsOpen || page === '闪光反查区域' || undefined} hidden={inlineLabelsOpen || page === '闪光反查区域'} tabIndex={-1}>
-              <header className="persistent-logs-header">
+            <section ref={logRegion} className="persistent-logs" data-log-header={!!window.desktop?.automation} aria-labelledby="persistent-logs-title" aria-hidden={paletteOpen || inlineLabelsOpen || page === '闪光反查区域' || undefined} hidden={inlineLabelsOpen || page === '闪光反查区域'} tabIndex={-1}>
+              <header className={'persistent-logs-header' + (window.desktop?.automation ? ' log-host-header' : '')}>
                 <FileClock size={15} />
                 <h2 id="persistent-logs-title">日志中心</h2>
+                {window.desktop?.automation && <div className="log-header-slot" ref={setLogHeaderHost} />}
                 <button ref={logExpandButton} className="text-button" onClick={() => showPanel('logs')}>展开</button>
               </header>
-              <LogsPanel logs={logs} source={panelWindows.logSource} setSource={setLogSource} clear={() => setLogs([])} />
+              <LogsPanel logs={logs} source={panelWindows.logSource} setSource={setLogSource} clear={() => setLogs([])} headerTarget={logHeaderHost} />
             </section>
           </aside>
         </div>

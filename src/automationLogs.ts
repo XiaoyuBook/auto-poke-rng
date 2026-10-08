@@ -2,7 +2,7 @@ import type { AutomationRound } from './automation';
 import type { LogEntry } from './workspace';
 
 export const logLevelLabels = { info: '信息', success: '成功', warning: '警告', error: '错误' };
-export const LOG_ROW_HEIGHT = 76;
+export const LOG_ROW_HEIGHT = 48;
 export function logText(logs: LogEntry[]) {
   return logs.map(row => `${row.timestamp || row.time}\t${row.source}\t${logLevelLabels[row.level]}\t${row.runId || '—'}\t${row.round ?? '—'}\t${row.phase || '—'}\t${row.message}`).join('\n');
 }

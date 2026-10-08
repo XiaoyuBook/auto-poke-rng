@@ -4,8 +4,8 @@ import { Check, ChevronDown } from 'lucide-react';
 
 type RecordOption = { value: string; label: string; description?: string; group?: string };
 
-export function AutomationPopover({ label, triggerContent, children, role = 'menu', disabled = false }: {
-  label: string; triggerContent: ReactNode; children: (close: () => void) => ReactNode; role?: 'menu' | 'dialog'; disabled?: boolean;
+export function AutomationPopover({ label, triggerContent, children, role = 'menu', disabled = false, showChevron = true }: {
+  label: string; triggerContent: ReactNode; children: (close: () => void) => ReactNode; role?: 'menu' | 'dialog'; disabled?: boolean; showChevron?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState({ left: 8, top: 8, maxHeight: 300 });
@@ -61,7 +61,7 @@ export function AutomationPopover({ label, triggerContent, children, role = 'men
       return;
     }
     if (role !== 'menu') return;
-    const buttons = Array.from(menu.current?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]:not(:disabled), [role="menuitem"]:not(:disabled)') || []);
+    const buttons = Array.from(menu.current?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]:not(:disabled), [role="menuitem"]:not(:disabled), [role="menuitemcheckbox"]:not(:disabled)') || []);
     const index = buttons.indexOf(event.target as HTMLButtonElement);
     const next = event.key === 'ArrowDown' ? (index + 1) % buttons.length : event.key === 'ArrowUp' ? (index + buttons.length - 1) % buttons.length : event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : -1;
     if (next >= 0) { event.preventDefault(); buttons[next]?.focus(); }
@@ -70,7 +70,7 @@ export function AutomationPopover({ label, triggerContent, children, role = 'men
   return <>
     <button ref={trigger} type="button" className="automation-record-picker" aria-label={label} aria-haspopup={role} aria-expanded={open} aria-controls={open ? id : undefined} disabled={disabled}
       onClick={() => setOpen(!open)} onKeyDown={event => { if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); setOpen(true); } }}>
-      {triggerContent}<ChevronDown size={14} aria-hidden="true" />
+      {triggerContent}{showChevron && <ChevronDown size={14} aria-hidden="true" />}
     </button>
     {open && createPortal(<div ref={menu} id={id} role={role} aria-label={label} className="automation-record-menu" style={position} onKeyDown={keyboard}>
       {children(close)}

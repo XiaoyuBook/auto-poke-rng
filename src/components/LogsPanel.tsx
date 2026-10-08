@@ -3,10 +3,11 @@ import type { LogEntry } from '../workspace';
 import type { LogSource } from '../desktop';
 import { AutomationLogs } from './AutomationLogs';
 
-export function LogsPanel({ logs, clear, source, setSource }: {
+export function LogsPanel({ logs, clear, source, setSource, headerTarget }: {
   logs: LogEntry[]; clear: () => void; source: LogSource; setSource: (source: LogSource) => void;
+  headerTarget?: HTMLElement | null;
 }) {
-  if (window.desktop?.automation) return <AutomationLogs />;
+  if (window.desktop?.automation) return <AutomationLogs headerTarget={headerTarget} />;
   const filtered = logs.filter(log => source === '全部来源' || log.source === source);
   return (
     <section className="logs-panel" aria-label="日志记录">
