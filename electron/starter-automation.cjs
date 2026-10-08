@@ -16,9 +16,12 @@ function resolveBuiltinScript(relative) {
 
 const usesStarterAutomation = config => config?.parameters?.starter_automation === true && STARTER_TARGETS.has(config.parameters.target);
 
-function starterActions(species, select = false) {
+function starterActions(species, select = false, pressDuration = 100) {
   const tap = (key, duration = 100) => [{ kind: 'button', key, down: true }, { kind: 'wait', duration_ms: duration }, { kind: 'button', key, down: false }];
-  if (!select) return tap('A');
+  if (!select) {
+    if (!Number.isInteger(pressDuration) || pressDuration < 30 || pressDuration > 200) throw Error('御三家 A 按键时长无效');
+    return tap('A', pressDuration);
+  }
   const slot = { 387: 0, 390: 1, 393: 2 }[species];
   if (slot === undefined) throw Error('御三家全自动目标无效');
   const keys = [...Array(slot).fill('RIGHT'), 'A', 'UP', 'A'];

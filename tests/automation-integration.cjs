@@ -96,6 +96,19 @@ test('starter selection cancelled before its request never reaches the controlle
   assert.equal(f.trace.includes('key'),false);
 });
 
+test('starter dialogue hold duration reaches the resident controller and invalid values never press',async t=>{
+  const f=fixture(t);enableStarter(f);
+  const sequences=[];
+  f.devices.controller.sequence=async({actions})=>sequences.push(actions);
+  await f.invoke('start',f.input);
+  for(const durationMs of [200,100])await f.callbacks().request('starter_action',{action:'press',durationMs});
+  assert.deepEqual(sequences.map(actions=>actions.find(action=>action.kind==='wait').duration_ms),[200,100]);
+  for(const durationMs of [0,29,201,Infinity,'200']){
+    await assert.rejects(()=>f.callbacks().request('starter_action',{action:'press',durationMs}),/时长无效/);
+  }
+  assert.equal(sequences.length,2);
+});
+
 test('starter fixed-delay readiness detects an impossible 200-frame window',async t=>{
   const f=fixture(t);enableStarter(f);f.input.config.delayConfig.baseline_delay=100;
   const check=await f.invoke('check',f.input);

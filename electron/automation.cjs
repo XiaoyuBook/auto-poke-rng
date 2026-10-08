@@ -130,7 +130,7 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
     await script.done; // script.done is emitted only after controller release.
     checkStopped(run);
   };
-  const runStarterAction=async(run,action,scriptId)=>{
+  const runStarterAction=async(run,action,scriptId,durationMs)=>{
     checkStopped(run);
     if(!usesStarterAutomation(run.input.config)||!['press','select'].includes(action))throw Error('御三家控制动作无效');
     if(run.currentScript)throw Error('已有自动控制动作正在运行');
@@ -139,7 +139,7 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
     script.done=(async()=>{
       await run.keepalive;checkStopped(run);
       if(script.stopped)return;
-      try{await devices.controller.sequence({actions:starterActions(run.target.speciesId,action==='select')});}
+      try{await devices.controller.sequence({actions:starterActions(run.target.speciesId,action==='select',durationMs)});}
       catch(error){if(!script.stopped)throw error;}
       checkStopped(run);
     })().finally(()=>{run.lastScriptId=script.scriptId;if(run.currentScript===script)run.currentScript=null;});
@@ -238,7 +238,7 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
       const request=async(method,params)=>{
         checkStopped(run);
         if(method==='script')return runScript(run,params.text,params.name,params.scriptId);
-        if(method==='starter_action')return runStarterAction(run,params.action,params.scriptId);
+        if(method==='starter_action')return runStarterAction(run,params.action,params.scriptId,params.durationMs);
         if(method==='stop_script')return stopScript(run,params.scriptId);
         if(method==='ocr')return ocrRequest(params,run.ocr);
         if(method==='delay_profile'){

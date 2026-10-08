@@ -1,6 +1,9 @@
 import os
+import json
+from pathlib import Path
 from types import SimpleNamespace
 import threading
+import time
 
 import pytest
 
@@ -13,6 +16,7 @@ from auto_bdsp_rng.automation.auto_rng.starter_flow import (
     DialogObserver, STARTER_TIMING, StarterFlow, StarterTargetMissed,
     TIMELINE_BUFFER, is_start_dialog, is_doctor_dialog, is_second_dialog,
     is_ball_dialog, normalize_dialog, selection_script, validate_starter_delay,
+    DOCTOR_PRESS_INTERVALS_MS, SECOND_PRESS_INTERVALS_MS, BALL_PRESS_INTERVALS_MS,
 )
 from auto_bdsp_rng.rng_core.seed import SeedState32
 from blink_core import Xorshift
@@ -28,25 +32,37 @@ class Clock:
         self.now += seconds
 
 
-def run_flow(species=387, delay=40, *, missing_second=False, stop_at=None, late_zero=None, script_log=None):
+def run_flow(species=387, delay=40, *, missing_second=False, missing_balls=False,
+             dropped_press=None, stop_at=None, late_zero=None, script_log=None,
+             ocr_reads=None, timing_log=None, stall_dialogue=False):
     clock, observations = Clock(), []
     scripts = [] if script_log is None else script_log
     seed = AutoRngSeedResult(SeedState32(0x12345678, 0x9ABCDEF0, 0x11111111, 0x22222222),
                              current_advances=1, npc=1, measured_at=0.0)
     target = AutoRngTarget(raw_target_advances=401)
-    dialogue = ["怎么回事？刚才那两人……", "哦！我们去看看吧！", "怎么了？你说不要到草丛里去？",
-                "………………", "没事没事！", "是个手提箱……", "一定是刚才那人掉的，怎么办？",
+    # Actual order before A frames 61,167,223,250,276,296,446,480,514 in 11.mp4.
+    dialogue = ["怎么回事？刚才那两人……", "咦？test！我们去看看吧！", "………………",
+                "怎么了？你说不要到草丛里去？", "没事没事！", "就进去一下而已，宝可梦不会出来啦。",
+                "是个手提箱……", "一定是刚才那人掉的，怎么办？",
                 "就是想还也不知道对方是谁啊，虽然有听到叫博士……"]
     index = 0
-    paused_at_zero = False
-    def text():
+    flow = None
+    paused_at_zero, enabled, stalled = False, True, False
+    def monotonic():
         nonlocal paused_at_zero
+        if flow is None:
+            return clock.time()
         timeline = flow.tracker.timeline
         at_first_zero = flow.tracker.countdown == 0 and timeline is None
         at_second_zero = timeline is not None and timeline.delay2_zero_at is not None
         if not paused_at_zero and ((late_zero == "first" and at_first_zero) or (late_zero == "second" and at_second_zero)):
             paused_at_zero = True
             clock.sleep(.2)  # Simulate a stalled worker after the clock update.
+        return clock.time()
+    def text():
+        assert enabled, 'OCR must be paused during fixed keys and clock waits'
+        if ocr_reads is not None:
+            ocr_reads.append(index)
         if index < len(dialogue):
             return normalize_dialog(dialogue[index])
         if index == len(dialogue):
@@ -55,15 +71,26 @@ def run_flow(species=387, delay=40, *, missing_second=False, stop_at=None, late_
             return "其他对话" if missing_second else "搞什么啊"
         if index == len(dialogue)+2:
             return "是精灵球用它来应战吧"
-        return "要选哪一只"
+        return "其他对话" if missing_balls else "要选哪一只"
     def press(script, name):
         nonlocal index
         scripts.append((name, clock.time(), flow.tracker.update(clock.time())["advances"]))
-        index += 1
-        clock.sleep(.1)
+        if len(scripts) != dropped_press:
+            index += 1
+        clock.sleep(int(script.split()[1])/1000)
+    def observe(value):
+        nonlocal enabled
+        enabled = value
+    def progress(stage, msg, current):
+        nonlocal stalled
+        observations.append((stage,current,clock.time()))
+        if stall_dialogue and not stalled and stage == 'doctor' and clock.time() >= 3:
+            stalled = True
+            clock.sleep(10)
     flow = StarterFlow(seed,target,delay,species,{"menuClose":True},latest_text=text,run_script=press,
-                       monotonic=clock.time,sleep=clock.sleep,
-                       progress=lambda stage,msg,current:observations.append((stage,current,clock.time())),
+                       monotonic=monotonic,sleep=clock.sleep,observe_dialog=observe,
+                       on_press=lambda timing: timing_log.append(timing) if timing_log is not None else None,
+                       progress=progress,
                        should_stop=lambda:stop_at is not None and clock.time()>=stop_at)
     result = flow.run()
     return result, scripts, observations, flow, seed
@@ -116,6 +143,54 @@ def test_missed_second_dialog_never_returns_selection():
         run_flow(missing_second=True)
 
 
+def test_fixed_sequences_match_recorded_intervals_and_only_read_four_anchors():
+    reads, timings = [], []
+    _,scripts,*_ = run_flow(ocr_reads=reads, timing_log=timings)
+    assert set(reads) == {0, 8, 10, 12}
+    assert len(scripts) == 12  # Eight + two ordinary + two clock-controlled A.
+    evidence = json.loads((Path(__file__).parents[2]/'docs/evidence/bdsp-starter-controller-timing.json').read_text(encoding='utf-8'))
+    recorded = [event for event in evidence['events'] if event['key'] == 'A']
+    assert len(recorded) == 12
+    for indices, intervals in [([*range(1,8)], DOCTOR_PRESS_INTERVALS_MS),
+                               ([9], SECOND_PRESS_INTERVALS_MS), ([11], BALL_PRESS_INTERVALS_MS)]:
+        for index, interval in zip(indices, intervals, strict=True):
+            measured = recorded[index]['since_previous_A_down_ms']
+            assert 0 <= interval-measured < 10
+            actual_gap = (scripts[index][1]-scripts[index-1][1])*1000
+            assert actual_gap == pytest.approx(interval, abs=21)
+            assert timings[index]['since_previous_press_ms'] == pytest.approx(actual_gap, abs=.001)
+    assert all(row['hold_ms'] == (100 if i in (8,10) else 200) for i,row in enumerate(timings))
+
+
+def test_dropped_ordinary_input_stops_at_doctor_without_sending_extra_a():
+    scripts = []
+    with pytest.raises(RuntimeError, match='博士|对话识别超时'):
+        run_flow(dropped_press=3, script_log=scripts)
+    assert len(scripts) == 8
+    assert all('归零' not in row[0] for row in scripts)
+
+
+def test_missing_ball_anchor_never_selects_or_sends_extra_a():
+    scripts = []
+    with pytest.raises(RuntimeError, match='精灵球界面|错过选择帧'):
+        run_flow(missing_balls=True, script_log=scripts)
+    assert len(scripts) == 12
+
+
+def test_stop_during_fixed_sequence_prevents_remaining_keys():
+    scripts = []
+    with pytest.raises(RuntimeError, match='已停止'):
+        run_flow(stop_at=6.5, script_log=scripts)
+    assert len(scripts) == 4
+
+
+def test_stalled_fixed_sequence_keeps_intervals_without_catch_up_burst():
+    _,scripts,*_ = run_flow(stall_dialogue=True)
+    for index, interval in enumerate(DOCTOR_PRESS_INTERVALS_MS, 1):
+        assert (scripts[index][1]-scripts[index-1][1])*1000 >= interval-.001
+    assert scripts[1][1] > 10
+
+
 def test_stop_during_countdown_does_not_dispatch_later_presses():
     with pytest.raises(RuntimeError,match="已停止"):
         run_flow(stop_at=105)
@@ -158,6 +233,55 @@ def test_slow_ocr_does_not_block_clock_reader_or_publish_after_close():
     release.set()
     observer.thread.join(1)
     assert observer.latest() is None
+
+
+def test_paused_observer_does_not_read_intermediate_dialogues():
+    entered = threading.Event()
+    observer = DialogObserver(lambda: entered.set() or '起点对话', lambda: False)
+    observer.set_enabled(False)
+    observer.start()
+    try:
+        assert not entered.wait(.15)
+        observer.set_enabled(True)
+        assert entered.wait(1)
+    finally:
+        observer.close()
+        observer.thread.join(1)
+
+
+def test_resumed_anchor_discards_in_flight_ocr_and_requires_two_fresh_reads():
+    entered = [threading.Event() for _ in range(3)]
+    release = [threading.Event() for _ in range(3)]
+    count = 0
+    def read():
+        nonlocal count
+        index = count
+        count += 1
+        if index < 3:
+            entered[index].set()
+            release[index].wait(1)
+        return '搞什么啊'
+    observer = DialogObserver(read,lambda:False)
+    observer.start()
+    try:
+        assert entered[0].wait(1)
+        observer.set_enabled(False)
+        observer.set_enabled(True)
+        release[0].set()
+        assert entered[1].wait(1)
+        release[1].set()
+        assert entered[2].wait(1)
+        assert observer.latest() is None
+        release[2].set()
+        deadline = time.monotonic()+1
+        while observer.latest() is None and time.monotonic() < deadline:
+            time.sleep(.01)
+        assert observer.latest() == '搞什么啊'
+    finally:
+        observer.close()
+        for event in release:
+            event.set()
+        observer.thread.join(1)
 
 
 def test_builtin_runner_hands_back_to_reverse_and_freezes_delay_each_round(tmp_path):

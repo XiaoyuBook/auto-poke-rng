@@ -10,6 +10,32 @@ import automation_host as host
 
 
 class AdapterContracts(unittest.TestCase):
+    def test_starter_passes_dialogue_durations_ocr_gates_and_timing_logs(self):
+        from auto_bdsp_rng.automation.auto_rng import starter_flow
+        events, requests, gates = [], [], []
+        session = host.Session({'species':387,'blink':{}},lambda **event:events.append(event))
+        session.runner = SimpleNamespace(config=SimpleNamespace(shiny_threshold_seconds=3))
+        session.recover_zoom = lambda: None
+        session.request = lambda method,**params: requests.append((method,params))
+        session.shiny = lambda *args,**kwargs: 'done'
+        observer = SimpleNamespace(start=lambda:None,close=lambda:None,latest=lambda:None,set_enabled=gates.append)
+        def build_flow(*args,**kwargs):
+            kwargs['observe_dialog'](False)
+            kwargs['run_script']('A 200\n','普通对话')
+            kwargs['run_script']('A 100\n','倒计时归零')
+            kwargs['on_press']({'name':'普通对话','elapsed_ms':3540,'since_previous_press_ms':3540,
+                                'hold_ms':200,'controller_request_ms':205,'late_ms':0})
+            kwargs['observe_dialog'](True)
+            return SimpleNamespace(run=lambda:'A 30\n')
+        target = SimpleNamespace(raw_target_advances=401)
+        with patch.object(starter_flow,'DialogObserver',return_value=observer), \
+             patch.object(starter_flow,'StarterFlow',side_effect=build_flow):
+            self.assertEqual(session.starter(None,target,40),'done')
+        self.assertEqual(requests,[('starter_action',{'action':'press','durationMs':200}),
+                                   ('starter_action',{'action':'press','durationMs':100})])
+        self.assertEqual(gates,[False,True])
+        self.assertIn('距上次 A 请求 3540.000ms',events[0]['message'])
+
     def test_early_double_blink_can_finish_before_warmup_discard(self):
         import blink_core
         detector = blink_core.BlinkDetector('recover', .9, 40, 10)

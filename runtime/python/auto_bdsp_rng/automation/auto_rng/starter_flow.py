@@ -1,4 +1,4 @@
-"""Dialogue-gated starter automation driven by the existing Project_Xs clock.
+"""Recorded dialogue sequences with OCR anchors and the Project_Xs clock.
 
 Only the observer thread performs OCR. The main thread owns the RNG clock and
 dispatches both countdown presses without waiting for an OCR response.
@@ -16,6 +16,13 @@ STARTER_TIMING = {"threshold": 0.7, "timeDelay": 0.0, "advanceDelay": 41,
                   "pokemonNpc": 2, "noisy": False}
 STARTER_SLOTS = {387: 0, 390: 1, 393: 2}
 SELECTION_PRESS_MS = 30  # The controller firmware's minimum report interval.
+# Successful A-down intervals from 11.mp4's frame PTS, rounded up to 10 ms.
+# Eight ordinary presses reach the doctor; the last two sequences each add one
+# ordinary press after a clock-controlled A. These waits include scene changes.
+DIALOG_PRESS_MS = 200  # Recording holds span 133-200 ms, at 33 ms resolution.
+DOCTOR_PRESS_INTERVALS_MS = (3540, 1870, 900, 870, 670, 5000, 1140)
+SECOND_PRESS_INTERVALS_MS = (3470,)
+BALL_PRESS_INTERVALS_MS = (4840,)
 # Eleven tracking ticks, the initial transition, eleven timeline events, and
 # the second transition must finish before the final selection can begin.
 TRANSITION_ADVANCES = 11 * (STARTER_TIMING["npc"] + 1) + STARTER_TIMING["advanceDelay"] + 11 + STARTER_TIMING["advanceDelay2"]
@@ -90,6 +97,8 @@ class DialogObserver:
         self.text: str | None = None
         self.observed_at = 0.0
         self.error: Exception | None = None
+        self.enabled = True
+        self.generation = 0
         self.thread = threading.Thread(target=self._run, daemon=True)
 
     def start(self) -> None:
@@ -98,6 +107,13 @@ class DialogObserver:
     def close(self) -> None:
         # Do not add a join delay immediately before the final controller press.
         self.stopped.set()
+
+    def set_enabled(self, enabled: bool) -> None:
+        """Start a fresh anchor check, or pause OCR during keys/countdowns."""
+        with self.lock:
+            self.generation += 1
+            self.enabled = enabled
+            self.text, self.observed_at = None, 0.0
 
     def latest(self) -> str | None:
         with self.lock:
@@ -108,22 +124,33 @@ class DialogObserver:
             return self.text
 
     def _run(self) -> None:
-        previous, repeated = None, 0
-        try:
-            while not self.stopped.is_set() and not self.should_stop():
-                current = normalize_dialog(self.read_text())
-                if self.stopped.is_set() or self.should_stop():
-                    return
-                repeated = repeated + 1 if current == previous else 1
-                previous = current
-                with self.lock:
-                    self.text = current if repeated >= 2 else None
-                    self.observed_at = time.monotonic()
+        previous, repeated, previous_generation = None, 0, None
+        while not self.stopped.is_set() and not self.should_stop():
+            with self.lock:
+                enabled, generation = self.enabled, self.generation
+            if not enabled:
                 self.stopped.wait(0.1)
-        except Exception as error:
-            if not self.stopped.is_set() and not self.should_stop():
+                continue
+            try:
+                current = normalize_dialog(self.read_text())
+            except Exception as error:
                 with self.lock:
+                    if generation != self.generation or not self.enabled or self.stopped.is_set() or self.should_stop():
+                        continue
                     self.error = error
+                return
+            if self.stopped.is_set() or self.should_stop():
+                return
+            with self.lock:
+                if generation != self.generation or not self.enabled:
+                    continue  # An in-flight read belongs to the old anchor.
+                if previous_generation != generation:
+                    previous, repeated = None, 0
+                repeated = repeated + 1 if current == previous else 1
+                previous, previous_generation = current, generation
+                self.text = current if repeated >= 2 else None
+                self.observed_at = time.monotonic()
+            self.stopped.wait(0.1)
 
 
 class StarterFlow:
@@ -133,13 +160,22 @@ class StarterFlow:
                  monotonic: Callable[[], float] = time.monotonic,
                  sleep: Callable[[float], None] = time.sleep,
                  should_stop: Callable[[], bool] = lambda: False,
-                 tracker=None, on_balls: Callable[[], None] = lambda: None):
+                 tracker=None, on_balls: Callable[[], None] = lambda: None,
+                 observe_dialog: Callable[[bool], None] = lambda *_: None,
+                 on_press: Callable[[dict], None] = lambda *_: None):
         validate_starter_delay(delay)
         self.delay, self.species = delay, species
         self.anchor = target.raw_target_advances - TIMELINE_BUFFER
         self.select_at = target.raw_target_advances - delay
         self.latest_text, self.run_script, self.progress = latest_text, run_script, progress
         self.monotonic, self.sleep, self.should_stop, self.on_balls = monotonic, sleep, should_stop, on_balls
+        self.observe_dialog, self.on_press = observe_dialog, on_press
+        self.next_dialog_at: float | None = None
+        self.pending_intervals = iter(())
+        self.last_press_at: float | None = None
+        self.last_completed_at = 0.0
+        self.last_hold_ms = 0
+        self.started_at = 0.0
         if tracker is None:
             from blink_core import Xorshift
             from blink_timing import BlinkTracking
@@ -149,9 +185,44 @@ class StarterFlow:
                                     seed.current_advances - int(config.get("menuClose", True)), measured, measured)
         self.tracker = tracker
 
+    def _press(self, duration_ms: int, name: str, scheduled_at: float) -> float:
+        started = self.monotonic()
+        self.run_script(f"A {duration_ms}\n", name)
+        completed = self.monotonic()
+        self.on_press({"name": name, "hold_ms": duration_ms,
+                       "elapsed_ms": round((started-self.started_at)*1000, 3),
+                       "since_previous_press_ms": None if self.last_press_at is None else round((started-self.last_press_at)*1000, 3),
+                       "late_ms": round(max(0.0, started-scheduled_at)*1000, 3),
+                       "controller_request_ms": round((completed-started)*1000, 3)})
+        self.last_press_at = started
+        self.last_completed_at, self.last_hold_ms = completed, duration_ms
+        return started
+
+    def _dialog_deadline(self, after: float, interval_ms: int) -> float:
+        # A slow controller round trip must not consume the release gap.
+        return max(after + interval_ms/1000,
+                   self.last_completed_at + max(0, interval_ms-self.last_hold_ms)/1000)
+
+    def _queue_dialogue(self, intervals: tuple[int, ...], after: float) -> None:
+        self.observe_dialog(False)
+        self.pending_intervals = iter(intervals)
+        self.next_dialog_at = self._dialog_deadline(after, next(self.pending_intervals))
+
+    def _advance_dialogue(self, now: float, name: str) -> None:
+        if self.next_dialog_at is None or now < self.next_dialog_at:
+            return
+        started = self._press(DIALOG_PRESS_MS, name, self.next_dialog_at)
+        interval = next(self.pending_intervals, None)
+        # A late worker never sends a burst to catch up with old deadlines.
+        self.next_dialog_at = None if interval is None else self._dialog_deadline(started, interval)
+        if self.next_dialog_at is None:
+            self.observe_dialog(True)
+
     def run(self) -> str:
         stage, entered_at = "start", self.monotonic()
-        last_pressed, last_press_at, reported_at = None, float("-inf"), float("-inf")
+        self.started_at = entered_at
+        self.observe_dialog(True)
+        reported_at = float("-inf")
         labels = {"start": "确认起点对话", "doctor": "自动推进到博士对话",
                   "anchor": "博士对话等待目标前 200 帧", "first_countdown": "Timeline 第一段倒计时",
                   "second": "自动推进到搞什么啊对话", "second_countdown": "Timeline 第二段倒计时",
@@ -164,7 +235,7 @@ class StarterFlow:
             tracking = self.tracker.update(now)
             current = tracking["advances"]
             timeline = self.tracker.timeline
-            text = self.latest_text() or ""
+            text = (self.latest_text() or "") if stage in ("start", "doctor", "second", "balls") and self.next_dialog_at is None else ""
             if stage != reported_stage or now - reported_at >= 0.2:
                 self.progress(stage, labels[stage], current)
                 reported_stage, reported_at = stage, now
@@ -174,20 +245,19 @@ class StarterFlow:
                 raise StarterTargetMissed(f"御三家未及时进入博士对话，错过固定启动帧 {self.anchor}")
             if stage == "start":
                 if is_start_dialog(text):
-                    self.run_script("A 100\n", "御三家·起点对话")
-                    last_pressed, last_press_at = text, self.monotonic()
+                    self.observe_dialog(False)
+                    started = self._press(DIALOG_PRESS_MS, "御三家·起点对话", now)
+                    self._queue_dialogue(DOCTOR_PRESS_INTERVALS_MS, started)
                     stage = "doctor"
             elif stage == "doctor":
-                if is_doctor_dialog(text):
+                if self.next_dialog_at is not None:
+                    self._advance_dialogue(now, "御三家·固定推进博士对话")
+                elif is_doctor_dialog(text):
+                    self.observe_dialog(False)
                     stage = "anchor"
                 elif is_second_dialog(text) or is_ball_dialog(text):
                     raise RuntimeError("御三家起点之后未识别到博士对话，已停止")
-                elif text and "就是" not in text and "想还" not in text and "想還" not in text and text != last_pressed and now-last_press_at >= 0.6:
-                    self.run_script("A 100\n", "御三家·推进对话")
-                    last_pressed, last_press_at = text, self.monotonic()
             elif stage == "anchor":
-                if text and not is_doctor_dialog(text):
-                    raise RuntimeError("等待 Timeline 时博士对话发生变化，已停止")
                 if current == self.anchor:
                     if not self.tracker.request_timeline():
                         raise RuntimeError("御三家 Timeline 无法启动")
@@ -197,34 +267,34 @@ class StarterFlow:
                 if zero_at is not None:
                     if self.monotonic() - zero_at > 0.15:
                         raise StarterTargetMissed("御三家第一段倒计时按键超时，本轮不选精灵")
-                    self.run_script("A 100\n", "御三家·第一段归零")
-                    last_pressed, last_press_at = text, self.monotonic()
+                    started = self._press(100, "御三家·第一段归零", zero_at)
+                    self._queue_dialogue(SECOND_PRESS_INTERVALS_MS, started)
                     stage = "second"
             elif stage == "second":
                 if is_ball_dialog(text) or "是精灵球" in text or "是精靈球" in text:
                     raise StarterTargetMissed("未确认第二段对话就进入精灵球界面，本轮不选精灵")
                 if timeline is not None and timeline.delay2_zero_at is not None:
                     raise StarterTargetMissed("第二段 Timer 归零前未进入搞什么啊对话，本轮不选精灵")
-                if is_second_dialog(text):
+                if self.next_dialog_at is not None:
+                    self._advance_dialogue(now, "御三家·固定推进遭遇对话")
+                elif is_second_dialog(text):
+                    self.observe_dialog(False)
                     stage = "second_countdown"
-                elif text and "搞" not in text and text != last_pressed and now-last_press_at >= 0.6:
-                    self.run_script("A 100\n", "御三家·推进遭遇对话")
-                    last_pressed, last_press_at = text, self.monotonic()
             elif stage == "second_countdown":
                 zero_at = timeline.delay2_zero_at if timeline is not None else None
                 if zero_at is not None:
                     if self.monotonic() - zero_at > 0.15:
                         raise StarterTargetMissed("御三家第二段倒计时按键超时，本轮不选精灵")
-                    self.run_script("A 100\n", "御三家·第二段归零")
-                    last_pressed, last_press_at = text, self.monotonic()
+                    started = self._press(100, "御三家·第二段归零", zero_at)
+                    self._queue_dialogue(BALL_PRESS_INTERVALS_MS, started)
                     stage = "balls"
             elif stage == "balls":
-                if is_ball_dialog(text):
+                if self.next_dialog_at is not None:
+                    self._advance_dialogue(now, "御三家·固定推进精灵球对话")
+                elif is_ball_dialog(text):
+                    self.observe_dialog(False)
                     self.on_balls()
                     stage = "selection"
-                elif text and "要选" not in text and "要選" not in text and text != last_pressed and now-last_press_at >= 0.6:
-                    self.run_script("A 100\n", "御三家·推进精灵球对话")
-                    last_pressed, last_press_at = text, self.monotonic()
             elif stage == "selection" and current == self.select_at:
                 self.progress("confirm", f"到达选择帧 {self.select_at}，使用本轮 delay {self.delay} 帧", current)
                 return selection_script(self.species)
@@ -237,4 +307,6 @@ class StarterFlow:
             next_at = self.tracker.next_at
             if timeline is not None:
                 next_at = timeline.queue[0][0] if timeline.queue else timeline.starts_at
+            if self.next_dialog_at is not None:
+                next_at = min(next_at, self.next_dialog_at)
             self.sleep(max(0.001, min(0.02, next_at-self.monotonic())))

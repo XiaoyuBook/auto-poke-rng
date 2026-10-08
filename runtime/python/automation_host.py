@@ -262,6 +262,17 @@ class Session:
             dialog = crop_starter_dialog(image)
             return '' if dialog is None else self.ocr(dialog)['text']
         observer = DialogObserver(read_dialog, self.cancel.is_set)
+        def press(text, name):
+            duration = {"A 100\n": 100, "A 200\n": 200}.get(text)
+            if duration is None:
+                raise ValueError('御三家对白按键无效')
+            return self.request('starter_action', action='press', durationMs=duration)
+        def record_press(timing):
+            previous = timing['since_previous_press_ms']
+            gap = '首次' if previous is None else f'{previous:.3f}ms'
+            self.log(f"{timing['name']}：接管后 {timing['elapsed_ms']:.3f}ms，距上次 A 请求 {gap}，"
+                     f"按住 {timing['hold_ms']}ms，请求耗时 {timing['controller_request_ms']:.3f}ms，"
+                     f"调度迟到 {timing['late_ms']:.3f}ms")
         def report(stage, message, current):
             if self.runner.should_stop():
                 return
@@ -278,8 +289,9 @@ class Session:
         observer.start()
         try:
             flow = StarterFlow(seed,target,delay,self.config['species'],self.config['blink'],
-                               latest_text=observer.latest,run_script=lambda *_:self.request('starter_action',action='press'),progress=report,
-                               sleep=self.sleep,should_stop=self.cancel.is_set,on_balls=observer.close)
+                               latest_text=observer.latest,run_script=press,progress=report,
+                               sleep=self.sleep,should_stop=self.cancel.is_set,on_balls=observer.close,
+                               observe_dialog=observer.set_enabled,on_press=record_press)
             text = flow.run()
             observer.close()
             self.check()
