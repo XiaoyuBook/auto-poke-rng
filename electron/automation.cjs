@@ -38,7 +38,7 @@ function validateParameters(kind, parameters) {
   }
 }
 
-function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,userData,workerFactory=startWorker,captureImage,encodeNotificationImage,notifications}){
+function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,userData,workerFactory=startWorker,captureImage,encodeNotificationImage,notifications,showSaveDialog=(...args)=>require('electron').dialog.showSaveDialog(...args)}){
   const store=new AutomationStore(userData);let active=null, auxiliary=null, timer=null, closed=false;
   let state={status:'idle',kind:null,runId:null,progress:null,capture:null,shiny:null,activity:null,flow:null,message:'等待开始',revision:0};
   const snapshot=()=>({...store.snapshot(),state});
@@ -68,7 +68,7 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
   const requireWindow=(event,main=false)=>{
     if(event.senderFrame!==event.sender.mainFrame||!getWindows().some(window=>!window.isDestroyed()&&window.webContents===event.sender)||(main&&event.sender!==getMainWindow()?.webContents))throw Error('Unknown automation sender');
   };
-  const handle=(name,action,main=true)=>ipcMain.handle('automation:'+name,async(event,args)=>{requireWindow(event,main);if(closed)throw Error('程序正在关闭');return action(args);});
+  const handle=(name,action,main=true)=>ipcMain.handle('automation:'+name,async(event,args)=>{requireWindow(event,main);if(closed)throw Error('程序正在关闭');return action(args,event);});
   const checkStopped=run=>{if(closed||run.stopped||(active!==run&&auxiliary!==run))throw Error('自动流程已停止');};
   const executeScript=async(run,text,name,script)=>{
     await run.keepalive;
@@ -340,6 +340,16 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
   handle('ocr-save',rows=>store.saveOcr(rows));handle('ocr-defaults',()=>defaults().ocr);
   handle('delay',({species,action,config,number,excluded})=>action==='save'?store.saveDelay(species,config):action==='clear'?store.clearDelay(species):store.excludeDelay(species,number,excluded));
   handle('logging',value=>store.setLogging(value),false);handle('clear-logs',()=>store.clearLogs(),false);
+  handle('export-diagnostics',async({runId},event)=>{
+    const source=store.runLogs.resolve(runId);
+    const parent=getWindows().find(window=>!window.isDestroyed()&&window.webContents===event.sender);
+    const result=await showSaveDialog(parent,{title:'导出本次完整诊断',defaultPath:path.basename(source),filters:[{name:'诊断日志',extensions:['jsonl']}],properties:['showOverwriteConfirmation']});
+    if(result.canceled||!result.filePath)return {canceled:true};
+    const run=store.runs.find(item=>item.id===runId);
+    const active=run?.status==='running',incomplete=!!run?.diagnosticsIncomplete;
+    const filePath=await store.runLogs.exportTo(runId,result.filePath);
+    return {canceled:false,filePath,active,incomplete};
+  },false);
   handle('log',row=>store.log(row.message,row.source,row.level));
   handle('ocr',async args=>{
     if(active||auxiliary)throw Error('已有流程正在使用 OCR');

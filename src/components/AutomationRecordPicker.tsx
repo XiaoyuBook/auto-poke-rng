@@ -4,8 +4,8 @@ import { Check, ChevronDown } from 'lucide-react';
 
 type RecordOption = { value: string; label: string; description?: string; group?: string };
 
-export function AutomationRecordPicker({ label, value, options, onChange, children }: {
-  label: string; value: string; options: RecordOption[]; onChange: (value: string) => void; children: ReactNode;
+export function AutomationPopover({ label, triggerContent, children, role = 'menu', disabled = false }: {
+  label: string; triggerContent: ReactNode; children: (close: () => void) => ReactNode; role?: 'menu' | 'dialog'; disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState({ left: 8, top: 8, maxHeight: 300 });
@@ -30,7 +30,7 @@ export function AutomationRecordPicker({ label, value, options, onChange, childr
 
   useLayoutEffect(() => {
     if (!open || !menu.current) return;
-    const selected = menu.current.querySelector<HTMLButtonElement>('[aria-checked="true"]') || menu.current.querySelector<HTMLButtonElement>('button');
+    const selected = menu.current.querySelector<HTMLElement>('[aria-checked="true"]') || menu.current.querySelector<HTMLElement>('input, select, button:not(:disabled)');
     selected?.focus({ preventScroll: true });
     selected?.scrollIntoView?.({ block: 'nearest' });
   }, [open, position.maxHeight]);
@@ -55,26 +55,39 @@ export function AutomationRecordPicker({ label, value, options, onChange, childr
 
   const keyboard = (event: KeyboardEvent) => {
     if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); return; }
-    if (event.key === 'Tab') { close(); return; }
-    const buttons = Array.from(menu.current?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]') || []);
+    if (event.key === 'Tab') {
+      const fields = Array.from(menu.current?.querySelectorAll<HTMLElement>('input:not(:disabled), select:not(:disabled), button:not(:disabled)') || []);
+      if (role === 'menu' || event.shiftKey && event.target === fields[0] || !event.shiftKey && event.target === fields.at(-1)) close();
+      return;
+    }
+    if (role !== 'menu') return;
+    const buttons = Array.from(menu.current?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]:not(:disabled), [role="menuitem"]:not(:disabled)') || []);
     const index = buttons.indexOf(event.target as HTMLButtonElement);
     const next = event.key === 'ArrowDown' ? (index + 1) % buttons.length : event.key === 'ArrowUp' ? (index + buttons.length - 1) % buttons.length : event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : -1;
     if (next >= 0) { event.preventDefault(); buttons[next]?.focus(); }
   };
 
   return <>
-    <button ref={trigger} type="button" className="automation-record-picker" aria-label={label} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? id : undefined} disabled={!options.length}
+    <button ref={trigger} type="button" className="automation-record-picker" aria-label={label} aria-haspopup={role} aria-expanded={open} aria-controls={open ? id : undefined} disabled={disabled}
       onClick={() => setOpen(!open)} onKeyDown={event => { if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); setOpen(true); } }}>
-      {children}<ChevronDown size={14} aria-hidden="true" />
+      {triggerContent}<ChevronDown size={14} aria-hidden="true" />
     </button>
-    {open && createPortal(<div ref={menu} id={id} role="menu" aria-label={label} className="automation-record-menu" style={position} onKeyDown={keyboard}>
-      {options.map((option, index) => <div key={option.value} role="none">
+    {open && createPortal(<div ref={menu} id={id} role={role} aria-label={label} className="automation-record-menu" style={position} onKeyDown={keyboard}>
+      {children(close)}
+    </div>, document.body)}
+  </>;
+}
+
+export function AutomationRecordPicker({ label, value, options, onChange, children }: {
+  label: string; value: string; options: RecordOption[]; onChange: (value: string) => void; children: ReactNode;
+}) {
+  return <AutomationPopover label={label} triggerContent={children} disabled={!options.length}>{close => <>
+    {options.map((option, index) => <div key={option.value} role="none">
         {option.group && option.group !== options[index - 1]?.group && <div className="automation-record-menu-group" role="presentation">{option.group}</div>}
         <button type="button" role="menuitemradio" tabIndex={-1} aria-checked={option.value === value} onClick={() => { onChange(option.value); close(); }}>
           <span><strong>{option.label}</strong>{option.description && <small>{option.description}</small>}</span>
           {option.value === value && <Check size={14} aria-hidden="true" />}
         </button>
-      </div>)}
-    </div>, document.body)}
-  </>;
+    </div>)}
+  </>}</AutomationPopover>;
 }

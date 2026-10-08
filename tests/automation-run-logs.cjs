@@ -62,6 +62,100 @@ test('retention does not delete unrelated files or interrupt an active run', t =
   assert.equal(fs.readFileSync(path.join(f.directory, 'logs/runs/notes.jsonl'), 'utf8'), 'keep');
 });
 
+test('export flushes full diagnostic history across all rounds even after the UI is cleared', async t => {
+  const f = fixture(t); f.store.beginRun('exported', 'frlg');
+  for (const round of [0, 1, 2]) {
+    f.store.history('exported', 'frlg_round', [{ number: round, data: {} }]);
+    f.store.log(`第 ${round} 轮摘要`, 'ECS', 'info', { runId: 'exported', round });
+    f.store.diagnostic('exported', { event: 'script.diagnostic', round, raw: `完整 OCR ${round}` });
+  }
+  f.store.clearLogs();
+  const destination = path.join(f.directory, 'export.jsonl');
+  assert.equal(await f.store.runLogs.exportTo('exported', destination), destination);
+  const rows = fs.readFileSync(destination, 'utf8').trim().split('\n').map(JSON.parse);
+  assert.deepEqual(rows.filter(row => row.raw).map(row => row.raw), ['完整 OCR 0', '完整 OCR 1', '完整 OCR 2']);
+  assert.equal(rows.filter(row => row.message).length, 3);
+  assert.deepEqual(rows, f.read(f.files()[0]));
+  assert.deepEqual(f.store.logs, []);
+});
+
+test('an active export is bounded before subsequent writes and a finished export includes its final boundary', async t => {
+  const f = fixture(t); f.store.beginRun('active-export', 'frlg');
+  f.store.diagnostic('active-export', { event: 'before', raw: '原文'.repeat(100000) });
+  const destination = path.join(f.directory, 'snapshot.jsonl');
+  const exporting = f.store.runLogs.exportTo('active-export', destination);
+  f.store.diagnostic('active-export', { event: 'after' });
+  f.store.finishRun('active-export', 'completed', 'done');
+  await exporting;
+  const rows = fs.readFileSync(destination, 'utf8').trim().split('\n').map(JSON.parse);
+  assert.deepEqual(rows.map(row => row.event), ['run.started', 'before']);
+  await f.store.runLogs.exportTo('active-export', destination);
+  assert.equal(JSON.parse(fs.readFileSync(destination, 'utf8').trim().split('\n').at(-1)).event, 'run.finished');
+});
+
+test('export rejects missing, expired, invalid and archive destinations without changing saved data', async t => {
+  const f = fixture(t); f.store.beginRun('one', 'frlg'); f.store.finishRun('one', 'completed', 'done');
+  const destination = path.join(f.directory, 'copy.jsonl'), source = f.store.runLogs.resolve('one');
+  const before = fs.readFileSync(source, 'utf8');
+  for (const runId of ['../one', 'one/../../secret', '', null, 42]) {
+    await assert.rejects(f.store.runLogs.exportTo(runId, destination), /标识无效/);
+  }
+  await assert.rejects(f.store.runLogs.exportTo('missing', destination), /没有已保存/);
+  await assert.rejects(f.store.runLogs.exportTo('one', source), /归档目录之外/);
+  await assert.rejects(f.store.runLogs.exportTo('one', path.join(f.store.runLogs.directory, 'copy.jsonl')), /归档目录之外/);
+  assert.equal(fs.readFileSync(source, 'utf8'), before);
+  for (let i = 0; i < 30; i++) { f.store.beginRun(`new-${i}`, 'frlg'); f.store.finishRun(`new-${i}`, 'completed', 'done'); }
+  await assert.rejects(f.store.runLogs.exportTo('one', destination), /文件已过期/);
+  assert.equal(fs.existsSync(destination), false);
+});
+
+test('export cannot overwrite the archive through a hard link outside its directory', async t => {
+  const f = fixture(t); f.store.beginRun('linked', 'frlg'); f.store.finishRun('linked', 'completed', 'done');
+  const source = f.store.runLogs.resolve('linked'), destination = path.join(f.directory, 'alias.jsonl');
+  const before = fs.readFileSync(source, 'utf8');
+  fs.linkSync(source, destination);
+  await assert.rejects(f.store.runLogs.exportTo('linked', destination), /链接/);
+  assert.equal(fs.readFileSync(source, 'utf8'), before);
+});
+
+test('an empty damaged archive closes its descriptor and leaves the destination untouched', async t => {
+  const f = fixture(t); f.store.beginRun('empty', 'frlg');
+  fs.truncateSync(f.store.runLogs.resolve('empty'));
+  const destination = path.join(f.directory, 'existing.jsonl'); fs.writeFileSync(destination, 'keep');
+  const close = t.mock.method(fs, 'closeSync');
+  await assert.rejects(f.store.runLogs.exportTo('empty', destination), /为空/);
+  assert.equal(close.mock.callCount(), 1);
+  assert.equal(fs.readFileSync(destination, 'utf8'), 'keep');
+});
+
+test('logging gaps are marked in both the run and exported file without inventing missing diagnostics', async t => {
+  const f = fixture(t); f.store.beginRun('gaps', 'frlg');
+  assert.equal(f.store.runs[0].diagnosticsIncomplete, false);
+  f.store.setLogging(false);
+  f.store.diagnostic('gaps', { event: 'missing' });
+  f.store.setLogging(true);
+  f.store.diagnostic('gaps', { event: 'resumed' });
+  f.store.finishRun('gaps', 'completed', 'done');
+  assert.equal(f.store.runs[0].diagnosticsIncomplete, true);
+  const destination = path.join(f.directory, 'gaps.jsonl'); await f.store.runLogs.exportTo('gaps', destination);
+  const rows = fs.readFileSync(destination, 'utf8').trim().split('\n').map(JSON.parse);
+  assert.deepEqual(rows.filter(row => row.event === 'logging.changed').map(row => row.enabled), [false, true]);
+  assert.ok(rows.some(row => row.event === 'resumed'));
+  assert.ok(!rows.some(row => row.event === 'missing'));
+  f.store.setLogging(false); f.store.beginRun('disabled', 'frlg');
+  assert.equal(f.store.runs[0].diagnosticsIncomplete, true);
+  await assert.rejects(f.store.runLogs.exportTo('disabled', path.join(f.directory, 'disabled.jsonl')), /没有已保存/);
+});
+
+test('logging can still be disabled when its diagnostic boundary fails to write', t => {
+  const f = fixture(t); f.store.beginRun('write-failed', 'frlg');
+  t.mock.method(f.store.runLogs, 'append', () => { throw Error('disk failure'); });
+  assert.doesNotThrow(() => f.store.setLogging(false));
+  assert.equal(f.store.data.logging, false);
+  assert.match(f.store.error, /disk failure/);
+  assert.equal(f.store.runs[0].diagnosticsIncomplete, true);
+});
+
 test('real Python host sends full hidden OCR and controller timing to the run file', async t => {
   const f = fixture(t), controller = new EventEmitter();
   controller.child = { killed: false };

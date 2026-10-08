@@ -49,7 +49,7 @@ export type FrlgRoundRecord = { request?: FrlgRoundRequest; nextRequest?: FrlgRo
   nextSeedMs?: number; f1?: number; tv?: number; f2?: number; result?: string; notes?: string[] };
 export type AutomationRound = { number: number; seed?: string; outcome: string; startedAt?: string; endedAt?: string; frlg?: FrlgRoundRecord; candidates: Candidate[]; selected?: number; sources?: string[];
   interval?: number; trigger?: number; usedDelay?: number; actualDelays?: number[]; reverse?: Candidate[]; events: { event: string; args: unknown[] }[] };
-export type AutomationRun = { id: string; kind: AutomationRunKind; context?: AutomationFlow['context'] | { profileId: string; target: string; game: 'frlg' } | null; startedAt: string; endedAt?: string; status: string; message?: string; rounds: AutomationRound[] };
+export type AutomationRun = { id: string; kind: AutomationRunKind; context?: AutomationFlow['context'] | { profileId: string; target: string; game: 'frlg' } | null; startedAt: string; endedAt?: string; status: string; message?: string; diagnosticsIncomplete?: boolean; rounds: AutomationRound[] };
 export type AutomationSnapshot = {
   config: { static: StaticAutomationConfig; tid: AutomationConfig; ocr: OcrRegionRow[] }; profiles: Record<string, DelayProfile>;
   staticGroups: { activeId: string; items: AutomationConfigGroup[] };
@@ -80,6 +80,7 @@ export interface AutomationApi {
   tidPreview(input: { seed: string[]; frame_threshold: number }): Promise<IdResults>;
   setLogging(value: boolean): Promise<AutomationSnapshot>;
   clearLogs(): Promise<void>;
+  exportDiagnostics(runId: string): Promise<{ canceled: boolean; filePath?: string; active?: boolean; incomplete?: boolean }>;
   log(row: Pick<LogEntry, 'message' | 'source' | 'level'>): Promise<void>;
 }
 export const automationBusy = (state?: AutomationSnapshot['state']) => !!state && ['starting','running','stopping'].includes(state.status);

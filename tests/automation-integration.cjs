@@ -9,11 +9,12 @@ const {defaults}=require('../electron/automation-store.cjs');
 const {createDeviceFixture,until}=require('./helpers/device-fixture.cjs');
 
 const deferred=()=>{let resolve;const promise=new Promise(done=>{resolve=done;});return {promise,resolve};};
-function fixture(t,{captureImage}={}){
+function fixture(t,{captureImage,showSaveDialog}={}){
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'automation-contract-'));
   const script=path.join(directory,'source.rng');fs.writeFileSync(script,'_目标帧数 = 300\nA 10\n');
   const trace=[],ocrRequests=[],workerMessages=[],notifications={calls:[],wantsTaskImage(){return true;},notifyTask(...args){this.calls.push(args);return Promise.resolve(true);}},handlers=new Map(),events=new EventEmitter();
   const window={isDestroyed:()=>false,webContents:{isDestroyed:()=>false,send:()=>{},mainFrame:{}}};
+  const detachedWindow={isDestroyed:()=>false,webContents:{isDestroyed:()=>false,send:()=>{},mainFrame:{}}};
   const state={video:{status:'connected',width:1920,height:1080,sharedMemory:{},session:'one'},controller:{status:'connected'}};
   let resolveDone,callbacks,workerConfig;
   const devices={events,getState:()=>state,claimAutomation:async()=>trace.push('claim'),releaseAutomation:()=>trace.push('release'),
@@ -24,15 +25,59 @@ function fixture(t,{captureImage}={}){
   const rng={isBusy:()=>false,cancel:async()=>trace.push('cancel-search'),generate:async input=>{trace.push(input);return [{advances:151,pid:'00000001',ec:'00000002',stats:[1,2,3,4,5,6]}];}};
   rng.generateReverse=input=>rng.generate(input);
   const workerFactory=(config,handlers)=>{workerConfig=config;callbacks=handlers;return {done:new Promise(resolve=>{resolveDone=resolve;}),send:message=>workerMessages.push(message),stop:async()=>resolveDone({status:'stopped'})};};
-  const automation=registerAutomation({ipcMain:{handle:(name,fn)=>handlers.set(name,fn)},getMainWindow:()=>window,getWindows:()=>[window],devices,rng,
-    blink:{getState:()=>({status:'idle'})},userData:directory,workerFactory,captureImage:captureImage|| (async()=>{trace.push('frame');return Buffer.from('snapshot').toString('base64');}),notifications});
+  const automation=registerAutomation({ipcMain:{handle:(name,fn)=>handlers.set(name,fn)},getMainWindow:()=>window,getWindows:()=>[window,detachedWindow],devices,rng,
+    blink:{getState:()=>({status:'idle'})},userData:directory,workerFactory,captureImage:captureImage|| (async()=>{trace.push('frame');return Buffer.from('snapshot').toString('base64');}),notifications,showSaveDialog});
   const invoke=(name,input,event={sender:window.webContents,senderFrame:window.webContents.mainFrame})=>handlers.get('automation:'+name)(event,input);
   const input={kind:'static',config:defaults().static,profile:{version:'BD',tid:0,sid:0},blink:{mode:'recover',eye:'data:image/png;base64,AQ==',
     sourceWidth:1920,sourceHeight:1080,roi:{x:0,y:0,width:100,height:100},threshold:.9,npc:0,seed:['1','2','3','4'],noisy:false,searchMin:0,searchMax:1000000}};
   input.config.scripts={...input.config.scripts,seed:'source.rng',advance:'source.rng',hit:'source.rng'};
   t.after(async()=>{await automation.close();fs.rmSync(directory,{recursive:true,force:true});});
-  return {automation,input,invoke,trace,ocrRequests,workerMessages,notifications,devices,state,rng,done:value=>resolveDone(value),callbacks:()=>callbacks,workerConfig:()=>workerConfig};
+  return {directory,window,detachedWindow,automation,input,invoke,trace,ocrRequests,workerMessages,notifications,devices,state,rng,done:value=>resolveDone(value),callbacks:()=>callbacks,workerConfig:()=>workerConfig};
 }
+
+test('diagnostic export uses a native save dialog owned by the requesting log window',async t=>{
+  const dialogs=[];
+  const f=fixture(t,{showSaveDialog:async(parent,options)=>{dialogs.push({parent,options});return {canceled:false,filePath:path.join(f.directory,'export.jsonl')};}});
+  f.automation.store.beginRun('export-run','frlg');
+  f.automation.store.diagnostic('export-run',{event:'hidden',raw:'OCR 原文'});
+  f.automation.store.setLogging(false);
+  const event={sender:f.detachedWindow.webContents,senderFrame:f.detachedWindow.webContents.mainFrame};
+  const result=await f.invoke('export-diagnostics',{runId:'export-run'},event);
+  assert.equal(dialogs[0].parent,f.detachedWindow);
+  assert.match(dialogs[0].options.defaultPath,/^run_\d{13}_export-run\.jsonl$/);
+  assert.deepEqual(dialogs[0].options.filters,[{name:'诊断日志',extensions:['jsonl']}]);
+  assert.deepEqual(result,{canceled:false,filePath:path.join(f.directory,'export.jsonl'),active:true,incomplete:true});
+  assert.match(fs.readFileSync(result.filePath,'utf8'),/OCR 原文/);
+});
+
+test('diagnostic export cancellation, invalid runs and unauthorized senders never copy files',async t=>{
+  const dialogs=[];
+  const f=fixture(t,{showSaveDialog:async(...args)=>{dialogs.push(args);return {canceled:true};}});
+  f.automation.store.beginRun('cancel-run','frlg');
+  const files=fs.readdirSync(f.directory);
+  assert.deepEqual(await f.invoke('export-diagnostics',{runId:'cancel-run'}),{canceled:true});
+  assert.deepEqual(fs.readdirSync(f.directory),files);
+  await assert.rejects(f.invoke('export-diagnostics',{runId:'missing'}),/没有已保存/);
+  await assert.rejects(f.invoke('export-diagnostics',{runId:'../outside'}),/标识无效/);
+  const foreign={mainFrame:{}};
+  await assert.rejects(f.invoke('export-diagnostics',{runId:'cancel-run'},{sender:foreign,senderFrame:foreign.mainFrame}),/sender/);
+  await assert.rejects(f.invoke('export-diagnostics',{runId:'cancel-run'},{sender:f.window.webContents,senderFrame:{}}),/sender/);
+  assert.equal(dialogs.length,1);
+});
+
+test('export result describes the copied snapshot even when the run ends while copying',async t=>{
+  const f=fixture(t,{showSaveDialog:async()=>({canceled:false,filePath:path.join(f.directory,'snapshot.jsonl')})});
+  f.automation.store.beginRun('ends-during-export','frlg');
+  const original=f.automation.store.runLogs.exportTo.bind(f.automation.store.runLogs);
+  t.mock.method(f.automation.store.runLogs,'exportTo',async(...args)=>{
+    const copying=original(...args);
+    f.automation.store.finishRun('ends-during-export','completed','done');
+    return copying;
+  });
+  const result=await f.invoke('export-diagnostics',{runId:'ends-during-export'});
+  assert.equal(result.active,true);
+  assert.ok(!fs.readFileSync(result.filePath,'utf8').includes('run.finished'));
+});
 
 test('C02: preparation compiles but does not save, press, warm up, or claim devices',async t=>{
   const f=fixture(t);f.input.config.parameters.fixed_delay=1442;

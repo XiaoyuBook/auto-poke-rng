@@ -59,7 +59,7 @@ test('compact navigation keeps a historical round during updates and can resume 
   expect(picker.textContent).toContain('第 2 轮');
 });
 
-test('round selection uses its run and number across retention and new runs', async () => {
+test('a manually selected historical round retains its run and number across retention and new runs', async () => {
   const rounds = [round(1, { seed: 'seed-one' }), round(2, { seed: 'seed-two' }), round(3, { seed: 'seed-three' })];
   const { update } = fixture([run('r1', rounds)]);
   render(<AutomationLogs />);
@@ -67,8 +67,8 @@ test('round selection uses its run and number across retention and new runs', as
   await update({ runs: [run('r1', rounds.slice(1))] });
   expect(screen.getByText('seed-two')).toBeTruthy();
   await update({ runs: [run('r2', [round(1), round(2), round(3, { seed: 'new-run-seed' })]), run('r1', rounds)] });
-  expect(screen.getByText('new-run-seed')).toBeTruthy();
-  expect(screen.queryByText('seed-two')).toBeNull();
+  expect(screen.getByText('seed-two')).toBeTruthy();
+  expect(screen.queryByText('new-run-seed')).toBeNull();
 });
 
 test('round menu supports keyboard navigation, Escape, and restoring focus', async () => {

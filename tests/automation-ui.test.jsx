@@ -264,7 +264,7 @@ test('L01/L03: record navigation filters detailed logs to the selected run and r
   render(<AutomationLogs />);
   fireEvent.click(await screen.findByRole('button',{name:'查看本轮日志'}));
   expect(screen.getByText('current round')).toBeTruthy();expect(screen.queryByText('other round')).toBeNull();
-  fireEvent.click(screen.getByRole('button',{name:'清除轮次筛选'}));
+  fireEvent.change(screen.getByRole('combobox',{name:'日志范围'}),{target:{value:'all'}});
   expect(screen.getByText('other round')).toBeTruthy();
 });
 
@@ -281,7 +281,9 @@ test('L04: FRLG runs expose lifecycle and ECS sources with phase and error filte
   expect(screen.getByText('标签读取失败')).toBeTruthy();
   expect(screen.queryByText('阶段完成：wild.data.candidate_range')).toBeNull();
   expect(screen.getByText('ECS 执行')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button',{name:'筛选日志'}));
   fireEvent.change(screen.getByRole('combobox',{name:'筛选日志来源'}),{target:{value:'ECS'}});
+  fireEvent.click(screen.getByRole('button',{name:'完成'}));
   expect(screen.getByText('标签读取失败')).toBeTruthy();
   expect(screen.queryByText('正在准备')).toBeNull();
   fireEvent.change(screen.getByRole('combobox',{name:'筛选日志级别'}),{target:{value:'error'}});
@@ -311,7 +313,7 @@ test('FRLG rounds default to latest, update live, and scope logs to round zero',
   fireEvent.click(screen.getByRole('button',{name:'查看火叶运行日志'}));
   expect(screen.getByText('第零轮环境检查')).toBeTruthy();
   expect(screen.queryByText('第一轮结果')).toBeNull();
-  expect(screen.getByRole('cell',{name:'0'})).toBeTruthy();
+  expect(within(screen.getByRole('list',{name:'运行日志列表'})).getByText('第 0 轮')).toBeTruthy();
 });
 
 test('BINGO renders an interactive distribution and explicitly shows out-of-chart hits',async()=>{
@@ -371,8 +373,8 @@ test('L03: a new run removes the previous round filter',async()=>{
   const {snapshot,api}=fixture();snapshot.state.runId='r1';
   localStorage.setItem('auto-poke-rng:log-context',JSON.stringify({runId:'r1',round:1}));
   snapshot.logs=[{id:'a',time:'10:00',source:'自动定点',level:'info',message:'new run message',runId:'r2',round:1}];
-  render(<AutomationLogs />);await screen.findByRole('button',{name:'清除轮次筛选'});
+  render(<AutomationLogs />);expect((await screen.findByRole('combobox',{name:'日志范围'})).value).toBe('round');
   expect(screen.queryByText('new run message')).toBeNull();
   await act(async()=>api.onState.mock.calls[0][0]({...snapshot,state:{...snapshot.state,runId:'r2',status:'starting'}}));
-  expect(screen.getByText('new run message')).toBeTruthy();expect(screen.queryByRole('button',{name:'清除轮次筛选'})).toBeNull();
+  expect(screen.getByText('new run message')).toBeTruthy();expect(screen.getByRole('combobox',{name:'日志范围'}).value).toBe('all');
 });

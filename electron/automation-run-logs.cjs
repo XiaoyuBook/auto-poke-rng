@@ -1,6 +1,7 @@
 // One file per start-to-stop automation run, irrespective of its round count.
 const fs = require('node:fs');
 const path = require('node:path');
+const { pipeline } = require('node:stream/promises');
 const RUN_FILE = /^run_(\d{13})_([a-zA-Z0-9_-]{1,100})\.jsonl$/;
 const RETAIN_RUNS = 30;
 
@@ -64,6 +65,35 @@ class AutomationRunLogs {
     this.flush();
     this.active.delete(runId);
     if (fs.existsSync(this.directory)) this.prune();
+  }
+  resolve(runId) {
+    if (typeof runId !== 'string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(runId)) throw Error('流程日志标识无效');
+    const name = fs.existsSync(this.directory) && fs.readdirSync(this.directory).filter(name => name.match(RUN_FILE)?.[2] === runId).sort().at(-1);
+    if (!name) throw Error('此次运行没有已保存的诊断文件，可能未开启日志保存或文件已过期');
+    const file = path.join(this.directory, name);
+    if (!fs.lstatSync(file).isFile()) throw Error('诊断文件不可用');
+    return file;
+  }
+  async exportTo(runId, destination) {
+    const source = this.resolve(runId);
+    const target = path.resolve(destination);
+    const archive = fs.realpathSync(this.directory);
+    const resolvedTarget = fs.existsSync(target) ? fs.realpathSync(target) : path.join(fs.realpathSync(path.dirname(target)), path.basename(target));
+    const relative = path.relative(archive, resolvedTarget);
+    if (!relative || (!relative.startsWith('..' + path.sep) && relative !== '..' && !path.isAbsolute(relative))) throw Error('请将诊断文件导出到日志归档目录之外');
+    if (fs.existsSync(target) && fs.statSync(target).nlink > 1) throw Error('导出目标是硬链接，请选择一个独立文件');
+    this.flush();
+    // Capture a complete JSONL boundary before yielding. New events may keep arriving
+    // while the bounded stream copies this snapshot, without growing renderer memory.
+    const fd = fs.openSync(source, 'r');
+    let input;
+    try {
+      const size = fs.fstatSync(fd).size;
+      if (!size) throw Error('诊断文件为空，无法导出');
+      input = fs.createReadStream(source, { fd, autoClose: true, start: 0, end: size - 1 });
+    } catch (error) { fs.closeSync(fd); throw error; }
+    await pipeline(input, fs.createWriteStream(target));
+    return target;
   }
 }
 

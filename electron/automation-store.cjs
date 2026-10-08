@@ -171,7 +171,16 @@ class AutomationStore extends EventEmitter {
     return this.change(next => { const sample = this.profile(next, species).samples.find(item => item.round_number === number); if (!sample) throw Error('样本不存在'); sample.excluded = !!excluded; });
   }
   clearDelay(species) { return this.change(next => { this.profile(next, species).samples = []; }); }
-  setLogging(value) { return this.change(next => { next.logging = !!value; }); }
+  setLogging(value) {
+    if (this.data.logging !== !!value) {
+      for (const run of this.runs.filter(run => run.status === 'running')) {
+        if (!value) run.diagnosticsIncomplete = true;
+        try { this.runLogs.append(run.id, { event: 'logging.changed', runId: run.id, enabled: !!value, timestamp: this.now().toISOString() }); }
+        catch (error) { this.error = '诊断日志写入失败：' + error.message; }
+      }
+    }
+    return this.change(next => { next.logging = !!value; });
+  }
   log(message, source = '系统', level = 'info', context = {}) {
     const now = this.now();
     const row = { ...context, id: randomUUID(), time: now.toLocaleTimeString('zh-CN', { hour12: false }), timestamp: now.toISOString(), message: String(message), source, level };
@@ -199,7 +208,7 @@ class AutomationStore extends EventEmitter {
     catch (error) { this.error = '诊断日志写入失败：' + error.message; }
   }
   beginRun(id, kind, context = null) {
-    const run = { id, kind, context: context ? clone(context) : null, startedAt: this.now().toISOString(), status: 'running', rounds: [] };
+    const run = { id, kind, context: context ? clone(context) : null, startedAt: this.now().toISOString(), status: 'running', rounds: [], diagnosticsIncomplete: !this.data.logging };
     this.runs.unshift(run);
     if (this.data.logging) try {
       this.runLogs.begin(run, kind === 'frlg' ? null : clone(this.data.config[kind] || {}));

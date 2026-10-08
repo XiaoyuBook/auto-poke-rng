@@ -37,6 +37,7 @@ contextBridge.exposeInMainWorld('desktop', {
     tidPreview: input => ipcRenderer.invoke('automation:tid-preview', input),
     setLogging: value => ipcRenderer.invoke('automation:logging', value),
     clearLogs: () => ipcRenderer.invoke('automation:clear-logs'),
+    exportDiagnostics: runId => ipcRenderer.invoke('automation:export-diagnostics', { runId }),
     log: row => ipcRenderer.invoke('automation:log', row),
   },
   notifications: {
