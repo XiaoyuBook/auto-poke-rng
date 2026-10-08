@@ -5,6 +5,8 @@ third_party/PokeFinder/** -text
 # Keep the original Project_Xs files byte-identical to their pinned revision.
 third_party/Project_Xs/** -text
 third_party/bdsp-automation-reference/** -text
+# Keep the bundled reverse script byte-identical to its published script package.
+resources/automation/bdsp-starter/reverse.ecs -text
 runtime/python/auto_bdsp_rng/**/*.py -text
 src/generated/bdsp-data.json text eol=lf
 runtime/generated/bdsp_data.hpp text eol=lf

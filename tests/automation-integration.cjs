@@ -3,6 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const os=require('node:os');
 const path=require('node:path');
+const {createHash}=require('node:crypto');
 const {EventEmitter}=require('node:events');
 const {registerAutomation}=require('../electron/automation.cjs');
 const {defaults}=require('../electron/automation-store.cjs');
@@ -119,8 +120,15 @@ test('starter readiness binds trusted bundled scripts without reading the user l
   assert.equal(config.scripts.advance,undefined);
   assert.equal(config.scripts.hit,undefined);
   for(const key of ['seed','reverse']){
-    assert.equal(config.scripts[key].text,fs.readFileSync(path.join(__dirname,'../resources/automation/bdsp-starter',key+'.ecs'),'utf8'));
+    const bytes=fs.readFileSync(path.join(__dirname,'../resources/automation/bdsp-starter',key+'.ecs'));
+    assert.equal(config.scripts[key].text,bytes.toString('utf8'));
     assert.match(config.scripts[key].path,/^__builtin__\//);
+    if(key==='reverse'){
+      const item=require('../resources/script-catalog.json').packages.find(item=>item.id==='bdsp-starter-reverse');
+      const script=item.files.find(file=>file.path==='御三家反查.txt');
+      assert.equal(bytes.length,script.bytes,'automatic reverse uses the published script bytes');
+      assert.equal(createHash('sha256').update(bytes).digest('hex'),script.sha256);
+    }
   }
   assert.equal(config.blink.eye,original.blink.eye);
   assert.deepEqual(config.blink.roi,original.blink.roi);
