@@ -2251,6 +2251,11 @@ kbd { display: inline-flex; align-items: center; justify-content: center; paddin
 .automation-feature-body { min-width: 0; margin: 0; padding: 12px 14px 14px; border: 0; }
 .automation-feature-body fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
 .automation-feature-body .automation-fields { margin: 0; }
+.automation-starter-heading { flex-wrap: wrap; row-gap: 6px; }
+.automation-workspace .automation-starter-toggle { display: inline-flex; align-items: center; gap: 7px; min-height: 28px; flex-shrink: 0; color: var(--secondary); font-size: 12px; cursor: pointer; }
+.automation-starter-toggle input { width: 15px; height: 15px; margin: 0; accent-color: var(--green); }
+.automation-starter-settings > label { display: grid; grid-template-columns: minmax(0, 1fr) 112px; align-items: center; gap: 6px 16px; color: var(--secondary); font-size: 12px; }
+.automation-starter-settings .automation-field-error { grid-column: 1 / -1; margin: 0; }
 .automation-shiny-fields > button { align-self: end; width: 100%; min-height: 34px; }
 .automation-feature-body p { margin: 0 0 10px; }
 .automation-tid-sections { grid-template-columns: minmax(0, 1fr); }

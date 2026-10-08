@@ -68,6 +68,7 @@ app.whenReady().then(async()=>{
   assert.equal(ready.ready,false);assert.equal(automation.getState().runs.length,0);
   await js(`document.querySelector('.automation-delay-trigger').click()`);
   await until(`Boolean(document.querySelector('.automation-delay-dialog'))`,'delay settings');
+  assert.equal(await js(`document.querySelector('[aria-label="固定 delay"]')?.value`),'66','new workflows show the default delay');
   await js(`(()=>{const input=document.querySelector('[aria-label="固定 delay"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'1442');input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
   await click('应用');
   await click('切换到自动 TID');
@@ -81,15 +82,33 @@ app.whenReady().then(async()=>{
   await until(`document.querySelector('.automation-save-status')?.textContent==='已保存'`,'parameter save');
   await screenshot('automatic-static.png');
   await js(`document.querySelector('.automation-delay-trigger').click()`);
-  await js(`(()=>{const input=document.querySelector('[aria-label="固定 delay"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'40');input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+  await js(`(()=>{const input=document.querySelector('[aria-label="固定 delay"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'66');input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
   await click('应用');
   await js(`document.querySelector('[aria-label="御三家全自动"]').click()`);
   assert.equal(await js(`Boolean(document.querySelector('[aria-label="撞帧脚本"]'))`),false,'starter needs no hit script picker');
   assert.equal(await js(`Boolean(document.querySelector('[aria-label="反查窗口（帧）"]'))`),true,'built-in reverse remains configurable');
+  const verifyStarterLayout=async()=>{
+    assert.deepEqual(await js(`(()=>{
+      const card=document.querySelector('#automation-section-scripts');
+      const input=card.querySelector('[aria-label="反查窗口（帧）"]');
+      const rect=input.getBoundingClientRect(),bounds=card.getBoundingClientRect();
+      const label=document.createRange();label.selectNode(input.parentElement.firstChild);
+      const text=label.getBoundingClientRect();
+      return {
+        toggleInHeading:card.querySelector('.automation-feature-heading').contains(card.querySelector('[aria-label="御三家全自动"]')),
+        compact:bounds.height<=130,
+        inlineField:text.right<rect.left&&text.top>=rect.top&&text.bottom<=rect.bottom,
+        contained:rect.right<=bounds.right&&rect.bottom<=bounds.bottom,
+        noParagraphs:card.querySelectorAll('p').length===0
+      };
+    })()`),{toggleInHeading:true,compact:true,inlineField:true,contained:true,noParagraphs:true},'starter settings stay compact and readable');
+  };
   await js(`document.querySelector('#automation-section-scripts').scrollIntoView({block:'start',behavior:'instant'})`);
+  await verifyStarterLayout();
   await screenshot('starter-automatic.png');
   main.setSize(1100,850);
   await js(`document.querySelector('#automation-section-scripts').scrollIntoView({block:'start',behavior:'instant'})`);
+  await verifyStarterLayout();
   await screenshot('starter-automatic-narrow.png');
   main.setSize(1500,940);
   await js(`document.querySelector('[aria-label="御三家全自动"]').click()`);

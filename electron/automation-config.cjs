@@ -1,6 +1,6 @@
 const featureKeys = ['reverse', 'exit', 'sync', 'escape'];
 const defaultFeatures = () => Object.fromEntries(featureKeys.map(key => [key, { added: false, enabled: false }]));
-const defaultDelay = (baseline = 100) => ({ strategy: 'fixed', baseline_delay: baseline, multi_candidate_policy: 'ignore', window_size: 5, ewma_alpha: 0.5, dense_interval_width: 2 });
+const defaultDelay = (baseline = 66) => ({ strategy: 'fixed', baseline_delay: baseline, multi_candidate_policy: 'ignore', window_size: 5, ewma_alpha: 0.5, dense_interval_width: 2 });
 
 function legacyFeatures(config) {
   const p = config.parameters || {}, scripts = config.scripts || {};

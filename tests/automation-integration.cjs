@@ -82,7 +82,7 @@ test('export result describes the copied snapshot even when the run ends while c
 test('C02: preparation compiles but does not save, press, warm up, or claim devices',async t=>{
   const f=fixture(t);f.input.config.parameters.fixed_delay=1442;
   assert.equal((await f.invoke('check',f.input)).ready,true);assert.deepEqual(f.trace,[]);
-  assert.equal(f.automation.getState().config.static.parameters.fixed_delay,100);
+  assert.equal(f.automation.getState().config.static.parameters.fixed_delay,66);
 });
 
 function enableStarter(f){
@@ -91,6 +91,20 @@ function enableStarter(f){
   f.input.config.delayConfig.baseline_delay=40;
   f.input.config.scripts={seed:'missing/seed.ecs',advance:'missing/advance.ecs',hit:'missing/hit.ecs',reverse:'missing/reverse.ecs'};
 }
+
+test('starter workflows can pass readiness and start with the default 66-frame delay',async t=>{
+  for(const target of ['Turtwig','Chimchar','Piplup']){
+    const f=fixture(t);
+    f.input.config.parameters.starter_automation=true;
+    f.input.config.parameters.target=target;
+    const check=await f.invoke('check',f.input);
+    assert.equal(check.ready,true,JSON.stringify(check.checks));
+    await f.invoke('start',f.input);
+    assert.equal(f.workerConfig().parameters.fixed_delay,66);
+    assert.equal((await f.callbacks().request('delay_profile',{})).config.baseline_delay,66);
+    await f.invoke('stop');
+  }
+});
 
 test('starter readiness binds trusted bundled scripts without reading the user library',async t=>{
   const f=fixture(t);enableStarter(f);

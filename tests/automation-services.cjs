@@ -10,6 +10,24 @@ function fixture(t, now = () => new Date(2026, 8, 25, 10)) {
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   return { directory, store: new AutomationStore(directory, { now }) };
 }
+test('new static workflows and species profiles use 66 frames without overwriting saved delays', t => {
+  const { directory, store } = fixture(t);
+  const first = store.snapshot().staticGroups.activeId;
+  assert.equal(store.snapshot().config.static.parameters.fixed_delay, 66);
+  assert.equal(store.snapshot().config.static.delayConfig.baseline_delay, 66);
+  store.save('static', 'parameters', { fixed_delay: 100 });
+  store.manageStaticGroup({ action: 'create', name: '新的御三家流程' });
+  const second = store.snapshot().staticGroups.activeId;
+  assert.equal(store.snapshot().config.static.parameters.fixed_delay, 66);
+  assert.equal(store.snapshot().config.static.delayConfig.baseline_delay, 66);
+  store.recordDelay(390, [65, 66]);
+  const restored = new AutomationStore(directory).snapshot();
+  assert.equal(restored.profiles['390'].config.baseline_delay, 66);
+  assert.deepEqual(restored.profiles['390'].samples[0].candidates, [65, 66]);
+  assert.equal(restored.staticGroups.items.find(item => item.id === first).config.delayConfig.baseline_delay, 100);
+  assert.equal(restored.staticGroups.items.find(item => item.id === second).config.delayConfig.baseline_delay, 66);
+});
+
 test('C01: parameter save preserves scripts, including deliberately empty choices', t => {
   const { directory, store } = fixture(t);
   store.save('static', 'scripts', { seed: 'BDSP/测种.rng', hit: '' });

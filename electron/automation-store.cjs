@@ -14,11 +14,11 @@ const regions = [
 ];
 const defaults = () => ({
   static: { parameters: { target: 'Turtwig', filters: [defaultFilter()], lead: 255, max_advances: 100000,
-    fixed_delay: 100, max_wait_frames: 300, reseed_threshold_frames: 900000, reidentify_max_attempts: 2,
+    fixed_delay: defaultDelay().baseline_delay, max_wait_frames: 300, reseed_threshold_frames: 900000, reidentify_max_attempts: 2,
     reidentify_failure_policy: 'next_round', reidentify_seed_max_attempts: 1, reseeding_threshold: 500000,
     auto_reverse: false, escape_continue: false, reverse_lookup_window: 500, shiny_threshold_seconds: 4, record_shiny: true,
     sync_mode: 0, sync_nature: '', blink_name: '', exit_blink_name: '', loop_mode: 'single', loop_count: 1, start: 'script', starter_automation: false },
-    scripts: { seed: '', advance: '', hit: '', exit: '', reverse: '', escape: '' }, features: defaultFeatures(), delayConfig: defaultDelay(100) },
+    scripts: { seed: '', advance: '', hit: '', exit: '', reverse: '', escape: '' }, features: defaultFeatures(), delayConfig: defaultDelay() },
   tid: { parameters: { frame_threshold: 300, delay: 0, target_display_tids: [], loop_mode: 'single', loop_count: 1, start: 'script' }, scripts: { seed: '', name: '' } },
   ocr: regions.map(([id,label,x,y,width,height]) => ({ id, label, rect: { x,y,width,height } })),
 });
@@ -149,7 +149,7 @@ class AutomationStore extends EventEmitter {
   }
   profile(data, species) {
     if (!Number.isInteger(Number(species)) || Number(species) < 1 || Number(species) > 1025) throw Error('物种无效');
-    return data.profiles[species] ||= { config: { strategy: 'fixed', baseline_delay: 100, multi_candidate_policy: 'ignore', window_size: 5, ewma_alpha: 0.5, dense_interval_width: 2 }, samples: [], next_round_number: 1 };
+    return data.profiles[species] ||= { config: defaultDelay(), samples: [], next_round_number: 1 };
   }
   saveDelay(species, config) {
     this.validateDelay(config);
