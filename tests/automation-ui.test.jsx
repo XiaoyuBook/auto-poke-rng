@@ -262,7 +262,7 @@ test('L01/L03: record navigation filters detailed logs to the selected run and r
   snapshot.runs=[{id:'r1',kind:'static',startedAt:'2026-09-25T10:00:00Z',rounds:[{number:1,outcome:'无候选',candidates:[],events:[]}]}];
   snapshot.logs=[{id:'a',time:'10:00',source:'自动定点',level:'info',message:'current round',runId:'r1',round:1},{id:'b',time:'10:00',source:'自动定点',level:'info',message:'other round',runId:'r1',round:2}];
   render(<AutomationLogs />);
-  fireEvent.click(await screen.findByRole('button',{name:'查看相关日志'}));
+  fireEvent.click(await screen.findByRole('button',{name:'查看本轮日志'}));
   expect(screen.getByText('current round')).toBeTruthy();expect(screen.queryByText('other round')).toBeNull();
   fireEvent.click(screen.getByRole('button',{name:'清除轮次筛选'}));
   expect(screen.getByText('other round')).toBeTruthy();
@@ -306,7 +306,8 @@ test('FRLG rounds default to latest, update live, and scope logs to round zero',
   await act(async()=>api.onState.mock.calls[0][0]({...snapshot,runs:[{...snapshot.runs[0],rounds:[...snapshot.runs[0].rounds,{number:2,outcome:'校准跳过',endedAt:'2026-10-03T01:00:00Z',candidates:[],events:[],frlg:{result:'校准跳过',notes:['本轮结果波动较大，参数保持不变']}}]}]}));
   expect(within(detail).getByText('本轮反查后跳过校准，未输出完整落点；具体原因见校准判断。')).toBeTruthy();
   expect(within(detail).queryByText(/等待本轮捕获与反查结果/)).toBeNull();
-  fireEvent.click(screen.getByRole('button',{name:/第 0 轮 · 已结束/}));
+  fireEvent.click(screen.getByRole('button',{name:'选择轮次'}));
+  fireEvent.click(screen.getByRole('menuitemradio',{name:/第 0 轮 · 已结束/}));
   fireEvent.click(screen.getByRole('button',{name:'查看火叶运行日志'}));
   expect(screen.getByText('第零轮环境检查')).toBeTruthy();
   expect(screen.queryByText('第一轮结果')).toBeNull();
