@@ -10,14 +10,20 @@ import automation_host as host
 
 
 class AdapterContracts(unittest.TestCase):
-    def test_starter_passes_dialogue_durations_ocr_gates_and_timing_logs(self):
+    def test_starter_passes_dialogue_and_cursor_actions_before_final_confirmation(self):
         from auto_bdsp_rng.automation.auto_rng import starter_flow
         events, requests, gates = [], [], []
-        session = host.Session({'species':387,'blink':{}},lambda **event:events.append(event))
+        session = host.Session({'species':393,'blink':{}},lambda **event:events.append(event))
         session.runner = SimpleNamespace(config=SimpleNamespace(shiny_threshold_seconds=3))
         session.recover_zoom = lambda: None
         session.request = lambda method,**params: requests.append((method,params))
-        session.shiny = lambda *args,**kwargs: 'done'
+        def shiny(text, name, threshold, run_action):
+            self.assertEqual(text,'A 30\nUP 30\nA 30\n')
+            self.assertEqual(threshold,3)
+            self.assertEqual(requests[-1],('starter_action',{'action':'position'}))
+            run_action('timed-final')
+            return 'done'
+        session.shiny = shiny
         observer = SimpleNamespace(start=lambda:None,close=lambda:None,latest=lambda:None,set_enabled=gates.append)
         def build_flow(*args,**kwargs):
             kwargs['observe_dialog'](False)
@@ -26,15 +32,21 @@ class AdapterContracts(unittest.TestCase):
             kwargs['on_press']({'name':'普通对话','elapsed_ms':3540,'since_previous_press_ms':3540,
                                 'hold_ms':200,'controller_request_ms':205,'late_ms':0})
             kwargs['observe_dialog'](True)
-            return SimpleNamespace(run=lambda:'A 30\n')
+            def run():
+                kwargs['position_cursor']()
+                return 'A 30\nUP 30\nA 30\n'
+            return SimpleNamespace(run=run)
         target = SimpleNamespace(raw_target_advances=401)
         with patch.object(starter_flow,'DialogObserver',return_value=observer), \
              patch.object(starter_flow,'StarterFlow',side_effect=build_flow):
             self.assertEqual(session.starter(None,target,40),'done')
         self.assertEqual(requests,[('starter_action',{'action':'press','durationMs':200}),
-                                   ('starter_action',{'action':'press','durationMs':100})])
+                                   ('starter_action',{'action':'press','durationMs':100}),
+                                   ('starter_action',{'action':'position'}),
+                                   ('starter_action',{'action':'select','scriptId':'timed-final'})])
         self.assertEqual(gates,[False,True])
         self.assertIn('距上次 A 请求 3540.000ms',events[0]['message'])
+        self.assertIn('光标提前定位完成',events[1]['message'])
 
     def test_early_double_blink_can_finish_before_warmup_discard(self):
         import blink_core

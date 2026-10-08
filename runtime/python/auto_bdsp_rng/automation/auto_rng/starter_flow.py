@@ -83,8 +83,8 @@ def is_ball_dialog(text: str) -> bool:
 def selection_script(species: int) -> str:
     if species not in STARTER_SLOTS:
         raise ValueError("御三家全自动目标无效")
-    # The suitcase cursor starts at Turtwig; the confirmation defaults to No.
-    keys = ["RIGHT"] * STARTER_SLOTS[species] + ["A", "UP", "A"]
+    # The cursor is already positioned; the confirmation defaults to No.
+    keys = ["A", "UP", "A"]
     return "".join(f"{key} {SELECTION_PRESS_MS}\n" for key in keys)
 
 
@@ -156,6 +156,7 @@ class DialogObserver:
 class StarterFlow:
     def __init__(self, seed, target, delay: int, species: int, blink: dict, *,
                  latest_text: Callable[[], str | None], run_script: Callable[[str, str], object],
+                 position_cursor: Callable[[], object],
                  progress: Callable[[str, str, int], None] = lambda *_: None,
                  monotonic: Callable[[], float] = time.monotonic,
                  sleep: Callable[[float], None] = time.sleep,
@@ -168,6 +169,7 @@ class StarterFlow:
         self.anchor = target.raw_target_advances - TIMELINE_BUFFER
         self.select_at = target.raw_target_advances - delay
         self.latest_text, self.run_script, self.progress = latest_text, run_script, progress
+        self.position_cursor = position_cursor
         self.monotonic, self.sleep, self.should_stop, self.on_balls = monotonic, sleep, should_stop, on_balls
         self.observe_dialog, self.on_press = observe_dialog, on_press
         self.next_dialog_at: float | None = None
@@ -226,7 +228,8 @@ class StarterFlow:
         labels = {"start": "确认起点对话", "doctor": "自动推进到博士对话",
                   "anchor": "博士对话等待目标前 200 帧", "first_countdown": "Timeline 第一段倒计时",
                   "second": "自动推进到搞什么啊对话", "second_countdown": "Timeline 第二段倒计时",
-                  "balls": "自动推进到精灵球界面", "selection": "精灵球界面等待本轮 delay 触发"}
+                  "balls": "自动推进到精灵球界面", "position": "提前移动到目标精灵球",
+                  "selection": "光标已定位，等待本轮 delay 触发"}
         reported_stage = None
         while True:
             if self.should_stop():
@@ -294,7 +297,20 @@ class StarterFlow:
                 elif is_ball_dialog(text):
                     self.observe_dialog(False)
                     self.on_balls()
-                    stage = "selection"
+                    stage = "position"
+            elif stage == "position":
+                # Progress callbacks and controller requests can consume time;
+                # refresh the RNG clock on both sides of cursor positioning.
+                if self.should_stop():
+                    raise RuntimeError("御三家自动接管已停止")
+                if self.tracker.update(self.monotonic())["advances"] >= self.select_at:
+                    raise StarterTargetMissed("到达选择帧时尚未开始光标定位，本轮不选精灵")
+                self.position_cursor()
+                if self.should_stop():
+                    raise RuntimeError("御三家自动接管已停止")
+                if self.tracker.update(self.monotonic())["advances"] >= self.select_at:
+                    raise StarterTargetMissed("光标定位未在选择帧前完成，本轮不选精灵")
+                stage = "selection"
             elif stage == "selection" and current == self.select_at:
                 self.progress("confirm", f"到达选择帧 {self.select_at}，使用本轮 delay {self.delay} 帧", current)
                 return selection_script(self.species)
@@ -303,7 +319,7 @@ class StarterFlow:
             if stage in ("start", "doctor", "second", "balls") and now-entered_at > 45:
                 raise RuntimeError(f"御三家对话识别超时：{labels[stage]}")
             if current == self.select_at and stage != "selection":
-                raise StarterTargetMissed("到达选择帧时尚未进入精灵球界面，本轮不选精灵")
+                raise StarterTargetMissed("到达选择帧时尚未完成精灵球界面准备，本轮不选精灵")
             next_at = self.tracker.next_at
             if timeline is not None:
                 next_at = timeline.queue[0][0] if timeline.queue else timeline.starts_at

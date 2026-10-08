@@ -34,7 +34,9 @@ class Clock:
 
 def run_flow(species=387, delay=40, *, missing_second=False, missing_balls=False,
              dropped_press=None, stop_at=None, late_zero=None, script_log=None,
-             ocr_reads=None, timing_log=None, stall_dialogue=False):
+             ocr_reads=None, timing_log=None, stall_dialogue=False, cursor_log=None,
+             cursor_seconds=.44, cursor_failure=False, stop_in_cursor=False,
+             cursor_finish_at_trigger=False, stall_before_cursor=False):
     clock, observations = Clock(), []
     scripts = [] if script_log is None else script_log
     seed = AutoRngSeedResult(SeedState32(0x12345678, 0x9ABCDEF0, 0x11111111, 0x22222222),
@@ -47,7 +49,7 @@ def run_flow(species=387, delay=40, *, missing_second=False, missing_balls=False
                 "就是想还也不知道对方是谁啊，虽然有听到叫博士……"]
     index = 0
     flow = None
-    paused_at_zero, enabled, stalled = False, True, False
+    paused_at_zero, enabled, stalled, stopped = False, True, False, False
     def monotonic():
         nonlocal paused_at_zero
         if flow is None:
@@ -81,26 +83,54 @@ def run_flow(species=387, delay=40, *, missing_second=False, missing_balls=False
     def observe(value):
         nonlocal enabled
         enabled = value
+    def advance_to_trigger():
+        while flow.tracker.update(clock.time())["advances"] < flow.select_at:
+            timeline = flow.tracker.timeline
+            next_at = timeline.queue[0][0] if timeline.queue else timeline.starts_at
+            clock.sleep(max(.001, next_at-clock.time()))
+        assert flow.tracker.update(clock.time())["advances"] == flow.select_at
+    def position_cursor():
+        nonlocal stopped
+        assert not enabled, 'OCR must be closed while positioning the cursor'
+        entry = {"species": species, "dialogue": index, "started": clock.time(),
+                 "advances": flow.tracker.update(clock.time())["advances"]}
+        if cursor_log is not None:
+            cursor_log.append(entry)
+        if cursor_failure:
+            raise RuntimeError('手柄定位失败')
+        clock.sleep(cursor_seconds)
+        if cursor_finish_at_trigger:
+            advance_to_trigger()
+        entry.update(completed=clock.time(), completed_advances=flow.tracker.update(clock.time())["advances"])
+        stopped = stop_in_cursor
     def progress(stage, msg, current):
         nonlocal stalled
         observations.append((stage,current,clock.time()))
         if stall_dialogue and not stalled and stage == 'doctor' and clock.time() >= 3:
             stalled = True
             clock.sleep(10)
+        if stall_before_cursor and stage == 'position':
+            advance_to_trigger()
     flow = StarterFlow(seed,target,delay,species,{"menuClose":True},latest_text=text,run_script=press,
                        monotonic=monotonic,sleep=clock.sleep,observe_dialog=observe,
                        on_press=lambda timing: timing_log.append(timing) if timing_log is not None else None,
-                       progress=progress,
-                       should_stop=lambda:stop_at is not None and clock.time()>=stop_at)
+                       progress=progress,position_cursor=position_cursor,
+                       should_stop=lambda:stopped or (stop_at is not None and clock.time()>=stop_at))
     result = flow.run()
     return result, scripts, observations, flow, seed
 
 
-@pytest.mark.parametrize("species,rights", [(387,0),(390,1),(393,2)])
-def test_starter_runs_two_clock_gates_then_selects_at_software_delay(species, rights):
-    result,scripts,observations,flow,seed = run_flow(species)
-    assert result.count("RIGHT") == rights
-    assert any(line.startswith("UP ") for line in result.splitlines())
+@pytest.mark.parametrize("species", [387,390,393])
+def test_starter_runs_two_clock_gates_positions_early_then_selects_at_software_delay(species):
+    moves = []
+    result,scripts,observations,flow,seed = run_flow(species, cursor_log=moves)
+    assert result == 'A 30\nUP 30\nA 30\n'
+    assert len(moves) == 1
+    assert moves[0]['species'] == species
+    assert moves[0]['dialogue'] == 12  # Only after confirming the ball anchor.
+    assert moves[0]['completed_advances'] < flow.select_at
+    assert moves[0]['completed'] < observations[-1][2]
+    assert next(row[2] for row in observations if row[0] == 'position') >= scripts[-1][1]+.2
     assert scripts[0][0] == "御三家·起点对话"
     first = next(row for row in scripts if row[0] == "御三家·第一段归零")
     second = next(row for row in scripts if row[0] == "御三家·第二段归零")
@@ -129,13 +159,44 @@ def test_starter_runs_two_clock_gates_then_selects_at_software_delay(species, ri
     assert observations[-1][0] == "confirm"
 
 
-@pytest.mark.parametrize("species,rights", [(387,0),(390,1),(393,2)])
-def test_selection_only_uses_short_presses_without_menu_waits(species, rights):
+@pytest.mark.parametrize("species", [387,390,393])
+def test_selection_only_uses_short_confirmation_presses_without_navigation(species):
     commands = [line.split() for line in selection_script(species).splitlines()]
-    assert [command for command, _ in commands] == ["RIGHT"] * rights + ["A", "UP", "A"]
+    assert [command for command, _ in commands] == ["A", "UP", "A"]
     durations = [int(duration) for _, duration in commands]
     assert all(0 < duration <= 30 for duration in durations)
-    assert sum(durations) <= (rights + 3) * 30
+    assert sum(durations) == 90
+
+
+@pytest.mark.parametrize('finish_at_trigger', [False,True])
+def test_cursor_must_finish_strictly_before_trigger_even_if_it_reaches_the_exact_frame(finish_at_trigger):
+    moves = []
+    with pytest.raises(StarterTargetMissed, match='光标定位未在选择帧前完成'):
+        run_flow(393, cursor_log=moves, cursor_seconds=0 if finish_at_trigger else 300,
+                 cursor_finish_at_trigger=finish_at_trigger)
+    assert len(moves) == 1
+    assert moves[0]['completed_advances'] >= 401-40
+
+
+def test_late_cursor_dispatch_never_moves_or_returns_selection():
+    moves = []
+    with pytest.raises(StarterTargetMissed, match='尚未开始光标定位'):
+        run_flow(393, cursor_log=moves, stall_before_cursor=True)
+    assert moves == []
+
+
+def test_stop_during_cursor_positioning_prevents_final_confirmation():
+    moves = []
+    with pytest.raises(RuntimeError, match='已停止'):
+        run_flow(393, cursor_log=moves, stop_in_cursor=True)
+    assert len(moves) == 1
+
+
+def test_failed_cursor_positioning_prevents_final_confirmation():
+    moves = []
+    with pytest.raises(RuntimeError, match='手柄定位失败'):
+        run_flow(393, cursor_log=moves, cursor_failure=True)
+    assert len(moves) == 1
 
 
 def test_missed_second_dialog_never_returns_selection():
@@ -171,10 +232,11 @@ def test_dropped_ordinary_input_stops_at_doctor_without_sending_extra_a():
 
 
 def test_missing_ball_anchor_never_selects_or_sends_extra_a():
-    scripts = []
+    scripts, moves = [], []
     with pytest.raises(RuntimeError, match='精灵球界面|错过选择帧'):
-        run_flow(missing_balls=True, script_log=scripts)
+        run_flow(393, missing_balls=True, script_log=scripts, cursor_log=moves)
     assert len(scripts) == 12
+    assert moves == []
 
 
 def test_stop_during_fixed_sequence_prevents_remaining_keys():

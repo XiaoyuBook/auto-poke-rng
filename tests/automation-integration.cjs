@@ -69,23 +69,31 @@ test('starter readiness binds trusted bundled scripts without reading the user l
     {threshold:.7,npc:1,timeDelay:0,advanceDelay:41,advanceDelay2:48,timelineNpc:-1,pokemonNpc:2,noisy:false});
 });
 
-test('starter countdown and selection use the resident controller with the correct species slot',async t=>{
+test('starter positions the correct species early and uses only A UP A for timed selection',async t=>{
   for(const [target,rights] of [['Turtwig',0],['Chimchar',1],['Piplup',2]]){
     const f=fixture(t);enableStarter(f);f.input.config.parameters.target=target;
     const sequences=[];
     f.devices.controller.sequence=async({actions})=>sequences.push(actions);
     await f.invoke('start',f.input);
     await f.callbacks().request('starter_action',{action:'press'});
+    await f.callbacks().request('starter_action',{action:'position'});
+    assert.equal(sequences.length,rights?2:1,'Turtwig is already selected and needs no cursor sequence');
+    const navigation=rights?sequences[1]:[];
+    assert.deepEqual(navigation.filter(action=>action.kind==='button'&&action.down).map(action=>action.key),Array(rights).fill('RIGHT'));
+    assert.equal(navigation.filter(action=>action.kind==='button'&&!action.down).length,rights);
+    assert.deepEqual(navigation.filter(action=>action.kind==='wait').map(action=>action.duration_ms),Array.from({length:rights},()=>[100,120]).flat());
     await f.callbacks().request('starter_action',{action:'select',scriptId:'final'});
     assert.equal(sequences[0][0].key,'A');
-    const down=sequences[1].filter(action=>action.kind==='button'&&action.down).map(action=>action.key);
-    assert.deepEqual(down,[...Array(rights).fill('RIGHT'),'A','UP','A']);
-    const waits=sequences[1].filter(action=>action.kind==='wait');
+    const selection=sequences.at(-1);
+    const down=selection.filter(action=>action.kind==='button'&&action.down).map(action=>action.key);
+    assert.deepEqual(down,['A','UP','A']);
+    const waits=selection.filter(action=>action.kind==='wait');
     assert.ok(waits.every(action=>action.duration_ms<=30),'selection must not pause longer than the controller report interval');
-    assert.ok(waits.reduce((total,action)=>total+action.duration_ms,0)<=(rights+3)*30,'selection must not add menu or navigation delays');
+    assert.equal(waits.reduce((total,action)=>total+action.duration_ms,0),90,'selection must not add menu or navigation delays');
     assert.equal(f.trace.some(item=>typeof item==='string'&&item.includes('A 100')),false);
     await f.invoke('stop');
     await assert.rejects(()=>f.callbacks().request('starter_action',{action:'press'}),/已停止/);
+    await assert.rejects(()=>f.callbacks().request('starter_action',{action:'position'}),/已停止/);
   }
 });
 
@@ -130,6 +138,25 @@ test('starter native selection can be stopped without leaving controller input h
   const state=await hardware.clients.controller.call('controller.status');
   assert.equal(state.report.buttons,0);
   assert.equal(state.owned,false);
+});
+
+test('stopping native starter positioning releases RIGHT and prevents later confirmation',{skip:process.platform!=='win32',timeout:15000},async t=>{
+  const hardware=createDeviceFixture(t);await hardware.connectController();
+  const f=fixture(t);enableStarter(f);f.input.config.parameters.target='Piplup';
+  f.devices.controller=hardware.devices.controller;
+  await f.invoke('start',f.input);
+  const request=f.callbacks().request;
+  const positioning=request('starter_action',{action:'position',scriptId:'native-position'});
+  void positioning.catch(()=>{});
+  await until(async()=>((await hardware.clients.controller.call('controller.status')).report.hat===2),'starter holds RIGHT');
+  assert.equal((await hardware.clients.controller.call('controller.status')).report.buttons,0);
+  await f.invoke('stop');
+  await assert.rejects(positioning,/已停止/);
+  const state=await hardware.clients.controller.call('controller.status');
+  assert.equal(state.report.hat,8);
+  assert.equal(state.report.buttons,0);
+  assert.equal(state.owned,false);
+  await assert.rejects(()=>request('starter_action',{action:'select',scriptId:'late-final'}),/已停止/);
 });
 
 test('worker OCR failure releases native starter input before releasing automation ownership',{skip:process.platform!=='win32',timeout:15000},async t=>{

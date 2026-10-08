@@ -267,6 +267,12 @@ class Session:
             if duration is None:
                 raise ValueError('御三家对白按键无效')
             return self.request('starter_action', action='press', durationMs=duration)
+        def position_cursor():
+            self.check()
+            started = time.monotonic()
+            self.request('starter_action', action='position')
+            self.check()
+            self.log(f'御三家·光标提前定位完成，请求耗时 {(time.monotonic()-started)*1000:.3f}ms')
         def record_press(timing):
             previous = timing['since_previous_press_ms']
             gap = '首次' if previous is None else f'{previous:.3f}ms'
@@ -291,7 +297,8 @@ class Session:
             flow = StarterFlow(seed,target,delay,self.config['species'],self.config['blink'],
                                latest_text=observer.latest,run_script=press,progress=report,
                                sleep=self.sleep,should_stop=self.cancel.is_set,on_balls=observer.close,
-                               observe_dialog=observer.set_enabled,on_press=record_press)
+                               observe_dialog=observer.set_enabled,on_press=record_press,
+                               position_cursor=position_cursor)
             text = flow.run()
             observer.close()
             self.check()

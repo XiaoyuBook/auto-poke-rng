@@ -132,14 +132,17 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
   };
   const runStarterAction=async(run,action,scriptId,durationMs)=>{
     checkStopped(run);
-    if(!usesStarterAutomation(run.input.config)||!['press','select'].includes(action))throw Error('御三家控制动作无效');
+    if(!usesStarterAutomation(run.input.config)||!['press','position','select'].includes(action))throw Error('御三家控制动作无效');
     if(run.currentScript)throw Error('已有自动控制动作正在运行');
     const script={scriptId:scriptId||randomUUID(),direct:true,stopped:run.cancelledScripts?.delete(scriptId)||false,done:null};
     run.currentScript=script;
     script.done=(async()=>{
       await run.keepalive;checkStopped(run);
       if(script.stopped)return;
-      try{await devices.controller.sequence({actions:starterActions(run.target.speciesId,action==='select',durationMs)});}
+      try{
+        const actions=starterActions(run.target.speciesId,action,durationMs);
+        if(actions.length)await devices.controller.sequence({actions});
+      }
       catch(error){if(!script.stopped)throw error;}
       checkStopped(run);
     })().finally(()=>{run.lastScriptId=script.scriptId;if(run.currentScript===script)run.currentScript=null;});
