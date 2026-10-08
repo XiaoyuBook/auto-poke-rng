@@ -35,6 +35,7 @@
     "test:controller-overlay": "npm run build && node tests/run-electron.cjs controller-overlay.cjs",
     "test:mapping": "npm run build && node tests/run-electron.cjs key-mapping.cjs",
     "test:script-editor": "npm run build && node tests/run-electron.cjs script-editor.cjs",
+    "test:scripts:menu:electron": "npm run build && node tests/run-electron.cjs script-library-menu.cjs",
     "test:qq": "node --test tests/notification-image.cjs && vitest run tests/qq-notifications.test.js src/components/QQNotifications.test.tsx",
     "test:qq:electron": "npm run build && node tests/run-electron.cjs qq-notifications.cjs",
     "test:frlg:notification": "node --test tests/frlg-execution.cjs tests/notification-image.cjs && node tests/run-electron.cjs frlg-notification-electron.cjs",

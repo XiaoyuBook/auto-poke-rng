@@ -5,6 +5,7 @@
 | 命令 | 内容 |
 | --- | --- |
 | `npm test` | Vitest 单元和组件测试 |
+| `npm run test:scripts:menu:electron` | 真实 Electron 验证新建脚本目录菜单不被裁切、长路径换行与滚动、不同窗口宽度与侧栏状态，以及选定目录创建脚本；截图保存于 `node_modules/.tmp/script-library-menu-review/` |
 | `npm run test:scripts:repository` | 空脚本库、旧文件迁移、脚本仓库下载与安装、文件保存和界面确认流程 |
 | `npm run test:scripts:package -- <ZIP 路径>` | 校验独立仓库的脚本包，在临时目录安装并逐个编译；不执行脚本，不写用户目录 |
 | `npm run test:automation:reference` | 固定旧版自动流程行为基线（不代表本项目已接入） |
