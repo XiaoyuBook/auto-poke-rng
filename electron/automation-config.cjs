@@ -1,6 +1,8 @@
 const featureKeys = ['reverse', 'exit', 'sync', 'escape'];
 const defaultFeatures = () => Object.fromEntries(featureKeys.map(key => [key, { added: false, enabled: false }]));
-const defaultDelay = (baseline = 66) => ({ strategy: 'fixed', baseline_delay: baseline, multi_candidate_policy: 'ignore', window_size: 5, ewma_alpha: 0.5, dense_interval_width: 2 });
+const staticDelayDefaults = require('../src/static-delay-defaults.json');
+const defaultDelay = (baseline = staticDelayDefaults.default) => ({ strategy: 'fixed', baseline_delay: baseline, multi_candidate_policy: 'ignore', window_size: 5, ewma_alpha: 0.5, dense_interval_width: 2 });
+const defaultDelayForSpecies = species => defaultDelay(staticDelayDefaults[String(species)] ?? staticDelayDefaults.default);
 
 function legacyFeatures(config) {
   const p = config.parameters || {}, scripts = config.scripts || {};
@@ -56,4 +58,4 @@ function projectStaticConfig(config) {
   return projected;
 }
 
-module.exports = { featureKeys, defaultFeatures, defaultDelay, legacyFeatures, normalizeFeatures, projectStaticConfig };
+module.exports = { featureKeys, defaultFeatures, defaultDelay, defaultDelayForSpecies, legacyFeatures, normalizeFeatures, projectStaticConfig };

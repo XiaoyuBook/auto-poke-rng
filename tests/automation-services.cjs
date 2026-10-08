@@ -4,15 +4,17 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { AutomationStore } = require('../electron/automation-store.cjs');
+const { defaultDelay } = require('../electron/automation-config.cjs');
 
 function fixture(t, now = () => new Date(2026, 8, 25, 10)) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'poke-automation-'));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   return { directory, store: new AutomationStore(directory, { now }) };
 }
-test('new static workflows and species profiles use 66 frames without overwriting saved delays', t => {
+test('only starter species default to 66 frames without overwriting saved delays', t => {
   const { directory, store } = fixture(t);
   const first = store.snapshot().staticGroups.activeId;
+  assert.equal(defaultDelay().baseline_delay, 100);
   assert.equal(store.snapshot().config.static.parameters.fixed_delay, 66);
   assert.equal(store.snapshot().config.static.delayConfig.baseline_delay, 66);
   store.save('static', 'parameters', { fixed_delay: 100 });
@@ -21,8 +23,16 @@ test('new static workflows and species profiles use 66 frames without overwritin
   assert.equal(store.snapshot().config.static.parameters.fixed_delay, 66);
   assert.equal(store.snapshot().config.static.delayConfig.baseline_delay, 66);
   store.recordDelay(390, [65, 66]);
+  store.recordDelay(387, [66]);
+  store.recordDelay(393, [67]);
+  store.recordDelay(487, [100]);
+  store.saveDelay(488, defaultDelay(66));
   const restored = new AutomationStore(directory).snapshot();
   assert.equal(restored.profiles['390'].config.baseline_delay, 66);
+  assert.equal(restored.profiles['387'].config.baseline_delay, 66);
+  assert.equal(restored.profiles['393'].config.baseline_delay, 66);
+  assert.equal(restored.profiles['487'].config.baseline_delay, 100);
+  assert.equal(restored.profiles['488'].config.baseline_delay, 66, 'an explicitly saved value remains intact');
   assert.deepEqual(restored.profiles['390'].samples[0].candidates, [65, 66]);
   assert.equal(restored.staticGroups.items.find(item => item.id === first).config.delayConfig.baseline_delay, 100);
   assert.equal(restored.staticGroups.items.find(item => item.id === second).config.delayConfig.baseline_delay, 66);

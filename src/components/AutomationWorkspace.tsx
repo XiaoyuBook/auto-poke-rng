@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Play, Square, ListChecks, FileClock, Plus, Pencil, Trash2, ChevronDown, SlidersHorizontal, RefreshCw, ArrowRightLeft } from 'lucide-react';
-import { automationBusy, downloadText, useAutomation, type AutomationConfig, type AutomationKind, type AutomationParameters, type DelayConfig, type IdResults, type Readiness, type StaticAutomationConfig, type StaticFeatureKey, type TargetFilter } from '../automation';
+import { automationBusy, defaultStaticDelay, downloadText, useAutomation, type AutomationConfig, type AutomationKind, type AutomationParameters, type DelayConfig, type IdResults, type Readiness, type StaticAutomationConfig, type StaticFeatureKey, type TargetFilter } from '../automation';
 import type { BlinkConfig } from '../blink';
 import type { BdspProfile } from '../bdspProfile';
 import type { ScriptFile } from '../scriptLibrary';
@@ -38,6 +38,7 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
   const savingRef=useRef(false);
   const operationRef=useRef(false);
   const delayTriggerRef=useRef<HTMLButtonElement>(null);
+  const customizedDelayFlows=useRef(new Set<string>());
   useEffect(()=>{if(snapshot&&!initialized.current){initialized.current=true;setConfig(structuredClone(snapshot.config[kind]));}},[snapshot,kind]);
   const refreshScripts=()=>{void window.desktop?.scripts.list().then(value=>setFiles(value.files)).catch(error=>setError(error.message));};
   useEffect(()=>{if(api)refreshScripts();},[api]);
@@ -71,12 +72,27 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
   const delaySamples=profileDelay?.samples||[];
   const currentRun=snapshot.runs.find(item=>item.id===snapshot.state.runId&&item.kind===kind),round=currentRun?.rounds.at(-1);
   const update=(values:Partial<AutomationParameters>)=>{setReadiness(null);setSaveFailed(false);setConfig(current=>current&&({...current,parameters:{...current.parameters,...values}}));};
+  const changeTarget=(nextTarget:string)=>{
+    setReadiness(null);setSaveFailed(false);setDelayOpen(false);
+    const flowId=snapshot.staticGroups.activeId;
+    const nextSpecies=STATIC_TARGETS.find(item=>item.speciesKey===nextTarget)?.speciesId||0;
+    const previousDefault=defaultStaticDelay(species);
+    const followsDefault=!customizedDelayFlows.current.has(flowId)&&staticConfig.delayConfig.strategy==='fixed'&&staticConfig.delayConfig.baseline_delay===previousDefault&&p.fixed_delay===previousDefault;
+    if(!followsDefault)customizedDelayFlows.current.add(flowId);
+    const nextDelay=defaultStaticDelay(nextSpecies);
+    setConfig(current=>{
+      if(!current)return current;
+      const draft=current as StaticAutomationConfig;
+      return {...draft,parameters:{...draft.parameters,target:nextTarget,starter_automation:draft.parameters.starter_automation&&[387,390,393].includes(nextSpecies),...(followsDefault?{fixed_delay:nextDelay}:{})},
+        delayConfig:followsDefault?{...draft.delayConfig,baseline_delay:nextDelay}:draft.delayConfig};
+    });
+  };
   const openTidTargetEditor=()=>{setTidTargetDraft([...p.target_display_tids]);setTidText('');setTidTargetError('');setTidTargetEditorOpen(true);};
   const closeTidTargetEditor=()=>{setTidTargetEditorOpen(false);setTidTargetError('');};
   const addTidTargets=()=>{const values=tidText.trim().split(/[\s,，]+/);if(values.some(value=>!/^\d{1,6}$/.test(value))){setTidTargetError('请输入 0–999999 之间的 Display TID');return;}setTidTargetDraft(current=>[...new Set([...current,...values.map(Number)])]);setTidText('');setTidTargetError('');};
   const saveTidTargets=async()=>{if(pending||busy||operationRef.current)return;operationRef.current=true;setPending(true);setTidTargetError('');try{const saved=await api.save({kind:'tid',scope:'parameters',values:{target_display_tids:tidTargetDraft}});setSnapshot({...saved,state:snapshot.state});setConfig(current=>current&&({...current,parameters:{...current.parameters,target_display_tids:[...tidTargetDraft]}}));setReadiness(null);setTidTargetEditorOpen(false);}catch(reason){setTidTargetError(reason instanceof Error?reason.message:String(reason));}finally{operationRef.current=false;setPending(false);}};
   const updateFeature=(key:StaticFeatureKey,added:boolean)=>{setReadiness(null);setSaveFailed(false);setConfig(current=>current&&({...current,features:{...(current as StaticAutomationConfig).features,[key]:{...(current as StaticAutomationConfig).features[key],added}}}));};
-  const updateDelay=(draft:DelayConfig)=>{setReadiness(null);setSaveFailed(false);setConfig(current=>current&&({...current,parameters:{...current.parameters,fixed_delay:draft.baseline_delay},delayConfig:draft}));};
+  const updateDelay=(draft:DelayConfig)=>{customizedDelayFlows.current.add(snapshot.staticGroups.activeId);setReadiness(null);setSaveFailed(false);setConfig(current=>current&&({...current,parameters:{...current.parameters,fixed_delay:draft.baseline_delay},delayConfig:draft}));};
   const closeDelay=()=>{setDelayOpen(false);requestAnimationFrame(()=>delayTriggerRef.current?.focus());};
   const perform=async(action:()=>Promise<unknown>,message='')=>{if(operationRef.current)return;operationRef.current=true;setError('');setNotice('');setPending(true);try{await action();if(message)setNotice(message);}catch(error){setError(error instanceof Error?error.message:String(error));}finally{operationRef.current=false;setPending(false);}};
   const input=()=>{
@@ -135,7 +151,7 @@ export function AutomationWorkspace({kind,profile,blinkConfig,blinkConfigs,openL
   const idText=()=>[['Adv','TID','SID','TSV','Display TID','累计用时','预计到达时间'],...idRows.map(idCells)].map(row=>row.map(value=>`"${String(value).replaceAll('"','""')}"`).join(',')).join('\r\n');
   const renderTargetEditor=()=>isStatic&&filter?<>
         <div className="automation-target-picker">
-          <label>目标宝可梦<select aria-label="自动定点宝可梦" disabled={busy||pending} value={p.target} onChange={event=>{update({target:event.target.value,starter_automation:p.starter_automation&&['Turtwig','Chimchar','Piplup'].includes(event.target.value)});setDelayOpen(false);}}>{CATEGORY_OPTIONS.filter(option=>option.key!=='all').map(category=><optgroup key={category.key} label={category.label}>{getStaticTargets(category.key,profile.version).map(item=><option key={item.speciesKey} value={item.speciesKey}>{item.species} · {item.level}级{item.roamer?' · 游走':''}</option>)}</optgroup>)}</select></label>
+          <label>目标宝可梦<select aria-label="自动定点宝可梦" disabled={busy||pending} value={p.target} onChange={event=>changeTarget(event.target.value)}>{CATEGORY_OPTIONS.filter(option=>option.key!=='all').map(category=><optgroup key={category.key} label={category.label}>{getStaticTargets(category.key,profile.version).map(item=><option key={item.speciesKey} value={item.speciesKey}>{item.species} · {item.level}级{item.roamer?' · 游走':''}</option>)}</optgroup>)}</select></label>
           {target&&<div className="automation-target-selected" aria-label="当前目标" aria-live="polite">
             <div className="automation-target-art"><img src={targetSprites[`../assets/bdsp-targets/${target.speciesId}.png`]} alt="" /></div>
             <div className="automation-target-identity"><span>当前目标</span><strong>{target.species}</strong><small>图鉴 #{String(target.speciesId).padStart(3,'0')} · {getCategoryLabel(target.category)} · {target.level} 级{target.roamer?' · 游走':''}</small></div>

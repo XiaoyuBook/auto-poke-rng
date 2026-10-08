@@ -43,6 +43,32 @@ test('starter built-in mode removes script pickers and saves the complete automa
   fireEvent.click(screen.getByRole('checkbox',{name:'御三家全自动'}));
   expect(screen.getByLabelText('测种脚本')).toBeTruthy();
 });
+test('target changes use 66 frames only for starters and restore the ordinary default',async()=>{
+  const {api}=fixture();
+  render(<AutomationWorkspace kind="static" profile={defaultBdspProfile} blinkConfig={newBlinkConfig()} blinkConfigs={[]} openLogs={()=>{}} />);
+  fireEvent.click(await screen.findByRole('button',{name:'目标设置'}));
+  for(const [target,delay] of [['Giratina',100],['Chimchar',66],['Piplup',66],['Turtwig',66]]){
+    fireEvent.change(screen.getByLabelText('自动定点宝可梦'),{target:{value:target}});
+    await screen.findByRole('button',{name:`设置 delay 策略：固定 delay，预计 ${delay} 帧`});
+  }
+  fireEvent.change(screen.getByLabelText('自动定点宝可梦'),{target:{value:'Giratina'}});
+  fireEvent.click(screen.getByRole('button',{name:'完成设置'}));
+  fireEvent.click(screen.getByRole('button',{name:'保存配置'}));
+  await waitFor(()=>expect(api.save).toHaveBeenCalledWith(expect.objectContaining({scope:'config',values:expect.objectContaining({parameters:expect.objectContaining({target:'Giratina',fixed_delay:100}),delayConfig:expect.objectContaining({baseline_delay:100})})})));
+});
+
+test.each([['fixed',70],['fixed',100],['median',66]])('target changes preserve a configured %s delay of %i frames',async(strategy,baseline)=>{
+  const {api,snapshot}=fixture();
+  snapshot.config.static.parameters.fixed_delay=baseline;
+  Object.assign(snapshot.config.static.delayConfig,{strategy,baseline_delay:baseline});
+  render(<AutomationWorkspace kind="static" profile={defaultBdspProfile} blinkConfig={newBlinkConfig()} blinkConfigs={[]} openLogs={()=>{}} />);
+  fireEvent.click(await screen.findByRole('button',{name:'目标设置'}));
+  for(const target of ['Giratina','Chimchar','Giratina'])fireEvent.change(screen.getByLabelText('自动定点宝可梦'),{target:{value:target}});
+  fireEvent.click(screen.getByRole('button',{name:'完成设置'}));
+  fireEvent.click(screen.getByRole('button',{name:'保存配置'}));
+  await waitFor(()=>expect(api.save).toHaveBeenCalledWith(expect.objectContaining({scope:'config',values:expect.objectContaining({parameters:expect.objectContaining({target:'Giratina',fixed_delay:baseline}),delayConfig:expect.objectContaining({strategy,baseline_delay:baseline})})})));
+});
+
 test('C01: one save persists the complete static draft',async()=>{
   const {api}=fixture();
   render(<AutomationWorkspace kind="static" profile={defaultBdspProfile} blinkConfig={newBlinkConfig()} blinkConfigs={[]} openLogs={()=>{}} />);

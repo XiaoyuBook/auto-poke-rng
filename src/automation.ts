@@ -3,6 +3,9 @@ import type { BlinkConfig } from './blink';
 import type { BdspProfile } from './bdspProfile';
 import type { StaticGenerationRequest, NativeStaticResult } from './desktop';
 import type { LogEntry } from './workspace';
+import staticDelayDefaults from './static-delay-defaults.json';
+
+export const defaultStaticDelay = (species: number) => (staticDelayDefaults as Record<string, number>)[String(species)] ?? staticDelayDefaults.default;
 
 export type AutomationKind = 'static' | 'tid';
 export type AutomationRunKind = AutomationKind | 'frlg';

@@ -68,7 +68,17 @@ app.whenReady().then(async()=>{
   assert.equal(ready.ready,false);assert.equal(automation.getState().runs.length,0);
   await js(`document.querySelector('.automation-delay-trigger').click()`);
   await until(`Boolean(document.querySelector('.automation-delay-dialog'))`,'delay settings');
-  assert.equal(await js(`document.querySelector('[aria-label="固定 delay"]')?.value`),'66','new workflows show the default delay');
+  assert.equal(await js(`document.querySelector('[aria-label="固定 delay"]')?.value`),'66','the initial starter target uses 66 frames');
+  await click('取消');
+  await click('目标设置');
+  for(const [target,expected] of [['Giratina',100],['Chimchar',66],['Piplup',66],['Turtwig',66]]){
+    await js(`(()=>{const select=document.querySelector('[aria-label="自动定点宝可梦"]');select.value=${JSON.stringify(target)};select.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+    await until(`document.querySelector('.automation-delay-trigger')?.getAttribute('aria-label').endsWith('预计 ${expected} 帧')`,'target-specific default delay');
+  }
+  await click('完成设置');
+  await until(`!document.querySelector('.automation-target-dialog')`,'target save');
+  await js(`document.querySelector('.automation-delay-trigger').click()`);
+  await until(`Boolean(document.querySelector('.automation-delay-dialog'))`,'delay settings restored');
   await js(`(()=>{const input=document.querySelector('[aria-label="固定 delay"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'1442');input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
   await click('应用');
   await click('切换到自动 TID');
