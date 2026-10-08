@@ -15,6 +15,7 @@ STARTER_TIMING = {"threshold": 0.7, "timeDelay": 0.0, "advanceDelay": 41,
                   "advanceDelay2": 48, "npc": 1, "timelineNpc": -1,
                   "pokemonNpc": 2, "noisy": False}
 STARTER_SLOTS = {387: 0, 390: 1, 393: 2}
+SELECTION_PRESS_MS = 30  # The controller firmware's minimum report interval.
 # Eleven tracking ticks, the initial transition, eleven timeline events, and
 # the second transition must finish before the final selection can begin.
 TRANSITION_ADVANCES = 11 * (STARTER_TIMING["npc"] + 1) + STARTER_TIMING["advanceDelay"] + 11 + STARTER_TIMING["advanceDelay2"]
@@ -76,8 +77,8 @@ def selection_script(species: int) -> str:
     if species not in STARTER_SLOTS:
         raise ValueError("御三家全自动目标无效")
     # The suitcase cursor starts at Turtwig; the confirmation defaults to No.
-    navigation = "RIGHT 100\nWAIT 120\n" * STARTER_SLOTS[species]
-    return navigation + "A 100\nWAIT 1800\nUP 100\nWAIT 100\nA 100\n"
+    keys = ["RIGHT"] * STARTER_SLOTS[species] + ["A", "UP", "A"]
+    return "".join(f"{key} {SELECTION_PRESS_MS}\n" for key in keys)
 
 
 class DialogObserver:

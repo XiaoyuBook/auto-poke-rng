@@ -64,7 +64,7 @@ def run_flow(species=387, delay=40, *, missing_second=False, stop_at=None):
 def test_starter_runs_two_clock_gates_then_selects_at_software_delay(species, rights):
     result,scripts,observations,flow,seed = run_flow(species)
     assert result.count("RIGHT") == rights
-    assert "UP 100" in result
+    assert any(line.startswith("UP ") for line in result.splitlines())
     assert scripts[0][0] == "御三家·起点对话"
     first = next(row for row in scripts if row[0] == "御三家·第一段归零")
     second = next(row for row in scripts if row[0] == "御三家·第二段归零")
@@ -84,6 +84,15 @@ def test_starter_runs_two_clock_gates_then_selects_at_software_delay(species, ri
     assert flow.tracker.update(observations[-1][2])["advances"] == 401-40
     assert flow.tracker.rng.get_state() == oracle.rng.get_state()
     assert observations[-1][0] == "confirm"
+
+
+@pytest.mark.parametrize("species,rights", [(387,0),(390,1),(393,2)])
+def test_selection_only_uses_short_presses_without_menu_waits(species, rights):
+    commands = [line.split() for line in selection_script(species).splitlines()]
+    assert [command for command, _ in commands] == ["RIGHT"] * rights + ["A", "UP", "A"]
+    durations = [int(duration) for _, duration in commands]
+    assert all(0 < duration <= 30 for duration in durations)
+    assert sum(durations) <= (rights + 3) * 30
 
 
 def test_missed_second_dialog_never_returns_selection():

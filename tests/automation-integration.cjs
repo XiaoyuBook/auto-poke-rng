@@ -80,6 +80,9 @@ test('starter countdown and selection use the resident controller with the corre
     assert.equal(sequences[0][0].key,'A');
     const down=sequences[1].filter(action=>action.kind==='button'&&action.down).map(action=>action.key);
     assert.deepEqual(down,[...Array(rights).fill('RIGHT'),'A','UP','A']);
+    const waits=sequences[1].filter(action=>action.kind==='wait');
+    assert.ok(waits.every(action=>action.duration_ms<=30),'selection must not pause longer than the controller report interval');
+    assert.ok(waits.reduce((total,action)=>total+action.duration_ms,0)<=(rights+3)*30,'selection must not add menu or navigation delays');
     assert.equal(f.trace.some(item=>typeof item==='string'&&item.includes('A 100')),false);
     await f.invoke('stop');
     await assert.rejects(()=>f.callbacks().request('starter_action',{action:'press'}),/已停止/);
