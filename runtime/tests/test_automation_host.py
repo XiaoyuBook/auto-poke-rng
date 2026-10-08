@@ -116,7 +116,9 @@ class AdapterContracts(unittest.TestCase):
         session.ocr = ocr
         session.search = lambda *_args, **_: [SimpleNamespace(advances=151, stats=[1,2,3,4,5,6])]
         result = session.reverse(None, SimpleNamespace(raw_target_advances=150, used_delay=1442))
-        self.assertEqual(events[:4], ['reverse.rng', 'notes', '反查翻页', 'stats'])
+        self.assertEqual([event for event in events if isinstance(event, str)][:4], ['reverse.rng', 'notes', '反查翻页', 'stats'])
+        self.assertEqual([event['stage'] for event in events if isinstance(event, dict) and event.get('event') == 'activity'],
+                         ['script', 'notes_ocr', 'matching', 'complete'])
         self.assertEqual(expansions, [0,1,2])
         self.assertEqual(result, [1443])
 

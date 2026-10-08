@@ -3,6 +3,7 @@ const fs = require('node:fs/promises');
 const { randomUUID } = require('node:crypto');
 const { AutomationStore, defaultFilter, defaults } = require('./automation-store.cjs');
 const { projectStaticConfig } = require('./automation-config.cjs');
+const { STARTER_TIMING, STARTER_MAX_DELAY, resolveBuiltinScript, usesStarterAutomation, starterActions } = require('./starter-automation.cjs');
 const { startWorker } = require('./automation-worker.cjs');
 const { createFlow, advanceFlow, isStaleFlowProgress } = require('./automation-flow.cjs');
 const { captureTaskImage } = require('./notification-image.cjs');
@@ -20,6 +21,8 @@ function validateParameters(kind, parameters) {
     if(!Array.isArray(parameters.target_display_tids)||!parameters.target_display_tids.length||parameters.target_display_tids.some(value=>!Number.isInteger(value)||value<0||value>999999))throw Error('请添加0–999999之间的目标 Display TID');
   }else{
     if(!data.targets.some(target=>target.speciesKey===parameters.target))throw Error('目标宝可梦无效');
+    if(parameters.starter_automation !== undefined && typeof parameters.starter_automation !== 'boolean')throw Error('御三家全自动开关无效');
+    if(parameters.starter_automation && !usesStarterAutomation({parameters}))throw Error('御三家全自动仅支持草苗龟、小火猴和波加曼');
     if(!['next_round','recapture_seed'].includes(parameters.reidentify_failure_policy))throw Error('校正失败策略无效');
     if(!Number.isFinite(parameters.shiny_threshold_seconds)||parameters.shiny_threshold_seconds<=0||parameters.shiny_threshold_seconds>300)throw Error('请设置大于0且不超过300秒的判闪阈值');
     if(typeof parameters.record_shiny!=='boolean')throw Error('录像开关无效');
@@ -122,9 +125,25 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
       (run.cancelledScripts||=new Set()).add(scriptId);return;
     }
     script.stopped=true;
-    await devices.runner.stop();
+    if(script.direct)await devices.controller.call('controller.stop');
+    else await devices.runner.stop();
     await script.done; // script.done is emitted only after controller release.
     checkStopped(run);
+  };
+  const runStarterAction=async(run,action,scriptId)=>{
+    checkStopped(run);
+    if(!usesStarterAutomation(run.input.config)||!['press','select'].includes(action))throw Error('御三家控制动作无效');
+    if(run.currentScript)throw Error('已有自动控制动作正在运行');
+    const script={scriptId:scriptId||randomUUID(),direct:true,stopped:run.cancelledScripts?.delete(scriptId)||false,done:null};
+    run.currentScript=script;
+    script.done=(async()=>{
+      await run.keepalive;checkStopped(run);
+      if(script.stopped)return;
+      try{await devices.controller.sequence({actions:starterActions(run.target.speciesId,action==='select')});}
+      catch(error){if(!script.stopped)throw error;}
+      checkStopped(run);
+    })().finally(()=>{run.lastScriptId=script.scriptId;if(run.currentScript===script)run.currentScript=null;});
+    return script.done;
   };
   const image=captureImage||(async()=>{
     const source=devices.getState().video;
@@ -141,7 +160,7 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
   const effectiveInput=input=>{
     if(input?.kind!=='static')return input;
     const config=projectStaticConfig(input.config);
-    return {...input,config,exitBlink:config.features.exit.enabled?input.exitBlink:undefined};
+    return {...input,config,blink:usesStarterAutomation(config)?{...input.blink,...STARTER_TIMING}:input.blink,exitBlink:config.features.exit.enabled?input.exitBlink:undefined};
   };
   const checks=async input=>{
     input=effectiveInput(input);
@@ -149,6 +168,7 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
     const add=async(label,action)=>{try{await action();checks.push({label,ok:true,detail:'已就绪'});}catch(error){checks.push({label,ok:false,detail:error.message});}};
     const {kind,config,profile}=input||{};
     await add('任务参数',()=>{if(!['static','tid'].includes(kind)||!config?.parameters||!config?.scripts)throw Error('自动流程配置无效');validateParameters(kind,config.parameters);target=data.targets.find(item=>item.speciesKey===config.parameters.target);
+      if(kind==='static'&&usesStarterAutomation(config)&&config.delayConfig?.strategy==='fixed'&&config.parameters.fixed_delay>=STARTER_MAX_DELAY)throw Error(`御三家固定 200 帧窗口要求本轮 delay 小于 ${STARTER_MAX_DELAY} 帧，请设置该御三家的 delay`);
       if(kind==='static'&&(!profile||!['BD','SP'].includes(profile.version)||!['tid','sid'].every(key=>Number.isInteger(profile[key])&&profile[key]>=0&&profile[key]<=65535)))throw Error('存档参数无效');
       if(target&&target.version!=='BDSP'&&target.version!==profile.version)throw Error('该目标不属于当前存档版本');});
     await add('视频源',()=>{if(devices.getState().video.status!=='connected')throw Error('请先连接视频源');});
@@ -158,7 +178,8 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
       if(['starting','preview','capturing','solving','tracking','countdown','timeline','stopping'].includes(blink.getState().status))throw Error('请先停止手动眨眼捕获/推进');});
     await add('脚本配置与语法',async()=>{
       if(!config?.scripts||!config.parameters)throw Error('脚本选择无效');
-      const required=kind==='tid'?['name']:['advance','hit'];
+      const starter=kind==='static'&&usesStarterAutomation(config);
+      const required=kind==='tid'?['name']:starter?['seed','reverse']:['advance','hit'];
       if(config.parameters.start==='script'||config.parameters.loop_mode!=='single')required.push('seed');
       if(config.parameters.auto_reverse)required.push('reverse');if(config.parameters.escape_continue)required.push('escape');
       if(kind==='static'&&config.features?.exit?.enabled)required.push('exit');
@@ -166,13 +187,13 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
       for(const key of required)if(!config.scripts[key])throw Error(`请选择${scriptNames[key]||key}脚本`);
       for(const [key,relative] of Object.entries(config.scripts)){
         if(!relative)continue;
-        const {absolute}=await devices.runner.resolveScript(relative);
+        const {absolute}=resolveBuiltinScript(relative)||await devices.runner.resolveScript(relative);
         const text=await fs.readFile(absolute,'utf8');
         const validation=await devices.runner.validate({text,path:relative});
         if(!validation.valid)throw Error(`${relative}：${validation.diagnostic?.message||'语法检查取消'}`);
         scripts[key]={path:relative,text};
       }
-      if(kind==='static'&&!/^\s*_目标帧数\s*=/m.test(scripts.advance?.text||''))throw Error('过帧脚本缺少 _目标帧数 参数');
+      if(kind==='static'&&!starter&&!/^\s*_目标帧数\s*=/m.test(scripts.advance?.text||''))throw Error('过帧脚本缺少 _目标帧数 参数');
       if(config.parameters.escape_continue&&!config.parameters.shiny_threshold_seconds)throw Error('逃跑续搜需要启用判闪');
     });
     return {checks,ready:checks.every(item=>item.ok),scripts,target};
@@ -217,6 +238,7 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
       const request=async(method,params)=>{
         checkStopped(run);
         if(method==='script')return runScript(run,params.text,params.name,params.scriptId);
+        if(method==='starter_action')return runStarterAction(run,params.action,params.scriptId);
         if(method==='stop_script')return stopScript(run,params.scriptId);
         if(method==='ocr')return ocrRequest(params,run.ocr);
         if(method==='delay_profile'){
@@ -289,7 +311,10 @@ function registerAutomation({ipcMain,getMainWindow,getWindows,devices,rng,blink,
       const health=setInterval(()=>{const current=devices.getState();if(current.video.status!=='connected'||current.video.session!==videoSession||current.controller.status!=='connected')void stop('设备已断开或视频源已切换',true);},200);
       run.done=(async()=>{
         const outcome=await run.worker.done;clearInterval(health);
-        await Promise.allSettled([devices.runner.stop(),rng.cancel()]);
+        const direct=run.currentScript?.direct?run.currentScript:null;
+        if(direct)direct.stopped=true;
+        await Promise.allSettled([devices.runner.stop(),rng.cancel(),direct?devices.controller.call('controller.stop'):null]);
+        if(direct)await direct.done.catch(()=>{});
         const status=run.failure?'failed':run.stopped?'stopped':outcome.status;
         const message=run.stopReason||outcome.message||'自动流程已结束';
         run.finalStatus=status;run.finalMessage=message;

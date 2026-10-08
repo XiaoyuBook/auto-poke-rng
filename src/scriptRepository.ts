@@ -12,7 +12,14 @@ export function repositoryGame(value: string) {
 }
 export const gameName = (value: string) => repositoryGames.find(game => game.id === repositoryGame(value))?.name || value;
 export const repositoryText = (value: string) => value.replace(/\bBDSP\b/gi, '珍钻复刻').replace(/\bFRLG\b/gi, '火红／叶绿').replace(/\bSWSH\b/gi, '剑／盾');
-export const repositoryCategories = ['过帧脚本', '过场脚本', '反查脚本', '撞帧脚本', '逃跑脚本', '测种脚本'] as const;
+const gameCategories: Record<string, readonly string[]> = {
+  bdsp: ['过帧脚本', '过场脚本', '反查脚本', '撞帧脚本', '逃跑脚本', '测种脚本'],
+  frlg: ['自动流程'],
+};
+export function repositoryCategories(game: string): readonly string[] {
+  const key = repositoryGame(game);
+  return Object.hasOwn(gameCategories, key) ? gameCategories[key] : [];
+}
 export const retiredRepositoryPackages = new Set(['bdsp-ocr-page', 'bdsp-record']);
 const legacyCategories: Record<string, string> = {
   'bdsp-advance': '过帧脚本', 'bdsp-advance-optimized': '过帧脚本', 'bdsp-pokedex-advance': '过帧脚本',
@@ -26,8 +33,11 @@ const legacyCategories: Record<string, string> = {
   'bdsp-underground-seed': '测种脚本',
 };
 export function repositoryCategory(item: RepositoryPackage) {
-  const category = item.files?.find(file => /\.(txt|rng)$/i.test(file.path))?.category;
-  return category && (repositoryCategories as readonly string[]).includes(category) ? category : legacyCategories[item.id] || '其他脚本';
+  const category = item.files?.find(file => /\.(txt|rng|ecs)$/i.test(file.path) && file.category && file.category !== '其他脚本')?.category;
+  if (category) return category;
+  const game = repositoryGame(item.game);
+  if (game === 'frlg' && item.id === 'frlg-automation') return '自动流程';
+  return game === 'bdsp' && Object.hasOwn(legacyCategories, item.id) ? legacyCategories[item.id] : '其他脚本';
 }
 export function repositoryError(cause: unknown) {
   const message = scriptError(cause);

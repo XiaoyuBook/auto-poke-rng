@@ -62,7 +62,8 @@ export function ScriptRepositoryDialog({ close, onInstalled, hasUnsaved, current
   const matches = (value: string) => repositoryText(value).toLocaleLowerCase().includes(search) || value.toLocaleLowerCase().includes(search);
   const shown = gamePackages.filter(item => (!search || matches([item.name, item.description, item.game, gameName(item.game), repositoryCategory(item), ...item.authors, ...(item.files || []).map(file => file.path + ' ' + categoryOf(file))].join(' ')))
     && (filter === 'all' || filter === 'installed' && installed.has(item.id) || filter === 'updates' && installed.has(item.id) && newerVersion(item.version, installed.get(item.id)!.version)));
-  const sectionNames = [...repositoryCategories, ...new Set(shown.map(repositoryCategory).filter(name => !(repositoryCategories as readonly string[]).includes(name)))];
+  const gameSections = repositoryCategories(game);
+  const sectionNames = [...gameSections, ...new Set(shown.map(repositoryCategory).filter(name => !gameSections.includes(name)))];
   const selectedCategory = selection.category;
   const current = selectedCategory ? undefined : shown.find(item => item.id === selection.id) || shown[0];
   const local = current && installed.get(current.id);
@@ -195,7 +196,7 @@ export function ScriptRepositoryDialog({ close, onInstalled, hasUnsaved, current
             </div>}
           </> : <div className="repository-empty repository-detail-empty"><Package size={42} /><h2>选择一个脚本</h2><p>在左侧选择游戏，浏览脚本用途、使用说明和配套文件。</p>{state?.catalogSource === 'bundled' && <small>当前为内置目录，联网后可检查最新版本。</small>}</div>}
         </div>
-        <footer className="repository-footer"><span>{selectedCategory && !settings && !plan ? `${shown.filter(item => repositoryCategory(item) === selectedCategory).length} 个脚本` : current && !settings && !plan ? `${files.filter(file => /\.(txt|rng)$/i.test(file.path)).length} 个脚本文件 · ${files.filter(file => !/\.(txt|rng)$/i.test(file.path)).length} 个配套文件` : '官方脚本仓库'}</span><span>个人修改受保护 · 安装后可离线使用</span></footer>
+        <footer className="repository-footer"><span>{selectedCategory && !settings && !plan ? `${shown.filter(item => repositoryCategory(item) === selectedCategory).length} 个脚本` : current && !settings && !plan ? `${files.filter(file => /\.(txt|rng|ecs)$/i.test(file.path)).length} 个脚本文件 · ${files.filter(file => !/\.(txt|rng|ecs)$/i.test(file.path)).length} 个配套文件` : '官方脚本仓库'}</span><span>个人修改受保护 · 安装后可离线使用</span></footer>
       </section>
     </div>
   </Dialog>;

@@ -15,6 +15,7 @@ export type AutomationParameters = {
   reidentify_failure_policy: 'next_round' | 'recapture_seed'; reidentify_seed_max_attempts: number; reseeding_threshold: number;
   auto_reverse: boolean; escape_continue: boolean; reverse_lookup_window: number; shiny_threshold_seconds: number | null; record_shiny: boolean;
   sync_mode: number; sync_nature: string; blink_name: string; exit_blink_name: string; frame_threshold: number; delay: number; target_display_tids: number[];
+  starter_automation?: boolean;
 };
 export type AutomationConfig = { parameters: AutomationParameters; scripts: Record<string, string> };
 export type StaticFeatureKey = 'reverse' | 'exit' | 'sync' | 'escape';
@@ -31,6 +32,7 @@ export type AutomationProgress = Partial<IdResults> & {
   activity_id?: number; activity_kind?: string; attempt_index?: number; requested_advances?: number | null;
   planned_next_phase?: string | null; result_kind?: string | null; recording_status?: string | null;
   wait_target_wall?: number | null;
+  starter_stage?: string | null;
 };
 export type FlowNode = 'seed' | 'search' | 'advance' | 'calibrate' | 'wait' | 'hit' | 'result';
 export type AutomationFlow = {

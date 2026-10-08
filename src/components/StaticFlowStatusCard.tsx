@@ -48,9 +48,15 @@ export function deriveStaticFlowView(state: State | null, run?: AutomationRun, o
         const interval = run?.rounds.at(-1)?.interval;
         if (typeof interval === 'number') metric = { label: '判闪间隔', value: interval.toFixed(3), unit: '秒' };
       } else {
+        if (progress?.result_kind === 'missed') {
+          title = '错过目标，本轮未选择精灵';
+          description = state.message || progress.log_message;
+          label = '已结束';
+        } else {
         title = progress?.result_kind === 'no_candidates' ? '搜索范围内无候选' : progress?.result_kind === 'unknown' ? '判闪结果未知，本轮已结束' : '本次运行已完成';
         description = progress?.result_kind === 'unknown' ? '已按当前策略结束运行' : '流程已正常结束';
         label = '已完成';
+        }
       }
     } else if (status === 'running' && progress) {
       label = '运行中';
@@ -82,6 +88,12 @@ export function deriveStaticFlowView(state: State | null, run?: AutomationRun, o
           if (progress.remaining_to_trigger != null) metric = { label: '距启动还需', value: progress.remaining_to_trigger.toLocaleString(), unit: 'Adv' }; break;
         case '动态调整闪帧': title = '正在调整脚本等待'; description = '调整完成后执行撞帧脚本'; break;
         case '运行撞闪脚本':
+          if (progress.starter_stage && progress.starter_stage !== 'confirm') {
+            title = '御三家自动接管';
+            description = progress.log_message;
+            if (progress.remaining_to_trigger != null) metric = { label: '距选择还需', value: progress.remaining_to_trigger.toLocaleString(), unit: 'Adv' };
+            break;
+          }
           title = '撞帧中 · 正在检测闪光';
           description = shiny?.stage === 'first_seen' ? '已识别第一条提示，等待第二条' : shiny?.stage === 'unknown' ? '判闪超时，结果尚不确定' : shiny?.scriptStatus === 'done' ? '脚本已结束，等待判闪结果' : '撞帧脚本与判闪检测并行运行';
           if (progress.attempt_index) metric = { label: '本轮尝试', value: `第 ${progress.attempt_index} 次` };

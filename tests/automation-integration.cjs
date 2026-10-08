@@ -39,6 +39,96 @@ test('C02: preparation compiles but does not save, press, warm up, or claim devi
   assert.equal((await f.invoke('check',f.input)).ready,true);assert.deepEqual(f.trace,[]);
   assert.equal(f.automation.getState().config.static.parameters.fixed_delay,100);
 });
+
+function enableStarter(f){
+  f.input.config.parameters.starter_automation=true;
+  f.input.config.parameters.fixed_delay=40;
+  f.input.config.delayConfig.baseline_delay=40;
+  f.input.config.scripts={seed:'missing/seed.ecs',advance:'missing/advance.ecs',hit:'missing/hit.ecs',reverse:'missing/reverse.ecs'};
+}
+
+test('starter readiness binds trusted bundled scripts without reading the user library',async t=>{
+  const f=fixture(t);enableStarter(f);
+  const original=structuredClone(f.input);
+  f.devices.runner.resolveScript=async()=>{throw Error('user script library must not be used');};
+  assert.equal((await f.invoke('check',f.input)).ready,true);
+  assert.deepEqual(f.input,original,'preparation preserves the saved draft');
+  assert.deepEqual(f.trace,[],'preparation never presses a key');
+  await f.invoke('start',f.input);
+  const config=f.workerConfig();
+  assert.equal(config.parameters.auto_reverse,true);
+  assert.equal(config.scripts.advance,undefined);
+  assert.equal(config.scripts.hit,undefined);
+  for(const key of ['seed','reverse']){
+    assert.equal(config.scripts[key].text,fs.readFileSync(path.join(__dirname,'../resources/automation/bdsp-starter',key+'.ecs'),'utf8'));
+    assert.match(config.scripts[key].path,/^__builtin__\//);
+  }
+  assert.equal(config.blink.eye,original.blink.eye);
+  assert.deepEqual(config.blink.roi,original.blink.roi);
+  assert.deepEqual(Object.fromEntries(['threshold','npc','timeDelay','advanceDelay','advanceDelay2','timelineNpc','pokemonNpc','noisy'].map(key=>[key,config.blink[key]])),
+    {threshold:.7,npc:1,timeDelay:0,advanceDelay:41,advanceDelay2:48,timelineNpc:-1,pokemonNpc:2,noisy:false});
+});
+
+test('starter countdown and selection use the resident controller with the correct species slot',async t=>{
+  for(const [target,rights] of [['Turtwig',0],['Chimchar',1],['Piplup',2]]){
+    const f=fixture(t);enableStarter(f);f.input.config.parameters.target=target;
+    const sequences=[];
+    f.devices.controller.sequence=async({actions})=>sequences.push(actions);
+    await f.invoke('start',f.input);
+    await f.callbacks().request('starter_action',{action:'press'});
+    await f.callbacks().request('starter_action',{action:'select',scriptId:'final'});
+    assert.equal(sequences[0][0].key,'A');
+    const down=sequences[1].filter(action=>action.kind==='button'&&action.down).map(action=>action.key);
+    assert.deepEqual(down,[...Array(rights).fill('RIGHT'),'A','UP','A']);
+    assert.equal(f.trace.some(item=>typeof item==='string'&&item.includes('A 100')),false);
+    await f.invoke('stop');
+    await assert.rejects(()=>f.callbacks().request('starter_action',{action:'press'}),/已停止/);
+  }
+});
+
+test('starter selection cancelled before its request never reaches the controller',async t=>{
+  const f=fixture(t);enableStarter(f);await f.invoke('start',f.input);
+  await f.callbacks().request('stop_script',{scriptId:'early-select'});
+  await f.callbacks().request('starter_action',{action:'select',scriptId:'early-select'});
+  assert.equal(f.trace.includes('key'),false);
+});
+
+test('starter fixed-delay readiness detects an impossible 200-frame window',async t=>{
+  const f=fixture(t);enableStarter(f);f.input.config.delayConfig.baseline_delay=100;
+  const check=await f.invoke('check',f.input);
+  assert.equal(check.ready,false);
+  assert.match(check.checks.find(row=>row.label==='任务参数').detail,/200.*78/);
+  assert.deepEqual(f.trace,[]);
+});
+
+test('starter native selection can be stopped without leaving controller input held',{skip:process.platform!=='win32',timeout:15000},async t=>{
+  const hardware=createDeviceFixture(t);await hardware.connectController();
+  const f=fixture(t);enableStarter(f);
+  f.devices.controller=hardware.devices.controller;
+  await f.invoke('start',f.input);
+  const request=f.callbacks().request;
+  const selection=request('starter_action',{action:'select',scriptId:'native-starter'});
+  void selection.catch(()=>{});
+  await until(async()=>((await hardware.clients.controller.call('controller.status')).report.buttons&4)!==0,'starter holds A');
+  await request('stop_script',{scriptId:'native-starter'});await selection;
+  const state=await hardware.clients.controller.call('controller.status');
+  assert.equal(state.report.buttons,0);
+  assert.equal(state.owned,false);
+});
+
+test('worker OCR failure releases native starter input before releasing automation ownership',{skip:process.platform!=='win32',timeout:15000},async t=>{
+  const hardware=createDeviceFixture(t);await hardware.connectController();
+  const f=fixture(t);enableStarter(f);f.devices.controller=hardware.devices.controller;
+  await f.invoke('start',f.input);
+  const selection=f.callbacks().request('starter_action',{action:'select',scriptId:'ocr-failure'});
+  void selection.catch(()=>{});
+  await until(async()=>((await hardware.clients.controller.call('controller.status')).report.buttons&4)!==0,'starter holds A before OCR error');
+  f.done({status:'failed',message:'OCR failure'});
+  await until(()=>f.automation.getState().state.status==='failed','worker failure propagated');
+  await selection;
+  assert.equal((await hardware.clients.controller.call('controller.status')).report.buttons,0);
+  assert.equal(f.trace.includes('release'),true);
+});
 test('automatic search ignores legacy initial advance and Offset values',async t=>{
   const f=fixture(t);
   f.input.config.parameters.initial_advances=450;

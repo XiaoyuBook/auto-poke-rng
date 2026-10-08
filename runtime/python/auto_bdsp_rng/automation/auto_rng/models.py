@@ -95,6 +95,7 @@ class AutoRngConfig:
     shiny_threshold_seconds: float | None = None
     record_shiny: bool = True
     debug_output: bool = False
+    starter_automation: bool = False
 
 
 @dataclass(frozen=True)
@@ -160,3 +161,4 @@ class AutoRngProgress:
     final_flash_frames: int | None = None
     last_script_path: Path | None = None
     log_message: str = ""
+    starter_stage: str | None = None

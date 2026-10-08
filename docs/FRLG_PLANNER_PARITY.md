@@ -1,6 +1,6 @@
 # 火叶搜索与推荐结果对齐
 
-锚点：`frlg-auto-rng` 提交 `5a5383ff226059cbf85f0b531c9de283f7b76c45`。本应用的 planner、Seed 表、遭遇表、个人数据均内置在 `runtime/python/frlg_planner`；不需要旁边存在原版项目。
+计算快照锚点：`frlg-auto-rng` 提交 `5a5383ff226059cbf85f0b531c9de283f7b76c45`；参考仓库最新源码已核对至 `592f9926a91d731889d8155e8a2adb0810891066`。本应用的 planner、Seed 表、遭遇表、个人数据均内置在 `runtime/python/frlg_planner`；不需要旁边存在原版项目。
 
 ## 修复的偏差
 

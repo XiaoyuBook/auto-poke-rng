@@ -14,6 +14,7 @@ class TimelineClock:
         self.started = False
         self.queue = []
         self.delay2_count = 10
+        self.delay2_at = None
         self.rng.next()
         if config.get('menuClose', True):
             self.rng.next()
@@ -37,6 +38,7 @@ class TimelineClock:
                     self.delay2_count -= 1
                 elif self.delay2_count == 0:
                     self.delay2_count = -1
+                    self.delay2_at = timestamp
                     self.rng.advance(delay)
                     self.advances += delay
             if kind == 0:

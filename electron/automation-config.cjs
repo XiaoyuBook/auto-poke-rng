@@ -46,6 +46,13 @@ function projectStaticConfig(config) {
   delete scripts.record;
   delete p.initial_advances;
   delete p.offset;
+  if (require('./starter-automation.cjs').usesStarterAutomation(projected)) {
+    const { STARTER_SCRIPTS } = require('./starter-automation.cjs');
+    Object.assign(scripts, { seed: STARTER_SCRIPTS.seed, reverse: STARTER_SCRIPTS.reverse, hit: '', advance: '', exit: '', escape: '' });
+    Object.assign(p, { auto_reverse: true, escape_continue: false, sync_mode: 0, sync_nature: '', lead: 255, exit_blink_name: '' });
+    if (p.start === 'reidentify') p.start = 'capture';
+    for (const key of ['exit', 'sync', 'escape']) projected.features[key] = { added: false, enabled: false };
+  }
   return projected;
 }
 

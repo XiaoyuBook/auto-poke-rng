@@ -150,6 +150,54 @@ test('a category contains scripts and the file list shows resources without a du
   expect(f.api.prepare).not.toHaveBeenCalled();
 });
 
+test('FRLG legacy catalogs show the automation category without BDSP sections', async () => {
+  const f = fixture();
+  f.state.packages.push({ ...f.pack, id: 'frlg-automation', game: 'FRLG', name: '野生／静态自动流程',
+    files: [{ path: '正式.ecs', bytes: 4, category: '其他脚本' }] });
+  f.state.categoryReadmes = { '自动流程': '# 自动流程\n\n在火叶首页搜索方案后运行。' };
+  render(<ScriptRepositoryDialog {...f} currentGame="frlg" hasUnsaved={false} />);
+  await screen.findByRole('heading', { name: '野生／静态自动流程' });
+  expect(screen.getByRole('button', { name: '脚本分类：自动流程' }).textContent).toContain('1');
+  expect(screen.getAllByRole('button', { name: /^脚本分类：/ })).toHaveLength(1);
+  fireEvent.change(screen.getByLabelText('搜索仓库脚本'), { target: { value: '自动流程' } });
+  fireEvent.click(screen.getByRole('button', { name: '脚本分类：自动流程' }));
+  expect(screen.getByText('在火叶首页搜索方案后运行。')).toBeTruthy();
+  expect(within(document.querySelector('.repository-category-scripts')).getByRole('button', { name: /野生／静态自动流程/ })).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: '游戏分类：珍钻复刻' }));
+  expect(screen.queryByRole('button', { name: '脚本分类：自动流程' })).toBeNull();
+  for (const name of ['过帧脚本', '过场脚本', '反查脚本', '撞帧脚本', '逃跑脚本', '测种脚本']) {
+    expect(screen.getByRole('button', { name: '脚本分类：' + name })).toBeTruthy();
+  }
+  fireEvent.click(screen.getByRole('button', { name: '游戏分类：火红／叶绿' }));
+  expect(screen.getAllByRole('button', { name: /^脚本分类：/ })).toHaveLength(1);
+  expect(screen.getByRole('heading', { name: '野生／静态自动流程' })).toBeTruthy();
+  expect(f.api.prepare).not.toHaveBeenCalled();
+});
+
+test('ECS entries use declared categories and count as scripts alongside shared libraries', async () => {
+  const f = fixture();
+  f.state.packages = [{ ...f.pack, id: 'frlg-helper', game: 'FRLG', name: '火叶辅助流程', files: [
+    { path: '辅助.ecs', bytes: 4, category: '辅助脚本' },
+    { path: 'lib/共用.ecs', bytes: 4, category: '其他脚本' },
+    { path: 'ImgLabel/眼睛.IL', bytes: 10, category: '图像标签' },
+  ] }];
+  render(<ScriptRepositoryDialog {...f} currentGame="frlg" hasUnsaved={false} />);
+  await screen.findByRole('heading', { name: '火叶辅助流程' });
+  expect(screen.getByRole('button', { name: '脚本分类：辅助脚本' }).textContent).toContain('1');
+  expect(screen.queryByRole('button', { name: '脚本分类：其他脚本' })).toBeNull();
+  expect(screen.getByText('2 个脚本文件 · 1 个配套文件')).toBeTruthy();
+});
+
+test('games without preset categories only show categories declared by their packages', async () => {
+  const f = fixture();
+  f.state.packages = [{ ...f.pack, id: 'swsh-helper', game: 'SWSH', name: '剑盾辅助流程',
+    files: [{ path: '辅助.ecs', bytes: 4, category: '辅助脚本' }] }];
+  render(<ScriptRepositoryDialog {...f} currentGame="swsh" hasUnsaved={false} />);
+  await screen.findByRole('heading', { name: '剑盾辅助流程' });
+  expect(screen.getAllByRole('button', { name: /^脚本分类：/ })).toHaveLength(1);
+  expect(screen.getByRole('button', { name: '脚本分类：辅助脚本' })).toBeTruthy();
+});
+
 test('retired packages stay hidden in old remote catalogs and naming is under hit frame', async () => {
   const f = fixture();
   f.state.packages = [

@@ -236,7 +236,8 @@ class Session:
                 timeline_npc=config.get('timelineNpc',0),pokemon_npc=max(1,config.get('pokemonNpc',0)) if timeline else 0,
                 white_delay=config.get('timeDelay',0),advance_delay=config.get('advanceDelay',0),advance_delay_2=config.get('advanceDelay2',0))
         else:
-            seed = AutoRngSeedResult(state,0,config['npc'],' '.join(state.to_seed_pair64().format_seeds()),now)
+            baseline = int(config.get('menuClose', True)) if self.config['parameters'].get('starter_automation') else 0
+            seed = AutoRngSeedResult(state,baseline,config['npc'],' '.join(state.to_seed_pair64().format_seeds()),now)
         self.emit(event='seed',seed=serialize(seed))
         self.emit(event='capture',captureId=capture_id,stage='complete',captured=count,target=count)
         return seed
@@ -251,23 +252,62 @@ class Session:
             detect_overlay=lambda image: contains_zoom_overlay_text(self.ocr(image)['text']),
             should_stop=self.cancel.is_set,sleep=self.sleep)
 
-    def shiny(self,text,name,threshold):
+    def starter(self, seed, target, delay):
+        from auto_bdsp_rng.automation.auto_rng.starter_flow import DialogObserver, StarterFlow, crop_starter_dialog
+        self.check()
+        self.recover_zoom()
+        self.check()
+        def read_dialog():
+            image = self.frame()
+            dialog = crop_starter_dialog(image)
+            return '' if dialog is None else self.ocr(dialog)['text']
+        observer = DialogObserver(read_dialog, self.cancel.is_set)
+        def report(stage, message, current):
+            if self.runner.should_stop():
+                return
+            updates = dict(starter_stage=stage, current_advances=current,
+                           remaining_to_trigger=target.raw_target_advances-delay-current,
+                           activity_kind='starter', log_message=message)
+            if self.runner.progress.starter_stage != stage:
+                self.runner._set_progress(AutoRngPhase.RUN_HIT_SCRIPT, message,
+                                          **{key:value for key,value in updates.items() if key!='log_message'})
+            else:
+                self.runner.progress = replace(self.runner.progress, **updates)
+                if self.runner.progress_callback:
+                    self.runner.progress_callback(self.runner.progress)
+        observer.start()
+        try:
+            flow = StarterFlow(seed,target,delay,self.config['species'],self.config['blink'],
+                               latest_text=observer.latest,run_script=lambda *_:self.request('starter_action',action='press'),progress=report,
+                               sleep=self.sleep,should_stop=self.cancel.is_set,on_balls=observer.close)
+            text = flow.run()
+            observer.close()
+            self.check()
+            return self.shiny(text,'御三家全自动·选择',self.runner.config.shiny_threshold_seconds,
+                              run_action=lambda script_id:self.request('starter_action',action='select',scriptId=script_id))
+        finally:
+            observer.close()
+
+    def shiny(self,text,name,threshold,run_action=None):
         script_id = uuid4().hex
         self.battle_script_id = script_id
         self.battle.clear()
         try:
-            return self.monitor_shiny(text,name,threshold,script_id)
+            return self.monitor_shiny(text,name,threshold,script_id,run_action=run_action)
         finally:
             self.battle_script_id = None
 
-    def monitor_shiny(self,text,name,threshold,script_id):
+    def monitor_shiny(self,text,name,threshold,script_id,run_action=None):
         from auto_bdsp_rng.automation.auto_rng.dialog_timing import measure_keyword_interval, DialogKeywordTimeoutError
         starter = self.config['species'] in (387,390,393)
         roamer = self.config['species'] in (481,488)
         errors, done = [],threading.Event()
         def script():
             try:
-                self.run_script(text,name,script_id=script_id)
+                if run_action is None:
+                    self.run_script(text,name,script_id=script_id)
+                else:
+                    run_action(script_id)
             except BaseException as error:
                 errors.append(error)
             finally:
@@ -420,16 +460,20 @@ class Session:
                 **{key+'_script_path':value for key,value in scripts.items()},
                 'start_phase':{'script':AutoRngPhase.RUN_SEED_SCRIPT,'capture':AutoRngPhase.CAPTURE_SEED,'reidentify':AutoRngPhase.REIDENTIFY}[parameters['start']],
                 'has_body_filters':any(f['heightMin']>0 or f['heightMax']<255 or f['weightMin']>0 or f['weightMax']<255 for f in parameters['filters'])})
-            validate_auto_scripts(config.seed_script_path,config.advance_script_path,config.hit_script_path,
-                escape_continue=config.escape_continue,escape_script_path=config.escape_script_path,
-                shiny_threshold_seconds=config.shiny_threshold_seconds,target_species=c['species'])
+            if config.starter_automation:
+                if c['species'] not in (387,390,393) or config.seed_script_path is None or config.reverse_script_path is None:
+                    raise RuntimeError('御三家全自动内置配置无效')
+            else:
+                validate_auto_scripts(config.seed_script_path,config.advance_script_path,config.hit_script_path,
+                    escape_continue=config.escape_continue,escape_script_path=config.escape_script_path,
+                    shiny_threshold_seconds=config.shiny_threshold_seconds,target_species=c['species'])
             current=SeedState32.from_hex_words(c['blink']['seed']) if parameters['start']=='reidentify' else None
             services=AutoRngServices(capture_seed=self.capture,reidentify=self.capture,reidentify_exit=lambda seed:self.capture(seed,exit_scene=True),
                 current_seed=lambda:AutoRngSeedResult(current,0,c['blink']['npc'],' '.join(current.to_seed_pair64().format_seeds()),time.monotonic()),
                 search_candidates=self.search,search_sync=self.search,run_script_text=self.run_script,
                 run_hit_script_with_shiny_check=self.shiny,run_reverse_lookup=self.reverse,
                 resolve_round_delay=self.resolve_delay,record_delay_observation=lambda values:self.request('delay_record',candidates=values),
-                recover_zoom_mode=self.recover_zoom,sleep=self.sleep)
+                recover_zoom_mode=self.recover_zoom,run_starter_flow=self.starter,sleep=self.sleep)
             self.runner=AutoRngRunner(config,services=services,progress_callback=self.progress,log_callback=self.log,
                 history_callback=lambda name,args:self.emit(event='history',name=name,args=serialize(args)))
         self.emit(event='ready')

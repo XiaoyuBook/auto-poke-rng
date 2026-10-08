@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, safeStorage, nativeImage } = require('elect
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 const { createHash } = require('node:crypto');
 const { zipSync } = require('fflate');
 const { registerDevices } = require('../electron/devices.cjs');
@@ -15,12 +16,13 @@ const { registerRng } = require('../electron/rng-client.cjs');
 const { registerQQNotifications } = require('../electron/qq-notifications.cjs');
 
 const root = path.resolve(__dirname, '..');
-const output = path.join(root, 'node_modules/.tmp/script-repository-review');
+const output = process.env.SCRIPT_REPOSITORY_REVIEW_OUTPUT || path.join(root, 'node_modules/.tmp/script-repository-review');
 fs.mkdirSync(output, { recursive: true });
 const fixture = fs.mkdtempSync(path.join(output, 'run-'));
 let scripts = path.join(fixture, 'profile', 'scripts');
 app.setPath('userData', path.join(fixture, 'profile'));
 app.disableHardwareAcceleration();
+app.commandLine.appendSwitch('force-device-scale-factor', '1');
 app.on('window-all-closed', () => {});
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 function pack(version, body, extra = {}) {
@@ -38,7 +40,9 @@ app.whenReady().then(async () => {
   const storage = await createScriptStorage({ userData: app.getPath('userData'), gate, isBusy: () => !!devices?.runner.current || !!automation?.isBusy() });
   assert.equal(storage.getRoot(), scripts);
   assert.deepEqual(fs.readdirSync(scripts), [], 'fresh profiles have no bundled scripts');
-  const main = new BrowserWindow({ show: false, width: 1440, height: 920, webPreferences: { preload: path.join(root, 'electron/preload.cjs'), contextIsolation: true, sandbox: true, backgroundThrottling: false } });
+  const main = new BrowserWindow({ show: false, width: 1440, height: 920, webPreferences: { preload: path.join(root, 'electron/preload.cjs'), contextIsolation: true, sandbox: true, backgroundThrottling: false, offscreen: true } });
+  const consoleErrors = [];
+  main.webContents.on('console-message', details => { if (details.level === 'error') consoleErrors.push(details.message); });
   const js = code => main.webContents.executeJavaScript(code, true).catch(error => { throw Error(code + '\n' + error.message); });
   const until = async (code, message) => { for (let i = 0; i < 180; i++) { if (await js(code)) return; await delay(25); } throw Error(message); };
   const click = async label => {
@@ -46,11 +50,18 @@ app.whenReady().then(async () => {
     await until(`Boolean(${query})`, 'button ready: ' + label);
     await js(`${query}.click()`);
   };
-  const screenshot = async name => { await delay(100); fs.writeFileSync(path.join(output, name), (await main.webContents.capturePage()).toPNG()); };
+  const screenshot = async name => {
+    await js(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
+    main.webContents.invalidate();
+    await delay(250);
+    fs.writeFileSync(path.join(output, name), (await main.webContents.capturePage()).toPNG());
+  };
   let remote = pack('1.0.0', 'A 1\n'), dialogs = 0, offline = false;
   const zipPath = path.join(fixture, 'import.zip');
   const loadWindow = (window, query = {}) => window.loadFile(path.join(root, 'dist/index.html'), { query });
   ipcMain.handle('app:metadata', () => ({ name: 'Auto Poke RNG', version: '0.1.0', platform: 'win32' }));
+  // This repository test browses FRLG packages without starting a game flow.
+  ipcMain.handle('frlg-automation:state', () => ({ status: 'idle', runId: null, profileId: null, message: '等待开始', logs: [] }));
   const panels = registerPanelWindows({ getMainWindow: () => main, loadWindow });
   registerScriptFiles({ getMainWindow: () => main, getLabelWindows: () => [panels.getVideoWindow()], rootDirectory: storage.getRoot, serialize: gate.run, isMigrating: () => storage.migrating });
   devices = registerDevices({ ipcMain, getWindows: () => BrowserWindow.getAllWindows(), rootDirectory: storage.getRoot, testMode: true, isScriptLibraryBusy: () => gate.busy });
@@ -66,7 +77,7 @@ app.whenReady().then(async () => {
     dialog: { showOpenDialog: async (_window, options) => { dialogs++; return { canceled: false, filePaths: [options.properties.includes('openDirectory') ? moveTo : zipPath] }; } },
   });
   await loadWindow(main);
-  main.showInactive();
+  if (process.env.SCRIPT_REPOSITORY_SHOW_WINDOW === '1') main.showInactive();
   await until(`Boolean(document.querySelector('[aria-label^="切换游戏"]'))`, 'game picker ready');
   await js(`document.querySelector('[aria-label^="切换游戏"]').click()`);
   await until(`Boolean(document.querySelector('[role="menuitemradio"]'))`, 'game menu open');
@@ -182,6 +193,26 @@ app.whenReady().then(async () => {
   await until(`document.querySelector('.repository-category-detail h2')?.textContent === '撞帧脚本'`, 'category README shown');
   assert.equal(await js(`document.querySelectorAll('.repository-category-scripts button').length`), 9);
   await screenshot('repository-category.png');
+  assert.equal(main.webContents.getURL(), pathToFileURL(path.join(root, 'dist/index.html')).href);
+  assert.equal(await js(`Boolean(document.title && document.querySelector('.repository-tree')) && !document.querySelector('vite-error-overlay')`), true);
+  await js(`document.querySelector('[aria-label="游戏分类：火红／叶绿"]').click()`);
+  await until(`document.querySelector('.repository-detail h2')?.textContent === '野生／静态自动流程'`, 'FRLG automation package selected');
+  assert.deepEqual(await js(`Array.from(document.querySelectorAll('.repository-section-select')).map(b => b.getAttribute('aria-label'))`), ['脚本分类：自动流程']);
+  assert.equal(await js(`document.querySelector('.repository-footer').textContent.includes('32 个脚本文件')`), true);
+  await screenshot('repository-frlg.png');
+  await js(`document.querySelector('[aria-label="脚本分类：自动流程"]').click()`);
+  await until(`document.querySelector('.repository-category-detail h2')?.textContent === '自动流程' && document.querySelector('.repository-guide').textContent.includes('火红／叶绿按完整运行工程组织脚本')`, 'FRLG category guide loaded');
+  assert.equal(await js(`document.querySelectorAll('.repository-category-scripts button').length`), 1);
+  await screenshot('repository-frlg-category.png');
+  main.setSize(1100, 680);
+  await delay(150);
+  assert.equal(await js(`document.querySelector('.repository-body').scrollWidth <= document.querySelector('.repository-body').clientWidth`), true);
+  await screenshot('repository-frlg-compact.png');
+  main.setSize(1440, 920);
+  await js(`document.querySelector('[aria-label="游戏分类：珍钻复刻"]').click()`);
+  await until(`Boolean(document.querySelector('[aria-label="脚本分类：撞帧脚本"]'))`, 'BDSP categories restored');
+  assert.equal(await js(`Boolean(document.querySelector('[aria-label="脚本分类：自动流程"]'))`), false);
+  await js(`document.querySelector('[aria-label="脚本分类：撞帧脚本"]').click()`);
   await js(`Array.from(document.querySelectorAll('.repository-category-scripts button')).find(b => b.textContent.includes('阿尔宙斯')).click()`);
   await until(`document.querySelector('.repository-detail h2')?.textContent === '阿尔宙斯'`, 'Arceus is one script in hit-frame category');
   await js(`Array.from(document.querySelectorAll('[role="tab"]')).find(b => b.textContent.startsWith('脚本与资源')).click()`);
@@ -213,6 +244,7 @@ app.whenReady().then(async () => {
   offline = false;
   await click('重试');
   await until(`!document.querySelector('[role="alert"]')`, 'network retry clears error');
+  assert.deepEqual(consoleErrors, [], 'no renderer console errors');
   console.log('PASS: real preload/IPC, txt and label installation, library refresh, update conflicts, backups, ZIP import, and execution write exclusion');
   console.log('Screenshots:', output);
 }).catch(error => { console.error(error); process.exitCode = 1; }).finally(async () => {

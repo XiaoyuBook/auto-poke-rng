@@ -20,6 +20,23 @@ function fixture(){
   window.desktop={automation:api,scripts:{list:vi.fn(async()=>({files:[],folders:[],warnings:[]}))}};
   return {snapshot,api};
 }
+
+test('starter built-in mode removes script pickers and saves the complete automatic draft',async()=>{
+  const {api,snapshot}=fixture();
+  api.save.mockImplementation(async({values})=>{snapshot.config.static=structuredClone(values);return structuredClone(snapshot);});
+  render(<AutomationWorkspace kind="static" profile={defaultBdspProfile} blinkConfig={newBlinkConfig()} blinkConfigs={[]} openLogs={()=>{}} />);
+  const checkbox=await screen.findByRole('checkbox',{name:'御三家全自动'});
+  fireEvent.click(checkbox);
+  for(const label of ['测种脚本','过帧脚本','撞帧脚本','反查脚本'])expect(screen.queryByLabelText(label)).toBeNull();
+  expect(screen.getByText(/时序采用图示配置/).textContent).toContain('41 / 48');
+  expect(screen.getByText(/目标前固定 200 帧/).textContent).toContain('本轮 delay');
+  expect(screen.queryByText('校正与补救 · 高级设置')).toBeNull();
+  fireEvent.click(screen.getByRole('button',{name:'保存配置'}));
+  await waitFor(()=>expect(api.save).toHaveBeenCalledWith(expect.objectContaining({scope:'config',values:expect.objectContaining({parameters:expect.objectContaining({starter_automation:true,start:'script'})})})));
+  await waitFor(()=>expect(screen.getByRole('checkbox',{name:'御三家全自动'}).disabled).toBe(false));
+  fireEvent.click(screen.getByRole('checkbox',{name:'御三家全自动'}));
+  expect(screen.getByLabelText('测种脚本')).toBeTruthy();
+});
 test('C01: one save persists the complete static draft',async()=>{
   const {api}=fixture();
   render(<AutomationWorkspace kind="static" profile={defaultBdspProfile} blinkConfig={newBlinkConfig()} blinkConfigs={[]} openLogs={()=>{}} />);

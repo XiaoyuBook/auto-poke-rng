@@ -10,6 +10,14 @@ function state(phase, node, options = {}) {
       transitionSeq: 4, transition: transition || null, trace: [] }, ...stateOverrides };
 }
 describe('automatic static flow status', () => {
+  test('starter reports actual dialogue waiting and a missed selection distinctly', () => {
+    const active=deriveStaticFlowView(state('运行撞闪脚本','hit',{progress:{starter_stage:'second_countdown',log_message:'Timeline 第二段倒计时',remaining_to_trigger:80}}));
+    expect(active.title).toBe('御三家自动接管');
+    expect(active.description).toBe('Timeline 第二段倒计时');
+    const missed=deriveStaticFlowView({...state('已完成','result',{progress:{result_kind:'missed'}}),status:'completed',message:'已错过选择帧'});
+    expect(missed.title).toContain('未选择精灵');
+    expect(missed.description).toContain('错过');
+  });
   test('keeps the calibration node during the internal decision, then shows a direct wait route', () => {
     const deciding = deriveStaticFlowView(state('决策过帧', 'calibrate'));
     expect(deciding.node).toBe('calibrate');

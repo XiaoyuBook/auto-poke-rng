@@ -11,6 +11,8 @@ class ScriptRunner {
     this.cancelValidation = null;
   }
   async resolveScript(relative) {
+    const builtin = require('./starter-automation.cjs').resolveBuiltinScript(relative);
+    if (builtin) return builtin;
     if (typeof relative !== 'string' || !relative || relative.includes('\\') || relative.includes(':') || relative.split('/').some(part => !part || part === '..' || part === '.') || !/\.(txt|rng|ecs)$/i.test(relative)) throw new Error('脚本路径无效。');
     const root = path.resolve(typeof this.rootDirectory === 'function' ? this.rootDirectory() : this.rootDirectory);
     const aliases = await require('./script-paths.cjs').scriptAliases(root);
