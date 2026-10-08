@@ -5,8 +5,10 @@ const STARTER_TIMING = Object.freeze({ threshold: 0.7, timeDelay: 0, advanceDela
   advanceDelay2: 48, npc: 1, timelineNpc: -1, pokemonNpc: 2, noisy: false });
 const STARTER_MAX_DELAY = 200 - 11*(STARTER_TIMING.npc+1) - STARTER_TIMING.advanceDelay - 11 - STARTER_TIMING.advanceDelay2;
 const STARTER_SCRIPTS = Object.freeze({ seed: '__builtin__/bdsp-starter/seed.ecs', reverse: '__builtin__/bdsp-starter/reverse.ecs' });
-// Match the firmware's minimum report interval; selection adds no menu pauses.
-const STARTER_SELECTION_PRESS_MS = 30;
+// Match the user's verified ECS sequence, including its default 50ms clicks.
+const STARTER_SELECTION_PRESS_MS = 50;
+const STARTER_SELECTION_MENU_WAIT_MS = 800;
+const STARTER_SELECTION_CONFIRM_WAIT_MS = 100;
 // Cursor movement finishes before the timed selection, with a neutral gap.
 const STARTER_CURSOR_PRESS_MS = 100;
 const STARTER_CURSOR_RELEASE_MS = 120;
@@ -34,7 +36,13 @@ function starterActions(species, action = 'press', pressDuration = 100) {
     ]).flat();
   }
   if (action !== 'select') throw Error('御三家控制动作无效');
-  return ['A', 'UP', 'A'].flatMap(key => tap(key, STARTER_SELECTION_PRESS_MS));
+  return [
+    ...tap('A', STARTER_SELECTION_PRESS_MS),
+    { kind: 'wait', duration_ms: STARTER_SELECTION_MENU_WAIT_MS },
+    ...tap('UP', STARTER_SELECTION_PRESS_MS),
+    { kind: 'wait', duration_ms: STARTER_SELECTION_CONFIRM_WAIT_MS },
+    ...tap('A', STARTER_SELECTION_PRESS_MS),
+  ];
 }
 
 module.exports = { STARTER_TARGETS, STARTER_TIMING, STARTER_MAX_DELAY, STARTER_SCRIPTS, resolveBuiltinScript, usesStarterAutomation, starterActions };

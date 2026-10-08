@@ -18,7 +18,7 @@ class AdapterContracts(unittest.TestCase):
         session.recover_zoom = lambda: None
         session.request = lambda method,**params: requests.append((method,params))
         def shiny(text, name, threshold, run_action):
-            self.assertEqual(text,'A 30\nUP 30\nA 30\n')
+            self.assertEqual(text,'A 50\nWAIT 800\nUP 50\nWAIT 100\nA 50\n')
             self.assertEqual(threshold,3)
             self.assertEqual(requests[-1],('starter_action',{'action':'position'}))
             run_action('timed-final')
@@ -34,7 +34,7 @@ class AdapterContracts(unittest.TestCase):
             kwargs['observe_dialog'](True)
             def run():
                 kwargs['position_cursor']()
-                return 'A 30\nUP 30\nA 30\n'
+                return 'A 50\nWAIT 800\nUP 50\nWAIT 100\nA 50\n'
             return SimpleNamespace(run=run)
         target = SimpleNamespace(raw_target_advances=401)
         with patch.object(starter_flow,'DialogObserver',return_value=observer), \

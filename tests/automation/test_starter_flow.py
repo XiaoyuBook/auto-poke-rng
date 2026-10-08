@@ -124,7 +124,7 @@ def run_flow(species=387, delay=40, *, missing_second=False, missing_balls=False
 def test_starter_runs_two_clock_gates_positions_early_then_selects_at_software_delay(species):
     moves = []
     result,scripts,observations,flow,seed = run_flow(species, cursor_log=moves)
-    assert result == 'A 30\nUP 30\nA 30\n'
+    assert result == 'A 50\nWAIT 800\nUP 50\nWAIT 100\nA 50\n'
     assert len(moves) == 1
     assert moves[0]['species'] == species
     assert moves[0]['dialogue'] == 12  # Only after confirming the ball anchor.
@@ -160,12 +160,11 @@ def test_starter_runs_two_clock_gates_positions_early_then_selects_at_software_d
 
 
 @pytest.mark.parametrize("species", [387,390,393])
-def test_selection_only_uses_short_confirmation_presses_without_navigation(species):
+def test_selection_matches_verified_ecs_clicks_and_release_gaps_without_navigation(species):
     commands = [line.split() for line in selection_script(species).splitlines()]
-    assert [command for command, _ in commands] == ["A", "UP", "A"]
-    durations = [int(duration) for _, duration in commands]
-    assert all(0 < duration <= 30 for duration in durations)
-    assert sum(durations) == 90
+    assert [(command, int(duration)) for command, duration in commands] == [
+        ('A', 50), ('WAIT', 800), ('UP', 50), ('WAIT', 100), ('A', 50),
+    ]
 
 
 @pytest.mark.parametrize('finish_at_trigger', [False,True])

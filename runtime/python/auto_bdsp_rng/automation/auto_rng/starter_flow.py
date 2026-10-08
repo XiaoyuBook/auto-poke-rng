@@ -15,7 +15,9 @@ STARTER_TIMING = {"threshold": 0.7, "timeDelay": 0.0, "advanceDelay": 41,
                   "advanceDelay2": 48, "npc": 1, "timelineNpc": -1,
                   "pokemonNpc": 2, "noisy": False}
 STARTER_SLOTS = {387: 0, 390: 1, 393: 2}
-SELECTION_PRESS_MS = 30  # The controller firmware's minimum report interval.
+SELECTION_PRESS_MS = 50  # Match bare A/UP clicks in the user's verified ECS.
+SELECTION_MENU_WAIT_MS = 800
+SELECTION_CONFIRM_WAIT_MS = 100
 # Successful A-down intervals from 11.mp4's frame PTS, rounded up to 10 ms.
 # Eight ordinary presses reach the doctor; the last two sequences each add one
 # ordinary press after a clock-controlled A. These waits include scene changes.
@@ -84,8 +86,9 @@ def selection_script(species: int) -> str:
     if species not in STARTER_SLOTS:
         raise ValueError("御三家全自动目标无效")
     # The cursor is already positioned; the confirmation defaults to No.
-    keys = ["A", "UP", "A"]
-    return "".join(f"{key} {SELECTION_PRESS_MS}\n" for key in keys)
+    return (f"A {SELECTION_PRESS_MS}\nWAIT {SELECTION_MENU_WAIT_MS}\n"
+            f"UP {SELECTION_PRESS_MS}\nWAIT {SELECTION_CONFIRM_WAIT_MS}\n"
+            f"A {SELECTION_PRESS_MS}\n")
 
 
 class DialogObserver:

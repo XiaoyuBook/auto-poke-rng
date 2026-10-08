@@ -128,7 +128,7 @@ test('starter readiness binds trusted bundled scripts without reading the user l
     {threshold:.7,npc:1,timeDelay:0,advanceDelay:41,advanceDelay2:48,timelineNpc:-1,pokemonNpc:2,noisy:false});
 });
 
-test('starter positions the correct species early and uses only A UP A for timed selection',async t=>{
+test('starter positions early and matches verified ECS clicks with 800ms and 100ms release gaps',async t=>{
   for(const [target,rights] of [['Turtwig',0],['Chimchar',1],['Piplup',2]]){
     const f=fixture(t);enableStarter(f);f.input.config.parameters.target=target;
     const sequences=[];
@@ -147,8 +147,22 @@ test('starter positions the correct species early and uses only A UP A for timed
     const down=selection.filter(action=>action.kind==='button'&&action.down).map(action=>action.key);
     assert.deepEqual(down,['A','UP','A']);
     const waits=selection.filter(action=>action.kind==='wait');
-    assert.ok(waits.every(action=>action.duration_ms<=30),'selection must not pause longer than the controller report interval');
-    assert.equal(waits.reduce((total,action)=>total+action.duration_ms,0),90,'selection must not add menu or navigation delays');
+    assert.deepEqual(waits.map(action=>action.duration_ms),[50,800,50,100,50]);
+    let elapsed=0,lastRelease=null,held=null;
+    const gaps=[];
+    for(const action of selection){
+      if(action.kind==='wait')elapsed+=action.duration_ms;
+      else if(action.down){
+        assert.equal(held,null,'release the previous key before the next press');
+        if(lastRelease!==null)gaps.push(elapsed-lastRelease);
+        held=action.key;
+      }else{
+        assert.equal(action.key,held);
+        held=null;lastRelease=elapsed;
+      }
+    }
+    assert.deepEqual(gaps,[800,100],'requested intervals are neutral waits after release');
+    assert.equal(held,null,'final confirmation must release A');
     assert.equal(f.trace.some(item=>typeof item==='string'&&item.includes('A 100')),false);
     await f.invoke('stop');
     await assert.rejects(()=>f.callbacks().request('starter_action',{action:'press'}),/已停止/);
